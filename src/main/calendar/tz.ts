@@ -31,7 +31,7 @@ export function isValidIana(tzid: string): boolean {
   if (hit !== undefined) return hit
   let ok = false
   // Intl akzeptiert auch Offsets ('+01:00') und alte Aliase; wir wollen Region/Stadt-IDs und UTC
-  if (/^[A-Za-z_]+(?:\/[A-Za-z0-9_+]+){0,2}$/.test(tzid)) {
+  if (/^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+){0,2}$/.test(tzid)) {
     try {
       new Intl.DateTimeFormat('en-US', { timeZone: tzid })
       ok = true
