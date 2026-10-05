@@ -202,7 +202,7 @@ export function useCalendarLive(): void {
   const queryClient = useQueryClient()
   useEffect(() => {
     const offChanged = onPush('calendar:changed', () => invalidateCalendarData(queryClient))
-    const offOpen = onPush('calendar:openEvent', ({ objectId, recurrenceId }) => {
+    const open = (objectId: number, recurrenceId: string | null): void => {
       void invoke('calendar:events:get', { objectId, recurrenceId })
         .then(({ event }) =>
           useCalendar.getState().focusEvent(objectId, recurrenceId, event.startUtc)
@@ -210,10 +210,22 @@ export function useCalendarLive(): void {
         .catch(() => {
           // Termin inzwischen gelöscht — kein Sprung
         })
-    })
+    }
+    const offOpen = onPush('calendar:openEvent', ({ objectId, recurrenceId }) =>
+      open(objectId, recurrenceId)
+    )
+    // Einladungskarte im Mail-View („Im Kalender öffnen") feuert ein Window-Event
+    const onWindowOpen = (e: Event): void => {
+      const detail = (e as CustomEvent<{ objectId: number; recurrenceId: string | null }>).detail
+      if (detail && typeof detail.objectId === 'number') {
+        open(detail.objectId, detail.recurrenceId ?? null)
+      }
+    }
+    window.addEventListener('calendar:openEvent', onWindowOpen)
     return () => {
       offChanged()
       offOpen()
+      window.removeEventListener('calendar:openEvent', onWindowOpen)
     }
   }, [queryClient])
 }
