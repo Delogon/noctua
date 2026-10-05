@@ -382,7 +382,7 @@ export function expandResource(root: ICAL.Component, opts: ExpandOptions): Occur
       const limit = untilLimit(ruleValue, start)
       const rule = ICAL.Recur.fromString(ruleValue.toString())
       rule.until = null
-      const dtstart = new ICAL.Time({
+      const dtstart = ICAL.Time.fromData({
         year: start.wall.y,
         month: start.wall.m,
         day: start.wall.d,
