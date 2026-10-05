@@ -10,7 +10,13 @@ describe('createSubjectProtocolParser', () => {
     const p = createSubjectProtocolParser()
     const out: string[] = []
     let subject: string | null = null
-    for (const delta of ['BET', 'REFF: Kaffee nächste ', 'Woche?\n--', '-\nHi Anna,\n', 'passt Dienstag?']) {
+    for (const delta of [
+      'BET',
+      'REFF: Kaffee nächste ',
+      'Woche?\n--',
+      '-\nHi Anna,\n',
+      'passt Dienstag?'
+    ]) {
       const r = p.feed(delta)
       if (r.subject) subject = r.subject
       if (r.text) out.push(r.text)
@@ -81,8 +87,18 @@ describe('m15 db-features', () => {
     const acc2 = seedAccount(db, { email: 'zwei@test.de' })
     const inbox1 = seedFolder(db, acc1, '\\Inbox', 'INBOX')
     const inbox2 = seedFolder(db, acc2, '\\Inbox', 'INBOX')
-    upsertEnvelope(db, acc1, inbox1, makeEnvelope({ uid: 1, messageId: '<x1@t>', subject: 'Konto 1' }))
-    upsertEnvelope(db, acc2, inbox2, makeEnvelope({ uid: 1, messageId: '<x2@t>', subject: 'Konto 2' }))
+    upsertEnvelope(
+      db,
+      acc1,
+      inbox1,
+      makeEnvelope({ uid: 1, messageId: '<x1@t>', subject: 'Konto 1' })
+    )
+    upsertEnvelope(
+      db,
+      acc2,
+      inbox2,
+      makeEnvelope({ uid: 1, messageId: '<x2@t>', subject: 'Konto 2' })
+    )
 
     expect(listThreads(db, 50)).toHaveLength(2)
     const only1 = listThreads(db, 50, acc1)

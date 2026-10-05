@@ -19,9 +19,15 @@ interface AttachmentRow {
  * Bewusst simpel (ganze Mail statt IMAP-Part-Fetch) — ausreichend für typische
  * Größen; BODYSTRUCTURE-Part-Fetching ist der dokumentierte Optimierungspunkt.
  */
-async function loadParsedAttachments(
-  messageId: number
-): Promise<Array<{ index: number; filename: string | null; contentId: string | null; mimeType: string | null; content: Uint8Array }>> {
+async function loadParsedAttachments(messageId: number): Promise<
+  Array<{
+    index: number
+    filename: string | null
+    contentId: string | null
+    mimeType: string | null
+    content: Uint8Array
+  }>
+> {
   const source = await syncEngine.fetchRawSource(messageId)
   if (!source) throw new Error('Nachricht nicht abrufbar (Konto offline?)')
   const email = await PostalMime.parse(source, { maxNestingDepth: 64 })
@@ -42,7 +48,9 @@ export async function saveAttachment(
   attachmentId: number
 ): Promise<string | null> {
   const row = db
-    .prepare('SELECT id, message_id, part_id, filename, mime_type, content_id FROM attachments WHERE id = ?')
+    .prepare(
+      'SELECT id, message_id, part_id, filename, mime_type, content_id FROM attachments WHERE id = ?'
+    )
     .get(attachmentId) as AttachmentRow | undefined
   if (!row) throw new Error('Anhang nicht gefunden')
 
@@ -75,7 +83,8 @@ export async function getInlineImages(
   for (const att of parsed) {
     if (!att.contentId || !att.mimeType?.startsWith('image/')) continue
     if (att.content.byteLength > MAX_INLINE_BYTES) continue
-    result[att.contentId] = `data:${att.mimeType};base64,${Buffer.from(att.content).toString('base64')}`
+    result[att.contentId] =
+      `data:${att.mimeType};base64,${Buffer.from(att.content).toString('base64')}`
   }
   return result
 }

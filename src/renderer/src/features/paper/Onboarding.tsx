@@ -193,9 +193,7 @@ export function Onboarding(): React.JSX.Element {
 
   // Wiederaufnahme nach Unterbrechung: Sind schon Konten verbunden, ist der
   // Willkommens-Schritt erledigt — direkt bei VERBINDEN weitermachen.
-  useEffect(() => {
-    if (step === 1 && connected.length > 0) setStep(2)
-  }, [step, connected.length])
+  if (step === 1 && connected.length > 0) setStep(2)
 
   // Erst-Sync live verfolgen: Solange ein Konto lädt, die Kontenliste alle
   // 2,5 s neu ziehen — Mail-Zähler und Puls-Punkt bleiben so ehrlich.

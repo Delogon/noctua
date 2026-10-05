@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { invoke, onPush } from '@renderer/lib/ipc'
+import type { InvokeOutput } from '@shared/ipc-contract'
 
 export function useFollowupInvalidation(): void {
   const queryClient = useQueryClient()
@@ -13,7 +14,7 @@ export function useFollowupInvalidation(): void {
   )
 }
 
-export function useFollowups() {
+export function useFollowups(): UseQueryResult<InvokeOutput<'followups:list'>['items']> {
   return useQuery({
     queryKey: ['followups'],
     queryFn: () => invoke('followups:list', undefined),

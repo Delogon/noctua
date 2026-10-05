@@ -31,7 +31,11 @@ export function isComposeDraftEmpty(draft: ComposeDraft): boolean {
 export async function saveComposeDraft(draft: ComposeDraft | null): Promise<void> {
   // settings:set erlaubt max. 100k Zeichen — überlange Inhalte kappen statt scheitern
   const value = draft
-    ? JSON.stringify({ ...draft, body: draft.body.slice(0, 40_000), html: draft.html.slice(0, 40_000) })
+    ? JSON.stringify({
+        ...draft,
+        body: draft.body.slice(0, 40_000),
+        html: draft.html.slice(0, 40_000)
+      })
     : ''
   await invoke('settings:set', { key: KEY, value })
 }

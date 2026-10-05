@@ -38,10 +38,8 @@ function RailCard({ children }: { children: React.ReactNode }): React.JSX.Elemen
  * Diktat → listen, Transkription/Entwurf → scan, kein Schlüssel → asleep,
  * sonst awake (blinzelt live).
  */
-export function railOwlPose(
-  compMode: string,
-  hasKey: boolean | undefined
-): OwlPose {
+// eslint-disable-next-line react-refresh/only-export-components -- Reine Hilfsfunktion, von Tests importiert
+export function railOwlPose(compMode: string, hasKey: boolean | undefined): OwlPose {
   if (compMode === 'listening') return 'listen'
   if (compMode === 'transcribing' || compMode === 'drafting') return 'scan'
   if (hasKey === false) return 'asleep'
@@ -149,7 +147,9 @@ export function OwlRail(): React.JSX.Element {
             {railDrafts.slice(0, RAIL_DRAFT_LIMIT).map((d, i) => (
               <div
                 key={d.threadKey}
-                style={i > 0 ? { marginTop: 10, borderTop: '1px solid var(--hairline)' } : undefined}
+                style={
+                  i > 0 ? { marginTop: 10, borderTop: '1px solid var(--hairline)' } : undefined
+                }
               >
                 <div className="flex items-baseline gap-2" style={{ marginTop: i > 0 ? 9 : 8 }}>
                   <span

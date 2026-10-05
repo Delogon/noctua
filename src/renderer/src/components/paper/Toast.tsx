@@ -3,6 +3,7 @@ import { useT } from '@renderer/lib/i18n'
 import { useToast, type Toast } from '@renderer/stores/toast'
 
 /** Augen nur bei Eulen-Ursprung — und nie beim Countdown (Rec-Punkt gewinnt). */
+// eslint-disable-next-line react-refresh/only-export-components -- Reine Hilfsfunktion, von Tests und Toast-Komponente gemeinsam genutzt
 export function showOwlEyes(toast: Pick<Toast, 'owl' | 'countdown'>): boolean {
   return Boolean(toast.owl) && !toast.countdown
 }

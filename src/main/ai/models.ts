@@ -35,8 +35,7 @@ export async function listModels(): Promise<ModelInfo[]> {
     .map((m) => ({
       id: m.id,
       promptPerM: Math.round(parseFloat(m.pricing?.prompt ?? '0') * 1_000_000 * 100) / 100,
-      completionPerM:
-        Math.round(parseFloat(m.pricing?.completion ?? '0') * 1_000_000 * 100) / 100,
+      completionPerM: Math.round(parseFloat(m.pricing?.completion ?? '0') * 1_000_000 * 100) / 100,
       context: m.context_length ?? 0,
       audioIn: (m.architecture?.input_modalities ?? []).includes('audio')
     }))

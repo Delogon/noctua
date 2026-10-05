@@ -18,7 +18,9 @@ vi.mock('electron', () => {
     on(): this {
       return this
     }
-    show(): void {}
+    show(): void {
+      // Test-Double: Benachrichtigungen werden nur mitgeschrieben, nicht angezeigt
+    }
     constructor() {
       notificationInstances.push(this)
     }

@@ -34,7 +34,9 @@ describe('outbox (Undo Send)', () => {
     const acc = setup()
     const { outboxId, sendAt } = outboxWorker.enqueue(acc, payload)
     expect(sendAt).toBeGreaterThan(Date.now())
-    const row = db.prepare('SELECT state FROM outbox WHERE id = ?').get(outboxId) as { state: string }
+    const row = db.prepare('SELECT state FROM outbox WHERE id = ?').get(outboxId) as {
+      state: string
+    }
     expect(row.state).toBe('pending')
   })
 
@@ -47,7 +49,9 @@ describe('outbox (Undo Send)', () => {
     expect(result.draft?.subject).toBe('Test')
     expect(result.draft?.bcc).toEqual(['hidden@test.de'])
     expect(result.draft?.htmlBody).toBe('<div><b>Hallo</b></div>')
-    const row = db.prepare('SELECT state FROM outbox WHERE id = ?').get(outboxId) as { state: string }
+    const row = db.prepare('SELECT state FROM outbox WHERE id = ?').get(outboxId) as {
+      state: string
+    }
     expect(row.state).toBe('canceled')
   })
 

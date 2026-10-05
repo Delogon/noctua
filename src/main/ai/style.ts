@@ -11,7 +11,12 @@ const STYLE_KEY = 'ai.styleProfile'
  * gekürzt, nie abgelehnt — Opus liefert gern 8 Anreden statt 6, und das
  * darf kein Fehler sein.
  */
-const clippedList = (maxItems: number, maxLen: number) =>
+const clippedList = (
+  maxItems: number,
+  maxLen: number
+): z.ZodCatch<
+  z.ZodPipe<z.ZodDefault<z.ZodArray<z.ZodUnknown>>, z.ZodTransform<string[], unknown[]>>
+> =>
   z
     .array(z.unknown())
     .default([])

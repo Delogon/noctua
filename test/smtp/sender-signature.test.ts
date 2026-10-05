@@ -58,7 +58,9 @@ describe('sendMail — Signatur genau einmal (Stups-Pfad)', () => {
 
     expect(transportSendMail).toHaveBeenCalledOnce()
     const sent = transportSendMail.mock.calls[0][0] as { text: string; html?: string }
-    expect(sent.text).toBe('Hallo Heike,\n\nwollte kurz nachhaken.\n\nLena Hartmann\nStudio Fernweh')
+    expect(sent.text).toBe(
+      'Hallo Heike,\n\nwollte kurz nachhaken.\n\nLena Hartmann\nStudio Fernweh'
+    )
     expect(occurrences(sent.text, 'Lena Hartmann')).toBe(1)
     // Auch die HTML-Alternative trägt die Signatur nur einmal
     expect(occurrences(sent.html ?? '', 'Lena Hartmann')).toBe(1)
