@@ -8,7 +8,13 @@ import { usePaper } from './paper'
 
 export type EditorTarget =
   | { kind: 'existing'; objectId: number; recurrenceId: string | null }
-  | { kind: 'new'; form: EventForm; rev: number }
+  | {
+      kind: 'new'
+      form: EventForm
+      rev: number
+      /** Läuft erst nach erfolgreichem Speichern (nicht bei Abbrechen/Schließen) */
+      onSaved?: () => void
+    }
 
 /** Schnell-Anlegen-Popover: Zeitfenster plus Bildschirmposition des Slots. */
 export interface QuickDraft {
@@ -44,15 +50,18 @@ interface CalendarState {
   shift: (dir: number) => void
   select: (key: string | null) => void
   openExisting: (objectId: number, recurrenceId: string | null) => void
-  openNew: (form: EventForm) => void
+  openNew: (form: EventForm, opts?: { onSaved?: () => void }) => void
+  /** Abbrechen/Schließen: onSaved des Neu-Editors verfällt */
   closeEditor: () => void
+  /** Der Editor hat erfolgreich gespeichert: schließen und onSaved des Neu-Editors auslösen */
+  finishEditor: () => void
   setQuick: (quick: QuickDraft | null) => void
   setDeleteTarget: (target: DeleteTarget | null) => void
   /** Zu einem Termin springen (Agenda, Erinnerungs-Klick): Ansicht öffnen, Tag wählen, Editor auf */
   focusEvent: (objectId: number, recurrenceId: string | null, startMs: number) => void
 }
 
-export const useCalendar = create<CalendarState>((set) => ({
+export const useCalendar = create<CalendarState>((set, get) => ({
   mode: 'week',
   anchor: dayKey(new Date()),
   selKey: null,
@@ -75,8 +84,14 @@ export const useCalendar = create<CalendarState>((set) => ({
       selKey: instanceKey(objectId, recurrenceId),
       quick: null
     }),
-  openNew: (form) => set({ editor: { kind: 'new', form, rev: Date.now() }, quick: null }),
+  openNew: (form, opts) =>
+    set({ editor: { kind: 'new', form, rev: Date.now(), onSaved: opts?.onSaved }, quick: null }),
   closeEditor: () => set({ editor: null }),
+  finishEditor: () => {
+    const editor = get().editor
+    set({ editor: null })
+    if (editor?.kind === 'new') editor.onSaved?.()
+  },
   setQuick: (quick) => set({ quick }),
   setDeleteTarget: (deleteTarget) => set({ deleteTarget }),
   focusEvent: (objectId, recurrenceId, startMs) => {

@@ -238,8 +238,26 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       await js(
         `(() => { const e = document.querySelector('.cal-editor .overflow-y-auto'); if (e) e.scrollTop = 9999 })()`
       )
-      await wait(400)
+      await wait(900)
       await shot('14b-event-editor-attendees-list')
+      // Autocomplete: Adressbuch/Mail-Historie
+      await js(`(() => {
+        const i = document.querySelector('.cal-editor input[aria-label*="ttendee" i], .cal-editor input[aria-label*="eilnehmer" i]')
+        if (i) i.focus()
+      })()`)
+      typeText('ma')
+      await wait(900)
+      await shot('14c-event-editor-attendee-autocomplete')
+      // Fokus weg (unvollständige Eingabe wird verworfen), nicht Escape: das würde den Editor schließen
+      await js(`(() => { if (document.activeElement) document.activeElement.blur() })()`)
+      await wait(300)
+      await clickText('.cal-editor button.text-btn', 'next free slot|nächster gemeinsamer')
+      await wait(1500)
+      await js(
+        `(() => { const e = document.querySelector('.cal-editor .overflow-y-auto'); if (e) e.scrollTop = 9999 })()`
+      )
+      await wait(400)
+      await shot('14d-event-editor-next-free-slot')
       key('Escape')
       await wait(500)
     })
@@ -321,6 +339,11 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       await clickText('.cal-event', 'Quarterly planning')
       await wait(1200)
       await shot('44-event-editor-1180')
+      await js(
+        `(() => { const e = document.querySelector('.cal-editor .overflow-y-auto'); if (e) e.scrollTop = 9999 })()`
+      )
+      await wait(900)
+      await shot('44b-event-editor-attendees-1180')
       key('Escape')
     })
     await step('settings', async () => {

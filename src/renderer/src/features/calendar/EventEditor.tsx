@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type {
   CalendarAttendee,
   CalendarEditScope,
@@ -11,17 +11,25 @@ import { invoke } from '@renderer/lib/ipc'
 import { useI18n, useT } from '@renderer/lib/i18n'
 import { toast } from '@renderer/stores/toast'
 import { instanceKey, useCalendar } from '@renderer/stores/calendar'
-import { useCalendarEventActions, useCalendarEventDetail } from '@renderer/queries/calendar'
+import {
+  useCalendarEventActions,
+  useCalendarEventDetail,
+  useSchedulingInfo
+} from '@renderer/queries/calendar'
 import { cleanIpcError } from '@renderer/features/paper/account-states'
 import { ALARM_PRESETS, type AlarmChoice } from './alarms'
-import { addDays, parseDayKey } from './dates'
+import { addDays, localWall, parseDayKey } from './dates'
 import {
   fieldsFromForm,
   formFromFields,
   validateForm,
   withFreq,
+  withStart,
   type EventForm
 } from './event-form'
+import { diffAttendees, hasAnyAttendees, myPartstat } from './attendees'
+import { AttendeesSection } from './AttendeesSection'
+import { AvailabilityStrip } from './AvailabilityStrip'
 import { MAX_INTERVAL, WEEKDAYS, type RecurrenceFreq, type Weekday } from './rrule'
 import { diffFields, effectiveScope, needsScope, patchForScope } from './scope'
 import { ScopeChoice } from './ScopeChoice'
@@ -56,14 +64,6 @@ const UNIT_KEYS: Record<Exclude<RecurrenceFreq, 'NONE'>, StringKey> = {
   MONTHLY: 'cvUnitMonth',
   YEARLY: 'cvUnitYear'
 }
-const PARTSTAT_KEYS: Record<string, StringKey> = {
-  ACCEPTED: 'cvPartAccepted',
-  DECLINED: 'cvPartDeclined',
-  TENTATIVE: 'cvPartTentative',
-  'NEEDS-ACTION': 'cvPartNeeds',
-  DELEGATED: 'cvPartDelegated'
-}
-
 function Field({
   label,
   children
@@ -78,51 +78,6 @@ function Field({
       </div>
       {children}
     </div>
-  )
-}
-
-function Attendees({
-  attendees,
-  organizer
-}: {
-  attendees: readonly CalendarAttendee[]
-  organizer: { email: string; name: string | null } | null
-}): React.JSX.Element | null {
-  const t = useT()
-  if (attendees.length === 0 && !organizer) return null
-  return (
-    <Field label={t('cvAttendees')}>
-      <div className="tint-card" style={{ padding: '8px 10px' }}>
-        {organizer && (
-          <div className="flex items-baseline gap-2" style={{ font: '400 12px var(--serif)' }}>
-            <span className="min-w-0 flex-1 truncate">{organizer.name || organizer.email}</span>
-            <span className="mchip" style={{ border: '1px solid var(--hairline)' }}>
-              {t('cvOrganizer')}
-            </span>
-          </div>
-        )}
-        {attendees.map((a) => {
-          const key = PARTSTAT_KEYS[a.partstat.toUpperCase()]
-          return (
-            <div
-              key={a.email}
-              className="flex items-baseline gap-2"
-              style={{ font: '400 12px var(--serif)', marginTop: 4 }}
-            >
-              <span className="min-w-0 flex-1 truncate" title={a.email}>
-                {a.name || a.email}
-              </span>
-              <span className="mchip" style={{ color: 'var(--muted)' }}>
-                {key ? t(key) : a.partstat.toLowerCase()}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-      <div className="mmeta" style={{ marginTop: 5, color: 'var(--faint)' }}>
-        {t('cvAttendeesNote')}
-      </div>
-    </Field>
   )
 }
 
@@ -293,12 +248,18 @@ function EditorForm({
 }): React.JSX.Element {
   const t = useT()
   const closeEditor = useCalendar((s) => s.closeEditor)
+  const finishEditor = useCalendar((s) => s.finishEditor)
   const actions = useCalendarEventActions()
   const [form, setForm] = useState(initialForm)
   // Basis für den Diff: der Stand beim Öffnen (spätere Sync-Aktualisierungen ändern ihn nicht)
   const [baseline] = useState(() => detail?.fields ?? null)
   const [prompt, setPrompt] = useState<'save' | 'delete' | null>(null)
   const [busy, setBusy] = useState(false)
+  const [attendees, setAttendees] = useState<CalendarAttendee[]>(() => baseline?.attendees ?? [])
+  const [notify, setNotify] = useState(true)
+  const [answered, setAnswered] = useState<string | null>(null)
+  const info = useSchedulingInfo(form.calendarId, detail?.objectId ?? null).data
+  const mine = useMemo(() => new Set(info?.myAddresses ?? []), [info])
 
   const readOnly = detail?.readOnly ?? false
   const recurring = detail?.recurring ?? false
@@ -307,6 +268,20 @@ function EditorForm({
   // Bestehender Termin: sein Kalender steht fest, auch wenn er nicht (mehr) in der Auswahl wäre
   const selectable = detail ? calendars.filter((c) => c.id === detail.calendarId) : writable
   const canSave = !readOnly && !busy && error === null && form.calendarId !== null
+  // Nur der Organisator ändert Teilnehmer; bis die Auskunft da ist, gilt ein bestehender Termin als fremd
+  const organizerIsMe = info ? info.organizerIsMe : !detail
+  const editableAttendees = !readOnly && !busy && organizerIsMe
+  const baseAttendees = baseline?.attendees ?? []
+  const hasAttendees = hasAnyAttendees(baseAttendees, attendees)
+  const serverSends = info?.autoSchedule ?? false
+  // „Teilnehmer benachrichtigen" wird nur mitgegeben, wenn es etwas zu benachrichtigen gibt
+  const notifyOpt = hasAttendees && organizerIsMe && !serverSends ? notify : undefined
+  const diff = diffAttendees(baseAttendees, attendees)
+  const organizer =
+    baseline?.organizer ??
+    (attendees.length > 0 && info?.ownAddress ? { email: info.ownAddress, name: null } : null)
+  const myState =
+    answered ?? myPartstat(baseAttendees, mine) ?? info?.invitation?.myPartstat ?? null
 
   const fail = (err: unknown): void => {
     toast.error(
@@ -320,9 +295,15 @@ function EditorForm({
     setBusy(true)
     try {
       if (!detail || !baseline) {
-        await actions.create({ ...fieldsFromForm(form, null), calendarId: form.calendarId })
+        await actions.create(
+          {
+            ...fieldsFromForm(form, null, organizerIsMe ? attendees : undefined),
+            calendarId: form.calendarId
+          },
+          { notifyAttendees: notifyOpt }
+        )
       } else {
-        const next = fieldsFromForm(form, baseline)
+        const next = fieldsFromForm(form, baseline, organizerIsMe ? attendees : undefined)
         const patch = diffFields(baseline, next)
         if (Object.keys(patch).length > 0) {
           const target = { recurring }
@@ -344,11 +325,12 @@ function EditorForm({
               recurring,
               occurrenceTime: baseline.time,
               masterTime
-            })
+            }),
+            notifyAttendees: notifyOpt
           })
         }
       }
-      closeEditor()
+      finishEditor()
     } catch (err) {
       fail(err)
     }
@@ -361,7 +343,8 @@ function EditorForm({
       await actions.remove({
         objectId: detail.objectId,
         scope: effectiveScope({ recurring }, scope),
-        recurrenceId: recurrenceId ?? detail.recurrenceId
+        recurrenceId: recurrenceId ?? detail.recurrenceId,
+        notifyAttendees: notifyOpt
       })
       closeEditor()
     } catch (err) {
@@ -374,7 +357,13 @@ function EditorForm({
     if (detail && needsScope({ recurring })) {
       // Ohne Änderung kein Dialog
       const changed =
-        baseline && Object.keys(diffFields(baseline, fieldsFromForm(form, baseline))).length > 0
+        baseline &&
+        Object.keys(
+          diffFields(
+            baseline,
+            fieldsFromForm(form, baseline, organizerIsMe ? attendees : undefined)
+          )
+        ).length > 0
       if (!changed) closeEditor()
       else setPrompt('save')
     } else void runSave(null)
@@ -514,7 +503,77 @@ function EditorForm({
           </Field>
         </fieldset>
 
-        {baseline && <Attendees attendees={baseline.attendees} organizer={baseline.organizer} />}
+        {(organizerIsMe
+          ? !readOnly || attendees.length > 0
+          : attendees.length > 0 || !!organizer) && (
+          <Field label={t('cvAttendees')}>
+            <AttendeesSection
+              attendees={attendees}
+              baseline={baseAttendees}
+              organizer={organizer}
+              mine={mine}
+              editable={editableAttendees}
+              onChange={setAttendees}
+              invitation={info?.invitation ?? null}
+              myState={myState}
+              onAnswered={(p) => {
+                setAnswered(p)
+                if (p === 'DECLINED') closeEditor()
+              }}
+            />
+            {organizerIsMe && !readOnly && hasAttendees && (
+              <div style={{ marginTop: 8 }}>
+                {serverSends ? (
+                  <div className="mmeta" style={{ color: 'var(--faint)' }}>
+                    {t('cvNotifyServer')}
+                  </div>
+                ) : (
+                  <label
+                    className="flex items-start gap-2"
+                    style={{ font: '400 12px var(--serif)' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={notify}
+                      disabled={busy}
+                      style={{ marginTop: 3 }}
+                      onChange={(e) => setNotify(e.target.checked)}
+                    />
+                    <span>{t('cvNotify')}</span>
+                  </label>
+                )}
+                {notify && !serverSends && (diff.added.length > 0 || diff.removed.length > 0) && (
+                  <div className="mmeta" style={{ marginTop: 3, color: 'var(--faint)' }}>
+                    {[
+                      diff.added.length > 0 ? t('cvDiffAdded', { n: diff.added.length }) : null,
+                      diff.removed.length > 0
+                        ? t('cvDiffRemoved', { n: diff.removed.length })
+                        : null
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </div>
+                )}
+              </div>
+            )}
+          </Field>
+        )}
+
+        {info && attendees.some((a) => !mine.has(a.email.toLowerCase())) && (
+          <div style={{ marginTop: 14 }}>
+            <AvailabilityStrip
+              form={form}
+              attendees={attendees}
+              mine={mine}
+              accountId={info.accountId}
+              excludeObjectId={detail?.objectId ?? null}
+              onMove={(startMs) => {
+                const s = localWall(startMs)
+                setForm(withStart(form, s.slice(0, 10), s.slice(11, 16)))
+              }}
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex-none border-t border-hairline" style={{ padding: '10px 18px 12px' }}>
@@ -534,6 +593,20 @@ function EditorForm({
             onChoose={(scope) => void runSave(scope)}
             onCancel={() => setPrompt(null)}
           />
+        )}
+        {prompt === 'delete' && organizerIsMe && !serverSends && baseAttendees.length > 0 && (
+          <label
+            className="flex items-start gap-2"
+            style={{ font: '400 12px var(--serif)', marginBottom: 8 }}
+          >
+            <input
+              type="checkbox"
+              checked={notify}
+              style={{ marginTop: 3 }}
+              onChange={(e) => setNotify(e.target.checked)}
+            />
+            <span>{t('cvNotifyDelete')}</span>
+          </label>
         )}
         {prompt === 'delete' && recurring && (
           <ScopeChoice

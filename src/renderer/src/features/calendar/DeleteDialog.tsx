@@ -4,7 +4,11 @@ import { useT } from '@renderer/lib/i18n'
 import { toast } from '@renderer/stores/toast'
 import { useCalendar, type DeleteTarget } from '@renderer/stores/calendar'
 import { cleanIpcError } from '@renderer/features/paper/account-states'
-import { useCalendarEventActions } from '@renderer/queries/calendar'
+import {
+  useCalendarEventActions,
+  useCalendarEventDetail,
+  useSchedulingInfo
+} from '@renderer/queries/calendar'
 import { effectiveScope } from './scope'
 import { ScopeChoice } from './ScopeChoice'
 
@@ -16,6 +20,12 @@ export function DeleteDialog({ target }: { target: DeleteTarget }): React.JSX.El
   const closeEditor = useCalendar((s) => s.closeEditor)
   const actions = useCalendarEventActions()
   const [busy, setBusy] = useState(false)
+  const [notify, setNotify] = useState(true)
+  // Mit Teilnehmern (und wir organisieren, der Server versendet nicht selbst): Rückfrage „benachrichtigen?"
+  const detail = useCalendarEventDetail(target.objectId, target.recurrenceId).data
+  const info = useSchedulingInfo(detail?.calendarId ?? null, target.objectId).data
+  const attendeeCount = detail?.fields.attendees.length ?? 0
+  const askNotify = !!info && info.organizerIsMe && !info.autoSchedule && attendeeCount > 0
 
   const run = (scope: CalendarEditScope | null): void => {
     setBusy(true)
@@ -23,7 +33,8 @@ export function DeleteDialog({ target }: { target: DeleteTarget }): React.JSX.El
       .remove({
         objectId: target.objectId,
         scope: effectiveScope(target, scope),
-        recurrenceId: target.recurrenceId
+        recurrenceId: target.recurrenceId,
+        notifyAttendees: askNotify ? notify : undefined
       })
       .then(() => {
         // War der gelöschte Termin im Editor offen, schließt dieser mit
@@ -51,6 +62,23 @@ export function DeleteDialog({ target }: { target: DeleteTarget }): React.JSX.El
         <div style={{ font: '500 17px var(--serif)', margin: '6px 0 14px' }}>
           {target.summary || t('cvNoTitle')}
         </div>
+        {askNotify && (
+          <div style={{ margin: '-6px 0 12px' }}>
+            <div className="mmeta" style={{ marginBottom: 4 }}>
+              {t('cvDeleteHasAttendees', { n: attendeeCount })}
+            </div>
+            <label className="flex items-start gap-2" style={{ font: '400 12px var(--serif)' }}>
+              <input
+                type="checkbox"
+                checked={notify}
+                disabled={busy}
+                style={{ marginTop: 3 }}
+                onChange={(e) => setNotify(e.target.checked)}
+              />
+              <span>{t('cvNotifyDelete')}</span>
+            </label>
+          </div>
+        )}
         {target.recurring ? (
           <ScopeChoice
             kind="delete"

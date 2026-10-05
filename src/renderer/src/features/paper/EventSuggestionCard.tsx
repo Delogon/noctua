@@ -69,18 +69,18 @@ function Card({ s }: { s: EventSuggestionView }): React.JSX.Element {
     }
   }
 
-  const edit = async (): Promise<void> => {
+  const edit = (): void => {
     if (busy) return
-    setBusy(true)
-    try {
-      // Editor übernimmt: Vorschlag gilt als erledigt, der Termin entsteht erst beim Speichern
-      await invoke('calendar:eventSuggestions:edit', { id: s.id })
-      usePaper.getState().setView('calendar')
-      useCalendar.getState().openNew(formFromSuggestion(s, s.calendarId))
-      refresh()
-    } finally {
-      setBusy(false)
-    }
+    // Der Vorschlag gilt erst als erledigt, wenn der Editor erfolgreich gespeichert hat;
+    // Abbrechen lässt ihn unverändert „neu".
+    usePaper.getState().setView('calendar')
+    useCalendar.getState().openNew(formFromSuggestion(s, s.calendarId), {
+      onSaved: () => {
+        void invoke('calendar:eventSuggestions:edit', { id: s.id })
+          .catch(() => undefined)
+          .then(refresh)
+      }
+    })
   }
 
   const dismiss = async (): Promise<void> => {
@@ -143,12 +143,7 @@ function Card({ s }: { s: EventSuggestionView }): React.JSX.Element {
           >
             {t('eventSuggestAdd')}
           </button>
-          <button
-            type="button"
-            onClick={() => void edit()}
-            disabled={busy}
-            style={buttonStyle(false, busy)}
-          >
+          <button type="button" onClick={edit} disabled={busy} style={buttonStyle(false, busy)}>
             {t('eventSuggestEdit')}
           </button>
           <button

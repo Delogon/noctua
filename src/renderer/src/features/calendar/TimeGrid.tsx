@@ -253,6 +253,8 @@ export function TimeGrid({
                     onOpen={onOpen}
                     onSelect={onSelect}
                     compact={p.bottom - p.top < 40}
+                    dayStart={days[col].getTime()}
+                    widthPx={(colWidth * span.width) / 100 - 3}
                     style={{
                       top: (p.top / 60) * HOUR_H,
                       height: Math.max(14, ((p.bottom - p.top) / 60) * HOUR_H - 1),

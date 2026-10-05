@@ -131,6 +131,7 @@ export function MonthGrid({
                   key={ev.key}
                   event={ev}
                   banner={isBanner(ev)}
+                  dayStart={d.getTime()}
                   color={colors.get(ev.calendarId) ?? 'var(--ac)'}
                   selected={selKey === instanceKey(ev.objectId, ev.recurrenceId)}
                   onOpen={onOpen}

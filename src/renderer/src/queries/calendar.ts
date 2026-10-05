@@ -131,6 +131,23 @@ export function useCalendarEventDetail(
   })
 }
 
+/** Scheduling-Kontext (Organisator?, eigene Adressen, Einladung) für Editor und Lösch-Dialog. */
+export function useSchedulingInfo(
+  calendarId: number | null,
+  objectId: number | null
+): UseQueryResult<InvokeOutput<'calendar:scheduling:info'>> {
+  return useQuery({
+    queryKey: ['calendar', 'scheduling', calendarId, objectId],
+    queryFn: () =>
+      invoke('calendar:scheduling:info', {
+        calendarId: calendarId ?? 0,
+        objectId: objectId ?? undefined
+      }),
+    enabled: calendarId !== null,
+    staleTime: 30_000
+  })
+}
+
 /** Alle Kalender-Abfragen (außer Konten) neu laden. */
 export function invalidateCalendarData(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: ['calendar', 'events'] })
@@ -173,14 +190,14 @@ export function useCalendarListActions(): {
 
 /** Termine anlegen/ändern/löschen; die Listen laden danach neu. */
 export function useCalendarEventActions(): {
-  create: (event: CalendarEventInput) => Promise<void>
+  create: (event: CalendarEventInput, opts?: { notifyAttendees?: boolean }) => Promise<void>
   update: (input: InvokeInput<'calendar:events:update'>) => Promise<void>
   remove: (input: InvokeInput<'calendar:events:delete'>) => Promise<void>
 } {
   const queryClient = useQueryClient()
   return {
-    create: async (event) => {
-      await invoke('calendar:events:create', { event })
+    create: async (event, opts) => {
+      await invoke('calendar:events:create', { event, notifyAttendees: opts?.notifyAttendees })
       invalidateCalendarData(queryClient)
     },
     update: async (input) => {

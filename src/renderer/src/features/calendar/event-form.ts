@@ -1,4 +1,4 @@
-import type { CalendarEventFields } from '@shared/calendar-types'
+import type { CalendarAttendee, CalendarEventFields } from '@shared/calendar-types'
 import {
   addDays,
   dayKey,
@@ -162,11 +162,13 @@ function sameTimeAtMinute(a: CalendarEventFields['time'], b: CalendarEventFields
 
 /**
  * Backend-Felder aus dem Formular. `base` (bestehender Termin) liefert alles, was der
- * Editor nicht ändert: Status, Teilnehmer, Organisator, nicht darstellbare Alarme/Regeln.
+ * Editor nicht ändert: Status, Organisator (das Backend setzt ihn bei Teilnehmern ohne Organisator), nicht darstellbare Alarme/Regeln.
  */
 export function fieldsFromForm(
   form: EventForm,
-  base: CalendarEventFields | null
+  base: CalendarEventFields | null,
+  /** Bearbeitete Teilnehmerliste (nur Organisator); sonst bleibt die des Termins */
+  attendees?: readonly CalendarAttendee[]
 ): CalendarEventFields {
   let time: CalendarEventFields['time'] = form.allDay
     ? {
@@ -204,7 +206,7 @@ export function fieldsFromForm(
       base && alarmChoiceOf(base.alarms) === form.alarm
         ? base.alarms
         : alarmsFromChoice(form.alarm, base?.alarms ?? []),
-    attendees: base?.attendees ?? [],
+    attendees: attendees ? [...attendees] : (base?.attendees ?? []),
     organizer: base?.organizer ?? null
   }
 }

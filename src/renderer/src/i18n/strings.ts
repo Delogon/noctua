@@ -261,10 +261,56 @@ const table = {
   cvLocation: { en: 'LOCATION', de: 'ORT' },
   cvDescription: { en: 'NOTES', de: 'NOTIZEN' },
   cvAttendees: { en: 'ATTENDEES', de: 'TEILNEHMER' },
-  cvAttendeesNote: {
-    en: 'Invitations can be edited in a later version.',
-    de: 'Einladungen lassen sich in einer späteren Version bearbeiten.'
+  cvAttendeeAddPh: {
+    en: 'Add attendee: name or address',
+    de: 'Teilnehmer hinzufügen: Name oder Adresse'
   },
+  cvAttendeeRemove: { en: 'Remove {addr}', de: '{addr} entfernen' },
+  cvAttendeeRole: { en: 'Role of {addr}', de: 'Rolle von {addr}' },
+  cvRoleReq: { en: 'required', de: 'Pflicht' },
+  cvRoleOpt: { en: 'optional', de: 'optional' },
+  cvRoleOther: { en: 'observer', de: 'Beobachter' },
+  cvYou: { en: 'you', de: 'ich' },
+  cvPartNew: { en: 'new', de: 'neu' },
+  cvOrganizerOnly: {
+    en: 'Only the organizer can change attendees.',
+    de: 'Nur der Organisator kann Teilnehmer ändern.'
+  },
+  cvNotify: {
+    en: 'Send invitations and updates to attendees',
+    de: 'Einladungen und Änderungen an Teilnehmer senden'
+  },
+  cvNotifyDelete: {
+    en: 'Notify attendees of the cancellation',
+    de: 'Teilnehmer über die Absage informieren'
+  },
+  cvNotifyServer: {
+    en: 'Your calendar server sends the invitations.',
+    de: 'Dein Kalenderserver verschickt die Einladungen.'
+  },
+  cvDiffAdded: { en: 'Invitation to {n} new', de: 'Einladung an {n} neue' },
+  cvDiffRemoved: { en: 'cancellation to {n} removed', de: 'Absage an {n} entfernte' },
+  cvRsvpHead: { en: 'YOUR RESPONSE', de: 'DEINE ANTWORT' },
+  cvRsvpYes: { en: 'Accept', de: 'Zusagen' },
+  cvRsvpMaybe: { en: 'Tentative', de: 'Vielleicht' },
+  cvRsvpNo: { en: 'Decline', de: 'Absagen' },
+  cvRsvpFailed: { en: 'Reply failed: {err}', de: 'Antwort fehlgeschlagen: {err}' },
+  cvRsvpSent: { en: 'Reply sent', de: 'Antwort gesendet' },
+  cvFbHead: { en: 'AVAILABILITY 08–20', de: 'VERFÜGBARKEIT 08–20' },
+  cvFbUnavailable: { en: 'no information', de: 'keine Auskunft' },
+  cvFbLoading: { en: 'loading…', de: 'lädt …' },
+  cvFbNext: { en: 'Next free slot for everyone', de: 'Nächster gemeinsamer freier Termin' },
+  cvFbNone: {
+    en: 'No common free slot in the next 10 working days.',
+    de: 'Kein gemeinsamer freier Termin in den nächsten 10 Arbeitstagen.'
+  },
+  cvFbUnknown: {
+    en: 'Not considered (no availability information): {n}',
+    de: 'Nicht berücksichtigt (keine Auskunft): {n}'
+  },
+  cvFbFailed: { en: 'Availability could not be loaded.', de: 'Verfügbarkeit nicht abrufbar.' },
+  cvFbTentative: { en: 'tentative', de: 'vorläufig' },
+  cvFbThisEvent: { en: 'this event', de: 'dieser Termin' },
   cvOrganizer: { en: 'ORGANIZER', de: 'ORGANISATOR' },
   cvPartAccepted: { en: 'accepted', de: 'zugesagt' },
   cvPartDeclined: { en: 'declined', de: 'abgesagt' },
@@ -274,6 +320,10 @@ const table = {
   cvDelete: { en: 'DELETE', de: 'LÖSCHEN' },
   cvDeleteConfirm: { en: 'Delete this event?', de: 'Diesen Termin löschen?' },
   cvDeleteTitle: { en: 'DELETE EVENT', de: 'TERMIN LÖSCHEN' },
+  cvDeleteHasAttendees: {
+    en: 'This event has {n} attendee(s).',
+    de: 'Dieser Termin hat {n} Teilnehmer.'
+  },
   cvScopeEditHead: {
     en: 'REPEATING EVENT — APPLY CHANGE TO',
     de: 'WIEDERKEHRENDER TERMIN — ÄNDERUNG GILT FÜR'

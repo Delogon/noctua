@@ -29,6 +29,13 @@ import { systemTimeZone, wallToUtcIana } from './tz'
 const MAX_RANGE_MS = 62 * 24 * 3600_000
 const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/
 
+let defaultDeps: FreeBusyDeps = {}
+
+/** Nur Dev/Demo: feste Abhängigkeiten für `queryFreeBusy` (z. B. eine Demo-Serverantwort). */
+export function setFreeBusyDeps(deps: FreeBusyDeps): void {
+  defaultDeps = deps
+}
+
 export interface FreeBusyDeps {
   fetch?: FetchLike
   getPassword?: (accountId: number) => string | null
@@ -42,6 +49,8 @@ export interface SelfBusyInput {
   rangeStart: number
   rangeEnd: number
   calendarIds?: number[]
+  /** Dieser Termin zählt nicht als belegt (Editor: der Termin selbst) */
+  excludeObjectId?: number
 }
 
 /**
@@ -65,7 +74,7 @@ export function selfBusy(input: SelfBusyInput, db: Database.Database = getDb()):
   const cache = new Map<number, { ics: string } | null>()
   const out: BusyInterval[] = []
   for (const e of events) {
-    if (e.status === 'CANCELLED') continue
+    if (e.status === 'CANCELLED' || e.objectId === input.excludeObjectId) continue
     let cached = cache.get(e.objectId)
     if (cached === undefined) {
       const row = db.prepare('SELECT ics FROM cal_objects WHERE id = ?').get(e.objectId) as
@@ -174,7 +183,7 @@ export interface FreeBusyQuery {
 export async function queryFreeBusy(
   query: FreeBusyQuery,
   db: Database.Database = getDb(),
-  deps: FreeBusyDeps = {}
+  deps: FreeBusyDeps = defaultDeps
 ): Promise<FreeBusyResult[]> {
   const { rangeStart, rangeEnd } = query
   if (!(rangeEnd > rangeStart) || rangeEnd - rangeStart > MAX_RANGE_MS) {

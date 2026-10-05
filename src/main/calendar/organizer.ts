@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3-multiple-ciphers'
-import type { CalendarEventFields } from '@shared/calendar-types'
+import type { CalendarEventFields, CalendarEventPatch } from '@shared/calendar-types'
 import { getSetting } from '../db'
 import { myAddresses, mailAccountForAddress, ownAddressOf } from './identity'
 import {
@@ -48,6 +48,23 @@ export function withDefaultOrganizer<T extends CalendarEventFields>(
   const own = ownAddressOf(db, account)
   if (!own) return fields
   return { ...fields, organizer: { email: own, name: null } }
+}
+
+/**
+ * Wie `withDefaultOrganizer`, für Änderungen: Kommen Teilnehmer zu einem Termin ohne
+ * Organisator hinzu, wird der Nutzer Organisator — sonst gingen keine Einladungen raus.
+ */
+export function withDefaultOrganizerPatch(
+  db: Database.Database,
+  account: CalAccountRow,
+  oldIcs: string,
+  patch: CalendarEventPatch
+): CalendarEventPatch {
+  if (!patch.attendees || patch.attendees.length === 0 || patch.organizer !== undefined)
+    return patch
+  if (organizerOf(oldIcs)) return patch
+  const own = ownAddressOf(db, account)
+  return own ? { ...patch, organizer: { email: own, name: null } } : patch
 }
 
 export function isOrganizerMe(db: Database.Database, ics: string): boolean {

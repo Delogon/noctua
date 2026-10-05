@@ -17,29 +17,32 @@ build with `NOCTUA_ORG_CONFIG=build/org-config.example.json`). See `src/main/dev
 | 05-mail-attachment-task | Attachment row with real size, "in your tasks" strip |
 | 10-calendar-week, 11-day, 12-month | Calendar views: overlapping events, all-day and multi-day banners, recurring (with a moved occurrence), event across midnight |
 | 13-quick-create | Quick-create popover on a time slot |
-| 14-event-editor-attendees, 14b | Event editor with reminder, notes, attendees and partstat |
+| 14-event-editor-attendees, 14b-14d | Event editor: attendee list (role required/optional, partstat, remove), add field, availability strip 08-20 per attendee (Marta without information), autocomplete from the address book (14c), "next free slot for everyone" (14d) |
 | 15-event-editor-recurring, 16-scope-choice | Recurrence editor and "only this / this and following / all" dialog |
 | 17-calendar-colour-palette | Calendar sidebar with colour palette |
 | 20-tasks | Tasks with CalDAV sync glyphs (synced, pending, conflict) |
 | 30, 30b | Settings, Accounts: mail account, CalDAV account with calendars, address books, tasks sync list, privacy |
 | 31, 31b, 31c | Settings, Intelligence: profiles (OpenRouter, local Ollama), task pickers, Local only, on-demand cards |
 | 32, 32b, 32c | Under the hood: pipelines and the live network connections list (Local only off) |
-| 40-45 | 1180 px window: inbox, calendar week/month/day, editor, settings |
+| 40-45 | 1180 px window: inbox, calendar week/month/day, editor (44b: attendees + availability), settings |
 | 50-52 | Local only ON: LOCAL ONLY badge, blocked external profile, "on request" connections |
 | 60, 61 | Onboarding with organisation AI profiles (company build) |
 | de-* | German UI (invitation, calendar week, accounts) |
 
 ## Known remaining visual issues
 
-- Week view with three overlapping events in a 58-90 px column (1180 px window or open editor)
-  stays cramped: blocks cascade, titles wrap mid-word.
-- Event across midnight shows its start time again on the second day (month chips).
 - With Local only ON and an external draft profile, the Owl says "asleep - no key" and Settings
   "no key yet" although the key exists; `ai:usage.hasApiKey` folds the Local-only block into
   "no key" (src/main/ipc/handlers.ts, left alone: AI code is being changed elsewhere).
 - Raw English errors surface in Settings when offline ("fetch failed", transformers "Forbidden
   access to file ...") - expected here, the sandbox has no network.
 - Date inputs in the editor follow the system locale (mm/dd/yyyy in this container).
+- Week view with three overlapping events in a 58-90 px column is still tight: blocks cascade, but
+  titles now end in an ellipsis (full title in the tooltip) and the time line is hidden below 96 px.
+- All-day events (e.g. a birthday) count as busy in "you" on the availability strip, so the whole day
+  is grey (existing `selfBusy` rule; "next free slot" skips such days for you).
+- Availability for attendees on other servers is demo data here (`installDemoFreeBusy` in
+  `src/main/dev/demo-seed.ts`); the demo server has no network.
 
 ## Console / CSP
 
