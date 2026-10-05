@@ -133,7 +133,16 @@ unveraendert). Fuer ein signiertes, notarisiertes Release setzt man:
 
 Hardened Runtime ist aktiv; die Entitlements stehen in
 `build/entitlements.mac.plist` (nur `allow-jit`). Electron-Fuses sind in
-`electron-builder.yml` (`electronFuses`) konfiguriert.
+`electron-builder.config.mjs` (`electronFuses`) konfiguriert.
+
+## Company edition (org config)
+
+The same codebase builds a branded company edition from an optional JSON
+file (`build/org-config.json` or `NOCTUA_ORG_CONFIG`), embedded at build time:
+product name and bundle ID, update feed (or none), managed AI profiles, OAuth
+clients, defaults and help links. Without the file the build is the unchanged
+upstream app. See [docs/ORG-CONFIG.md](docs/ORG-CONFIG.md); signing uses the
+variables described above.
 
 ## Architecture
 
@@ -143,8 +152,8 @@ Hardened Runtime ist aktiv; die Entitlements stehen in
 - **Renderer**: React 19, sandboxed with no Node access; data flows
   exclusively through the typed IPC contract (`src/shared/ipc-contract.ts`,
   zod-validated)
-- **Updates**: the app checks GitHub releases and shows a notice with a
-  download link — no automatic installs
+- **Updates**: the app checks GitHub releases (or the feed configured in the
+  org config) and shows a notice with a download link — no automatic installs
 
 ## Known limits
 
