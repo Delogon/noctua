@@ -202,7 +202,7 @@ Setting "Sync tasks with" (Accounts; IPC `tasks:sync:get|set`, default off) pick
 calendar. `src/main/tasks/caldav-sync.ts` reconciles `tasks` with that calendar's VTODOs from
 `cal_objects` after each calendar sync and after each local task change; pushes go through
 `cal_pending_ops` (If-Match / 412 -> server version wins + `calendar:conflict` toast).
-`task_caldav` (migration 030) stores uid, last agreed field hash and ETag per task.
+`task_caldav` (migration 029) stores uid, last agreed field hash and ETag per task.
 
 | Noctua | VTODO |
 | --- | --- |
