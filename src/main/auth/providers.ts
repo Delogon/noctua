@@ -79,19 +79,33 @@ export function buildImapOptions(
   host: string
   port: number
   secure: boolean
+  doSTARTTLS?: boolean
+  connectionTimeout: number
+  greetingTimeout: number
+  socketTimeout: number
   auth: { user: string; pass?: string; accessToken?: string }
   logger: false
   tls?: { rejectUnauthorized: boolean }
 } {
+  const loopback = isLoopbackHost(account.imap_host)
+  const implicitTls = account.imap_port === 993
   return {
     host: account.imap_host,
     port: account.imap_port,
-    // Port 993 = implizites TLS; 143/1143 (Proton Bridge) = STARTTLS
-    secure: account.imap_port === 993,
+    // Port 993 = implizites TLS; sonst STARTTLS
+    secure: implicitTls,
+    // Nicht-Loopback: STARTTLS ist Pflicht (kein stilles Downgrade auf
+    // Klartext). Loopback (Proton Bridge) bleibt wie bisher opportunistisch.
+    ...(!loopback && !implicitTls ? { doSTARTTLS: true } : {}),
+    // socketTimeout 5 min: imapflow fängt Timeouts im IDLE selbst ab (NOOP +
+    // erneutes IDLE), ein kürzerer Wert würde dort unnötig Recovery auslösen.
+    connectionTimeout: 30_000,
+    greetingTimeout: 20_000,
+    socketTimeout: 5 * 60_000,
     auth: credentials.accessToken
       ? { user: credentials.user, accessToken: credentials.accessToken }
       : { user: credentials.user, pass: credentials.pass },
     logger: false,
-    ...(isLoopbackHost(account.imap_host) ? { tls: { rejectUnauthorized: false } } : {})
+    ...(loopback ? { tls: { rejectUnauthorized: false } } : {})
   }
 }

@@ -23,6 +23,8 @@ export interface OutgoingMail {
   textBody: string
   htmlBody?: string
   replyToMessageId?: number
+  /** Stabile Message-ID (aus der Outbox) — macht eine gesendete Mail wiedererkennbar. */
+  messageId?: string
 }
 
 interface StoredSignature {
@@ -129,8 +131,11 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
     host: account.smtp_host,
     port: account.smtp_port,
     secure: implicitTls,
-    // Port 587 (Outlook.com) verlangt STARTTLS
-    requireTLS: !loopback && account.smtp_port === 587,
+    // Nicht-Loopback ohne implizites TLS: STARTTLS erzwingen (kein Klartext-Fallback)
+    requireTLS: !loopback && !implicitTls,
+    connectionTimeout: 30_000,
+    greetingTimeout: 20_000,
+    socketTimeout: 60_000,
     auth,
     // Loopback (Proton Bridge): selbstsigniertes Zertifikat akzeptieren
     ...(loopback ? { tls: { rejectUnauthorized: false } } : {})
@@ -205,6 +210,7 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
       subject: mail.subject,
       text: plainText,
       ...(html ? { html, attachments } : {}),
+      ...(mail.messageId ? { messageId: mail.messageId } : {}),
       inReplyTo,
       references
     })
