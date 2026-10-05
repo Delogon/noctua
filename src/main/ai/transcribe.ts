@@ -1,6 +1,8 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { logUsage } from './budget'
-import { requireTaskWithBudget } from './providers/registry'
+import { getSetting } from '../db'
+import { appleSpeechLocale, isAppleSpeechAvailable, transcribeWithApple } from './apple-speech'
+import { getTaskProfileId, requireTaskWithBudget } from './providers/registry'
 
 /**
  * Diktat-Transkription über das Profil der Aufgabe „stt": bei OpenRouter ein
@@ -12,6 +14,14 @@ export async function transcribeAudio(
   audioBase64: string,
   format: 'wav' | 'mp3'
 ): Promise<string> {
+  // Apple-Spracherkennung (Pseudo-Profil 'apple'): on-device, ohne Kosten/Key, zählt als lokal
+  if (getTaskProfileId('stt') === 'apple') {
+    if (format !== 'wav') throw new Error('Apple-Diktat braucht WAV-Audio')
+    const locale = appleSpeechLocale(getSetting('ui.language'))
+    const state = await isAppleSpeechAvailable(locale)
+    if (!state.available) throw new Error(`Apple-Diktat nicht verfügbar: ${state.reason}`)
+    return transcribeWithApple(Buffer.from(audioBase64, 'base64'), 'wav', locale)
+  }
   const { client, model, profile } = requireTaskWithBudget(db, 'stt')
   if (!client.transcribe) {
     throw new Error(`Profil „${profile.name}" unterstützt keine Transkription`)

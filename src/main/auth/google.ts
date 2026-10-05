@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { shell } from 'electron'
 import { getSetting } from '../db'
 import { deleteSecret, getSecret, setSecret } from './secrets'
+import { isGoogleReauthCode, ReauthRequiredError } from './reauth'
 
 /**
  * Google-OAuth für Gmail-Konten (Loopback-Flow mit PKCE, wie beim
@@ -246,7 +247,8 @@ export async function googleAccessToken(email: string): Promise<string> {
   if (cached && cached.expiresAt - EXPIRY_MARGIN_MS > Date.now()) return cached.token
 
   const refreshToken = getSecret(refreshSecretKey(key))
-  if (!refreshToken) throw new Error('Google-Konto nicht angemeldet — bitte neu verbinden')
+  if (!refreshToken)
+    throw new ReauthRequiredError('Google-Konto nicht angemeldet — bitte erneut anmelden')
 
   const tokens = await tokenRequest({
     client_id: clientId(),
@@ -255,11 +257,11 @@ export async function googleAccessToken(email: string): Promise<string> {
     grant_type: 'refresh_token'
   })
   if (!tokens.access_token) {
-    if (tokens.error === 'invalid_grant') {
+    if (isGoogleReauthCode(tokens.error)) {
       // Zugriff widerrufen oder Token abgelaufen — Rest aufräumen, Re-Login nötig
       deleteSecret(refreshSecretKey(key))
       accessTokens.delete(key)
-      throw new Error('Google-Zugriff widerrufen — bitte Konto neu verbinden')
+      throw new ReauthRequiredError('Google-Zugriff widerrufen — bitte erneut anmelden')
     }
     throw new Error(
       `Google-Token-Refresh fehlgeschlagen: ${tokens.error_description ?? tokens.error ?? 'unbekannt'}`

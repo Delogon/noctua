@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 
 /**
  * Baut contact_stats für ein Konto neu auf: sent_count aus den Empfängern des

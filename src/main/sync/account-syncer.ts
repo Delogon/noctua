@@ -1,5 +1,5 @@
 import { ImapFlow, type FetchMessageObject, type MessageAddressObject } from 'imapflow'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { buildImapOptions, type AccountRow, type MailCredentials } from '../auth/providers'
 import { parseMail } from '../mail/parser'
 import {
@@ -9,6 +9,7 @@ import {
   upsertEnvelope,
   type EnvelopeData
 } from '../mail/ingest'
+import { isReauthError } from '../auth/reauth'
 import { rebuildContactStats } from '../db/repos/contacts'
 import { applyRules } from '../ai/rules'
 import {
@@ -37,7 +38,12 @@ export type SyncState = 'idle' | 'connecting' | 'syncing' | 'error' | 'needs-rea
  */
 export function isAuthFailure(error: unknown): boolean {
   const e = error as { authenticationFailed?: unknown; serverResponseCode?: unknown } | null
-  return e?.authenticationFailed === true || e?.serverResponseCode === 'AUTHENTICATIONFAILED'
+  return (
+    e?.authenticationFailed === true ||
+    e?.serverResponseCode === 'AUTHENTICATIONFAILED' ||
+    // OAuth-Refresh gescheitert (invalid_grant / interaction_required)
+    isReauthError(error)
+  )
 }
 
 export interface SyncEvents {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { closeTestDb, createTestDb } from '../helpers/db'
 import { setSetting } from '@main/db'
 import type { AiProfile } from '@main/ai/providers/types'

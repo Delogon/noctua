@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { sendMail } from '@main/smtp/sender'
 import { setSetting } from '@main/db'
 import { setSecret } from '@main/auth/secrets'

@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { existsSync, readdirSync, rmSync, statSync } from 'fs'
 import { basename, dirname, join } from 'path'
 import { migrations } from './migrations'

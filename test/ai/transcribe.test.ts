@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { createProfile, setTaskAssignment } from '@main/ai/providers/registry'
 import { setSecret } from '@main/auth/secrets'
 import { setLocalOnly } from '@main/privacy'

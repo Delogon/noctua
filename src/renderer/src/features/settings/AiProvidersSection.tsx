@@ -485,7 +485,9 @@ export function TaskProviderPicker({ task }: { task: AiTaskName }): React.JSX.El
   const current = assignments.data?.[task]
   const appleAvailable = appleFm.data?.state === 'available'
   const showApple =
-    task === 'triage' && appleFm.data !== undefined && appleFm.data.state !== 'device-unsupported'
+    (task === 'triage' || task === 'stt') &&
+    appleFm.data !== undefined &&
+    appleFm.data.state !== 'device-unsupported'
 
   const change = (profileId: string): void => {
     if (!current || profileId === current.profileId) return
@@ -528,7 +530,7 @@ export function TaskProviderPicker({ task }: { task: AiTaskName }): React.JSX.El
           ))}
           {showApple && (
             <option value="apple" disabled={!appleAvailable}>
-              {t('fmProviderApple')}
+              {task === 'stt' ? t('sttProviderApple') : t('fmProviderApple')}
             </option>
           )}
         </select>

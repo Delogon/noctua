@@ -1,6 +1,6 @@
 import { foldSharpS } from '../search/fold'
 import { createHash } from 'node:crypto'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { htmlToText, type ParsedMail } from './parser'
 import { computeThreadKey } from './threading'
 import { isVisibleMailAttachment } from './attachment-visibility'

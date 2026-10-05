@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { outboxWorker, classifySendError, MAX_SEND_ATTEMPTS } from '@main/smtp/outbox'
 import { sendMail } from '@main/smtp/sender'
 import { setSetting } from '@main/db'

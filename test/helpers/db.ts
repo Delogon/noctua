@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import Database from 'better-sqlite3-multiple-ciphers'
 import * as sqliteVec from 'sqlite-vec'
 import { runMigrations } from '@main/db/migrate'
 import { __setTestDb } from '@main/db'

@@ -13,6 +13,8 @@ export const accountSummarySchema = z.object({
   accountName: z.string(),
   displayName: z.string().nullable(),
   provider: z.enum(['gmail', 'microsoft', 'proton', 'imap']),
+  /** Wie sich das Konto anmeldet — bestimmt „Passwort neu eingeben" vs. „Erneut anmelden". */
+  credentialType: z.enum(['password', 'oauth-ms', 'oauth-google', 'bridge']).default('password'),
   color: z.string(),
   syncState: z.enum(['idle', 'connecting', 'syncing', 'error', 'needs-reauth', 'off']),
   lastError: z.string().nullable(),

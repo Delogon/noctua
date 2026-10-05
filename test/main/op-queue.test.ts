@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { createTestDb, closeTestDb, seedAccount, seedFolder } from '../helpers/db'
 import {
   enqueueOp,

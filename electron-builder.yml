@@ -27,6 +27,7 @@ extraResources:
 asarUnpack:
   - resources/**
   - '**/node_modules/sqlite-vec-darwin-arm64/**'
+  - '**/node_modules/better-sqlite3-multiple-ciphers/prebuilds/**'
   - '**/node_modules/onnxruntime-node/**'
   - '**/node_modules/@huggingface/transformers/**'
 # Electron-Fuses (werden beim Packen in die Electron-Binary geschrieben).
@@ -52,5 +53,11 @@ mac:
   # README "Signing & notarization"); ohne sie wird sie uebersprungen.
   # Signatur-Identity kommt aus CSC_NAME / CSC_LINK, lokale Builds bleiben unsigniert.
   notarize: true
+  # TCC-Texte: Spracherkennung (On-Device-Diktat, noctua-fm) und Mikrofon
+  # (Aufnahme im Renderer). Keine zusätzlichen Entitlements nötig — die App
+  # ist nicht sandboxed, der Helper erbt die Hardened-Runtime-Entitlements.
+  extendInfo:
+    NSSpeechRecognitionUsageDescription: Noctua erkennt diktierte Sprache direkt auf diesem Mac. Die Aufnahme verlässt das Gerät nicht.
+    NSMicrophoneUsageDescription: Noctua nimmt dein Diktat über das Mikrofon auf.
 dmg:
   artifactName: ${name}-${version}.${ext}

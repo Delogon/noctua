@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { getSecret, hasSecret } from '@main/auth/secrets'
 import { getSetting, setSetting } from '@main/db'
 import { setLocalOnly } from '@main/privacy'
@@ -205,6 +205,14 @@ describe('resolveTask', () => {
     setTaskAssignment('triage', 'openrouter', 'x/y')
     expect(getTaskProfileId('triage')).toBe('openrouter')
     expect(getSetting('ai.triageProvider')).toBe('openrouter')
+  })
+
+  it('Apple-Spracherkennung ist als stt-Pseudo-Profil wählbar', () => {
+    setTaskAssignment('stt', 'apple', '')
+    expect(getTaskProfileId('stt')).toBe('apple')
+    expect(resolveTask('stt')).toBeNull() // kein Client — transcribe.ts behandelt 'apple' selbst
+    setTaskAssignment('stt', 'openrouter', '')
+    expect(getTaskProfileId('stt')).toBe('openrouter')
   })
 
   it('lehnt Zuordnung auf unbekanntes Profil ab', () => {

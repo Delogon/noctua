@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { htmlToText } from '../mail/parser'
 import { cleanupSearchOrphans, refreshMessageSearchIndex } from '../mail/ingest'
 import { isLocalOnly } from '../privacy'

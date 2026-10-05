@@ -1,5 +1,5 @@
 import { app, Notification, BrowserWindow } from 'electron'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import icon from '../../resources/icon.png?asset'
 import { getSetting } from './db'

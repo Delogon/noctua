@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { deleteSecret, getSecret, hasSecret, setSecret } from '../../auth/secrets'
 import { getDb, getSetting, setSetting } from '../../db'
 import { isLocalOnly } from '../../privacy'
@@ -188,7 +188,9 @@ function modelKey(task: AiTask): string {
  */
 export function getTaskProfileId(task: AiTask): string {
   if (task === 'triage' && getSetting('ai.triageProvider') === 'apple') return 'apple'
-  return getSetting(profileKey(task))?.trim() || OPENROUTER_PROFILE_ID
+  const id = getSetting(profileKey(task))?.trim() || OPENROUTER_PROFILE_ID
+  // stt: Apple-Spracherkennung als Pseudo-Profil (ai.sttProfile = 'apple')
+  return task === 'stt' && id === 'apple' ? 'apple' : id
 }
 
 /** Modell der Aufgabe: ausdrücklich gesetzt, sonst nur beim OpenRouter-Profil ein Default. */
@@ -200,10 +202,15 @@ export function getTaskModel(task: AiTask, profile: Pick<AiProfile, 'preset'>): 
 
 export function setTaskAssignment(task: AiTask, profileId: string, model: string): void {
   if (profileId !== 'apple' && !getProfile(profileId)) throw new Error('Profil nicht gefunden')
-  if (profileId === 'apple' && task !== 'triage') throw new Error('Apple On-Device nur für Triage')
-  if (task === 'triage')
+  if (profileId === 'apple' && task === 'draft') {
+    throw new Error('Apple On-Device nur für Triage und Diktat')
+  }
+  if (task === 'triage') {
     setSetting('ai.triageProvider', profileId === 'apple' ? 'apple' : 'openrouter')
-  if (profileId !== 'apple') {
+  }
+  if (task === 'stt' && profileId === 'apple') {
+    setSetting(profileKey(task), 'apple')
+  } else if (profileId !== 'apple') {
     setSetting(profileKey(task), profileId)
     setSetting(modelKey(task), model.trim())
   }

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import { getSetting } from '../db'
 import { sendMail, type OutgoingMail } from './sender'

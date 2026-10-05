@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { startDraftNudge } from '@main/ai/drafts'
 import { upsertEnvelope } from '@main/mail/ingest'
 import { setSetting } from '@main/db'

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { createHash } from 'node:crypto'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { emailFromIdToken, googleAccessToken, googleAuthUrl, pkcePair } from '@main/auth/google'
 import { setSecret, getSecret } from '@main/auth/secrets'
 import { createTestDb, closeTestDb } from '../helpers/db'
@@ -90,7 +90,7 @@ describe('google-auth', () => {
   it('verlangt ohne Refresh-Token einen Re-Login', async () => {
     db = createTestDb()
     await expect(googleAccessToken('unbekannt@gmail.com')).rejects.toThrow(
-      /nicht angemeldet.*neu verbinden/
+      /nicht angemeldet.*erneut anmelden/
     )
   })
 

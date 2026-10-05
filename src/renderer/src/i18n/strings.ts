@@ -488,6 +488,14 @@ const table = {
     en: 'The server rejected the sign-in — update the password or sign in again.',
     de: 'Der Server hat die Anmeldung abgelehnt — Passwort aktualisieren oder neu anmelden.'
   },
+  credReenter: { en: 'RE-ENTER PASSWORD', de: 'PASSWORT NEU EINGEBEN' },
+  credSignInAgain: { en: 'SIGN IN AGAIN', de: 'ERNEUT ANMELDEN' },
+  credNewPassword: { en: 'New password', de: 'Neues Passwort' },
+  credSave: { en: 'SAVE', de: 'SPEICHERN' },
+  credChecking: { en: 'checking···', de: 'prüft···' },
+  credCancel: { en: 'CANCEL', de: 'ABBRECHEN' },
+  toastCredUpdated: { en: 'Password updated', de: 'Passwort aktualisiert' },
+  toastReauthorized: { en: 'Signed in again', de: 'Erneut angemeldet' },
   sinceTime: { en: 'since {time}', de: 'seit {time}' },
   addAddress: { en: 'ADD AN ADDRESS', de: 'ADRESSE HINZUFÜGEN' },
   waitingForBrowser: {
@@ -693,6 +701,14 @@ const table = {
   taskBlockedNoProfile: {
     en: 'This provider no longer exists — pick another.',
     de: 'Dieser Anbieter existiert nicht mehr — wähle einen anderen.'
+  },
+  sttProviderApple: {
+    en: 'Apple speech recognition — on this Mac',
+    de: 'Apple-Spracherkennung — auf diesem Mac'
+  },
+  taskAppleNote: {
+    en: 'Runs on this Mac — no model, no key, no cost.',
+    de: 'Läuft auf diesem Mac — kein Modell, kein Schlüssel, keine Kosten.'
   },
   toastTaskProfile: { en: 'Now using {name}', de: 'Nutzt jetzt {name}' },
   modelsFrom: { en: 'models from {name}', de: 'Modelle von {name}' },
