@@ -42,6 +42,8 @@ export interface SelfBusyInput {
   rangeStart: number
   rangeEnd: number
   calendarIds?: number[]
+  /** Dieser Termin zählt nicht als belegt (Editor: der Termin selbst) */
+  excludeObjectId?: number
 }
 
 /**
@@ -65,7 +67,7 @@ export function selfBusy(input: SelfBusyInput, db: Database.Database = getDb()):
   const cache = new Map<number, { ics: string } | null>()
   const out: BusyInterval[] = []
   for (const e of events) {
-    if (e.status === 'CANCELLED') continue
+    if (e.status === 'CANCELLED' || e.objectId === input.excludeObjectId) continue
     let cached = cache.get(e.objectId)
     if (cached === undefined) {
       const row = db.prepare('SELECT ics FROM cal_objects WHERE id = ?').get(e.objectId) as

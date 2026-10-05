@@ -124,5 +124,28 @@ export type FreeBusyResult = z.infer<typeof freeBusyResultSchema>
 export const freeBusySelfInputSchema = z.object({
   rangeStart: z.number(),
   rangeEnd: z.number(),
-  calendarIds: z.array(z.number().int()).max(200).optional()
+  calendarIds: z.array(z.number().int()).max(200).optional(),
+  /** Termin, der nicht als belegt zählt (der gerade bearbeitete) */
+  excludeObjectId: z.number().int().optional()
 })
+
+/** Scheduling-Kontext des Termin-Editors: wer bin ich, bin ich Organisator, gibt es eine Einladung. */
+export const schedulingInfoInputSchema = z.object({
+  calendarId: z.number().int(),
+  objectId: z.number().int().optional()
+})
+
+export const schedulingInfoSchema = z.object({
+  accountId: z.number().int(),
+  /** Server verschickt Einladungen selbst (calendar-auto-schedule) */
+  autoSchedule: z.boolean(),
+  /** Hauptadresse des Kalender-Kontos (Organisator neuer Termine) */
+  ownAddress: z.string().nullable(),
+  /** Alle eigenen Adressen (kleingeschrieben) */
+  myAddresses: z.array(z.string()),
+  /** Neuer Termin, kein Organisator oder Organisator = ich */
+  organizerIsMe: z.boolean(),
+  /** Einladung (iMIP), aus der der Termin stammt — für die RSVP-Knöpfe */
+  invitation: z.object({ id: z.number().int(), myPartstat: z.string().nullable() }).nullable()
+})
+export type SchedulingInfo = z.infer<typeof schedulingInfoSchema>

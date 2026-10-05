@@ -48,7 +48,8 @@ import { calendarSync } from '../calendar/sync'
 import {
   getInvitationsForMessage,
   removeCancelledEvent,
-  respondToInvitation
+  respondToInvitation,
+  schedulingInfo
 } from '../calendar/invitations'
 import { queryFreeBusy, selfBusy } from '../calendar/freebusy'
 import {
@@ -556,6 +557,8 @@ export const handlers: IpcHandlers = {
   'calendar:freebusy': async (input) => ({ results: await queryFreeBusy(input) }),
 
   'calendar:freebusy:self': (input) => ({ busy: selfBusy(input) }),
+
+  'calendar:scheduling:info': (input) => schedulingInfo(getDb(), input),
 
   'calendar:refresh': ({ accountId }) => {
     calendarSync.refresh(accountId)

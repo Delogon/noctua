@@ -31,6 +31,8 @@ import {
   freeBusyInputSchema,
   freeBusyResultSchema,
   freeBusySelfInputSchema,
+  schedulingInfoInputSchema,
+  schedulingInfoSchema,
   busyIntervalSchema,
   invitationRespondInputSchema,
   invitationRespondOutputSchema,
@@ -368,6 +370,11 @@ export const invokeContract = {
   'calendar:freebusy:self': {
     input: freeBusySelfInputSchema,
     output: z.object({ busy: z.array(busyIntervalSchema) })
+  },
+  // Scheduling-Kontext für den Editor (Organisator?, eigene Adressen, Einladung zum Termin)
+  'calendar:scheduling:info': {
+    input: schedulingInfoInputSchema,
+    output: schedulingInfoSchema
   },
   // Sofortiger Abgleich (ein Konto oder alle); hebt needs-reauth-Wartezeiten auf
   'calendar:refresh': {

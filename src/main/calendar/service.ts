@@ -40,6 +40,7 @@ import {
   queueForCreate,
   queueForDelete,
   withDefaultOrganizer,
+  withDefaultOrganizerPatch,
   type SchedulingOptions
 } from './organizer'
 import { calendarSync } from './sync'
@@ -448,7 +449,15 @@ export function updateEvent(
   if (!obj || obj.pending_op === 'delete') throw new Error('Ereignis nicht gefunden')
   const cal = writableCalendar(db, obj.calendar_id)
   const account = getCalAccount(db, cal.account_id)
-  const result = updateIcs(obj.ics, { scope, recurrenceId, patch }, ctx)
+  const result = updateIcs(
+    obj.ics,
+    {
+      scope,
+      recurrenceId,
+      patch: account ? withDefaultOrganizerPatch(db, account, obj.ics, patch) : patch
+    },
+    ctx
+  )
   let createdObjectId: number | null = null
   db.transaction(() => {
     // Organisator mit Teilnehmern: SEQUENCE/PARTSTAT nach RFC 5546 führen, Mails einreihen

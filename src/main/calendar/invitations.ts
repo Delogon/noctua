@@ -1,10 +1,15 @@
 import type Database from 'better-sqlite3-multiple-ciphers'
 import type { CalendarAttendee } from '@shared/calendar-types'
-import type { InvitationRespondInput, InvitationView, RsvpPartstat } from '@shared/invitation-types'
+import type {
+  InvitationRespondInput,
+  InvitationView,
+  RsvpPartstat,
+  SchedulingInfo
+} from '@shared/invitation-types'
 import { getSetting } from '../db'
 import type { ParsedCalendarPart } from '../mail/parser'
 import { defaultEditContext, type EditContext } from './edit'
-import { myAddresses } from './identity'
+import { myAddresses, ownAddressOf } from './identity'
 import { readAttendees, parseCalendar, splitComponents, vtimezonesOf } from './ics'
 import {
   buildReplyIcs,
@@ -578,4 +583,49 @@ export function removeCancelledEvent(
   db.prepare(`UPDATE invitations SET state = 'removed' WHERE uid = ? AND method = 'CANCEL'`).run(
     row.uid
   )
+}
+
+// --- Scheduling-Kontext für den Termin-Editor ---------------------------------------------------------
+
+/**
+ * Wer bin ich zu diesem Termin? Neuer Termin / ohne Organisator → ich bin Organisator;
+ * sonst entscheidet der ORGANIZER des gespeicherten Termins. Stammt der Termin aus
+ * einer Einladung (REQUEST zur UID), liefert das die Einladung für die RSVP-Knöpfe.
+ */
+export function schedulingInfo(
+  db: Database.Database,
+  input: { calendarId: number; objectId?: number }
+): SchedulingInfo {
+  const cal = getCalendar(db, input.calendarId)
+  if (!cal) throw new Error('Kalender nicht gefunden')
+  const account = getCalAccount(db, cal.account_id)
+  if (!account) throw new Error('Kalender-Konto nicht gefunden')
+  const mine = myAddresses(db)
+  let organizerIsMe = true
+  let invitation: SchedulingInfo['invitation'] = null
+  if (input.objectId !== undefined) {
+    const obj = db.prepare('SELECT * FROM cal_objects WHERE id = ?').get(input.objectId) as
+      CalObjectRow | undefined
+    if (obj) {
+      const org = organizerOf(obj.ics)
+      organizerIsMe = org === null || mine.has(org)
+      if (!organizerIsMe) {
+        const row = db
+          .prepare(
+            `SELECT id, my_partstat FROM invitations
+              WHERE uid = ? AND method = 'REQUEST' ORDER BY created_at DESC, id DESC LIMIT 1`
+          )
+          .get(obj.uid) as { id: number; my_partstat: string | null } | undefined
+        if (row) invitation = { id: row.id, myPartstat: row.my_partstat }
+      }
+    }
+  }
+  return {
+    accountId: account.id,
+    autoSchedule: account.auto_schedule === 1,
+    ownAddress: ownAddressOf(db, account),
+    myAddresses: [...mine],
+    organizerIsMe,
+    invitation
+  }
 }
