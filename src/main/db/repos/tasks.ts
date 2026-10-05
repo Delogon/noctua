@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import type { TaskItem } from '@shared/types'
 import { getSetting } from '../index'
 import { htmlToText } from '../../mail/parser'

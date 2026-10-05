@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { getSetting, setSetting } from '../db'
 import { hasSecret, setSecret } from './secrets'
 import { accountSecretKey, PROVIDER_DEFAULTS } from './providers'

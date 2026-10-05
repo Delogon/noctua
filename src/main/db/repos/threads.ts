@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { isSecurityNotification, isUserAuthoredMail } from './tasks'
 import { taskAddresseeVerdict } from '../../ai/addressee'
 import type { AiCategory, MessageDetail, Recipient, ThreadListItem } from '@shared/types'

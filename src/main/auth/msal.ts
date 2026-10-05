@@ -8,6 +8,7 @@ import {
 import { getSetting } from '../db'
 import { getSecret, setSecret } from './secrets'
 import { CancelableLoopbackClient } from './loopback'
+import { mapMsalError, ReauthRequiredError } from './reauth'
 
 /**
  * Microsoft-OAuth für persönliche Konten (Hotmail/Outlook.com).
@@ -109,11 +110,33 @@ export function cancelMsLogin(): boolean {
   return true
 }
 
-/** Frisches Access-Token (silent, mit Refresh); wirft, wenn Re-Login nötig ist. */
+/** Entfernt ein Konto aus dem MSAL-Cache (z. B. nach einer Anmeldung mit falscher Adresse). */
+export async function msForgetAccount(email: string): Promise<void> {
+  const lower = email.toLowerCase()
+  const accounts = await getPca().getTokenCache().getAllAccounts()
+  for (const account of accounts) {
+    if (account.username.toLowerCase() === lower) {
+      await getPca().getTokenCache().removeAccount(account)
+    }
+  }
+}
+
+/**
+ * Frisches Access-Token (silent, mit Refresh). Ist ein Re-Login nötig
+ * (Refresh-Token abgelaufen/widerrufen, kein Konto im Cache), wirft die
+ * Funktion einen ReauthRequiredError → needs-reauth statt Backoff-Loop.
+ */
 export async function msAccessToken(email: string): Promise<string> {
   const account = await findAccount(email)
-  if (!account) throw new Error('Microsoft-Konto nicht angemeldet — bitte neu verbinden')
-  const result = await getPca().acquireTokenSilent({ account, scopes: MS_MAIL_SCOPES })
+  if (!account) {
+    throw new ReauthRequiredError('Microsoft-Konto nicht angemeldet — bitte erneut anmelden')
+  }
+  let result
+  try {
+    result = await getPca().acquireTokenSilent({ account, scopes: MS_MAIL_SCOPES })
+  } catch (error) {
+    throw mapMsalError(error)
+  }
   if (!result?.accessToken) throw new Error('Kein Access-Token erhalten')
   return result.accessToken
 }

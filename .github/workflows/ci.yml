@@ -31,11 +31,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Tests laufen unter System-Node — better-sqlite3 gegen dessen ABI bauen
-      # (postinstall baut zunächst gegen Electron).
-      - name: Rebuild native module for Node
-        run: npm rebuild better-sqlite3
-
       - name: Lint
         run: pnpm lint
 

@@ -1,5 +1,5 @@
 import { isDev } from '../dev-mode'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
 import { getSetting, setSetting } from '../db'
 import { extractUsage, getDraftModel, getOpenRouter, providerBody } from './openrouter'

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 
 // OpenRouter mocken — geprüft wird das [LEER]-Protokoll, nicht das Netz
 const createMock = vi.fn()

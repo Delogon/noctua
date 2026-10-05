@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { currentDateLine, localStamp } from './prompt-date'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import { htmlToText } from '../mail/parser'
 import { extractUsage, getDraftModel, getOpenRouter, providerBody } from './openrouter'

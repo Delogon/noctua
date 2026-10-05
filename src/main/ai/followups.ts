@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import { getSetting } from '../db'

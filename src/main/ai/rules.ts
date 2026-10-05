@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
 import { extractUsage, getDraftModel, getOpenRouter, providerBody } from './openrouter'
 import { logUsage } from './budget'

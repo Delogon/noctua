@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { getSecret } from '../auth/secrets'
 import { getSetting } from '../db'
 import { accountSecretKey, isLoopbackHost, type AccountRow } from '../auth/providers'

@@ -1,38 +1,80 @@
 import { app } from 'electron'
+import { existsSync, statSync } from 'fs'
 import { join } from 'path'
-import Database from 'better-sqlite3'
-import * as sqliteVec from 'sqlite-vec'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { runMigrations } from './migrate'
+import {
+  discardPlainBackups,
+  discardPlainMigrationBackup,
+  isPlaintextSqlite,
+  loadVecExtension,
+  migratePlaintextToEncrypted,
+  openEncrypted,
+  restrictPermissions
+} from './encryption'
+import { DB_KEY_FILENAME, loadOrCreateDbKey } from './key'
 
 let db: Database.Database | null = null
 
+/**
+ * Öffnet die SQLCipher-verschlüsselte Datenbank (Schlüssel aus safeStorage) und
+ * migriert dabei eine vorhandene Klartext-DB. Fehlt safeStorage oder der
+ * Schlüssel, wirft die Funktion — es gibt keinen Klartext-Fallback.
+ */
 export function openDb(): Database.Database {
   if (db) return db
 
-  const dbPath = join(app.getPath('userData'), 'noctua.sqlite')
-  db = new Database(dbPath)
-  // Vektor-Extension VOR den Migrationen laden (vec0-Tabellen brauchen sie).
-  // In der verpackten App liegt die dylib in app.asar.unpacked — SQLites
-  // natives dlopen kennt Electrons asar-Umleitung nicht, Pfad selbst umbiegen.
-  db.loadExtension(sqliteVec.getLoadablePath().replace('app.asar', 'app.asar.unpacked'))
-  db.pragma('journal_mode = WAL')
-  db.pragma('synchronous = NORMAL')
-  db.pragma('foreign_keys = ON')
+  const userData = app.getPath('userData')
+  const dbPath = join(userData, 'noctua.sqlite')
+  const keyPath = join(userData, DB_KEY_FILENAME)
 
-  let from: number
-  let to: number
+  // Neue Dateien (DB, -wal, -shm, Schlüssel, Backups) nur für den Besitzer lesbar.
+  // SQLite legt -wal/-shm mit den Rechten der Hauptdatei an. Umask nur
+  // während des Öffnens, damit z. B. gespeicherte Anhänge unberührt bleiben.
+  const previousUmask = process.umask(0o077)
   try {
-    ;({ from, to } = runMigrations(db))
-  } catch (error) {
-    // Downgrade-Guard/Migrationsfehler: Handle freigeben, damit die DB-Datei
-    // unberührt bleibt; main/index.ts zeigt den Fehler per Dialog und beendet.
-    db.close()
-    db = null
-    throw error
+    const exists = existsSync(dbPath) && statSync(dbPath).size > 0
+    const plaintext = exists && isPlaintextSqlite(dbPath)
+    // Nur ohne DB oder bei Klartext-DB darf ein neuer Schlüssel entstehen.
+    const keyHex = loadOrCreateDbKey(keyPath, !exists || plaintext)
+
+    if (plaintext) {
+      console.log('[db] Klartext-Datenbank gefunden — verschlüssele …')
+      migratePlaintextToEncrypted(dbPath, keyHex)
+      console.log('[db] Verschlüsselung abgeschlossen')
+    }
+
+    const opened = openEncrypted(dbPath, keyHex)
+    // Alte Klartext-Pre-Migration-Backups (.bak-v*) sofort verwerfen — die
+    // Rotation in migrate.ts legt gleich verschlüsselte an.
+    discardPlainBackups(dbPath)
+    let from: number
+    let to: number
+    try {
+      // Vektor-Extension VOR den Migrationen laden (vec0-Tabellen brauchen sie).
+      loadVecExtension(opened)
+      opened.pragma('journal_mode = WAL')
+      opened.pragma('synchronous = NORMAL')
+      opened.pragma('foreign_keys = ON')
+      ;({ from, to } = runMigrations(opened))
+    } catch (error) {
+      // Downgrade-Guard/Migrationsfehler: Handle freigeben, damit die DB-Datei
+      // unberührt bleibt; main/index.ts zeigt den Fehler per Dialog und beendet.
+      opened.close()
+      throw error
+    }
+    if (from !== to) {
+      console.log(`[db] migrated ${dbPath} from v${from} to v${to}`)
+    }
+    db = opened
+
+    // Die verschlüsselte DB lief einmal durch → Klartext-Backup der Migration
+    // verwerfen. unlink genügt; Überschreiben bringt auf APFS/SSD nichts.
+    discardPlainMigrationBackup(dbPath)
+  } finally {
+    process.umask(previousUmask)
   }
-  if (from !== to) {
-    console.log(`[db] migrated ${dbPath} from v${from} to v${to}`)
-  }
+  restrictPermissions(dbPath)
   return db
 }
 

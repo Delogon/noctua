@@ -439,6 +439,154 @@ function AccountCard({
       </div>
       <ColorRow account={a} />
       <SyncRangeRow account={a} />
+      <CredentialsRow account={a} failed={failed} />
+    </div>
+  )
+}
+
+/**
+ * Zugangsdaten erneuern: bei Passwort-/Bridge-Konten ein Inline-Feld (der
+ * Server-Login wird vor dem Speichern geprüft), bei Google/Microsoft der
+ * Browser-Login erneut. Im Fehlerzustand hervorgehoben, sonst dezent.
+ */
+function CredentialsRow({
+  account,
+  failed
+}: {
+  account: AccountSummary
+  failed: boolean
+}): React.JSX.Element {
+  const t = useT()
+  const queryClient = useQueryClient()
+  const { toastNow } = usePaper()
+  const oauth = account.credentialType === 'oauth-google' || account.credentialType === 'oauth-ms'
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const done = (toast: string): void => {
+    setBusy(false)
+    setOpen(false)
+    setPassword('')
+    toastNow(toast)
+    void queryClient.invalidateQueries({ queryKey: ['accounts'] })
+  }
+  const fail = (err: unknown): void => {
+    setBusy(false)
+    setError(err instanceof Error ? err.message : String(err))
+  }
+
+  const savePassword = (): void => {
+    if (!password || busy) return
+    setBusy(true)
+    setError(null)
+    invoke('accounts:updatePassword', { accountId: account.id, password })
+      .then(() => done(t('toastCredUpdated')))
+      .catch(fail)
+  }
+  const signInAgain = (): void => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    invoke('accounts:reauthorize', { accountId: account.id })
+      .then(() => done(t('toastReauthorized')))
+      .catch(fail)
+  }
+
+  const buttonStyle: React.CSSProperties = {
+    font: '500 9px var(--mono)',
+    letterSpacing: '.5px',
+    border: failed ? '1px solid var(--ink)' : '1px solid var(--rule, var(--faint))',
+    color: failed ? 'var(--ink)' : 'var(--muted)',
+    padding: '4px 10px'
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {oauth ? (
+        <div className="flex items-baseline gap-2">
+          <button
+            type="button"
+            className="btn-bare"
+            style={buttonStyle}
+            disabled={busy}
+            onClick={signInAgain}
+          >
+            {busy ? t('waitingForBrowser') : t('credSignInAgain')}
+          </button>
+          {busy && (
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => {
+                void invoke('accounts:cancelOAuth', {
+                  provider: account.credentialType === 'oauth-ms' ? 'microsoft' : 'gmail'
+                }).catch(() => {})
+              }}
+            >
+              {t('credCancel')}
+            </button>
+          )}
+        </div>
+      ) : open ? (
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            savePassword()
+          }}
+        >
+          <input
+            type="password"
+            autoFocus
+            autoComplete="off"
+            maxLength={1000}
+            value={password}
+            placeholder={t('credNewPassword')}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation()
+                setOpen(false)
+                setPassword('')
+                setError(null)
+              }
+            }}
+            className="paper-input"
+            style={{ flex: 1, padding: '3px 8px', font: '500 10px var(--mono)' }}
+          />
+          <button
+            type="submit"
+            className="btn-bare"
+            style={buttonStyle}
+            disabled={busy || !password}
+          >
+            {busy ? t('credChecking') : t('credSave')}
+          </button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="btn-bare"
+          style={buttonStyle}
+          onClick={() => setOpen(true)}
+        >
+          {t('credReenter')}
+        </button>
+      )}
+      {error && (
+        <div
+          style={{
+            font: '400 12px var(--serif)',
+            fontStyle: 'italic',
+            color: 'var(--ac)',
+            marginTop: 4
+          }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   )
 }
