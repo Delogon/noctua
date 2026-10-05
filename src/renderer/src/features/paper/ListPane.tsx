@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { TaskSyncGlyph } from './TaskSyncGlyph'
 import { contrastOn, type AccountSummary, type ThreadListItem } from '@shared/types'
 import { useMboxCounts, useThreads } from '@renderer/queries/threads'
 import { useDrafts } from '@renderer/queries/drafts'
@@ -892,6 +893,7 @@ function TasksList(): React.JSX.Element {
                 >
                   {task.title}
                 </span>
+                <TaskSyncGlyph state={task.syncState} />
                 {task.dueDate && (
                   <span
                     className="mchip flex-none"

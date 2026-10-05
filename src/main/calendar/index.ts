@@ -4,6 +4,7 @@ import { ensureInstanceWindow } from './repo'
 import { reminderScheduler, type NotifyFn } from './reminders'
 import { setCalendarChangedHandler } from './service'
 import { calendarSync } from './sync'
+import { afterCalendarChanged, initTasksSync } from '../tasks/caldav-sync'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
@@ -22,11 +23,17 @@ export function initCalendar(db: Database.Database, push: PushFn, notify: Notify
       onChanged: (accountId, calendarIds) => {
         push('calendar:changed', { accountId, calendarIds })
         reminderScheduler.tick()
+        // Aufgaben <-> VTODO (3.2): nach Sync/Push die gewählte Liste abgleichen
+        afterCalendarChanged(db, accountId, calendarIds)
       },
       onConflict: (info) => push('calendar:conflict', info)
     },
     (accountId, state, detail) => push('calendar:accountState', { accountId, state, detail })
   )
+  initTasksSync({
+    onTasksChanged: () => push('tasks:changed', {}),
+    onConflict: (info) => push('calendar:conflict', { ...info, kind: 'update', reason: 'conflict' })
+  })
   ensureInstanceWindow(db)
   calendarSync.startAll()
   reminderScheduler.init(db, notify)

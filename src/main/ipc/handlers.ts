@@ -6,6 +6,7 @@ import { ACCOUNT_COLORS, PASTEL_COLORS } from '@shared/types'
 import { getDb, getSetting, setSetting } from '../db'
 import { getThreadMessages, imagesAllowKey, listThreads, mboxCounts } from '../db/repos/threads'
 import { getInlineImages, saveAttachment } from '../mail/attachments'
+import { listTaskLists, setTasksSyncCalendar, targetCalendar } from '../tasks/caldav-sync'
 import { countOpenTasks, decideSuggestion, listTasks, updateTaskStatus } from '../db/repos/tasks'
 import { preferredAccountForContact, suggestContacts } from '../db/repos/contacts'
 import { deleteDraft, listDrafts, saveDraft } from '../db/repos/drafts'
@@ -812,6 +813,17 @@ export const handlers: IpcHandlers = {
     updateTaskStatus(getDb(), id, status)
     pushFn('tasks:changed', {})
     return { ok: true }
+  },
+
+  'tasks:sync:get': () => {
+    const db = getDb()
+    return { calendarId: targetCalendar(db)?.id ?? null, lists: listTaskLists(db) }
+  },
+
+  'tasks:sync:set': ({ calendarId }) => {
+    setTasksSyncCalendar(getDb(), calendarId)
+    pushFn('tasks:changed', {})
+    return { ok: true as const }
   },
 
   'drafts:list': () => ({ drafts: listDrafts(getDb()) }),

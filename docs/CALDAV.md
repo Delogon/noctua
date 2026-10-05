@@ -185,7 +185,7 @@ servers: mailbox.org, Fastmail, Posteo, SOGo, Baïkal (the generic RFC 4791/6578
 
 ## Limitations
 
-- No VTODO two-way sync, invitations/iMIP, free/busy, CardDAV (VTODOs are only stored).
+- Invitations/iMIP, free/busy, CardDAV: not part of the CalDAV core (VTODOs: see "Tasks" below).
 - RFC 6638 scheduling is only detected/stored (`auto_schedule`, inbox/outbox URLs, user
   addresses); ATTENDEE/ORGANIZER are written as given, no PARTSTAT replies yet.
 - Moving an event between calendars is not supported by `updateEvent`.
@@ -195,3 +195,25 @@ servers: mailbox.org, Fastmail, Posteo, SOGo, Baïkal (the generic RFC 4791/6578
 - A server that answers an empty calendar list does not delete local calendars (guards against
   glitches); delete the account to drop them.
 - Discovery by SRV needs DNS access; blocked DNS falls back to well-known.
+
+## Tasks <-> VTODO (3.2)
+
+Setting "Sync tasks with" (Accounts; IPC `tasks:sync:get|set`, default off) picks one VTODO
+calendar. `src/main/tasks/caldav-sync.ts` reconciles `tasks` with that calendar's VTODOs from
+`cal_objects` after each calendar sync and after each local task change; pushes go through
+`cal_pending_ops` (If-Match / 412 -> server version wins + `calendar:conflict` toast).
+`task_caldav` (migration 030) stores uid, last agreed field hash and ETag per task.
+
+| Noctua | VTODO |
+| --- | --- |
+| title | SUMMARY |
+| notes | DESCRIPTION |
+| due (`YYYY-MM-DD`) | DUE (DATE; DATE-TIME reduced to its wall date, untouched unless the date changes) |
+| status done / open | STATUS COMPLETED + COMPLETED + PERCENT-COMPLETE:100 / NEEDS-ACTION (CANCELLED reads as done) |
+| source mail | X-NOCTUA-MESSAGE-ID (RFC Message-ID) + URL `mid:<id>` |
+
+Only open tasks are pushed (never AI suggestions, dismissed or already-done unmapped tasks).
+Dismissing or deleting a task deletes the VTODO; server deletions remove the local task.
+Unknown VTODO properties are preserved (only changed mapped fields are patched).
+Limitations: no priority (Noctua has none; server PRIORITY is preserved), no recurring VTODOs
+(RRULE kept, instance semantics ignored), no subtasks (RELATED-TO kept), one list overall.
