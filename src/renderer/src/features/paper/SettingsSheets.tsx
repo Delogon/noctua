@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { DraftCalendarToggle } from '@renderer/features/settings/DraftCalendarToggle'
 import { useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import { useAccounts } from '@renderer/queries/accounts'
@@ -1857,6 +1858,10 @@ export function IntelSheet(): React.JSX.Element {
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
         <TasksAutoCard />
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <DraftCalendarToggle />
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>

@@ -13,6 +13,13 @@ import {
   stripQuoted
 } from './style'
 import { getSetting } from '../db'
+import { buildAvailabilityBlock } from './availability'
+import {
+  UNTRUSTED_SYSTEM_NOTE,
+  sanitizeUntrusted,
+  sanitizeUntrustedLine,
+  wrapUntrusted
+} from './untrusted'
 import {
   renderSignatureText,
   stripRedundantSignatureTail,
@@ -210,13 +217,28 @@ async function runDraft(
   const contactStyle = extractContactStyle(db, accountId, lastForeign.from_addr)
   const formality = formalityBlock(db, accountId, account.email, lastForeign.from_addr, messages)
 
-  const threadContext = [...messages]
-    .reverse()
-    .map(
-      (m) =>
-        `--- ${m.from_name ?? m.from_addr ?? '?'} (${m.date ? localStamp(m.date) : '?'}) ---\n${bodyText(m)}`
-    )
-    .join('\n\n')
+  // SEC-15: Mail-Inhalt ist unvertrauenswürdig — bereinigt und in Delimitern
+  const threadContext = wrapUntrusted(
+    'THREAD',
+    [...messages]
+      .reverse()
+      .map(
+        (m) =>
+          `--- ${sanitizeUntrustedLine(m.from_name ?? m.from_addr ?? '?', 120)} (${m.date ? localStamp(m.date) : '?'}) ---\n${sanitizeUntrusted(bodyText(m), 1500)}`
+      )
+      .join('\n\n')
+  )
+
+  // Verfügbarkeit (opt-out über ai.draftUseCalendar): nur wenn die Mail nach einem Termin fragt
+  const availability = buildAvailabilityBlock(db, {
+    now: Date.now(),
+    lastMessageText: stripQuoted(bodyText(lastForeign)),
+    hasEventSuggestion: !!db
+      .prepare(
+        `SELECT 1 FROM event_suggestions WHERE thread_key = ? AND state != 'dismissed' LIMIT 1`
+      )
+      .get(input.threadKey)
+  })
 
   const profileBlock = profile
     ? `\n\nSchreibstil-Profil des Nutzers (gelernt aus gesendeten Mails):
@@ -236,6 +258,7 @@ Verwende exakt dieses Register.`
 
   const systemPrompt = `${currentDateLine()}
 Du entwirfst E-Mail-Antworten für ${account.display_name ?? account.email} <${account.email}>.
+${UNTRUSTED_SYSTEM_NOTE}
 Regeln:
 - Antworte in der Sprache der letzten eingehenden Nachricht.
 - Triff den Ton des Nutzers: Stil-Profil und Kontakt-Register unten sind maßgeblich,
@@ -247,13 +270,13 @@ ${
     : '- Beende mit der Grußformel des Nutzers und höchstens seinem Vornamen.'
 }
 - Sei konkret und knapp und erfinde keine Fakten, die nicht im Thread stehen.
-${BASE_STYLE_RULES}${profileBlock}${contactBlock}${formality}${styleInstructionsBlock(accountId)}${
+${BASE_STYLE_RULES}${profileBlock}${contactBlock}${formality}${styleInstructionsBlock(accountId)}${availability ?? ''}${
     examples.length > 0
       ? `\n\nStilbeispiele des Nutzers (frühere gesendete Mails):\n\n${examples.map((e, i) => `Beispiel ${i + 1}:\n${e}`).join('\n\n')}`
       : ''
   }`
 
-  const userPrompt = `Unterhaltung (älteste zuerst):\n\n${threadContext}\n\nSchreibe eine Antwort auf die letzte Nachricht von ${lastForeign.from_name ?? lastForeign.from_addr}.${
+  const userPrompt = `Unterhaltung (älteste zuerst):\n\n${threadContext}\n\nSchreibe eine Antwort auf die letzte Nachricht von ${sanitizeUntrustedLine(lastForeign.from_name ?? lastForeign.from_addr, 120)}.${
     input.instruction ? `\nAnweisung des Nutzers: ${input.instruction}` : ''
   }${
     input.reviseText?.trim() && input.idea?.trim()

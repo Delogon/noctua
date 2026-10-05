@@ -28,6 +28,8 @@ const WRITABLE_EXACT = new Set([
   'ai.triageProvider',
   'followup.waitDays',
   'tasks.autoCreate',
+  // Entwürfe dürfen freie Zeitfenster (ohne Termindetails) nutzen; '0' = aus
+  'ai.draftUseCalendar',
   'compose.draft'
 ])
 
