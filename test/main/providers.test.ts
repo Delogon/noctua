@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { buildImapOptions, isLoopbackHost, PROVIDER_DEFAULTS } from '@main/auth/providers'
 
-const base = { email: 'x@test.de', provider: 'imap' as const, imap_host: 'imap.test', imap_port: 993 }
+const base = {
+  email: 'x@test.de',
+  provider: 'imap' as const,
+  imap_host: 'imap.test',
+  imap_port: 993
+}
 
 describe('buildImapOptions', () => {
   it('nutzt Passwort-Auth für klassische Konten', () => {

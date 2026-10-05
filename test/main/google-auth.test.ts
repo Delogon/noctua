@@ -1,12 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { createHash } from 'node:crypto'
 import type Database from 'better-sqlite3'
-import {
-  emailFromIdToken,
-  googleAccessToken,
-  googleAuthUrl,
-  pkcePair
-} from '@main/auth/google'
+import { emailFromIdToken, googleAccessToken, googleAuthUrl, pkcePair } from '@main/auth/google'
 import { setSecret, getSecret } from '@main/auth/secrets'
 import { createTestDb, closeTestDb } from '../helpers/db'
 

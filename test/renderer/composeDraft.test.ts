@@ -55,7 +55,11 @@ describe('isComposeDraftEmpty', () => {
 
 describe('saveComposeDraft / loadComposeDraft', () => {
   it('Roundtrip erhält alle Felder', async () => {
-    const draft = mkDraft({ cc: ['jens@example.org'], bcc: ['leise@example.org'], replyToMessageId: 42 })
+    const draft = mkDraft({
+      cc: ['jens@example.org'],
+      bcc: ['leise@example.org'],
+      replyToMessageId: 42
+    })
     await saveComposeDraft(draft)
     expect(await loadComposeDraft()).toEqual(draft)
   })

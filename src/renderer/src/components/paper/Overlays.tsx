@@ -418,7 +418,9 @@ function PaperPaletteOpen(): React.JSX.Element {
           )}
           <button
             type="button"
-            onClick={() => (dictation.state === 'listening' ? dictation.finish() : dictation.start())}
+            onClick={() =>
+              dictation.state === 'listening' ? dictation.finish() : dictation.start()
+            }
             className="btn-bare hit-target"
             title={t('voiceQueryStart')}
             aria-label={t('voiceQueryStart')}

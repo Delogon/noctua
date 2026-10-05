@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
+import type { InvokeOutput } from '@shared/ipc-contract'
 
 /** Key-Status + aktive Modelle (aus ai:usage — dort liegt beides schon). */
-export function useOrKeyStatus() {
+export function useOrKeyStatus(): UseQueryResult<{ hasKey: boolean }> {
   return useQuery({
     queryKey: ['ai', 'usage'],
     queryFn: () => invoke('ai:usage', undefined),
@@ -11,7 +12,7 @@ export function useOrKeyStatus() {
   })
 }
 
-export function useModels() {
+export function useModels(): UseQueryResult<{ scanModel: string; writeModel: string }> {
   return useQuery({
     queryKey: ['ai', 'usage'],
     queryFn: () => invoke('ai:usage', undefined),
@@ -21,7 +22,7 @@ export function useModels() {
 }
 
 /** Verfügbarkeit von Apple Intelligence (On-Device-Triage). */
-export function useAppleFm() {
+export function useAppleFm(): UseQueryResult<InvokeOutput<'ai:appleFm'>> {
   return useQuery({
     queryKey: ['ai', 'appleFm'],
     queryFn: () => invoke('ai:appleFm', undefined),
@@ -31,7 +32,7 @@ export function useAppleFm() {
 }
 
 /** Live-Modellliste von OpenRouter (main-seitig gecacht). */
-export function useModelCatalog() {
+export function useModelCatalog(): UseQueryResult<InvokeOutput<'ai:models'>['models']> {
   return useQuery({
     queryKey: ['ai', 'models'],
     queryFn: () => invoke('ai:models', undefined),

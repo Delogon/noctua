@@ -43,9 +43,7 @@ export function applyFilters<T extends Pick<ThreadListItem, 'aiPriority'>>(
   active: ReadonlySet<InboxFilterId>
 ): T[] {
   if (active.size === 0) return rows
-  const predicates = INBOX_FILTERS.filter((def) => active.has(def.id)).map(
-    (def) => def.predicate
-  )
+  const predicates = INBOX_FILTERS.filter((def) => active.has(def.id)).map((def) => def.predicate)
   return rows.filter((row) => predicates.every((matches) => matches(row)))
 }
 

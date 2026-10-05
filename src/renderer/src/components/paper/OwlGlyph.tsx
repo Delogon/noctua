@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useState } from 'react'
 
 // Die Eule als Inline-SVG — eine Komponente, fünf Posen (Design-Handoff
 // Turn 4a). Kopf-Outline und Schnabel sind in allen Posen identisch, nur
@@ -78,6 +78,7 @@ const TIERS: Tier[] = [
 ]
 
 /** Exportiert für den Render-Test — bewusst Lookup statt Rechnung (4a „SCALES"). */
+// eslint-disable-next-line react-refresh/only-export-components -- Reine Funktion, vom Render-Test importiert; Fast Refresh der Komponente bleibt unberührt
 export function owlTier(size: number): Tier {
   return TIERS.find((tier) => size >= tier.min) ?? TIERS[TIERS.length - 1]
 }
@@ -90,7 +91,7 @@ export function OwlGlyph({
   accentLeftEye = false
 }: OwlGlyphProps): React.JSX.Element {
   // Blinzeldauer einmal pro Mount würfeln — nie zwei Eulen synchron
-  const blinkDur = useRef(8 + Math.random() * 6)
+  const [blinkDur] = useState(() => 8 + Math.random() * 6)
   const tier = owlTier(size)
 
   const pupils = (radius: number): React.JSX.Element => (
@@ -106,15 +107,13 @@ export function OwlGlyph({
         if (!live) return pupils(tier.pupil)
         return (
           <>
-            <g style={{ animation: `owl-pupil ${blinkDur.current}s infinite` }}>
-              {pupils(tier.pupil)}
-            </g>
+            <g style={{ animation: `owl-pupil ${blinkDur}s infinite` }}>{pupils(tier.pupil)}</g>
             <path
               d={tier.lid.d}
               stroke={color}
               strokeWidth={tier.lid.w}
               strokeLinecap="round"
-              style={{ animation: `owl-lid ${blinkDur.current}s infinite`, opacity: 0 }}
+              style={{ animation: `owl-lid ${blinkDur}s infinite`, opacity: 0 }}
             />
           </>
         )
@@ -132,7 +131,9 @@ export function OwlGlyph({
         )
       case 'scan':
         if (!live) return pupils(tier.scan)
-        return <g style={{ animation: 'owl-scan 3.6s ease-in-out infinite' }}>{pupils(tier.scan)}</g>
+        return (
+          <g style={{ animation: 'owl-scan 3.6s ease-in-out infinite' }}>{pupils(tier.scan)}</g>
+        )
       case 'listen':
         return pupils(tier.listen)
     }

@@ -8,12 +8,7 @@ import {
 
 /** Filter-Registry der Posteingangs-Liste (Design Turn 7). */
 
-const rows = [
-  { aiPriority: 5 },
-  { aiPriority: 4 },
-  { aiPriority: 3 },
-  { aiPriority: null }
-]
+const rows = [{ aiPriority: 5 }, { aiPriority: 4 }, { aiPriority: 3 }, { aiPriority: null }]
 
 describe('applyFilters', () => {
   it('leeres Set lässt die Rows unangetastet (Identität)', () => {
