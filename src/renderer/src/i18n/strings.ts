@@ -1318,11 +1318,6 @@ const table = {
   },
 
   // ── Onboarding — Schlüssel-Schritt + pausiertes Training (Design 1b) ──
-  obKeyHead: { en: 'Bring your own key', de: 'Bring deinen eigenen Schlüssel' },
-  obKeySub: {
-    en: 'Gists, tasks and drafts run on OpenRouter with your key. Calls go straight there — nothing passes through us.',
-    de: 'Gists, Aufgaben und Entwürfe laufen über OpenRouter mit deinem Schlüssel. Anfragen gehen direkt dorthin — nichts läuft über uns.'
-  },
   obOrgHead: { en: 'Your organisation’s AI', de: 'Die KI deiner Organisation' },
   obOrgSub: {
     en: 'Gists, tasks and drafts run on the AI profiles your organisation provides. Add your key where one is needed.',
@@ -1365,6 +1360,100 @@ const table = {
   obPausedFootnote: {
     en: 'mail works without a key — the owl just sleeps',
     de: 'Mail läuft auch ohne Schlüssel — die Eule schläft nur'
+  },
+
+  // ── Onboarding — KI-Schritt „Wo soll die KI laufen?" (lokal zuerst) ──
+  obAiHead: { en: 'Where should the AI run?', de: 'Wo soll die KI laufen?' },
+  obAiSub: {
+    en: 'The owl reads your e-mail to sort it and to write drafts. Choose where that happens — you can change it any time in Settings → Intelligence.',
+    de: 'Die Eule liest deine E-Mails, um sie zu sortieren und Entwürfe zu schreiben. Wähle, wo das passiert — jederzeit änderbar unter Einstellungen → Intelligenz.'
+  },
+  obAiLocalTitle: { en: 'Local server', de: 'Lokaler Server' },
+  obAiRecommended: { en: 'RECOMMENDED', de: 'EMPFOHLEN' },
+  obAiLocalSub: {
+    en: 'Ollama, LM Studio or similar on this machine — your e-mail never leaves it.',
+    de: 'Ollama, LM Studio o. Ä. auf diesem Rechner — deine E-Mails verlassen ihn nie.'
+  },
+  obAiAppleTitle: { en: 'Apple on-device', de: 'Apple auf dem Gerät' },
+  obAiAppleSub: {
+    en: 'Sorts your inbox with Apple Intelligence, entirely on this Mac.',
+    de: 'Sortiert deinen Posteingang mit Apple Intelligence, komplett auf diesem Mac.'
+  },
+  obAiAppleNote: {
+    en: 'Drafting needs a local server or a cloud provider — add one later in Settings → Intelligence.',
+    de: 'Für Entwürfe brauchst du einen lokalen Server oder einen Cloud-Anbieter — den kannst du später unter Einstellungen → Intelligenz hinzufügen.'
+  },
+  obAiCloudTitle: { en: 'Cloud provider', de: 'Cloud-Anbieter' },
+  obAiCloudSub: {
+    en: 'OpenRouter or any OpenAI-compatible service.',
+    de: 'OpenRouter oder ein anderer OpenAI-kompatibler Dienst.'
+  },
+  obAiCloudOther: { en: 'Other (OpenAI-compatible)', de: 'Anderer (OpenAI-kompatibel)' },
+  obAiCloudPrivacy: {
+    en: 'Heads-up: with a cloud provider, the content of your e-mails is sent to that provider.',
+    de: 'Hinweis: Bei einem Cloud-Anbieter wird der Inhalt deiner E-Mails an diesen Anbieter gesendet.'
+  },
+  obAiSkipTitle: {
+    en: 'Skip — use Noctua as a plain mail client',
+    de: 'Überspringen — Noctua als reiner E-Mail-Client'
+  },
+  obAiSkipSub: {
+    en: 'No AI for now. You can set it up later in Settings → Intelligence.',
+    de: 'Erstmal ohne KI. Du kannst sie später unter Einstellungen → Intelligenz einrichten.'
+  },
+  obAiDetecting: { en: 'looking for local servers…', de: 'suche nach lokalen Servern…' },
+  obAiFoundLabel: { en: 'FOUND ON THIS MACHINE', de: 'AUF DIESEM RECHNER GEFUNDEN' },
+  obAiModelOne: { en: '1 model', de: '1 Modell' },
+  obAiModelMany: { en: '{n} models', de: '{n} Modelle' },
+  obAiKindOther: { en: 'LocalAI / vLLM', de: 'LocalAI / vLLM' },
+  obAiNoneFound: {
+    en: 'No local server found. Start Ollama or LM Studio, or enter its address.',
+    de: 'Kein lokaler Server gefunden. Starte Ollama oder LM Studio oder gib die Adresse ein.'
+  },
+  obAiSearchAgain: { en: 'search again', de: 'erneut suchen' },
+  obAiOtherAddress: { en: 'use another address', de: 'andere Adresse verwenden' },
+  obAiUrlLabel: { en: 'SERVER ADDRESS', de: 'SERVERADRESSE' },
+  obAiKeyOptional: { en: 'API KEY (OPTIONAL)', de: 'API-SCHLÜSSEL (OPTIONAL)' },
+  obAiTest: { en: 'TEST', de: 'TESTEN' },
+  obAiTestOk: { en: '✓ connected — {n} models', de: '✓ verbunden — {n} Modelle' },
+  obAiScanLabel: { en: 'INBOX SCANNING', de: 'POSTEINGANG SORTIEREN' },
+  obAiWriteLabel: { en: 'WRITING', de: 'SCHREIBEN' },
+  obAiModelsAuto: {
+    en: 'We picked a small, fast model for scanning and your largest for writing — change them if you like.',
+    de: 'Wir haben ein kleines, schnelles Modell zum Sortieren und dein größtes zum Schreiben gewählt — ändere sie, wenn du magst.'
+  },
+  obAiNotLocal: {
+    en: 'This address is neither on this machine nor in your network — with Local only on, it is blocked.',
+    de: 'Diese Adresse liegt weder auf diesem Rechner noch in deinem Netz — mit „Nur lokal“ wird sie blockiert.'
+  },
+  obAiDictation: { en: 'Dictation (optional)', de: 'Diktat (optional)' },
+  obAiDictWhisper: { en: 'Whisper server', de: 'Whisper-Server' },
+  obAiDictNone: { en: 'not now', de: 'jetzt nicht' },
+  obAiWhisperUrl: { en: 'Whisper server address', de: 'Whisper-Serveradresse' },
+  obAiWhisperModel: { en: 'Whisper model', de: 'Whisper-Modell' },
+  obAiLocalOnly: { en: 'LOCAL ONLY', de: 'NUR LOKAL' },
+  obAiLocalOnlyNote: {
+    en: 'The AI then uses only local providers, and nothing is fetched from the internet automatically.',
+    de: 'Die KI nutzt dann nur lokale Anbieter, und nichts wird automatisch aus dem Internet geholt.'
+  },
+  obAiLocalOnlyCloud: {
+    en: 'With Local only on, a cloud provider stays blocked until you switch it off.',
+    de: 'Mit „Nur lokal“ bleibt ein Cloud-Anbieter gesperrt, bis du es ausschaltest.'
+  },
+  obAiContinueSkip: { en: 'CONTINUE WITHOUT AI', de: 'OHNE KI WEITER' },
+  obAiPausedNoAi: { en: 'PAUSED — NO AI', de: 'PAUSIERT — KEINE KI' },
+  obAiPausedCallout: {
+    en: 'The owl needs an AI to read and write. Set one up and training runs on its own.',
+    de: 'Die Eule braucht eine KI zum Lesen und Schreiben. Richte eine ein, und das Training läuft von allein.'
+  },
+  obAiPausedCalloutApple: {
+    en: 'Apple on-device can sort your inbox, but drafting — and so voice training — needs a local server or a cloud provider.',
+    de: 'Apple auf dem Gerät kann deinen Posteingang sortieren, aber Entwürfe — und damit das Stimmtraining — brauchen einen lokalen Server oder einen Cloud-Anbieter.'
+  },
+  obAiSetUp: { en: 'SET UP AI', de: 'KI EINRICHTEN' },
+  obAiPausedFootnote: {
+    en: 'e-mail works without AI — the owl just sleeps',
+    de: 'E-Mail funktioniert auch ohne KI — die Eule schläft nur'
   },
 
   // ── Compose-Overlay (Feature-Erhalt, nicht im Prototyp) ──
