@@ -157,7 +157,14 @@ function installSessionSecurity(): void {
   })
 
   ses.webRequest.onHeadersReceived((details, callback) => {
-    if (details.resourceType === 'mainFrame' && isTrustedAppUrl(details.url, trustedPages())) {
+    // Nur für die gebaute App (file://). Der Vite-Dev-Server injiziert ein Inline-Skript
+    // (React-Refresh-Preamble) vor dem <meta>-CSP — ein Header-CSP würde es blockieren;
+    // im Dev-Modus gilt daher wie bisher nur die <meta>-CSP aus index.html.
+    if (
+      details.resourceType === 'mainFrame' &&
+      details.url.startsWith('file:') &&
+      isTrustedAppUrl(details.url, trustedPages())
+    ) {
       callback({
         responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [APP_CSP] }
       })
