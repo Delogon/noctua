@@ -88,3 +88,12 @@ export function useEmbeddingStatus(): UseQueryResult<InvokeOutput<'embeddings:st
     staleTime: 5_000
   })
 }
+
+/** Branding-/Onboarding-Hinweise der Org-Konfiguration (Upstream: Standardwerte). */
+export function useOrgInfo(): UseQueryResult<InvokeOutput<'org:info'>> {
+  return useQuery({
+    queryKey: ['org', 'info'],
+    queryFn: () => invoke('org:info', undefined),
+    staleTime: Infinity
+  })
+}
