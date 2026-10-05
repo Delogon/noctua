@@ -52,6 +52,7 @@ export function TimedBlock({
       data-cancelled={event.status === 'CANCELLED'}
       data-readonly={event.readOnly}
       data-compact={compact}
+      data-glyphs={event.recurring || event.pending}
       style={{ ...style, ['--cal-c' as string]: color }}
       aria-label={ariaLabelOf(event, t('cvNoTitle'), t('cvPendingTip'))}
       aria-pressed={selected}

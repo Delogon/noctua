@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import { useT } from '@renderer/lib/i18n'
+import { hhmm } from '@renderer/features/calendar/format'
 import { useDavContacts } from '@renderer/queries/contacts'
 import { cleanIpcError } from '@renderer/features/paper/account-states'
 
@@ -70,10 +71,7 @@ export function AddressBooksPanel({ accountId }: { accountId: number }): React.J
         {data.enabled && data.lastSync && (
           <span style={{ font: '500 9px var(--mono)', color: 'var(--muted)' }}>
             {t('cardSynced', {
-              time: new Date(data.lastSync).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit'
-              })
+              time: hhmm(data.lastSync)
             })}
           </span>
         )}

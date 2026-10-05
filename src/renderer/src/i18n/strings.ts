@@ -150,7 +150,7 @@ const table = {
   cvPendingTip: { en: 'Not synced to the server yet', de: 'Noch nicht auf dem Server' },
   cvPending: { en: 'NOT SYNCED YET', de: 'NOCH NICHT ÜBERTRAGEN' },
   cvNoTitle: { en: '(No title)', de: '(Ohne Titel)' },
-  cvAllDayShort: { en: 'ALL DAY', de: 'GANZTÄGIG' },
+  cvAllDayShort: { en: 'ALL DAY', de: 'GANZTAG' },
   cvAllDay: { en: 'All day', de: 'Ganztägig' },
   cvNewAllDayOn: { en: 'New all-day event on {day}', de: 'Neuer ganztägiger Termin am {day}' },
   cvNoAccount: { en: 'No calendar connected yet.', de: 'Noch kein Kalender verbunden.' },

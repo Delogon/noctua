@@ -3907,7 +3907,7 @@ kbd,
   align-items: flex-start;
   gap: 1px;
   overflow: hidden;
-  padding: 2px 16px 2px 6px;
+  padding: 2px 4px 2px 6px;
   text-align: left;
   cursor: pointer;
   color: var(--ink);
@@ -3915,6 +3915,21 @@ kbd,
   border: 1px solid color-mix(in srgb, var(--cal-c) 40%, var(--sheet));
   border-left: 3px solid var(--cal-c);
   font: 500 11px/1.25 var(--serif);
+}
+
+.cal-event[data-glyphs='true'] {
+  /* Platz für ↻/● oben rechts — nur wenn der Termin ein Glyph trägt (schmale Blöcke) */
+  padding-right: 16px;
+}
+
+.cal-scroll[data-narrow='true'] .cal-event {
+  padding: 1px 3px 1px 4px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.cal-scroll[data-narrow='true'] .cal-event__meta {
+  display: none;
 }
 
 .cal-event:hover,
@@ -4028,6 +4043,11 @@ kbd,
 .cal-chip .cal-glyphs {
   position: static;
   flex: none;
+}
+
+.cal-month-body[data-narrow='true'] .cal-chip__time,
+.cal-month-body[data-narrow='true'] .cal-chip .cal-glyphs {
+  display: none;
 }
 
 /* Ziehen zum Anlegen und Jetzt-Linie */

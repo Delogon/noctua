@@ -107,6 +107,30 @@ export function layoutDay(
   return placed
 }
 
+/** Unter dieser Breite (px) je Überlappungs-Spalte ist ein Termintitel nicht mehr lesbar. */
+const MIN_COL_PX = 64
+/** Anteil der Spaltenbreite, den ein überlappender Termin im Kaskaden-Layout behält. */
+const CASCADE_MAX_PCT = 85
+
+/**
+ * Horizontale Lage eines Blocks in Prozent der Tagesspalte. Normalfall: gleich
+ * breite Spalten. Wird dabei jede Spalte schmaler als MIN_COL_PX (Wochenansicht,
+ * 3 Überlappungen), staffeln sich die Blöcke stattdessen versetzt (jeder spätere
+ * liegt über dem vorigen) — so bleibt jeder Titel lesbar.
+ */
+export function blockSpan(
+  col: number,
+  cols: number,
+  colWidthPx: number
+): { left: number; width: number; cascade: boolean } {
+  if (cols <= 1 || colWidthPx <= 0 || colWidthPx / cols >= MIN_COL_PX) {
+    return { left: (col / cols) * 100, width: 100 / cols, cascade: false }
+  }
+  const width = Math.max(100 / cols, Math.min(CASCADE_MAX_PCT, (MIN_COL_PX / colWidthPx) * 100))
+  const step = (100 - width) / (cols - 1)
+  return { left: col * step, width, cascade: true }
+}
+
 export interface Span<T> {
   item: T
   /** Erste Spalte (0-basiert) und Ende (exklusiv) innerhalb der Zeile */

@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CalendarInstance } from '@shared/calendar-types'
 import { useI18n, useT } from '@renderer/lib/i18n'
 import { addDays, dayKey, isSameDay, pad2, wallMinutes } from './dates'
-import { isBanner, layoutDay, layoutSpans } from './layout'
+import { blockSpan, isBanner, layoutDay, layoutSpans } from './layout'
 import { BannerBar, TimedBlock } from './EventBlocks'
 import { weekdayShort } from './format'
 import { instanceKey, type QuickDraft } from '@renderer/stores/calendar'
@@ -19,6 +19,7 @@ const WORK_START = 8
 const WORK_END = 18
 const INITIAL_SCROLL_HOUR = 7
 const BAR_H = 20
+const NARROW_COL_PX = 80
 
 interface Props {
   days: Date[]
@@ -64,12 +65,24 @@ export function TimeGrid({
   const lang = useI18n((s) => s.lang)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
+  // Breite einer Tagesspalte (px): bestimmt, ob Überlappungen nebeneinander oder gestaffelt laufen
+  const [colWidth, setColWidth] = useState(0)
   const nowDate = new Date(now)
 
   // Beim Öffnen auf 07:00 scrollen (Sticky-Kopf liegt im Fluss darüber → scrollTop = 7 h)
   useLayoutEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = INITIAL_SCROLL_HOUR * HOUR_H
+    if (scrollRef.current) scrollRef.current.scrollTop = INITIAL_SCROLL_HOUR * HOUR_H - 8
   }, [])
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const measure = (): void => setColWidth(Math.max(0, (el.clientWidth - GUTTER) / days.length))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [days.length])
 
   const dayKeys = useMemo(() => days.map(dayKey), [days])
   const { banners, laid } = useMemo(() => {
@@ -101,7 +114,12 @@ export function TimeGrid({
   }
 
   return (
-    <div ref={scrollRef} className="cal-scroll min-h-0 flex-1 overflow-y-auto">
+    <div
+      ref={scrollRef}
+      className="cal-scroll min-h-0 flex-1 overflow-y-auto"
+      // Schmale Spalten (1180-px-Fenster, Wochenansicht): kleinere Schrift, damit Titel lesbar bleiben
+      data-narrow={colWidth > 0 && colWidth < NARROW_COL_PX}
+    >
       <div className="cal-sticky">
         <div className="cal-head" style={{ gridTemplateColumns: cols }}>
           <div className="cal-head__gutter" />
@@ -224,23 +242,28 @@ export function TimeGrid({
                   height: (WORK_END - WORK_START) * HOUR_H
                 }}
               />
-              {laid[col].map((p) => (
-                <TimedBlock
-                  key={p.item.key}
-                  event={p.item}
-                  color={colors.get(p.item.calendarId) ?? 'var(--ac)'}
-                  selected={selKey === instanceKey(p.item.objectId, p.item.recurrenceId)}
-                  onOpen={onOpen}
-                  onSelect={onSelect}
-                  compact={p.bottom - p.top < 40}
-                  style={{
-                    top: (p.top / 60) * HOUR_H,
-                    height: Math.max(14, ((p.bottom - p.top) / 60) * HOUR_H - 1),
-                    left: `calc(${(p.col / p.cols) * 100}% + 1px)`,
-                    width: `calc(${100 / p.cols}% - 3px)`
-                  }}
-                />
-              ))}
+              {laid[col].map((p) => {
+                const span = blockSpan(p.col, p.cols, colWidth)
+                return (
+                  <TimedBlock
+                    key={p.item.key}
+                    event={p.item}
+                    color={colors.get(p.item.calendarId) ?? 'var(--ac)'}
+                    selected={selKey === instanceKey(p.item.objectId, p.item.recurrenceId)}
+                    onOpen={onOpen}
+                    onSelect={onSelect}
+                    compact={p.bottom - p.top < 40}
+                    style={{
+                      top: (p.top / 60) * HOUR_H,
+                      height: Math.max(14, ((p.bottom - p.top) / 60) * HOUR_H - 1),
+                      left: `calc(${span.left}% + 1px)`,
+                      width: `calc(${span.width}% - 3px)`,
+                      // Gestaffelt: spätere Blöcke über den früheren
+                      ...(span.cascade ? { zIndex: p.col + 1 } : {})
+                    }}
+                  />
+                )
+              })}
               {drag?.col === col && (
                 <div
                   className="cal-ghost"

@@ -4,6 +4,7 @@ import {
   dayRange,
   eventsByDay,
   isBanner,
+  blockSpan,
   layoutDay,
   layoutSpans
 } from '@renderer/features/calendar/layout'
@@ -204,5 +205,23 @@ describe('Agenda', () => {
     const r = agendaItems([next, past, tomorrow, cancelled, running, holiday], now)
     expect(r.today.map((e) => e.key)).toEqual([holiday.key, running.key, next.key])
     expect(r.tomorrow.map((e) => e.key)).toEqual([tomorrow.key])
+  })
+})
+
+describe('blockSpan', () => {
+  it('gleich breite Spalten, solange sie lesbar bleiben', () => {
+    expect(blockSpan(1, 2, 200)).toEqual({ left: 50, width: 50, cascade: false })
+    expect(blockSpan(0, 1, 40)).toEqual({ left: 0, width: 100, cascade: false })
+  })
+
+  it('schmale Wochenspalte mit drei Überlappungen: gestaffelt statt 30-px-Streifen', () => {
+    const a = blockSpan(0, 3, 92)
+    const c = blockSpan(2, 3, 92)
+    expect(a.cascade).toBe(true)
+    expect(a.left).toBe(0)
+    expect(a.width).toBeGreaterThan(60)
+    // letzter Block schließt bündig mit der rechten Spaltenkante ab
+    expect(c.left + c.width).toBeCloseTo(100)
+    expect(c.left).toBeGreaterThan(a.left)
   })
 })
