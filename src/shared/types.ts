@@ -14,7 +14,7 @@ export const accountSummarySchema = z.object({
   displayName: z.string().nullable(),
   provider: z.enum(['gmail', 'microsoft', 'proton', 'imap']),
   color: z.string(),
-  syncState: z.enum(['idle', 'connecting', 'syncing', 'error', 'off']),
+  syncState: z.enum(['idle', 'connecting', 'syncing', 'error', 'needs-reauth', 'off']),
   lastError: z.string().nullable(),
   /** Seit wann der aktuelle Fehlerzustand besteht (Design 3b: „since 11:42"). */
   errorSince: z.number().nullable().default(null),
