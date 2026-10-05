@@ -393,12 +393,12 @@ function AccountCard({
 }): React.JSX.Element {
   const t = useT()
   const lang = useI18n((s) => s.lang)
-  const failed = a.syncState === 'error'
+  const failed = a.syncState === 'error' || a.syncState === 'needs-reauth'
   const errLine = failed
     ? (syncErrorLine(
         a.lastError,
         a.errorSince ? t('sinceTime', { time: rowTime(lang, a.errorSince) }) : null
-      ) ?? t('errorState'))
+      ) ?? t(a.syncState === 'needs-reauth' ? 'syncNeedsReauthHint' : 'errorState'))
     : null
   return (
     <div className="tint-card" style={{ padding: '11px 13px' }}>
@@ -538,7 +538,9 @@ function AccountRowActions({
     <div className="flex flex-none items-center gap-3">
       {failed ? (
         <>
-          <span style={{ font: '500 9px var(--mono)', color: 'var(--ac)' }}>{t('syncFailed')}</span>
+          <span style={{ font: '500 9px var(--mono)', color: 'var(--ac)' }}>
+            {t(account.syncState === 'needs-reauth' ? 'syncNeedsReauth' : 'syncFailed')}
+          </span>
           <button
             type="button"
             onClick={retry}

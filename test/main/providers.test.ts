@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { buildImapOptions, isLoopbackHost, PROVIDER_DEFAULTS } from '@main/auth/providers'
 
-const base = { email: 'x@test.de', provider: 'imap' as const, imap_host: 'imap.test', imap_port: 993 }
+const base = {
+  email: 'x@test.de',
+  provider: 'imap' as const,
+  imap_host: 'imap.test',
+  imap_port: 993
+}
 
 describe('buildImapOptions', () => {
   it('nutzt Passwort-Auth für klassische Konten', () => {
@@ -30,6 +35,35 @@ describe('buildImapOptions', () => {
     // Für echte Hosts bleibt die Zertifikatsprüfung strikt an
     const remote = buildImapOptions(base, { user: 'x', pass: 'p' })
     expect(remote.tls).toBeUndefined()
+  })
+})
+
+describe('buildImapOptions — Transportsicherheit (SEC-3)', () => {
+  const creds = { user: 'x', pass: 'p' }
+
+  it('993 = implizites TLS, ohne doSTARTTLS (imapflow verbietet die Kombination)', () => {
+    const opts = buildImapOptions(base, creds)
+    expect(opts.secure).toBe(true)
+    expect(opts.doSTARTTLS).toBeUndefined()
+  })
+
+  it('Nicht-Loopback auf anderem Port: STARTTLS ist Pflicht', () => {
+    const opts = buildImapOptions({ ...base, imap_port: 143 }, creds)
+    expect(opts.secure).toBe(false)
+    expect(opts.doSTARTTLS).toBe(true)
+  })
+
+  it('Loopback (Bridge) bleibt opportunistisch', () => {
+    const opts = buildImapOptions({ ...base, imap_host: '127.0.0.1', imap_port: 1143 }, creds)
+    expect(opts.secure).toBe(false)
+    expect(opts.doSTARTTLS).toBeUndefined()
+  })
+
+  it('setzt Timeouts; socketTimeout bleibt IDLE-tauglich (>= 5 min)', () => {
+    const opts = buildImapOptions(base, creds)
+    expect(opts.connectionTimeout).toBeGreaterThan(0)
+    expect(opts.greetingTimeout).toBeGreaterThan(0)
+    expect(opts.socketTimeout).toBeGreaterThanOrEqual(5 * 60_000)
   })
 })
 

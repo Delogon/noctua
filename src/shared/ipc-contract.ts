@@ -14,6 +14,11 @@ import {
   taskItemSchema,
   threadListItemSchema
 } from './types'
+import {
+  isRendererSecretKey,
+  isRendererSettingReadable,
+  isRendererSettingWritable
+} from './settings-keys'
 
 /**
  * Der zentrale IPC-Vertrag zwischen Main und Renderer.
@@ -28,6 +33,18 @@ import {
  * und Renderer-Typen leiten sich automatisch ab.
  */
 
+// Schlüssel-Allowlists (settings-keys.ts) greifen schon im Schema; die Handler
+// prüfen zusätzlich selbst (Defense in Depth).
+const readableSettingKey = z
+  .string()
+  .max(200)
+  .refine(isRendererSettingReadable, 'Schlüssel nicht erlaubt')
+const writableSettingKey = z
+  .string()
+  .max(200)
+  .refine(isRendererSettingWritable, 'Schlüssel nicht erlaubt')
+const secretKey = z.string().max(200).refine(isRendererSecretKey, 'Schlüssel nicht erlaubt')
+
 /** Sync-Zeitraum in Tagen: 0 = alles, null = Standard (90 Tage Liste / 183 Suche). */
 const syncDaysSchema = z.union([z.literal(0), z.number().int().min(7).max(3650)]).nullable()
 
@@ -37,21 +54,21 @@ export const invokeContract = {
     output: z.object({ app: z.string(), electron: z.string(), node: z.string() })
   },
   'settings:get': {
-    input: z.object({ key: z.string().max(200) }),
+    input: z.object({ key: readableSettingKey }),
     output: z.object({ value: z.string().nullable() })
   },
   'settings:set': {
-    input: z.object({ key: z.string().max(200), value: z.string().max(100_000) }),
+    input: z.object({ key: writableSettingKey, value: z.string().max(100_000) }),
     output: z.object({ ok: z.literal(true) })
   },
   // Secrets sind write-only für den Renderer: setzen und prüfen — nie lesen.
   // Entschlüsselte Werte bleiben ausschließlich im Main-Prozess.
   'secrets:set': {
-    input: z.object({ key: z.string().max(200), value: z.string().max(100_000) }),
+    input: z.object({ key: secretKey, value: z.string().max(100_000) }),
     output: z.object({ ok: z.literal(true) })
   },
   'secrets:exists': {
-    input: z.object({ key: z.string().max(200) }),
+    input: z.object({ key: secretKey }),
     output: z.object({ exists: z.boolean() })
   },
   'app:openExternal': {
@@ -62,7 +79,7 @@ export const invokeContract = {
     input: z.object({
       provider: z.enum(['gmail', 'imap']),
       accountName: z.string().trim().min(1).max(40),
-      email: z.string().email(),
+      email: z.string().email().max(320),
       displayName: z.string().max(200).optional(),
       password: z.string().min(1).max(1000),
       imapHost: z.string().max(500).optional(),
@@ -127,7 +144,7 @@ export const invokeContract = {
     output: z.object({ inbox: z.number(), sent: z.number(), spam: z.number() })
   },
   'threads:get': {
-    input: z.object({ threadKey: z.string().max(500) }),
+    input: z.object({ threadKey: z.string().max(512) }),
     output: z.object({ messages: z.array(messageDetailSchema) })
   },
   'messages:details': {
@@ -159,7 +176,7 @@ export const invokeContract = {
     output: z.object({ ok: z.literal(true) })
   },
   'ai:overrideCategory': {
-    input: z.object({ threadKey: z.string().max(500), category: aiCategorySchema.nullable() }),
+    input: z.object({ threadKey: z.string().max(512), category: aiCategorySchema.nullable() }),
     output: z.object({ ok: z.literal(true) })
   },
   'ai:testModel': {
@@ -233,9 +250,9 @@ export const invokeContract = {
   'compose:send': {
     input: z.object({
       accountId: z.number(),
-      to: z.array(z.string().email()).min(1).max(50),
-      cc: z.array(z.string().email()).max(50).default([]),
-      bcc: z.array(z.string().email()).max(50).default([]),
+      to: z.array(z.string().email().max(320)).min(1).max(50),
+      cc: z.array(z.string().email().max(320)).max(50).default([]),
+      bcc: z.array(z.string().email().max(320)).max(50).default([]),
       subject: z.string().max(500),
       textBody: z.string().max(500_000),
       htmlBody: z.string().max(1_000_000).optional(),
@@ -249,14 +266,14 @@ export const invokeContract = {
   },
   'drafts:save': {
     input: z.object({
-      threadKey: z.string().min(1),
+      threadKey: z.string().min(1).max(512),
       text: z.string().min(1).max(500_000),
       html: z.string().max(1_000_000).default('')
     }),
     output: z.object({ ok: z.literal(true) })
   },
   'drafts:delete': {
-    input: z.object({ threadKey: z.string().min(1) }),
+    input: z.object({ threadKey: z.string().min(1).max(512) }),
     output: z.object({ ok: z.boolean() })
   },
   'outbox:cancel': {
@@ -322,12 +339,12 @@ export const invokeContract = {
     })
   },
   'contacts:preferredAccount': {
-    input: z.object({ addr: z.string().email() }),
+    input: z.object({ addr: z.string().email().max(320) }),
     output: z.object({ accountId: z.number().int().nullable() })
   },
   'ai:draftReply': {
     input: z.object({
-      threadKey: z.string().max(500),
+      threadKey: z.string().max(512),
       instruction: z.string().max(2000).optional(),
       idea: z.string().max(20_000).optional(),
       reviseText: z.string().max(20_000).optional()
@@ -337,7 +354,7 @@ export const invokeContract = {
   'ai:draftNew': {
     input: z.object({
       accountId: z.number().int(),
-      to: z.array(z.string()).default([]),
+      to: z.array(z.string().max(320)).max(50).default([]),
       subject: z.string().max(500).default(''),
       idea: z.string().min(1).max(20_000),
       instruction: z.string().max(2000).optional()
@@ -361,7 +378,7 @@ export const invokeContract = {
     output: z.object({ tasks: z.array(taskItemSchema), openCount: z.number() })
   },
   'tasks:decideSuggestion': {
-    input: z.object({ threadKey: z.string(), accept: z.boolean() }),
+    input: z.object({ threadKey: z.string().max(512), accept: z.boolean() }),
     output: z.object({ ok: z.literal(true) })
   },
   'tasks:update': {
@@ -470,8 +487,15 @@ export const pushContract = {
   }),
   'sync:state': z.object({
     accountId: z.number(),
-    state: z.enum(['idle', 'connecting', 'syncing', 'error', 'off']),
+    state: z.enum(['idle', 'connecting', 'syncing', 'error', 'needs-reauth', 'off']),
     detail: z.string().nullable()
+  }),
+  // Op-Queue: IMAP-Aktionen, die endgültig nicht ausgeführt werden konnten
+  // (Dead-Letter) — der Renderer zeigt eine Toast statt stillem Verlust.
+  'sync:opsDead': z.object({
+    accountId: z.number(),
+    count: z.number(),
+    reason: z.enum(['attempts', 'uidvalidity', 'no-target-folder', 'no-trash', 'folder-gone'])
   }),
   'app:openThread': z.object({ threadKey: z.string() }),
   'updates:available': z.object({ latest: z.string(), url: z.string() }),
@@ -492,7 +516,7 @@ export const pushContract = {
   'tasks:changed': z.object({}),
   'outbox:changed': z.object({
     outboxId: z.number(),
-    state: z.enum(['pending', 'sending', 'sent', 'canceled', 'error'])
+    state: z.enum(['pending', 'sending', 'sent', 'canceled', 'error', 'unknown'])
   }),
   'ai:chatChunk': z.object({
     chatId: z.string(),

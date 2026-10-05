@@ -19,7 +19,29 @@ const table = {
     en: 'Send failed — your draft is safe.',
     de: 'Senden fehlgeschlagen — dein Entwurf ist noch da.'
   },
+  toastSendUnknown: {
+    en: 'Sending was interrupted — it may have been sent. Check your Sent folder.',
+    de: 'Senden unterbrochen — evtl. schon gesendet. Prüfe den Gesendet-Ordner.'
+  },
   toastOpenDraft: { en: 'Open draft', de: 'Entwurf öffnen' },
+
+  // ── Op-Queue: nicht ausführbare Aktionen (Dead-Letter) ──
+  opsDeadAttempts: {
+    en: '{n} action(s) could not be synced to the server and were dropped.',
+    de: '{n} Aktion(en) ließen sich nicht mit dem Server abgleichen und wurden verworfen.'
+  },
+  opsDeadUidvalidity: {
+    en: '{n} action(s) were dropped because the server folder was reset.',
+    de: '{n} Aktion(en) wurden verworfen, weil der Serverordner zurückgesetzt wurde.'
+  },
+  opsDeadNoTarget: {
+    en: '{n} action(s) failed: the Archive/Trash folder was not found on the server.',
+    de: '{n} Aktion(en) gescheitert: Archiv-/Papierkorb-Ordner nicht auf dem Server gefunden.'
+  },
+  opsDeadFolderGone: {
+    en: '{n} action(s) were dropped because the folder no longer exists.',
+    de: '{n} Aktion(en) wurden verworfen, weil der Ordner nicht mehr existiert.'
+  },
 
   // ── Update-Hinweis ──
   updateAvailable: { en: 'Version {v} is available', de: 'Version {v} ist verfügbar' },
@@ -49,6 +71,11 @@ const table = {
   },
   remoteImagesShow: { en: 'Show', de: 'Anzeigen' },
   remoteImagesAllowSender: { en: 'Always for {addr}', de: 'Immer für {addr}' },
+  linkMismatchWarn: {
+    en: 'Link text says {shown}, but it leads to {actual}',
+    de: 'Der Linktext nennt {shown}, der Link führt aber zu {actual}'
+  },
+  linkMismatchOpen: { en: 'Open anyway', de: 'Trotzdem öffnen' },
 
   // ── Owl-View (Suchen + Fragen in einem Eingabefeld) ──
   chatEmptyTitle: { en: 'Ask your mailbox.', de: 'Frag dein Postfach.' },
@@ -456,6 +483,11 @@ const table = {
   disconnectKeep: { en: 'KEEP', de: 'BEHALTEN' },
   // Sync-Fehler inline (Design 3b): gespeicherter Fehlertext + Zeitpunkt
   syncFailed: { en: 'sync failed', de: 'Sync gescheitert' },
+  syncNeedsReauth: { en: 'sign-in needed', de: 'Anmeldung nötig' },
+  syncNeedsReauthHint: {
+    en: 'The server rejected the sign-in — update the password or sign in again.',
+    de: 'Der Server hat die Anmeldung abgelehnt — Passwort aktualisieren oder neu anmelden.'
+  },
   sinceTime: { en: 'since {time}', de: 'seit {time}' },
   addAddress: { en: 'ADD AN ADDRESS', de: 'ADRESSE HINZUFÜGEN' },
   waitingForBrowser: {
@@ -926,6 +958,11 @@ const table = {
   },
   echoSending: { en: 'SENDING', de: 'WIRD GESENDET' },
   echoSendFailed: { en: 'SEND FAILED', de: 'NICHT GESENDET' },
+  echoSendUnknown: { en: 'MAY HAVE BEEN SENT', de: 'EVTL. GESENDET' },
+  echoSendUnknownHint: {
+    en: 'May have been sent — check Sent folder',
+    de: 'Evtl. gesendet — Gesendet-Ordner prüfen'
+  },
   composeDraftRestored: { en: 'Draft restored', de: 'Entwurf wiederhergestellt' },
   tasksAutoHead: { en: 'TASKS FROM MAIL', de: 'AUFGABEN AUS MAILS' },
   tasksAutoSub: {

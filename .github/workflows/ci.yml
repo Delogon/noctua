@@ -5,15 +5,23 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+# Neuere Pushes auf demselben Ref brechen laufende Läufe ab
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
+      # pnpm-Version kommt aus "packageManager" in package.json
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -23,8 +31,42 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm lint
+
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Test
         run: pnpm test:ci
+
+      # Vorerst nicht blockierend: hunspell-asm zieht ein veraltetes nanoid
+      # (Advisory, kein kompatibler Fix). Auf blockierend stellen, sobald behoben.
+      - name: Audit (prod, high)
+        run: pnpm audit --prod --audit-level=high
+        continue-on-error: true
+
+  build-mac:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (electron-vite)
+        run: pnpm exec electron-vite build
+
+      # Unsignierter Paketierungs-Test (prüft Fuses/asarUnpack-Konfiguration)
+      - name: Package (unsigned)
+        run: pnpm exec electron-builder --mac --dir
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'

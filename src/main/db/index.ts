@@ -4,7 +4,8 @@ import { join } from 'path'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { runMigrations } from './migrate'
 import {
-  discardPlainLeftovers,
+  discardPlainBackups,
+  discardPlainMigrationBackup,
   isPlaintextSqlite,
   loadVecExtension,
   migratePlaintextToEncrypted,
@@ -44,26 +45,32 @@ export function openDb(): Database.Database {
     }
 
     const opened = openEncrypted(dbPath, keyHex)
+    // Alte Klartext-Pre-Migration-Backups (.bak-v*) sofort verwerfen — die
+    // Rotation in migrate.ts legt gleich verschlüsselte an.
+    discardPlainBackups(dbPath)
+    let from: number
+    let to: number
     try {
       // Vektor-Extension VOR den Migrationen laden (vec0-Tabellen brauchen sie).
       loadVecExtension(opened)
       opened.pragma('journal_mode = WAL')
       opened.pragma('synchronous = NORMAL')
       opened.pragma('foreign_keys = ON')
-
-      const { from, to } = runMigrations(opened)
-      if (from !== to) {
-        console.log(`[db] migrated ${dbPath} from v${from} to v${to}`)
-      }
+      ;({ from, to } = runMigrations(opened))
     } catch (error) {
+      // Downgrade-Guard/Migrationsfehler: Handle freigeben, damit die DB-Datei
+      // unberührt bleibt; main/index.ts zeigt den Fehler per Dialog und beendet.
       opened.close()
       throw error
     }
+    if (from !== to) {
+      console.log(`[db] migrated ${dbPath} from v${from} to v${to}`)
+    }
     db = opened
 
-    // Die verschlüsselte DB lief einmal durch → Klartext-Reste (Migrations-Backup,
-    // alte .bak-v*) verwerfen. unlink genügt; Überschreiben bringt auf APFS nichts.
-    discardPlainLeftovers(dbPath)
+    // Die verschlüsselte DB lief einmal durch → Klartext-Backup der Migration
+    // verwerfen. unlink genügt; Überschreiben bringt auf APFS/SSD nichts.
+    discardPlainMigrationBackup(dbPath)
   } finally {
     process.umask(previousUmask)
   }
@@ -92,8 +99,7 @@ export function closeDb(): void {
 
 export function getSetting(key: string): string | null {
   const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as
-    | { value: string }
-    | undefined
+    { value: string } | undefined
   return row?.value ?? null
 }
 

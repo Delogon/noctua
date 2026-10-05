@@ -1,14 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import DOMPurify, { type Config } from 'dompurify'
 import { invoke } from '@renderer/lib/ipc'
-import { useT } from '@renderer/lib/i18n'
+import { t, useT } from '@renderer/lib/i18n'
+import { toast } from '@renderer/stores/toast'
+import { linkHostMismatch } from '@renderer/lib/link-check'
+import { buildMailSrcdoc, isTrackingPixel, sanitizeInlineStyle } from '@renderer/lib/mail-sanitize'
 
 /**
  * Rendert Mail-HTML nach hartem Sanitizing. Verteidigungslinien:
- * DOMPurify (Tags/Attribute/URIs) + Bild-Transform (Remote-Bilder werden
- * geparkt statt geladen — kein einziger Netz-Request ohne Freigabe) +
- * App-CSP + sandboxed Renderer. Links gehen ausschließlich über den
- * Main-Prozess in den System-Browser.
+ * DOMPurify (Tags/Attribute/URIs, Inline-Styles ohne url()/fixed) + Bild-Transform
+ * (Remote-Bilder werden geparkt statt geladen, Tracking-Pixel entfernt) +
+ * sandboxed iframe mit eigener CSP (kein Netz ohne Freigabe, kein Overlay über
+ * der App-UI) + App-CSP + sandboxed Renderer. Links gehen ausschließlich über
+ * den Main-Prozess in den System-Browser.
  */
 const PURIFY_CONFIG: Config = {
   FORBID_TAGS: [
@@ -31,6 +35,14 @@ const PURIFY_CONFIG: Config = {
   ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|cid:|data:image\/)/i
 }
 
+// Inline-Styles dürfen keine Netz-Requests auslösen und nichts über die UI legen
+DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
+  if (data.attrName !== 'style') return
+  const style = sanitizeInlineStyle(data.attrValue)
+  if (style) data.attrValue = style
+  else data.keepAttr = false
+})
+
 function transformImages(
   cleanHtml: string,
   inlineImages: Record<string, string>,
@@ -45,7 +57,17 @@ function transformImages(
       if (dataUri) img.setAttribute('src', dataUri)
       else img.removeAttribute('src')
     } else if (/^https?:/i.test(src)) {
-      if (!remoteAllowed) {
+      // Tracking-Pixel fliegen auch bei erlaubten Remote-Bildern raus (die
+      // Freigabe hängt an der fälschbaren From-Adresse) und zählen nicht als blockiert.
+      if (
+        isTrackingPixel({
+          width: img.getAttribute('width'),
+          height: img.getAttribute('height'),
+          style: img.getAttribute('style')
+        })
+      ) {
+        img.remove()
+      } else if (!remoteAllowed) {
         img.removeAttribute('src')
         img.setAttribute('data-blocked', '1')
         blockedCount++
@@ -55,13 +77,78 @@ function transformImages(
   return { html: doc.body.innerHTML, blockedCount }
 }
 
+/**
+ * Öffnet einen Link über den Main-Prozess. Sieht der Linktext wie eine URL aus
+ * und führt der href zu einem anderen Host (Phishing-Muster), kommt vorher eine
+ * Rückfrage als Toast.
+ */
+function openAnchor(anchor: HTMLAnchorElement): void {
+  const href = anchor.getAttribute('href')
+  if (!href) return
+  const open = (): void => void invoke('app:openExternal', { url: href })
+  const mismatch = linkHostMismatch(anchor.textContent ?? '', href)
+  if (!mismatch) return open()
+  toast.info(t('linkMismatchWarn', mismatch), {
+    dismiss: true,
+    action: { label: t('linkMismatchOpen'), run: open }
+  })
+}
+
 function openLink(event: React.MouseEvent): void {
   const anchor = (event.target as HTMLElement).closest('a')
   if (anchor) {
     event.preventDefault()
-    const href = anchor.getAttribute('href')
-    if (href) void invoke('app:openExternal', { url: href })
+    openAnchor(anchor)
   }
+}
+
+/** Mail-HTML in sandboxed iframe: eigenes Dokument, eigene CSP, kein Zugriff auf die App-UI. */
+function SandboxedMail({
+  body,
+  remoteAllowed
+}: {
+  body: string
+  remoteAllowed: boolean
+}): React.JSX.Element {
+  const [height, setHeight] = useState(120)
+  const observer = useRef<ResizeObserver | null>(null)
+  const srcDoc = useMemo(() => buildMailSrcdoc(body, remoteAllowed), [body, remoteAllowed])
+
+  useEffect(() => () => observer.current?.disconnect(), [])
+
+  // Sandbox: bewusst OHNE allow-scripts (und ohne Popups/Forms/Navigation). allow-same-origin
+  // ist nur gesetzt, damit das Elternfenster Höhe messen und Klicks abfangen kann; ohne
+  // Scripts (plus CSP default-src 'none') kann der Frame-Inhalt diese Brücke nicht nutzen.
+  const onLoad = (event: React.SyntheticEvent<HTMLIFrameElement>): void => {
+    const doc = event.currentTarget.contentDocument
+    if (!doc?.body) return
+    observer.current?.disconnect()
+    const measure = (): void => setHeight(Math.ceil(doc.body.getBoundingClientRect().height))
+    measure()
+    observer.current = new ResizeObserver(measure)
+    observer.current.observe(doc.body)
+    doc.addEventListener('click', (e) => {
+      const anchor = (e.target as Element | null)?.closest('a')
+      if (anchor) {
+        e.preventDefault()
+        openAnchor(anchor)
+      }
+    })
+  }
+
+  return (
+    <iframe
+      title="mail"
+      sandbox="allow-same-origin"
+      srcDoc={srcDoc}
+      onLoad={onLoad}
+      scrolling="no"
+      className="mail-html block w-full select-text rounded-lg shadow-[inset_0_0_0_1px_var(--border)]"
+      // Mail-Clients begrenzen Bodys auf ~640-700px — sonst wachsen
+      // Newsletter-Bilder auf Sheet-Breite und wirken riesig.
+      style={{ maxWidth: 680, margin: '0 auto', height, border: 0 }}
+    />
+  )
 }
 
 export function MailFrame({
@@ -117,14 +204,7 @@ export function MailFrame({
           )}
         </div>
       )}
-      <div
-        className="mail-html select-text overflow-x-hidden rounded-lg bg-mail-surface px-5 py-4 text-[14px] leading-relaxed text-mail-text shadow-[inset_0_0_0_1px_var(--border)] [&_a]:text-blue-700 [&_a]:underline [&_img]:h-auto [&_img]:max-w-full [&_img[data-blocked]]:inline-block [&_img[data-blocked]]:min-h-6 [&_img[data-blocked]]:min-w-6 [&_img[data-blocked]]:rounded [&_img[data-blocked]]:border [&_img[data-blocked]]:border-dashed [&_img[data-blocked]]:border-neutral-300 [&_img[data-blocked]]:bg-neutral-100 [&_table]:max-w-full"
-        onClick={openLink}
-        // Mail-Clients begrenzen Bodys auf ~640-700px — sonst wachsen
-        // Newsletter-Bilder auf Sheet-Breite und wirken riesig.
-        style={{ maxWidth: 680, margin: '0 auto' }}
-        dangerouslySetInnerHTML={{ __html: rendered }}
-      />
+      <SandboxedMail body={rendered} remoteAllowed={remoteAllowed} />
     </div>
   )
 }

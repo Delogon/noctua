@@ -2,6 +2,7 @@ import { foldSharpS } from '../search/fold'
 import { fuzzySenderThreadKeys } from '../search/fuzzy-sender'
 import { queryTerms } from '../search/semantic'
 import { randomUUID } from 'node:crypto'
+import { isDev } from '../dev-mode'
 import { currentDateLine, localStamp } from './prompt-date'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
@@ -119,14 +120,15 @@ Antworte NUR mit JSON: {"keywords": ["…"]}`
   try {
     const jsonText = raw.match(/\{[\s\S]*\}|\[[\s\S]*\]/)?.[0] ?? raw
     const keywords = keywordSchema.parse(JSON.parse(jsonText))
-    console.log(`[chat] keywords: ${keywords.join(', ')}`)
+    // Suchbegriffe stammen aus der Nutzerfrage — nur in Dev loggen
+    if (isDev) console.log(`[chat] keywords: ${keywords.join(', ')}`)
     return keywords
   } catch (error) {
     console.warn(
       '[chat] Query-Expansion unlesbar, Wort-Fallback:',
       (error as Error).message.slice(0, 120),
-      '| raw:',
-      raw.slice(0, 200)
+      // Modellantwort kann Mail-Inhalt enthalten: im Release nur die Länge
+      !isDev ? `| raw: ${raw.length} Zeichen` : `| raw: ${raw.slice(0, 200)}`
     )
     return question.split(/\s+/).filter((w) => w.length > 3)
   }

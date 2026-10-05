@@ -118,6 +118,23 @@ safeStorage (`userData/noctua.dbkey`).
 
 CI (`.github/workflows/ci.yml`) runs typecheck + tests on every push and PR.
 
+## Signing & notarization
+
+`pnpm build:mac` baut ohne Zertifikat unsigniert (lokale Builds funktionieren
+unveraendert). Fuer ein signiertes, notarisiertes Release setzt man:
+
+- Signatur: `CSC_NAME` (Name der "Developer ID Application"-Identity im
+  Keychain) oder `CSC_LINK` + `CSC_KEY_PASSWORD` (.p12 als Pfad/base64).
+- Notarisierung (eine der drei Varianten, electron-builder erkennt sie selbst):
+  1. `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` (empfohlen)
+  2. `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`
+  3. `APPLE_KEYCHAIN`, `APPLE_KEYCHAIN_PROFILE`
+- `CSC_IDENTITY_AUTO_DISCOVERY=false` erzwingt einen unsignierten Build (CI).
+
+Hardened Runtime ist aktiv; die Entitlements stehen in
+`build/entitlements.mac.plist` (nur `allow-jit`). Electron-Fuses sind in
+`electron-builder.yml` (`electronFuses`) konfiguriert.
+
 ## Architecture
 
 - **Main process**: IMAP sync (imapflow, IDLE + polling), SQLite with FTS5

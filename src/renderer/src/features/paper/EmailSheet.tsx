@@ -628,9 +628,23 @@ export function EmailSheet(): React.JSX.Element {
     extraCcText.current = ''
     extraBccText.current = ''
   }, [])
+  // Beim Threadwechsel zurücksetzen: State direkt im Render nachziehen
+  // (React-Muster „State bei Prop-Änderung anpassen"), Refs im Effect.
+  const [extrasThreadKey, setExtrasThreadKey] = useState(threadKey)
+  if (extrasThreadKey !== threadKey) {
+    setExtrasThreadKey(threadKey)
+    setExtrasOpen(false)
+    setExtraTo([])
+    setExtraCc([])
+    setExtraBcc([])
+    setDroppedRecipients([])
+    setHasPendingExtra(false)
+  }
   useEffect(() => {
-    resetExtras()
-  }, [threadKey, resetExtras])
+    extraToText.current = ''
+    extraCcText.current = ''
+    extraBccText.current = ''
+  }, [threadKey])
   const transcriptionOpRef = useRef(0)
   const generationRequestRef = useRef(0)
   const [hasRetryableRecording, setHasRetryableRecording] = useState(false)

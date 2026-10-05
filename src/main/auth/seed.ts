@@ -3,6 +3,7 @@ import { getSetting, setSetting } from '../db'
 import { hasSecret, setSecret } from './secrets'
 import { accountSecretKey, PROVIDER_DEFAULTS } from './providers'
 import { ACCOUNT_COLORS } from '@shared/types'
+import { isDev } from '../dev-mode'
 
 /**
  * Dev-Seeding über Umgebungsvariablen — Credentials landen direkt im
@@ -13,12 +14,13 @@ import { ACCOUNT_COLORS } from '@shared/types'
  *   NOCTUA_SEED_OPENROUTER_KEY
  */
 export function seedFromEnv(db: Database.Database): void {
+  // Zweite Absicherung neben dem Aufrufer: im Produktions-Bundle nie aus der Umgebung seeden
+  if (!isDev) return
   const gmailUser = process.env.NOCTUA_SEED_GMAIL_USER?.trim().toLowerCase()
   const gmailPass = process.env.NOCTUA_SEED_GMAIL_PASS?.replace(/\s+/g, '')
   if (gmailUser && gmailPass) {
     const existing = db.prepare('SELECT id FROM accounts WHERE email = ?').get(gmailUser) as
-      | { id: number }
-      | undefined
+      { id: number } | undefined
     if (!existing) {
       const g = PROVIDER_DEFAULTS.gmail
       const count = (db.prepare('SELECT count(*) AS c FROM accounts').get() as { c: number }).c
@@ -51,6 +53,5 @@ export function seedFromEnv(db: Database.Database): void {
 
   if (getSetting('ai.triageModel') === null)
     setSetting('ai.triageModel', 'deepseek/deepseek-v4-flash')
-  if (getSetting('ai.draftModel') === null)
-    setSetting('ai.draftModel', 'anthropic/claude-opus-4.8')
+  if (getSetting('ai.draftModel') === null) setSetting('ai.draftModel', 'anthropic/claude-opus-4.8')
 }

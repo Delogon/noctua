@@ -40,6 +40,11 @@ import { openExternalSafe } from '../util/links'
 import { searchSemantic } from '../search'
 import { getMessageHeaderDetails, storeMessageHeaderDetails } from '../db/repos/message-headers'
 import { getSpellEngine } from '../spell'
+import {
+  assertSecretKey,
+  assertSettingReadable,
+  assertSettingWritable
+} from '@shared/settings-keys'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
@@ -128,19 +133,33 @@ export const handlers: IpcHandlers = {
 
   'app:openExternal': ({ url }) => ({ ok: openExternalSafe(url) }),
 
-  'settings:get': ({ key }) => ({ value: getSetting(key) }),
+  // Allowlist hier nochmals erzwungen (nicht nur im zod-Schema): OAuth-Client-
+  // Konfiguration und fremde Secrets bleiben für den Renderer unerreichbar.
+  'settings:get': ({ key }) => {
+    assertSettingReadable(key)
+    return { value: getSetting(key) }
+  },
 
   'settings:set': ({ key, value }) => {
+    assertSettingWritable(key)
     setSetting(key, value)
     return { ok: true }
   },
 
   'secrets:set': ({ key, value }) => {
+    assertSecretKey(key)
     setSecret(key, value)
+    // Geänderte Konto-Zugangsdaten beenden needs-reauth (Syncer liest neu)
+    void syncEngine
+      .credentialsChanged(key)
+      .catch((error) => console.warn('[sync] credentialsChanged:', error))
     return { ok: true }
   },
 
-  'secrets:exists': ({ key }) => ({ exists: hasSecret(key) }),
+  'secrets:exists': ({ key }) => {
+    assertSecretKey(key)
+    return { exists: hasSecret(key) }
+  },
 
   'accounts:add': async (input) => {
     const db = getDb()

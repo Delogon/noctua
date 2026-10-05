@@ -24,12 +24,23 @@ export function logUsage(
   ).run(todayKey(), model, inputTokens, outputTokens, costUsd)
 }
 
+/**
+ * Budget-Setting als Zahl; leer, NaN, Infinity oder negativ ergibt den Default —
+ * sonst würde ein kaputter Wert (NaN >= x ist immer false) das Gate aushebeln.
+ */
+function budgetSetting(key: string, fallback: number): number {
+  const raw = getSetting(key)
+  if (raw === null || raw.trim() === '') return fallback
+  const value = Number(raw)
+  return Number.isFinite(value) && value >= 0 ? value : fallback
+}
+
 export function getDailyBudgetUsd(): number {
-  return Number(getSetting('ai.dailyBudgetUsd') ?? '0.50')
+  return budgetSetting('ai.dailyBudgetUsd', 0.5)
 }
 
 export function getMonthlyBudgetUsd(): number {
-  return Number(getSetting('ai.monthlyBudgetUsd') ?? '10')
+  return budgetSetting('ai.monthlyBudgetUsd', 10)
 }
 
 export function getUsageSummary(db: Database.Database): {

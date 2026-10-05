@@ -108,7 +108,15 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams(params).toString()
   })
-  return (await response.json()) as TokenResponse
+  const body = (await response.json().catch(() => null)) as TokenResponse | null
+  // Google meldet Fehler (z. B. invalid_grant) als HTTP 400 mit JSON-Body —
+  // den reichen wir durch, die Aufrufer werten error/error_description aus.
+  // Ohne verwertbaren Body (Proxy-Fehlerseite, 5xx) gibt es einen klaren Fehler.
+  if (!response.ok && !body?.error) {
+    throw new Error(`Google-Token-Anfrage fehlgeschlagen (HTTP ${response.status})`)
+  }
+  if (!body) throw new Error('Google-Token-Anfrage lieferte keine gültige Antwort')
+  return body
 }
 
 const HTML_HEAD = '<html><body style="font-family:sans-serif;padding:2rem">'

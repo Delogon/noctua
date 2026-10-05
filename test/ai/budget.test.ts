@@ -21,7 +21,11 @@ describe('budget', () => {
     logUsage(db, 'deepseek/deepseek-v4-flash', 200, 60, 0.002)
     const row = db
       .prepare('SELECT requests, input_tokens, cost_usd FROM ai_usage_log WHERE model = ?')
-      .get('deepseek/deepseek-v4-flash') as { requests: number; input_tokens: number; cost_usd: number }
+      .get('deepseek/deepseek-v4-flash') as {
+      requests: number
+      input_tokens: number
+      cost_usd: number
+    }
     expect(row.requests).toBe(2)
     expect(row.input_tokens).toBe(300)
     expect(row.cost_usd).toBeCloseTo(0.003, 6)

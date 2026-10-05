@@ -61,7 +61,9 @@ export function recordSentContacts(
   recipients: string[],
   sentAt = Date.now()
 ): void {
-  const addresses = [...new Set(recipients.map(normalizeAddress).filter((addr): addr is string => !!addr))]
+  const addresses = [
+    ...new Set(recipients.map(normalizeAddress).filter((addr): addr is string => !!addr))
+  ]
   if (addresses.length === 0) return
   const upsert = db.prepare(
     `INSERT INTO contact_stats (account_id, addr, sent_count, received_count, last_interaction)
@@ -76,10 +78,7 @@ export function recordSentContacts(
 }
 
 /** Zuletzt genutztes Absenderkonto fuer einen bereits angeschriebenen Kontakt. */
-export function preferredAccountForContact(
-  db: Database.Database,
-  address: string
-): number | null {
+export function preferredAccountForContact(db: Database.Database, address: string): number | null {
   const normalized = normalizeAddress(address)
   if (!normalized) return null
   const row = db

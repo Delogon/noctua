@@ -1,3 +1,4 @@
+import { isDev } from '../dev-mode'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
 import { getSetting, setSetting } from '../db'
@@ -11,7 +12,12 @@ const STYLE_KEY = 'ai.styleProfile'
  * gekürzt, nie abgelehnt — Opus liefert gern 8 Anreden statt 6, und das
  * darf kein Fehler sein.
  */
-const clippedList = (maxItems: number, maxLen: number) =>
+const clippedList = (
+  maxItems: number,
+  maxLen: number
+): z.ZodCatch<
+  z.ZodPipe<z.ZodDefault<z.ZodArray<z.ZodUnknown>>, z.ZodTransform<string[], unknown[]>>
+> =>
   z
     .array(z.unknown())
     .default([])
@@ -119,7 +125,11 @@ export async function refreshStyleProfile(
   try {
     parsed = JSON.parse(jsonText)
   } catch {
-    console.warn('[style] unparsebare Antwort:', raw.slice(0, 400))
+    // Antwort enthält Auszüge aus gesendeten Mails — im Release nur die Länge
+    console.warn(
+      '[style] unparsebare Antwort:',
+      !isDev ? `${raw.length} Zeichen` : raw.slice(0, 400)
+    )
     throw new Error('Stil-Analyse lieferte kein JSON — bitte nochmal versuchen')
   }
   const profile = styleProfileSchema.parse(parsed)

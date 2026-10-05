@@ -140,7 +140,9 @@ describe('suggestContacts', () => {
       1_800_000_000_000
     )
     const row = db
-      .prepare('SELECT sent_count, last_interaction FROM contact_stats WHERE account_id = ? AND addr = ?')
+      .prepare(
+        'SELECT sent_count, last_interaction FROM contact_stats WHERE account_id = ? AND addr = ?'
+      )
       .get(accountId, 'new@example.com') as { sent_count: number; last_interaction: number }
 
     expect(row).toEqual({ sent_count: 1, last_interaction: 1_800_000_000_000 })

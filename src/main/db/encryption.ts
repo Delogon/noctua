@@ -263,17 +263,19 @@ export function migratePlaintextToEncrypted(
 }
 
 /**
- * Räumt Klartext-Reste auf, nachdem die verschlüsselte DB erfolgreich geöffnet
- * wurde: das Migrations-Backup und alte Klartext-Pre-Migration-Backups
- * (`<db>.bak-v<N>`). Verschlüsselte `.bak-v*` bleiben erhalten.
+ * Verwirft das Klartext-Backup der Migration, nachdem die verschlüsselte DB
+ * erfolgreich geöffnet (und migriert) wurde.
  */
-export function discardPlainLeftovers(dbPath: string): number {
+export function discardPlainMigrationBackup(dbPath: string): void {
+  unlinkQuiet(dbPath + PLAIN_BACKUP_SUFFIX)
+}
+
+/**
+ * Löscht alte Klartext-Pre-Migration-Backups (`<db>.bak-v<N>`, vor der
+ * Verschlüsselung per VACUUM INTO entstanden). Verschlüsselte bleiben erhalten.
+ */
+export function discardPlainBackups(dbPath: string): number {
   let removed = 0
-  const backup = dbPath + PLAIN_BACKUP_SUFFIX
-  if (existsSync(backup)) {
-    unlinkQuiet(backup)
-    removed++
-  }
   const dir = dirname(dbPath)
   const prefix = basename(dbPath) + '.bak-v'
   for (const name of readdirSync(dir)) {
