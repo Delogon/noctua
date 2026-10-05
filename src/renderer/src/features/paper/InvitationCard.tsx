@@ -58,7 +58,7 @@ const S = {
   },
   en: {
     invitation: 'INVITATION',
-    cancelled: 'CANCELLED',
+    cancelled: 'CANCELED',
     reply: 'RESPONSE',
     counter: 'COUNTER PROPOSAL',
     when: 'When',
@@ -75,8 +75,8 @@ const S = {
     openInCalendar: 'Open in calendar',
     remove: 'Remove from calendar',
     outdated: 'Outdated — a newer version of this invitation exists.',
-    cancelledNote: 'This event was cancelled.',
-    mismatch: 'Note: the sender of this mail is not the organizer.',
+    cancelledNote: 'This event was canceled.',
+    mismatch: 'Note: the sender of this email is not the organizer.',
     serverNote: 'Your calendar server sends the reply.',
     responded: { ACCEPTED: 'Accepted', TENTATIVE: 'Tentatively accepted', DECLINED: 'Declined' },
     replyLine: {
@@ -123,7 +123,7 @@ function useConflicts(inv: InvitationView, enabled: boolean): string[] {
     staleTime: 30_000
   })
   return (q.data?.events ?? [])
-    .filter((e) => e.objectId !== inv.localEvent?.objectId && e.status !== 'CANCELLED')
+    .filter((e) => e.objectId !== inv.localEvent?.objectId && e.status !== 'CANCELED')
     .map((e) => e.summary || '—')
     .slice(0, 3)
 }

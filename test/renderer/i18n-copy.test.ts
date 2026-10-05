@@ -61,3 +61,18 @@ describe('Deutsche Texte: Glossar-Heuristiken', () => {
     expect(bad).toEqual([])
   })
 })
+
+describe('Englische Texte: Glossar-Heuristiken', () => {
+  const en = entries.map(([k, v]) => [k, v.en] as const)
+
+  it('nutzt „email“ statt „mail“, „account“ statt „mailbox“, US-Schreibweise', () => {
+    const bad = en
+      .filter(([, s]) =>
+        /(?<![\w.-])mails?\b(?![-\s]?servers?\b)|\bmailbox(?!\.org)|colour|organis|cancell(?:ed|ing)/i.test(
+          s.replace(/mail\.yourdomain\.com/g, '')
+        )
+      )
+      .map(([k]) => k)
+    expect(bad).toEqual([])
+  })
+})
