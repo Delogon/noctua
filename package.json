@@ -38,14 +38,14 @@
     "@azure/msal-node": "^5.3.1",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "@huggingface/transformers": "^4.2.0",
+    "@huggingface/transformers": "^4.3.0",
     "better-sqlite3": "^12.11.1",
     "hunspell-asm": "^4.0.2",
     "imapflow": "^1.4.3",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^10.0.15",
     "openai": "^6.45.0",
     "postal-mime": "^2.7.5",
-    "sharp": "0.34.5",
+    "sharp": "^0.35.5",
     "sqlite-vec": "^0.1.9"
   },
   "devDependencies": {
@@ -61,7 +61,7 @@
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-virtual": "^3.14.5",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.19.1",
+    "@types/node": "^24.9.0",
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -69,9 +69,9 @@
     "@vitest/coverage-v8": "^4.1.9",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "dompurify": "^3.4.11",
-    "electron": "^39.2.6",
-    "electron-builder": "^26.0.12",
+    "dompurify": "^3.4.16",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react": "^7.37.5",
@@ -100,6 +100,13 @@
       "onnxruntime-node",
       "protobufjs",
       "sharp"
-    ]
-  }
+    ],
+    "overrides": {
+      "nodemailer": "^10.0.15",
+      "ip-address": "^10.7.1",
+      "protobufjs": "^7.6.5",
+      "adm-zip": "^0.6.1"
+    }
+  },
+  "packageManager": "pnpm@10.28.0"
 }
