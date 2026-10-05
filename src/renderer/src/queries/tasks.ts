@@ -27,3 +27,20 @@ export function useTasks(status: 'open' | 'done'): UseQueryResult<InvokeOutput<'
     staleTime: 5_000
   })
 }
+
+/** Gewählte CalDAV-Aufgabenliste + wählbare Listen (Phase 3.2). */
+export function useTasksSyncSettings(): UseQueryResult<InvokeOutput<'tasks:sync:get'>> {
+  const queryClient = useQueryClient()
+  useEffect(
+    () =>
+      onPush('calendar:changed', () => {
+        void queryClient.invalidateQueries({ queryKey: ['tasks', 'sync'] })
+      }),
+    [queryClient]
+  )
+  return useQuery({
+    queryKey: ['tasks', 'sync'],
+    queryFn: () => invoke('tasks:sync:get', undefined),
+    staleTime: 5_000
+  })
+}

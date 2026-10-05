@@ -185,7 +185,7 @@ servers: mailbox.org, Fastmail, Posteo, SOGo, Baïkal (the generic RFC 4791/6578
 
 ## Limitations
 
-- No VTODO two-way sync, CardDAV (VTODOs are only stored).
+- No VTODO two-way sync beyond "Tasks" below, no CardDAV in this document.
 - Scheduling and invitations: see "Scheduling & invitations" below.
 - Moving an event between calendars is not supported by `updateEvent`.
 - Floating times follow the current system zone; a zone change is picked up on re-materialisation.
@@ -278,3 +278,25 @@ Nextcloud/sabre behaviour on attendee PARTSTAT PUT (reply delivery), decline via
 between our created copy and the server's own inbox delivery (uid conflict → dead op shown as
 conflict), schedule-outbox responses of real servers, delivery/rendering of the iMIP mails in
 Outlook/Gmail/Apple Mail.
+
+## Tasks <-> VTODO (3.2)
+
+Setting "Sync tasks with" (Accounts; IPC `tasks:sync:get|set`, default off) picks one VTODO
+calendar. `src/main/tasks/caldav-sync.ts` reconciles `tasks` with that calendar's VTODOs from
+`cal_objects` after each calendar sync and after each local task change; pushes go through
+`cal_pending_ops` (If-Match / 412 -> server version wins + `calendar:conflict` toast).
+`task_caldav` (migration 029) stores uid, last agreed field hash and ETag per task.
+
+| Noctua | VTODO |
+| --- | --- |
+| title | SUMMARY |
+| notes | DESCRIPTION |
+| due (`YYYY-MM-DD`) | DUE (DATE; DATE-TIME reduced to its wall date, untouched unless the date changes) |
+| status done / open | STATUS COMPLETED + COMPLETED + PERCENT-COMPLETE:100 / NEEDS-ACTION (CANCELLED reads as done) |
+| source mail | X-NOCTUA-MESSAGE-ID (RFC Message-ID) + URL `mid:<id>` |
+
+Only open tasks are pushed (never AI suggestions, dismissed or already-done unmapped tasks).
+Dismissing or deleting a task deletes the VTODO; server deletions remove the local task.
+Unknown VTODO properties are preserved (only changed mapped fields are patched).
+Limitations: no priority (Noctua has none; server PRIORITY is preserved), no recurring VTODOs
+(RRULE kept, instance semantics ignored), no subtasks (RELATED-TO kept), one list overall.

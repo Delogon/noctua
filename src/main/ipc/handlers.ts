@@ -6,6 +6,7 @@ import { ACCOUNT_COLORS, PASTEL_COLORS } from '@shared/types'
 import { getDb, getSetting, setSetting } from '../db'
 import { getThreadMessages, imagesAllowKey, listThreads, mboxCounts } from '../db/repos/threads'
 import { getInlineImages, saveAttachment } from '../mail/attachments'
+import { listTaskLists, setTasksSyncCalendar, targetCalendar } from '../tasks/caldav-sync'
 import { countOpenTasks, decideSuggestion, listTasks, updateTaskStatus } from '../db/repos/tasks'
 import { preferredAccountForContact, suggestContacts } from '../db/repos/contacts'
 import { deleteDraft, listDrafts, saveDraft } from '../db/repos/drafts'
@@ -51,6 +52,7 @@ import {
 } from '../calendar/invitations'
 import { queryFreeBusy, selfBusy } from '../calendar/freebusy'
 import { defaultEditContext } from '../calendar/edit'
+import { contactsStatus, setAddressBookEnabled, setContactsSync } from '../contacts/accounts'
 import { getDraftModel, getTriageModel } from '../ai/openrouter'
 import { appleFmStatus } from '../ai/apple-fm'
 import { startDraftNew, startDraftNudge, startDraftReply, stylePreview } from '../ai/drafts'
@@ -798,6 +800,15 @@ export const handlers: IpcHandlers = {
 
   'contacts:suggest': ({ q, limit }) => ({ contacts: suggestContacts(getDb(), q, limit) }),
 
+  'contacts:dav:status': ({ accountId }) => contactsStatus(getDb(), accountId),
+
+  'contacts:dav:setSync': ({ accountId, enabled }) => setContactsSync(getDb(), accountId, enabled),
+
+  'contacts:dav:setAddressBook': ({ addressBookId, enabled }) => {
+    setAddressBookEnabled(getDb(), addressBookId, enabled)
+    return { ok: true }
+  },
+
   'contacts:preferredAccount': ({ addr }) => ({
     accountId: preferredAccountForContact(getDb(), addr)
   }),
@@ -837,6 +848,17 @@ export const handlers: IpcHandlers = {
     updateTaskStatus(getDb(), id, status)
     pushFn('tasks:changed', {})
     return { ok: true }
+  },
+
+  'tasks:sync:get': () => {
+    const db = getDb()
+    return { calendarId: targetCalendar(db)?.id ?? null, lists: listTaskLists(db) }
+  },
+
+  'tasks:sync:set': ({ calendarId }) => {
+    setTasksSyncCalendar(getDb(), calendarId)
+    pushFn('tasks:changed', {})
+    return { ok: true as const }
   },
 
   'drafts:list': () => ({ drafts: listDrafts(getDb()) }),

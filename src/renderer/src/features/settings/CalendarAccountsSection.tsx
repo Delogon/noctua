@@ -6,6 +6,7 @@ import { usePaper } from '@renderer/stores/paper'
 import { useAccounts } from '@renderer/queries/accounts'
 import { useCalendarAccounts, useCalendars } from '@renderer/queries/calendar'
 import { cleanIpcError } from '@renderer/features/paper/account-states'
+import { AddressBooksPanel } from './AddressBooksPanel'
 import type { InvokeOutput } from '@shared/ipc-contract'
 
 // Settings → Konten: Kalender-Konten (CalDAV). Bewusst minimal (Phase 2.1):
@@ -435,6 +436,8 @@ function CalendarAccountCard({
           </div>
         ))}
       </div>
+
+      <AddressBooksPanel accountId={account.id} />
 
       <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 8 }}>
         {pwOpen ? (

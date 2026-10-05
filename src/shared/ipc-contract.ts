@@ -26,6 +26,7 @@ import {
   calendarSummarySchema,
   discoveredCalendarSchema
 } from './calendar-types'
+import { davContactsStatusSchema } from './contacts-types'
 import {
   freeBusyInputSchema,
   freeBusyResultSchema,
@@ -649,6 +650,20 @@ export const invokeContract = {
       contacts: z.array(z.object({ addr: z.string(), name: z.string().nullable() }))
     })
   },
+  // CardDAV-Kontakte (Phase 3.1, nur lesend) je Kalender-Konto
+  'contacts:dav:status': {
+    input: z.object({ accountId: z.number().int() }),
+    output: davContactsStatusSchema
+  },
+  // „Kontakte synchronisieren" ein/aus; ein = Discovery gegen den Server des Kontos
+  'contacts:dav:setSync': {
+    input: z.object({ accountId: z.number().int(), enabled: z.boolean() }),
+    output: z.object({ addressBookCount: z.number() })
+  },
+  'contacts:dav:setAddressBook': {
+    input: z.object({ addressBookId: z.number().int(), enabled: z.boolean() }),
+    output: z.object({ ok: z.literal(true) })
+  },
   'contacts:preferredAccount': {
     input: z.object({ addr: z.string().email().max(320) }),
     output: z.object({ accountId: z.number().int().nullable() })
@@ -694,6 +709,24 @@ export const invokeContract = {
   },
   'tasks:update': {
     input: z.object({ id: z.number(), status: z.enum(['open', 'done', 'dismissed']) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'tasks:sync:get': {
+    input: z.void(),
+    output: z.object({
+      calendarId: z.number().nullable(),
+      lists: z.array(
+        z.object({
+          calendarId: z.number(),
+          accountId: z.number(),
+          accountName: z.string(),
+          name: z.string()
+        })
+      )
+    })
+  },
+  'tasks:sync:set': {
+    input: z.object({ calendarId: z.number().int().positive().nullable() }),
     output: z.object({ ok: z.literal(true) })
   },
   'followups:list': {
@@ -824,6 +857,8 @@ export const pushContract = {
     kind: z.enum(['create', 'update', 'delete']),
     reason: z.enum(['conflict', 'deleted-on-server', 'forbidden', 'attempts'])
   }),
+  // CardDAV-Kontakte (Phase 3.1): Adressbücher/Karten eines Kontos wurden abgeglichen
+  'contacts:changed': z.object({ accountId: z.number() }),
   // Klick auf eine Erinnerung
   'calendar:openEvent': z.object({
     objectId: z.number(),

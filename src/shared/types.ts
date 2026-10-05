@@ -243,7 +243,9 @@ export const taskItemSchema = z.object({
   status: z.enum(['open', 'done', 'dismissed']),
   createdAt: z.number(),
   sourceSubject: z.string().nullable(),
-  sourceMessageId: z.number().nullable()
+  sourceMessageId: z.number().nullable(),
+  /** CalDAV-Abgleich (Phase 3.2); null/fehlend = nicht zugeordnet */
+  syncState: z.enum(['pending', 'synced', 'conflict']).nullable().optional()
 })
 
 /** Gespeicherter Antwort-Entwurf (ein Entwurf je Thread, Eulen-Leiste). */

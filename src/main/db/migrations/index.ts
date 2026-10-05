@@ -26,6 +26,8 @@ import m025 from './025_op_queue_dead_letter.sql?raw'
 import m026 from './026_ai_profiles.sql?raw'
 import m027 from './027_ai_profiles_managed.sql?raw'
 import m028 from './028_caldav.sql?raw'
+import m029 from './029_task_caldav.sql?raw'
+import m030 from './030_carddav.sql?raw'
 import m031 from './031_invitations.sql?raw'
 
 /**
@@ -62,5 +64,7 @@ export const migrations: ReadonlyArray<{ version: number; name: string; sql: str
   { version: 26, name: '026_ai_profiles', sql: m026 },
   { version: 27, name: '027_ai_profiles_managed', sql: m027 },
   { version: 28, name: '028_caldav', sql: m028 },
+  { version: 29, name: '029_task_caldav', sql: m029 },
+  { version: 30, name: '030_carddav', sql: m030 },
   { version: 31, name: '031_invitations', sql: m031 }
 ]

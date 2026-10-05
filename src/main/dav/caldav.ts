@@ -128,7 +128,7 @@ export function cleanEtag(raw: string | null): string | null {
 }
 
 /** Etag aus <getetag> (Property-Text): Server liefern es mit Anführungszeichen. */
-function propEtag(r: DavResponse): string | null {
+export function propEtag(r: DavResponse): string | null {
   return cleanEtag(okPropText(r, NS.dav, 'getetag'))
 }
 
@@ -189,13 +189,13 @@ function parseCalendarResponse(r: DavResponse): DavCalendarInfo | null {
 }
 
 /** Absolute URL mit Slash am Ende (Collections). */
-function collectionUrl(url: string): string {
+export function collectionUrl(url: string): string {
   const u = new URL(url)
   u.pathname = normalizeCollectionHref(u.pathname, u)
   return u.toString()
 }
 
-function sameCollection(a: string, b: string): boolean {
+export function sameCollection(a: string, b: string): boolean {
   return a.replace(/\/+$/, '') === b.replace(/\/+$/, '')
 }
 
@@ -216,15 +216,17 @@ const KNOWN_PROVIDERS: Record<string, string> = {
 /** Kandidaten-URLs aus einer Mail-Adresse oder Domain ableiten (RFC 6764 + Anbieter-Tabelle). */
 export async function candidateUrlsForDomain(
   domain: string,
-  resolver: DnsResolver = systemDns
+  resolver: DnsResolver = systemDns,
+  service: 'caldav' | 'carddav' = 'caldav',
+  providers: Record<string, string> = KNOWN_PROVIDERS
 ): Promise<string[]> {
   const lower = domain.toLowerCase()
   const out: string[] = []
-  const known = KNOWN_PROVIDERS[lower]
+  const known = providers[lower]
   if (known) out.push(known)
-  out.push(`https://${lower}/.well-known/caldav`)
+  out.push(`https://${lower}/.well-known/${service}`)
   try {
-    const srv = (await resolver.resolveSrv(`_caldavs._tcp.${lower}`))
+    const srv = (await resolver.resolveSrv(`_${service}s._tcp.${lower}`))
       .slice()
       .sort((a, b) => a.priority - b.priority || b.weight - a.weight)[0]
     const srvHost = srv?.name?.replace(/\.$/, '').toLowerCase()
@@ -234,9 +236,9 @@ export async function candidateUrlsForDomain(
     if (srvHost && (srvHost === lower || srvHost.endsWith(`.${lower}`))) {
       const host = srvHost
       const port = srv.port && srv.port !== 443 ? `:${srv.port}` : ''
-      let path = '/.well-known/caldav'
+      let path = `/.well-known/${service}`
       try {
-        const txt = await resolver.resolveTxt(`_caldavs._tcp.${lower}`)
+        const txt = await resolver.resolveTxt(`_${service}s._tcp.${lower}`)
         for (const rec of txt) {
           const entry = rec.join('').match(/^path=(\/.*)$/)
           if (entry) path = entry[1]
@@ -259,11 +261,11 @@ export interface DiscoverOptions {
   dns?: DnsResolver
 }
 
-function looksLikeEmail(v: string): boolean {
+export function looksLikeEmail(v: string): boolean {
   return /^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(v.trim())
 }
 
-function looksLikeBareDomain(v: string): boolean {
+export function looksLikeBareDomain(v: string): boolean {
   return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(v.trim())
 }
 

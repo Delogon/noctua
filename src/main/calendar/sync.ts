@@ -16,6 +16,7 @@ import {
 } from '../dav'
 import { getSecret } from '../auth/secrets'
 import { flushItipQueue } from './organizer'
+import { syncAccountContacts } from '../contacts/sync'
 import {
   calSecretKey,
   deleteObject,
@@ -57,6 +58,8 @@ export interface SyncEvents {
   /** calendarIds leer = Kalenderliste hat sich geändert */
   onChanged(accountId: number, calendarIds: number[]): void
   onConflict(info: ConflictInfo): void
+  /** CardDAV-Kontakte eines Kontos haben sich geändert (Phase 3.1) */
+  onContactsChanged?(accountId: number): void
 }
 
 export interface SyncContext {
@@ -596,6 +599,12 @@ export class AccountLoop {
       const force = this.forceNext
       this.forceNext = false
       await syncAccount({ db, client, events: this.deps.events }, account, { force })
+      // Kontakte (CardDAV) teilen Zugangsdaten, Backoff und needs-reauth mit dem Kalender
+      await syncAccountContacts(
+        { db, client, onChanged: (id) => this.deps.events.onContactsChanged?.(id) },
+        getCalAccount(db, account.id) ?? account,
+        { force }
+      )
       ensureInstanceWindow(db)
       db.prepare('UPDATE cal_accounts SET last_sync = ? WHERE id = ?').run(Date.now(), account.id)
       this.setState(account, 'idle', null)

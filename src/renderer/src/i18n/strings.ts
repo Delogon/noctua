@@ -44,6 +44,18 @@ const table = {
   },
 
   // ── Kalender-Konten (CalDAV, Phase 2.1) ──
+  taskSyncHead: { en: 'SYNC TASKS WITH (CALDAV)', de: 'AUFGABEN SYNCHRONISIEREN MIT (CALDAV)' },
+  taskSyncNote: {
+    en: 'Accepted tasks and the task list of one calendar stay in step both ways. Owl suggestions you have not accepted are never uploaded; dismissing or deleting a task removes it on the server too.',
+    de: 'Übernommene Aufgaben und die Aufgabenliste eines Kalenders bleiben in beide Richtungen gleich. Nicht übernommene Eulen-Vorschläge werden nie hochgeladen; Verwerfen oder Löschen entfernt die Aufgabe auch auf dem Server.'
+  },
+  taskSyncOff: { en: 'Off', de: 'Aus' },
+  taskSyncPending: { en: 'Waiting to sync', de: 'Wartet auf Abgleich' },
+  taskSyncSynced: { en: 'In sync with CalDAV', de: 'Mit CalDAV abgeglichen' },
+  taskSyncConflict: {
+    en: 'Conflict — the server version was kept',
+    de: 'Konflikt — die Server-Fassung wurde behalten'
+  },
   calHead: { en: 'CALENDARS (CALDAV)', de: 'KALENDER (CALDAV)' },
   calNote: {
     en: 'Nextcloud, mailbox.org, Fastmail, Posteo, iCloud (app password) and other CalDAV servers. Sign-in works over HTTPS only.',
@@ -85,6 +97,15 @@ const table = {
   calSynced: { en: 'synced {time}', de: 'abgeglichen {time}' },
   calPending: { en: '{n} waiting to upload', de: '{n} warten auf Übertragung' },
   calDead: { en: '{n} not applied', de: '{n} nicht übernommen' },
+  cardSync: { en: 'Sync contacts (CardDAV)', de: 'Kontakte synchronisieren (CardDAV)' },
+  cardNote: {
+    en: 'Read-only: address books feed recipient suggestions. Edit contacts in Nextcloud.',
+    de: 'Nur lesend: Adressbücher füllen die Empfänger-Vorschläge. Kontakte bearbeitest du in Nextcloud.'
+  },
+  cardCount: { en: '{n} contacts', de: '{n} Kontakte' },
+  cardSynced: { en: 'contacts synced {time}', de: 'Kontakte abgeglichen {time}' },
+  cardOn: { en: 'on', de: 'an' },
+  cardOff: { en: 'off', de: 'aus' },
   calVisible: { en: 'visible', de: 'sichtbar' },
   calHidden: { en: 'hidden', de: 'ausgeblendet' },
   calReadOnly: { en: 'READ-ONLY', de: 'NUR LESEN' },
