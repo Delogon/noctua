@@ -9,8 +9,18 @@ import { createTasksFromTriage, isUserAuthoredMail } from '../db/repos/tasks'
 import { isForwardWithoutRequest, textBeforeForwardedMessage } from '../mail/forwarded'
 import { recipientPlacement, salutationTarget } from './addressee'
 import { localStamp } from './prompt-date'
+import {
+  UNTRUSTED_SYSTEM_NOTE,
+  sanitizeUntrusted,
+  sanitizeUntrustedLine,
+  wrapUntrusted
+} from './untrusted'
 
-export const PROMPT_VERSION = 5
+// v6: Mail-Inhalt in Delimitern + „Daten, keine Anweisung" (SEC-15). Das Ausgabeformat
+// ist unverändert; bestehende Annotationen bleiben gültig. Die Erhöhung setzt beim Start
+// nur permanent gescheiterte Jobs zurück (requeueOnPromptChange) — erledigte Jobs bleiben
+// über UNIQUE(message_id, kind) gesperrt, es gibt KEINE Neu-Triage des 30-Tage-Fensters.
+export const PROMPT_VERSION = 6
 
 export const AI_CATEGORIES = [
   'personal',
@@ -67,6 +77,7 @@ eine andere Person nennt, reinen Infos ohne Bitte.
 Im Zweifel: NEIN.`
 
 const SYSTEM_PROMPT = `Du bist der Triage-Klassifikator eines persönlichen E-Mail-Clients.
+${UNTRUSTED_SYSTEM_NOTE}
 Analysiere die E-Mail und antworte AUSSCHLIESSLICH mit einem JSON-Objekt, exakt in dieser Form:
 {
   "category": "personal" | "work" | "newsletter" | "promotions" | "notifications" | "transactional" | "other",
@@ -134,7 +145,7 @@ interface TriageRow {
 
 function buildUserPrompt(db: Database.Database, row: TriageRow): string {
   const fullBodyText = row.text_plain?.trim() || htmlToText(row.html_raw ?? '')
-  const bodyText = textBeforeForwardedMessage(row.subject, fullBodyText).slice(0, 6000)
+  const bodyText = sanitizeUntrusted(textBeforeForwardedMessage(row.subject, fullBodyText), 6000)
   const stats = db
     .prepare('SELECT sent_count FROM contact_stats WHERE account_id = ? AND addr = ?')
     .get(row.account_id, row.from_addr ?? '') as { sent_count: number } | undefined
@@ -172,14 +183,14 @@ function buildUserPrompt(db: Database.Database, row: TriageRow): string {
         : 'keine erkennbare Anrede'
 
   return [
-    `Von: ${row.from_name ?? ''} <${row.from_addr ?? 'unbekannt'}>`,
-    `Betreff: ${row.subject ?? '(kein Betreff)'}`,
+    `Von: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unbekannt', 200)}>`,
+    `Betreff: ${sanitizeUntrustedLine(row.subject, 300) || '(kein Betreff)'}`,
     `Datum: ${row.date ? localStamp(row.date) : 'unbekannt'}`,
     `EMPFÄNGER (Kontoinhaber): ${ownerName ? `${ownerName} ` : ''}<${row.account_email ?? 'unbekannt'}>; ${placementLabel}; Anrede der Mail: ${salutationLabel}`,
     signals.length > 0 ? `Signale: ${signals.join('; ')}` : null,
     '',
     'Inhalt:',
-    bodyText || '(kein Textinhalt)'
+    wrapUntrusted('MAIL', bodyText || '(kein Textinhalt)')
   ]
     .filter((line) => line !== null)
     .join('\n')
