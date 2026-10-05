@@ -55,6 +55,26 @@ function LocalTag({ isLocal }: { isLocal: boolean }): React.JSX.Element {
   )
 }
 
+/** Tag „ORGANISATION" an einem von der Organisation bereitgestellten Profil. */
+function ManagedTag(): React.JSX.Element {
+  const t = useT()
+  return (
+    <span
+      className="flex-none"
+      title={t('profileManagedNote')}
+      style={{
+        font: '500 8.5px var(--mono)',
+        letterSpacing: '.6px',
+        padding: '1px 5px',
+        border: '1px solid var(--ink)',
+        color: 'var(--ink)'
+      }}
+    >
+      {t('profileManaged')}
+    </span>
+  )
+}
+
 // ── Local only ──────────────────────────────────────────────────────────────
 
 export function LocalOnlyCard(): React.JSX.Element {
@@ -135,6 +155,8 @@ function ProfileEditor({
   const queryClient = useQueryClient()
   const { toastNow } = usePaper()
   const builtin = profile?.preset === 'openrouter'
+  // Von der Organisation bereitgestellt: alles außer dem Key gesperrt
+  const managed = profile?.managed === true
   const [draft, setDraft] = useState<Draft>(
     profile
       ? {
@@ -177,7 +199,7 @@ function ProfileEditor({
           await invoke('ai:profiles:update', {
             id: draft.id,
             name: draft.name,
-            ...(builtin
+            ...(builtin || managed
               ? {}
               : { baseUrl: draft.baseUrl, apiStyle: draft.apiStyle, isLocal: draft.isLocal })
           })
@@ -235,7 +257,7 @@ function ProfileEditor({
   }
 
   const remove = (): void => {
-    if (!saved || builtin) return
+    if (!saved || builtin || managed) return
     void invoke('ai:profiles:delete', { id: saved.id })
       .then(() => {
         refresh()
@@ -250,12 +272,18 @@ function ProfileEditor({
       className="flex flex-col gap-2.5"
       style={{ border: '1px dashed var(--hairline)', padding: 12, marginTop: 10 }}
     >
+      {managed && (
+        <div style={{ font: '400 9.5px var(--mono)', color: 'var(--muted)' }}>
+          {t('profileManagedNote')}
+        </div>
+      )}
       <label style={field}>
         <span className="mlabel" style={{ color: 'var(--muted)' }}>
           {t('profileName')}
         </span>
         <input
           value={draft.name}
+          disabled={managed}
           onChange={(e) => patch({ name: e.target.value })}
           onKeyDown={(e) => e.stopPropagation()}
           maxLength={60}
@@ -269,7 +297,7 @@ function ProfileEditor({
         </span>
         <input
           value={draft.baseUrl}
-          disabled={builtin}
+          disabled={builtin || managed}
           onChange={(e) => {
             const baseUrl = e.target.value
             patch({
@@ -289,7 +317,7 @@ function ProfileEditor({
         </span>
         <select
           value={draft.apiStyle}
-          disabled={builtin}
+          disabled={builtin || managed}
           onChange={(e) => patch({ apiStyle: e.target.value as 'chat' | 'responses' })}
           className="paper-input"
           style={{ width: 'auto', alignSelf: 'start' }}
@@ -319,7 +347,7 @@ function ProfileEditor({
           )}
         </div>
       </label>
-      {!builtin && (
+      {!builtin && !managed && (
         <label
           className="flex cursor-pointer items-start gap-2"
           style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}
@@ -372,7 +400,7 @@ function ProfileEditor({
         <button type="button" className="text-btn" onClick={onClose}>
           {saved ? t('profileClose') : t('cancel')}
         </button>
-        {saved && !builtin && (
+        {saved && !builtin && !managed && (
           <button type="button" className="text-btn ml-auto" onClick={remove}>
             {t('profileDelete')}
           </button>
@@ -416,6 +444,7 @@ export function ProvidersCard(): React.JSX.Element {
                   {p.name}
                 </span>
                 <LocalTag isLocal={p.isLocal} />
+                {p.managed && <ManagedTag />}
                 <span
                   className="min-w-0 flex-1 truncate"
                   style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}

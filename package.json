@@ -25,10 +25,10 @@
     "dev": "node scripts/dev.mjs",
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
-    "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
-    "build:mac": "node scripts/build-fm-helper.mjs && electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build && electron-builder --linux",
+    "build:unpack": "npm run build && electron-builder --config electron-builder.config.mjs --dir",
+    "build:win": "npm run build && electron-builder --config electron-builder.config.mjs --win",
+    "build:mac": "node scripts/build-fm-helper.mjs && electron-vite build && electron-builder --config electron-builder.config.mjs --mac",
+    "build:linux": "electron-vite build && electron-builder --config electron-builder.config.mjs --linux",
     "dev:fresh": "./scripts/dev.sh"
   },
   "dependencies": {

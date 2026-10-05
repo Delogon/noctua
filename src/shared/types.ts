@@ -257,6 +257,24 @@ export const draftItemSchema = z.object({
 })
 
 export type Recipient = z.infer<typeof recipientSchema>
+/** Eine Netzwerkverbindung der App (Technik-Seite, Abschnitt „Netzwerkverbindungen"). */
+export const networkConnectionSchema = z.object({
+  kind: z.enum(['mail', 'oauth', 'ai', 'updates', 'embeddings']),
+  /** Konto/Profil/Anbieter; leer bei updates und embeddings */
+  label: z.string().max(200),
+  /** Zielhost; null, wenn nichts verbunden wird (Update-Check aus) */
+  host: z.string().max(255).nullable(),
+  scope: z.enum(['external', 'local']),
+  status: z.enum(['active', 'blocked', 'manual-only', 'on-demand', 'cached', 'off']),
+  /** nur bei kind = ai: bediente Aufgaben */
+  tasks: z.array(z.enum(['triage', 'draft', 'stt'])).max(3)
+})
+export const networkConnectionsSchema = z.object({
+  localOnly: z.boolean(),
+  connections: z.array(networkConnectionSchema).max(200)
+})
+
+export type NetworkConnection = z.infer<typeof networkConnectionSchema>
 export type AccountSummary = z.infer<typeof accountSummarySchema>
 export type DraftItem = z.infer<typeof draftItemSchema>
 export type ThreadListItem = z.infer<typeof threadListItemSchema>

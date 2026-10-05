@@ -2,7 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import { useAccounts } from '@renderer/queries/accounts'
-import { useOrKeyStatus } from '@renderer/queries/intel'
+import { useOrgInfo, useOrKeyStatus, useProfiles } from '@renderer/queries/intel'
+import { OnboardingOrgProfiles } from '@renderer/features/paper/OnboardingOrgProfiles'
 import { usePaper } from '@renderer/stores/paper'
 import { useT } from '@renderer/lib/i18n'
 import { OwlGlyph } from '@renderer/components/paper/OwlGlyph'
@@ -37,6 +38,8 @@ export function Onboarding(): React.JSX.Element {
   const queryClient = useQueryClient()
   const accounts = useAccounts()
   const orStatus = useOrKeyStatus()
+  const orgInfo = useOrgInfo()
+  const profiles = useProfiles()
   const { setOnboarding, toastNow } = usePaper()
   const [step, setStep] = useState<ObStep>(1)
   const [form, setForm] = useState<'gmail' | 'microsoft' | 'imap' | null>(null)
@@ -58,7 +61,12 @@ export function Onboarding(): React.JSX.Element {
 
   const connected = accounts.data ?? []
   // Replay-Fall: existiert schon ein Schlüssel (ai:usage), ist der CTA sofort aktiv
-  const keyReady = keySaved || orStatus.data?.hasKey === true
+  // Company Edition mit hideOpenRouterOnboarding: Profile der Organisation statt OpenRouter-Key
+  const orgMode = orgInfo.data?.hideOpenRouterOnboarding === true
+  const orgProfiles = (profiles.data ?? []).filter((p) => p.managed)
+  const keyReady = orgMode
+    ? orgProfiles.some((p) => p.isLocal || p.hasKey)
+    : keySaved || orStatus.data?.hasKey === true
 
   const finish = (): void => {
     void invoke('settings:set', { key: 'noctua.onboarded', value: '1' })
@@ -181,8 +189,8 @@ export function Onboarding(): React.JSX.Element {
 
   // Schritt 3 ohne Schlüssel: Input fokussieren — auch beim Rücksprung über ADD KEY
   useEffect(() => {
-    if (step === 3 && !keyReady) keyInputRef.current?.focus()
-  }, [step, keyReady])
+    if (step === 3 && !keyReady && !orgMode) keyInputRef.current?.focus()
+  }, [step, keyReady, orgMode])
 
   // Laufenden Flow markieren: Ein Neustart mittendrin setzt das Onboarding
   // dann fort, statt verbundene Konten als „Bestandsinstallation" zu werten
@@ -532,7 +540,9 @@ export function Onboarding(): React.JSX.Element {
             <div className="mlabel" style={{ letterSpacing: 2, color: 'var(--ac)' }}>
               {t('obStep3')}
             </div>
-            <div style={{ font: '500 24px var(--serif)', marginTop: 8 }}>{t('obKeyHead')}</div>
+            <div style={{ font: '500 24px var(--serif)', marginTop: 8 }}>
+              {orgMode ? t('obOrgHead') : t('obKeyHead')}
+            </div>
             <div
               style={{
                 font: '400 13.5px/1.6 var(--serif)',
@@ -541,79 +551,82 @@ export function Onboarding(): React.JSX.Element {
                 marginTop: 4
               }}
             >
-              {t('obKeySub')}
+              {orgMode ? t('obOrgSub') : t('obKeySub')}
             </div>
 
-            <div className="tint-card" style={{ padding: 14, marginTop: 22 }}>
-              <div className="mlabel" style={{ color: 'var(--muted)' }}>
-                {t('obKeyLabel')}
-              </div>
-              <div className="flex gap-2" style={{ marginTop: 8 }}>
-                <input
-                  ref={keyInputRef}
-                  value={key}
-                  onChange={(e) => {
-                    setKey(e.target.value)
-                    setKeyErr(null)
-                  }}
-                  onKeyDown={(e) => {
-                    // Enter im Input = speichern, nie Schritt-Weiter (Design 1b)
-                    if (e.key === 'Enter') saveKey()
-                    e.stopPropagation()
-                  }}
-                  type="password"
-                  placeholder="sk-or-v1-…"
-                  className="paper-input flex-1"
-                  aria-label={t('obKeyLabel')}
-                />
-                <button
-                  type="button"
-                  onClick={saveKey}
-                  className="btn-bare flex-none"
-                  style={{
-                    font: '500 10px var(--mono)',
-                    letterSpacing: 1,
-                    color: 'var(--paper)',
-                    background: 'var(--ink)',
-                    padding: '8px 14px'
-                  }}
-                >
-                  {keyBusy ? '···' : t('obKeySave')}
-                </button>
-              </div>
-              {keyErr ? (
-                <div
-                  role="alert"
-                  style={{ font: '400 9px var(--mono)', color: 'var(--ac)', marginTop: 8 }}
-                >
-                  {keyErr}
+            {orgMode && <OnboardingOrgProfiles profiles={orgProfiles} />}
+            {!orgMode && (
+              <div className="tint-card" style={{ padding: 14, marginTop: 22 }}>
+                <div className="mlabel" style={{ color: 'var(--muted)' }}>
+                  {t('obKeyLabel')}
                 </div>
-              ) : (
-                <div
-                  style={{
-                    font: '400 9px var(--mono)',
-                    color: keyReady ? 'var(--ink)' : 'var(--muted)',
-                    marginTop: 8
-                  }}
-                >
-                  {keyReady ? t('orSaved') : t('orNoKey')}
+                <div className="flex gap-2" style={{ marginTop: 8 }}>
+                  <input
+                    ref={keyInputRef}
+                    value={key}
+                    onChange={(e) => {
+                      setKey(e.target.value)
+                      setKeyErr(null)
+                    }}
+                    onKeyDown={(e) => {
+                      // Enter im Input = speichern, nie Schritt-Weiter (Design 1b)
+                      if (e.key === 'Enter') saveKey()
+                      e.stopPropagation()
+                    }}
+                    type="password"
+                    placeholder="sk-or-v1-…"
+                    className="paper-input flex-1"
+                    aria-label={t('obKeyLabel')}
+                  />
+                  <button
+                    type="button"
+                    onClick={saveKey}
+                    className="btn-bare flex-none"
+                    style={{
+                      font: '500 10px var(--mono)',
+                      letterSpacing: 1,
+                      color: 'var(--paper)',
+                      background: 'var(--ink)',
+                      padding: '8px 14px'
+                    }}
+                  >
+                    {keyBusy ? '···' : t('obKeySave')}
+                  </button>
                 </div>
-              )}
-              <div style={{ font: '400 9px var(--mono)', color: 'var(--faint)', marginTop: 4 }}>
-                {t('obKeyFootnotePre')}
-                <button
-                  type="button"
-                  onClick={() =>
-                    void invoke('app:openExternal', { url: 'https://openrouter.ai/keys' })
-                  }
-                  className="btn-bare"
-                  style={{ color: 'var(--faint)', borderBottom: '1px solid var(--hairline)' }}
-                >
-                  openrouter.ai/keys
-                </button>
-                {t('obKeyFootnotePost')}
+                {keyErr ? (
+                  <div
+                    role="alert"
+                    style={{ font: '400 9px var(--mono)', color: 'var(--ac)', marginTop: 8 }}
+                  >
+                    {keyErr}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      font: '400 9px var(--mono)',
+                      color: keyReady ? 'var(--ink)' : 'var(--muted)',
+                      marginTop: 8
+                    }}
+                  >
+                    {keyReady ? t('orSaved') : t('orNoKey')}
+                  </div>
+                )}
+                <div style={{ font: '400 9px var(--mono)', color: 'var(--faint)', marginTop: 4 }}>
+                  {t('obKeyFootnotePre')}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void invoke('app:openExternal', { url: 'https://openrouter.ai/keys' })
+                    }
+                    className="btn-bare"
+                    style={{ color: 'var(--faint)', borderBottom: '1px solid var(--hairline)' }}
+                  >
+                    openrouter.ai/keys
+                  </button>
+                  {t('obKeyFootnotePost')}
+                </div>
               </div>
-            </div>
+            )}
 
             <div style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)', marginTop: 12 }}>
               {t('obKeyModelsNote')}

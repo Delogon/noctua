@@ -6,6 +6,7 @@ import {
   messageActionSchema,
   messageDetailSchema,
   messageHeaderDetailsSchema,
+  networkConnectionsSchema,
   owlConversationListItemSchema,
   owlConversationSchema,
   owlMessageSchema,
@@ -55,6 +56,7 @@ export const aiProfileSchema = z.object({
   apiStyle: z.enum(['chat', 'responses']),
   isLocal: z.boolean(),
   preset: z.enum(['openrouter', 'custom']),
+  managed: z.boolean(),
   hasKey: z.boolean()
 })
 
@@ -307,6 +309,21 @@ export const invokeContract = {
   'privacy:setLocalOnly': {
     input: z.object({ localOnly: z.boolean() }),
     output: z.object({ localOnly: z.boolean() })
+  },
+  // Alle Netzwerkverbindungen der App (Technik-Seite), live aus Konten/Profilen/Konfiguration
+  'privacy:networkConnections': {
+    input: z.void(),
+    output: networkConnectionsSchema
+  },
+  // Branding/Onboarding-Hinweise aus der Org-Konfiguration (Upstream: Defaults)
+  'org:info': {
+    input: z.void(),
+    output: z.object({
+      productName: z.string().max(60),
+      /** true: Onboarding bietet statt OpenRouter die Profile der Organisation an */
+      hideOpenRouterOnboarding: z.boolean(),
+      edition: z.enum(['upstream', 'organisation'])
+    })
   },
   // Update-Check auf Anforderung (bei Local only der einzige Weg)
   'updates:checkNow': {

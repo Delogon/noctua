@@ -67,7 +67,7 @@ jobs:
 
       # Unsignierter Paketierungs-Test (prüft Fuses/asarUnpack-Konfiguration)
       - name: Package (unsigned)
-        run: pnpm exec electron-builder --mac --dir
+        run: pnpm exec electron-builder --config electron-builder.config.mjs --mac --dir
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 

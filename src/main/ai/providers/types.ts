@@ -16,6 +16,8 @@ export interface AiProfile {
   /** lokal/On-Prem (true) oder externer Dienst (false) — Grundlage für „Local only" */
   isLocal: boolean
   preset: ProfilePreset
+  /** von der Organisation (Org-Konfiguration) bereitgestellt: URL/Stil/Name gesperrt, nur der Key editierbar */
+  managed: boolean
   /** Key im Vault hinterlegt (der Key selbst verlässt den Main-Prozess nie) */
   hasKey: boolean
 }

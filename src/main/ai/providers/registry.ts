@@ -27,6 +27,7 @@ interface ProfileRow {
   api_style: ApiStyle
   is_local: number
   preset: 'openrouter' | 'custom'
+  managed: number
 }
 
 /** Vault-Key eines Profils; das OpenRouter-Preset behält den Upstream-Key. */
@@ -43,6 +44,7 @@ function toProfile(row: ProfileRow): AiProfile {
     apiStyle: row.api_style,
     isLocal: row.is_local === 1,
     preset: row.preset,
+    managed: row.managed === 1,
     hasKey: hasSecret(profileSecretKey(base))
   }
 }
@@ -112,6 +114,8 @@ export function createProfile(input: ProfileInput, db: Database.Database = getDb
 /**
  * Profil ändern. Beim OpenRouter-Preset sind nur Name und lokal-Flag fix bzw.
  * unveränderlich: URL und API-Stil gehören zum Preset (Header, ZDR, Katalog).
+ * Von der Organisation bereitgestellte Profile (managed) sind komplett gesperrt;
+ * nur der Key (setProfileKey) bleibt änderbar.
  */
 export function updateProfile(
   id: string,
@@ -121,6 +125,7 @@ export function updateProfile(
   const current = getProfile(id, db)
   if (!current) throw new Error('Profil nicht gefunden')
   const builtin = current.preset === 'openrouter'
+  if (current.managed) return current
   const next = {
     name: patch.name !== undefined ? cleanName(patch.name) : current.name,
     baseUrl:
@@ -141,6 +146,8 @@ export function deleteProfile(id: string, db: Database.Database = getDb()): void
   if (!current) return
   if (current.preset === 'openrouter')
     throw new Error('Das OpenRouter-Profil kann nicht gelöscht werden')
+  if (current.managed)
+    throw new Error('Von der Organisation bereitgestelltes Profil kann nicht gelöscht werden')
   db.transaction(() => {
     for (const task of TASKS) {
       if (getTaskProfileId(task) === id) {

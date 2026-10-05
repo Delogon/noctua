@@ -16,6 +16,8 @@ import { outboxWorker } from './smtp/outbox'
 import { initNotifications, updateBadge } from './notifications'
 import { setRuleActionExecutor } from './ai/rules'
 import { startUpdateChecks, stopUpdateChecks } from './updates'
+import { appId, packagedAppName, productName } from './org-config'
+import { applyOrgConfig } from './org-defaults'
 import { stopAppleFm } from './ai/apple-fm'
 import { openExternalSafe } from './util/links'
 import { installAppMenu } from './menu'
@@ -49,7 +51,8 @@ const trustedPages = (): TrustedAppPages => ({
 // Storage-Schlüssel): Dev belegt bereits „noctua", und da macOS-Dateisysteme
 // Groß-/Kleinschreibung ignorieren, würde auch „Noctua" dieselbe DB treffen —
 // zwei Instanzen auf einer DB heißt Lock-Konflikte und doppelter IMAP-Sync.
-if (!isDev) app.setName('noctua-prod')
+// Eine Company Edition (Org-Konfiguration) bekommt wiederum einen eigenen Namen.
+if (!isDev) app.setName(packagedAppName())
 
 let mainWindow: BrowserWindow | null = null
 
@@ -61,7 +64,7 @@ function createWindow(): BrowserWindow {
     minWidth: 1180,
     minHeight: 760,
     show: false,
-    title: 'Noctua',
+    title: productName(),
     backgroundColor: '#F4F1EA',
     titleBarStyle: 'hiddenInset',
     // Traffic lights vertically centered on the masthead wordmark: its box
@@ -186,9 +189,11 @@ if (!isDev) {
 app
   .whenReady()
   .then(() => {
-    electronApp.setAppUserModelId('de.timsigl.noctua')
+    electronApp.setAppUserModelId(appId())
 
     const db = openDb()
+    // Org-Defaults + bereitgestellte AI-Profile (No-op ohne Org-Konfiguration)
+    applyOrgConfig(db, app.getLocale())
     cleanupForwardTasksWithoutRequest(db)
     reindexHtmlOnlyMessages(db)
     if (isDev) seedFromEnv(db)

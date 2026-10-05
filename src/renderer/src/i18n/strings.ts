@@ -656,6 +656,11 @@ const table = {
   },
   profileLocal: { en: 'LOCAL', de: 'LOKAL' },
   profileExternal: { en: 'EXTERNAL', de: 'EXTERN' },
+  profileManaged: { en: 'ORGANISATION', de: 'ORGANISATION' },
+  profileManagedNote: {
+    en: 'Provided by your organisation: URL, API style and name are fixed. Only the key can be changed.',
+    de: 'Von deiner Organisation bereitgestellt: URL, API-Stil und Name sind fest. Nur der Schlüssel lässt sich ändern.'
+  },
   profileName: { en: 'NAME', de: 'NAME' },
   profileUrl: { en: 'BASE URL', de: 'BASIS-URL' },
   profileStyle: { en: 'API STYLE', de: 'API-STIL' },
@@ -1019,6 +1024,21 @@ const table = {
     en: 'Gists, tasks and drafts run on OpenRouter with your key. Calls go straight there — nothing passes through us.',
     de: 'Gists, Aufgaben und Entwürfe laufen über OpenRouter mit deinem Schlüssel. Anfragen gehen direkt dorthin — nichts läuft über uns.'
   },
+  obOrgHead: { en: 'Your organisation’s AI', de: 'Die KI deiner Organisation' },
+  obOrgSub: {
+    en: 'Gists, tasks and drafts run on the AI profiles your organisation provides. Add your key where one is needed.',
+    de: 'Gists, Aufgaben und Entwürfe laufen über die KI-Profile deiner Organisation. Hinterlege deinen Schlüssel, wo einer nötig ist.'
+  },
+  obOrgProfilesLabel: {
+    en: 'AI PROFILES FROM YOUR ORGANISATION',
+    de: 'KI-PROFILE DEINER ORGANISATION'
+  },
+  obOrgNoProfiles: {
+    en: 'No AI profiles provided — the owl stays paused. You can add one in Settings → Intelligence.',
+    de: 'Keine KI-Profile bereitgestellt — die Eule bleibt pausiert. Du kannst unter Einstellungen → Intelligenz eines anlegen.'
+  },
+  obOrgKeySaved: { en: '✓ key saved', de: '✓ Schlüssel gespeichert' },
+  obOrgNoKeyNeeded: { en: 'local — no key needed', de: 'lokal — kein Schlüssel nötig' },
   obKeyLabel: { en: 'OPENROUTER API KEY', de: 'OPENROUTER-API-SCHLÜSSEL' },
   obKeySave: { en: 'SAVE — ↵', de: 'SPEICHERN — ↵' },
   obKeyFootnotePre: { en: 'no account yet? ', de: 'noch kein Konto? ' },
@@ -1365,18 +1385,18 @@ const table = {
   cmdTechNote: { en: 'every pipeline, one picture', de: 'jede Pipeline ein Bild' },
   techHead: { en: 'How the owl thinks', de: 'Wie die Eule denkt' },
   techSub: {
-    en: 'TEN PIPELINES, TEN PICTURES · NO MAGIC, JUST PLUMBING',
-    de: 'ZEHN PIPELINES, ZEHN BILDER · KEINE MAGIE, NUR HANDWERK'
+    en: 'TEN PIPELINES, TEN PICTURES, ONE LIVE NETWORK LIST · NO MAGIC, JUST PLUMBING',
+    de: 'ZEHN PIPELINES, ZEHN BILDER, EINE LIVE-NETZWERKLISTE · KEINE MAGIE, NUR HANDWERK'
   },
   techLegendSolid: { en: 'SOLID — ON YOUR DEVICE', de: 'DURCHGEZOGEN — AUF DEINEM GERÄT' },
   techLegendDashed: {
-    en: 'DASHED — API CALL VIA OPENROUTER',
-    de: 'GESTRICHELT — API-CALL ÜBER OPENROUTER'
+    en: 'DASHED — API CALL TO AN AI PROFILE',
+    de: 'GESTRICHELT — API-CALL AN EIN KI-PROFIL'
   },
   techLegendModel: { en: '✦ — A LANGUAGE MODEL', de: '✦ — EIN SPRACHMODELL' },
   techLegendNote: {
-    en: 'Dashed lines only exist once you add an OpenRouter key — without one, the owl stays fully on paper.',
-    de: 'Gestrichelte Linien gibt es erst mit deinem OpenRouter-Schlüssel — ohne bleibt die Eule ganz auf dem Papier.'
+    en: 'Dashed lines only exist once an AI profile is set up (by default OpenRouter, with your key) — without one, the owl stays fully on paper. Which servers are actually contacted is listed at the bottom.',
+    de: 'Gestrichelte Linien gibt es erst mit einem eingerichteten KI-Profil (standardmäßig OpenRouter mit deinem Schlüssel) — ohne bleibt die Eule ganz auf dem Papier. Welche Server tatsächlich kontaktiert werden, steht ganz unten.'
   },
 
   // 01 · Triage
@@ -1583,16 +1603,37 @@ const table = {
   techDataChip1: { en: 'E5 EMBEDDINGS', de: 'E5-EMBEDDINGS' },
   techDataChip2: { en: 'HUNSPELL DE+EN', de: 'HUNSPELL DE+EN' },
   techDataChip3: { en: 'SQLITE-VEC', de: 'SQLITE-VEC' },
-  techDataOr: { en: 'OPENROUTER', de: 'OPENROUTER' },
-  techDataOrNote: { en: 'LLM CALLS ONLY', de: 'NUR LLM-CALLS' },
-  techDataGh: { en: 'GITHUB RELEASES', de: 'GITHUB RELEASES' },
-  techDataGhNote: { en: 'UPDATE CHECK · ANONYMOUS', de: 'UPDATE-CHECK · ANONYM' },
+  techDataNet: { en: 'NETWORK', de: 'NETZWERK' },
+  techDataNetNote: { en: 'LIVE LIST BELOW', de: 'LIVE-LISTE UNTEN' },
   techDataPixels: { en: 'TRACKING PIXELS', de: 'TRACKING-PIXEL' },
   techDataBlocked: { en: 'BLOCKED BY DEFAULT', de: 'STANDARDMÄSSIG BLOCKIERT' },
   techDataCap: {
-    en: 'Everything lives in one local SQLite file; credentials sit safeStorage-encrypted in a Keychain-backed vault. Outbound, only three things talk: your mail servers, the LLM calls via OpenRouter — and a quiet, anonymous release check on GitHub.',
-    de: 'Alles wohnt in einer lokalen SQLite-Datei; Zugangsdaten liegen safeStorage-verschlüsselt im Schlüsselbund-gestützten Vault. Nach draußen reden nur drei Dinge: deine Mailserver, die LLM-Calls über OpenRouter — und ein stiller, anonymer Update-Check bei GitHub.'
-  }
+    en: 'Everything lives in one local SQLite file; credentials sit safeStorage-encrypted in a Keychain-backed vault. What actually talks to the outside is listed live below — it depends on your accounts, AI profiles and settings.',
+    de: 'Alles wohnt in einer lokalen SQLite-Datei; Zugangsdaten liegen safeStorage-verschlüsselt im Schlüsselbund-gestützten Vault. Was tatsächlich nach draußen redet, steht live in der Liste darunter — es hängt von deinen Konten, KI-Profilen und Einstellungen ab.'
+  },
+  techNetTitle: { en: 'Network connections', de: 'Netzwerkverbindungen' },
+  techNetCap: {
+    en: 'Computed from your accounts, AI profiles, update source and the Local only switch. Tracking pixels and remote images stay blocked unless you allow them.',
+    de: 'Berechnet aus deinen Konten, KI-Profilen, Update-Quelle und dem Local-only-Schalter. Tracking-Pixel und Remote-Bilder bleiben blockiert, solange du sie nicht erlaubst.'
+  },
+  techNetLocalOnlyOn: { en: 'LOCAL ONLY: ON', de: 'LOCAL ONLY: AN' },
+  techNetLocalOnlyOff: { en: 'LOCAL ONLY: OFF', de: 'LOCAL ONLY: AUS' },
+  techNetKindMail: { en: 'MAIL SERVER', de: 'MAILSERVER' },
+  techNetKindOauth: { en: 'SIGN-IN (OAUTH)', de: 'ANMELDUNG (OAUTH)' },
+  techNetKindAi: { en: 'AI PROFILE', de: 'KI-PROFIL' },
+  techNetKindUpdates: { en: 'UPDATE CHECK', de: 'UPDATE-CHECK' },
+  techNetKindEmbeddings: { en: 'SEARCH MODEL', de: 'SUCHMODELL' },
+  techNetActive: { en: 'ACTIVE', de: 'AKTIV' },
+  techNetBlocked: { en: 'BLOCKED (LOCAL ONLY)', de: 'GESPERRT (LOCAL ONLY)' },
+  techNetManual: { en: 'ONLY ON REQUEST', de: 'NUR AUF ANFRAGE' },
+  techNetOnDemand: { en: 'DOWNLOAD ON DEMAND', de: 'DOWNLOAD BEI BEDARF' },
+  techNetCached: { en: 'CACHED · NO NETWORK', de: 'IM CACHE · KEIN NETZ' },
+  techNetOff: { en: 'OFF', de: 'AUS' },
+  techNetLocal: { en: 'LOCAL', de: 'LOKAL' },
+  techNetExternal: { en: 'EXTERNAL', de: 'EXTERN' },
+  techNetTaskTriage: { en: 'triage', de: 'Sortierung' },
+  techNetTaskDraft: { en: 'drafts', de: 'Entwürfe' },
+  techNetTaskStt: { en: 'dictation', de: 'Diktat' }
 } as const
 
 export type StringKey = keyof typeof table

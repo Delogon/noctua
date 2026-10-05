@@ -17,3 +17,6 @@ native/fm-helper/bin/*
 .claude/
 .env
 .env.*
+
+# Firmenspezifische Org-Konfiguration (Vorlage: build/org-config.example.json)
+build/org-config.json

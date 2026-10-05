@@ -6,6 +6,8 @@ import {
   type TokenCacheContext
 } from '@azure/msal-node'
 import { getSetting } from '../db'
+import { getOrgConfig } from '../org-config'
+import type { OrgConfig } from '@shared/org-config'
 import { getSecret, setSecret } from './secrets'
 import { CancelableLoopbackClient } from './loopback'
 import { mapMsalError, ReauthRequiredError } from './reauth'
@@ -31,8 +33,13 @@ export const MS_MAIL_SCOPES = [
   'https://outlook.office.com/SMTP.Send'
 ]
 
+/** Client-ID: explizites Main-Setting > Org-Konfiguration > Thunderbird-Default. */
+export function resolveMicrosoftClientId(setting: string | null, org: OrgConfig | null): string {
+  return setting?.trim() || org?.oauth?.microsoft?.clientId || THUNDERBIRD_CLIENT_ID
+}
+
 function clientId(): string {
-  return getSetting('ms.clientId')?.trim() || THUNDERBIRD_CLIENT_ID
+  return resolveMicrosoftClientId(getSetting('ms.clientId'), getOrgConfig())
 }
 
 /** Persistiert den MSAL-Token-Cache verschlüsselt im safeStorage-Vault. */
