@@ -265,6 +265,22 @@ schedule-outbox (headers `Originator`, `Recipient`; RFC 6638 §5), response pars
 `schedule-response`. Servers without outbox: `source: 'unavailable'`. `calendar:freebusy:self` returns
 own busy intervals (excludes CANCELLED, TRANSPARENT, events declined by me; TENTATIVE separate).
 
+### Editor (Phase 2.5)
+
+`EventEditor` edits attendees for events we organise (no organizer, or ORGANIZER = one of "my"
+addresses; IPC `calendar:scheduling:info {calendarId, objectId?}` returns `organizerIsMe`,
+`myAddresses`, `autoSchedule` and the invitation row for events that came from an iMIP REQUEST).
+Attendees come with address-book autocomplete (`contacts:suggest`), role REQ/OPT-PARTICIPANT and
+PARTSTAT per attendee; adding attendees to an event without organizer makes the account address
+organizer (`withDefaultOrganizerPatch`). "Send invitations and updates" maps to `notifyAttendees`
+(hidden on `calendar-auto-schedule` accounts: the server delivers); deleting asks the same question.
+As a plain attendee the list is read-only and the RSVP buttons call `calendar:invitations:respond`.
+The availability strip (08-20 of the event day) uses `calendar:freebusy` for others and
+`calendar:freebusy:self` with `excludeObjectId` for me (the edited event does not count as busy);
+servers without an outbox show "no information". "Next free slot for everyone"
+(`features/calendar/free-slots.ts`) searches the next 10 working days 08-18 in 15 min steps and
+ignores attendees without information.
+
 ### Security
 
 Invitation content is untrusted: size/attendee caps, description stored as capped plain text and
@@ -287,13 +303,13 @@ calendar. `src/main/tasks/caldav-sync.ts` reconciles `tasks` with that calendar'
 `cal_pending_ops` (If-Match / 412 -> server version wins + `calendar:conflict` toast).
 `task_caldav` (migration 029) stores uid, last agreed field hash and ETag per task.
 
-| Noctua | VTODO |
-| --- | --- |
-| title | SUMMARY |
-| notes | DESCRIPTION |
-| due (`YYYY-MM-DD`) | DUE (DATE; DATE-TIME reduced to its wall date, untouched unless the date changes) |
+| Noctua             | VTODO                                                                                        |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| title              | SUMMARY                                                                                      |
+| notes              | DESCRIPTION                                                                                  |
+| due (`YYYY-MM-DD`) | DUE (DATE; DATE-TIME reduced to its wall date, untouched unless the date changes)            |
 | status done / open | STATUS COMPLETED + COMPLETED + PERCENT-COMPLETE:100 / NEEDS-ACTION (CANCELLED reads as done) |
-| source mail | X-NOCTUA-MESSAGE-ID (RFC Message-ID) + URL `mid:<id>` |
+| source mail        | X-NOCTUA-MESSAGE-ID (RFC Message-ID) + URL `mid:<id>`                                        |
 
 Only open tasks are pushed (never AI suggestions, dismissed or already-done unmapped tasks).
 Dismissing or deleting a task deletes the VTODO; server deletions remove the local task.

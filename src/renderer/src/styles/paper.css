@@ -3928,6 +3928,10 @@ kbd,
   line-height: 1.2;
 }
 
+.cal-scroll[data-narrow='true'] .cal-event[data-glyphs='true'] {
+  padding-right: 12px;
+}
+
 .cal-scroll[data-narrow='true'] .cal-event__meta {
   display: none;
 }
@@ -4056,7 +4060,8 @@ kbd,
   flex: none;
 }
 
-.cal-month-body[data-narrow='true'] .cal-chip__time,
+.cal-month-body[data-narrow='true'] .cal-chip__time:not([data-cont='true']),
+.cal-month-body[data-narrow='true'] .cal-chip__time .cal-chip__end,
 .cal-month-body[data-narrow='true'] .cal-chip .cal-glyphs {
   display: none;
 }

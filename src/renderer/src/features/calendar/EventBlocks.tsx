@@ -124,6 +124,16 @@ export function BannerBar({
   )
 }
 
+/** Uhrzeit im Monatschip; Folgetag („→ 01:30"): in schmalen Zellen bleibt nur der Pfeil. */
+function ChipTime({ label }: { label: string }): React.JSX.Element {
+  if (!label.startsWith('→')) return <span className="cal-chip__time">{label}</span>
+  return (
+    <span className="cal-chip__time" data-cont="true">
+      →<span className="cal-chip__end">{label.slice(1)}</span>
+    </span>
+  )
+}
+
 /** Eintrag einer Monatszelle: Zeittermine mit Uhrzeit, Bänder gefüllt. */
 export function MonthChip({
   event,
@@ -153,7 +163,7 @@ export function MonthChip({
         onOpen(event)
       }}
     >
-      {!banner && <span className="cal-chip__time">{dayTimeLabel(event, dayStart, 'start')}</span>}
+      {!banner && <ChipTime label={dayTimeLabel(event, dayStart, 'start')} />}
       <span className="cal-chip__title">{event.summary || t('cvNoTitle')}</span>
       <Glyphs event={event} />
     </button>

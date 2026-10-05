@@ -8,6 +8,7 @@ import { accountSecretKey } from '../auth/providers'
 import { parseMail } from '../mail/parser'
 import { storeBody, upsertEnvelope, type EnvelopeData } from '../mail/ingest'
 import { createEventIcs, updateIcs, type EditContext } from '../calendar/edit'
+import { setFreeBusyDeps } from '../calendar/freebusy'
 import { calSecretKey, newObjectHref, upsertObject } from '../calendar/repo'
 import { upsertContact } from '../contacts/repo'
 import { buildTodoIcs, fieldsHash, taskUid } from '../tasks/todo'
@@ -495,7 +496,7 @@ function seedCalendar(
            state, last_sync, created_at)
          VALUES ('Acme Nextcloud', 'https://cloud.acme-corp.example/remote.php/dav',
            '/remote.php/dav/principals/users/nora/', 'https://cloud.acme-corp.example/remote.php/dav/calendars/nora/',
-           ?, ?, '/remote.php/dav/calendars/nora/inbox/', '/remote.php/dav/calendars/nora/outbox/', ?, 1,
+           ?, ?, '/remote.php/dav/calendars/nora/inbox/', 'https://cloud.acme-corp.example/remote.php/dav/calendars/nora/outbox/', ?, 1,
            '["calendar-access","calendar-auto-schedule","addressbook"]', 'idle', ?, ?)`
       )
       .run(DEMO_EMAIL, mailAccountId, JSON.stringify([DEMO_EMAIL]), now - 4 * 60_000, now)
@@ -863,7 +864,9 @@ function seedContacts(db: Database.Database, now: number): void {
     ['Marta Lindqvist', 'marta.lindqvist@acme-partners.example', 'Acme Partners'],
     ['Priya Nair', 'priya.nair@acme-partners.example', 'Acme Partners'],
     ['Jonas Weber', 'jonas.weber@acme-corp.example', 'Acme Corp'],
-    ['Lena Fischer', 'lena.fischer@acme-corp.example', 'Acme Corp']
+    ['Lena Fischer', 'lena.fischer@acme-corp.example', 'Acme Corp'],
+    ['Mara Hoffmann', 'mara.hoffmann@acme-corp.example', 'Acme Corp'],
+    ['Matteo Rossi', 'matteo.rossi@acme-partners.example', 'Acme Partners']
   ]
   people.forEach(([name, mail, org], i) => {
     const [given, ...rest] = name.split(' ')
@@ -894,6 +897,7 @@ function seedAi(): void {
 
 export async function seedDemoData(db: Database.Database): Promise<void> {
   if (!isDev) return
+  installDemoFreeBusy()
   const lang = process.env.NOCTUA_DEMO_LANG === 'de' ? 'de' : 'en'
   const set = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
   const existing = db.prepare('SELECT id FROM accounts WHERE email = ?').get(DEMO_EMAIL) as
@@ -916,4 +920,106 @@ export async function seedDemoData(db: Database.Database): Promise<void> {
   set.run('ui.language', lang)
   // Local only: pro Lauf wählbar (Zustand ändert sich auch auf bestehender DB)
   setLocalOnly(process.env.NOCTUA_DEMO_LOCAL_ONLY === '1')
+}
+
+// --- Demo-Free/Busy -----------------------------------------------------------------------------
+
+/**
+ * Der Demo-Server (kein Netz) beantwortet Free/Busy-Anfragen an die Scheduling-Outbox mit
+ * festen Mustern je Teilnehmer, damit der Verfügbarkeitsstreifen im Editor etwas zeigt.
+ * Marta (Partnerfirma) liefert bewusst keine Auskunft.
+ */
+const DEMO_BUSY: Record<string, Array<[number, number, number[]?]>> = {
+  // [von, bis, Wochentage (0=So) — leer = alle Arbeitstage]
+  'jonas.weber@acme-corp.example': [
+    [9, 10.5],
+    [13, 14, [1, 3, 5]]
+  ],
+  'lena.fischer@acme-corp.example': [
+    [10, 12, [1, 3]],
+    [14.5, 16, [3]],
+    [15, 17, [2, 4]]
+  ],
+  'priya.nair@acme-partners.example': [
+    [8.5, 9.5],
+    [11, 12, [3]],
+    [16, 18, [1, 2, 3, 4]]
+  ]
+}
+
+function icsUtc(ms: number): string {
+  return new Date(ms).toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z'
+}
+
+function demoScheduleResponse(recipients: string[], rangeStart: number, rangeEnd: number): string {
+  const parts: string[] = []
+  for (const email of recipients) {
+    const periods: string[] = []
+    const blocks = DEMO_BUSY[email]
+    if (blocks) {
+      const days = Math.ceil((rangeEnd - rangeStart) / 86_400_000)
+      for (let d = 0; d < days; d++) {
+        const day = new Date(rangeStart + d * 86_400_000)
+        const wd = day.getDay()
+        if (wd === 0 || wd === 6) continue
+        for (const [from, to, only] of blocks) {
+          if (only && !only.includes(wd)) continue
+          const a = rangeStart + d * 86_400_000 + from * 3_600_000
+          const b = rangeStart + d * 86_400_000 + to * 3_600_000
+          periods.push(`FREEBUSY;FBTYPE=BUSY:${icsUtc(a)}/${icsUtc(b)}`)
+        }
+      }
+      parts.push(`<C:response><C:recipient><D:href>mailto:${email}</D:href></C:recipient>
+<C:request-status>2.0;Success</C:request-status>
+<C:calendar-data>BEGIN:VCALENDAR
+VERSION:2.0
+METHOD:REPLY
+BEGIN:VFREEBUSY
+DTSTAMP:${icsUtc(Date.now())}
+DTSTART:${icsUtc(rangeStart)}
+DTEND:${icsUtc(rangeEnd)}
+ATTENDEE:mailto:${email}
+${periods.join('\n')}
+END:VFREEBUSY
+END:VCALENDAR
+</C:calendar-data></C:response>`)
+    } else {
+      parts.push(`<C:response><C:recipient><D:href>mailto:${email}</D:href></C:recipient>
+<C:request-status>3.7;Invalid Calendar User</C:request-status></C:response>`)
+    }
+  }
+  return `<?xml version="1.0" encoding="utf-8"?>
+<C:schedule-response xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+${parts.join('\n')}
+</C:schedule-response>`
+}
+
+export function installDemoFreeBusy(): void {
+  if (!isDev) return
+  setFreeBusyDeps({
+    getPassword: () => 'demo-password',
+    fetch: async (_url, init) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>
+      const recipients = (headers['Recipient'] ?? '')
+        .split(',')
+        .map((r) =>
+          r
+            .trim()
+            .replace(/^mailto:/i, '')
+            .toLowerCase()
+        )
+        .filter(Boolean)
+      const body = typeof init?.body === 'string' ? init.body : ''
+      const ts = (name: string): number => {
+        const m = new RegExp(`${name}:(\\d{4})(\\d{2})(\\d{2})T(\\d{2})(\\d{2})(\\d{2})Z`).exec(
+          body
+        )
+        return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : 0
+      }
+      return new Response(demoScheduleResponse(recipients, ts('DTSTART'), ts('DTEND')), {
+        status: 200,
+        headers: { 'Content-Type': 'application/xml' }
+      })
+    }
+  })
 }

@@ -329,6 +329,9 @@ export function AttendeesSection({
     for (const m of mine) s.add(m)
     return s
   }, [attendees, mine])
+  const organizerAtt = organizer
+    ? attendees.find((a) => normEmail(a.email) === normEmail(organizer.email))
+    : undefined
   const isMe = organizer !== null && mine.has(normEmail(organizer.email))
   return (
     <div>
@@ -339,21 +342,25 @@ export function AttendeesSection({
               {organizer.name || organizer.email}
               {isMe && <span className="mmeta"> ({t('cvYou')})</span>}
             </span>
+            {organizerAtt && <PartChip partstat={organizerAtt.partstat} isNew={false} />}
             <span className="mchip" style={{ border: '1px solid var(--hairline)' }}>
               {t('cvOrganizer')}
             </span>
           </div>
         )}
-        {attendees.map((a) => (
-          <Row
-            key={normEmail(a.email)}
-            a={a}
-            isNew={!known.has(normEmail(a.email))}
-            editable={editable}
-            onRole={(role) => onChange(setAttendeeRole(attendees, a.email, role))}
-            onRemove={() => onChange(removeAttendee(attendees, a.email))}
-          />
-        ))}
+        {attendees.map((a) =>
+          // Der Organisator steht oben (mit seiner Antwort), nicht noch einmal in der Liste
+          organizerAtt && a === organizerAtt ? null : (
+            <Row
+              key={normEmail(a.email)}
+              a={a}
+              isNew={!known.has(normEmail(a.email))}
+              editable={editable}
+              onRole={(role) => onChange(setAttendeeRole(attendees, a.email, role))}
+              onRemove={() => onChange(removeAttendee(attendees, a.email))}
+            />
+          )
+        )}
         {attendees.length === 0 && !editable && (
           <div className="mmeta">{t('cvAttendees').toLowerCase()}: –</div>
         )}

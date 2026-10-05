@@ -305,8 +305,8 @@ const table = {
     de: 'Kein gemeinsamer freier Termin in den nächsten 10 Arbeitstagen.'
   },
   cvFbUnknown: {
-    en: '{n} without availability information are not considered.',
-    de: '{n} ohne Verfügbarkeitsauskunft sind nicht berücksichtigt.'
+    en: 'Not considered (no availability information): {n}',
+    de: 'Nicht berücksichtigt (keine Auskunft): {n}'
   },
   cvFbFailed: { en: 'Availability could not be loaded.', de: 'Verfügbarkeit nicht abrufbar.' },
   cvFbTentative: { en: 'tentative', de: 'vorläufig' },

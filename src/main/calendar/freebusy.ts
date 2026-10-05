@@ -29,6 +29,13 @@ import { systemTimeZone, wallToUtcIana } from './tz'
 const MAX_RANGE_MS = 62 * 24 * 3600_000
 const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/
 
+let defaultDeps: FreeBusyDeps = {}
+
+/** Nur Dev/Demo: feste Abhängigkeiten für `queryFreeBusy` (z. B. eine Demo-Serverantwort). */
+export function setFreeBusyDeps(deps: FreeBusyDeps): void {
+  defaultDeps = deps
+}
+
 export interface FreeBusyDeps {
   fetch?: FetchLike
   getPassword?: (accountId: number) => string | null
@@ -176,7 +183,7 @@ export interface FreeBusyQuery {
 export async function queryFreeBusy(
   query: FreeBusyQuery,
   db: Database.Database = getDb(),
-  deps: FreeBusyDeps = {}
+  deps: FreeBusyDeps = defaultDeps
 ): Promise<FreeBusyResult[]> {
   const { rangeStart, rangeEnd } = query
   if (!(rangeEnd > rangeStart) || rangeEnd - rangeStart > MAX_RANGE_MS) {
