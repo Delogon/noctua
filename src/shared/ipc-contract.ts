@@ -509,7 +509,7 @@ export const pushContract = {
   'tasks:changed': z.object({}),
   'outbox:changed': z.object({
     outboxId: z.number(),
-    state: z.enum(['pending', 'sending', 'sent', 'canceled', 'error'])
+    state: z.enum(['pending', 'sending', 'sent', 'canceled', 'error', 'unknown'])
   }),
   'ai:chatChunk': z.object({
     chatId: z.string(),

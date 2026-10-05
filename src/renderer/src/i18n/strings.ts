@@ -19,6 +19,10 @@ const table = {
     en: 'Send failed — your draft is safe.',
     de: 'Senden fehlgeschlagen — dein Entwurf ist noch da.'
   },
+  toastSendUnknown: {
+    en: 'Sending was interrupted — it may have been sent. Check your Sent folder.',
+    de: 'Senden unterbrochen — evtl. schon gesendet. Prüfe den Gesendet-Ordner.'
+  },
   toastOpenDraft: { en: 'Open draft', de: 'Entwurf öffnen' },
 
   // ── Update-Hinweis ──
@@ -931,6 +935,11 @@ const table = {
   },
   echoSending: { en: 'SENDING', de: 'WIRD GESENDET' },
   echoSendFailed: { en: 'SEND FAILED', de: 'NICHT GESENDET' },
+  echoSendUnknown: { en: 'MAY HAVE BEEN SENT', de: 'EVTL. GESENDET' },
+  echoSendUnknownHint: {
+    en: 'May have been sent — check Sent folder',
+    de: 'Evtl. gesendet — Gesendet-Ordner prüfen'
+  },
   composeDraftRestored: { en: 'Draft restored', de: 'Entwurf wiederhergestellt' },
   tasksAutoHead: { en: 'TASKS FROM MAIL', de: 'AUFGABEN AUS MAILS' },
   tasksAutoSub: {

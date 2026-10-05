@@ -572,7 +572,7 @@ function InboxList(): React.JSX.Element {
       <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto">
         {sentEchoes.map((e) => {
           const color = accounts.data?.find((a) => a.id === e.accountId)?.color ?? '#c3b8e0'
-          const failed = e.state === 'error'
+          const failed = e.state === 'error' || e.state === 'unknown'
           return (
             <div key={`echo-${e.outboxId}`} className="list-row" style={{ cursor: 'default' }}>
               <div className="flex items-baseline gap-1.5">
@@ -590,7 +590,7 @@ function InboxList(): React.JSX.Element {
                   style={{ color: failed ? 'var(--ac)' : 'var(--muted)' }}
                 >
                   {failed ? (
-                    t('echoSendFailed')
+                    t(e.state === 'unknown' ? 'echoSendUnknown' : 'echoSendFailed')
                   ) : (
                     <>
                       {t('echoSending')}
@@ -599,6 +599,11 @@ function InboxList(): React.JSX.Element {
                   )}
                 </span>
               </div>
+              {e.state === 'unknown' && (
+                <div style={{ font: '400 12px var(--serif)', color: 'var(--ac)', marginTop: 2 }}>
+                  {t('echoSendUnknownHint')}
+                </div>
+              )}
               {e.subject.trim() && (
                 <div
                   className="truncate"
