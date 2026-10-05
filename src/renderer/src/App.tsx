@@ -128,6 +128,23 @@ function App(): React.JSX.Element {
     []
   )
 
+  // Dead-Letter der IMAP-Op-Queue: nie still verwerfen, sondern sichtbar melden
+  useEffect(
+    () =>
+      onPush('sync:opsDead', ({ count, reason }) => {
+        const key =
+          reason === 'attempts'
+            ? 'opsDeadAttempts'
+            : reason === 'uidvalidity'
+              ? 'opsDeadUidvalidity'
+              : reason === 'folder-gone'
+                ? 'opsDeadFolderGone'
+                : 'opsDeadNoTarget'
+        toast.error(t(key, { n: count }))
+      }),
+    []
+  )
+
   // Native Menü-Aktionen + Notification-Klick
   useEffect(() => {
     const offMenu = onPush('app:menuAction', ({ action }) => {

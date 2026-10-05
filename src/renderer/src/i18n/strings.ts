@@ -25,6 +25,24 @@ const table = {
   },
   toastOpenDraft: { en: 'Open draft', de: 'Entwurf öffnen' },
 
+  // ── Op-Queue: nicht ausführbare Aktionen (Dead-Letter) ──
+  opsDeadAttempts: {
+    en: '{n} action(s) could not be synced to the server and were dropped.',
+    de: '{n} Aktion(en) ließen sich nicht mit dem Server abgleichen und wurden verworfen.'
+  },
+  opsDeadUidvalidity: {
+    en: '{n} action(s) were dropped because the server folder was reset.',
+    de: '{n} Aktion(en) wurden verworfen, weil der Serverordner zurückgesetzt wurde.'
+  },
+  opsDeadNoTarget: {
+    en: '{n} action(s) failed: the Archive/Trash folder was not found on the server.',
+    de: '{n} Aktion(en) gescheitert: Archiv-/Papierkorb-Ordner nicht auf dem Server gefunden.'
+  },
+  opsDeadFolderGone: {
+    en: '{n} action(s) were dropped because the folder no longer exists.',
+    de: '{n} Aktion(en) wurden verworfen, weil der Ordner nicht mehr existiert.'
+  },
+
   // ── Update-Hinweis ──
   updateAvailable: { en: 'Version {v} is available', de: 'Version {v} ist verfügbar' },
   updateDownload: { en: 'Download', de: 'Herunterladen' },
@@ -465,6 +483,11 @@ const table = {
   disconnectKeep: { en: 'KEEP', de: 'BEHALTEN' },
   // Sync-Fehler inline (Design 3b): gespeicherter Fehlertext + Zeitpunkt
   syncFailed: { en: 'sync failed', de: 'Sync gescheitert' },
+  syncNeedsReauth: { en: 'sign-in needed', de: 'Anmeldung nötig' },
+  syncNeedsReauthHint: {
+    en: 'The server rejected the sign-in — update the password or sign in again.',
+    de: 'Der Server hat die Anmeldung abgelehnt — Passwort aktualisieren oder neu anmelden.'
+  },
   sinceTime: { en: 'since {time}', de: 'seit {time}' },
   addAddress: { en: 'ADD AN ADDRESS', de: 'ADRESSE HINZUFÜGEN' },
   waitingForBrowser: {

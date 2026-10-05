@@ -19,7 +19,17 @@ export function openDb(): Database.Database {
   db.pragma('synchronous = NORMAL')
   db.pragma('foreign_keys = ON')
 
-  const { from, to } = runMigrations(db)
+  let from: number
+  let to: number
+  try {
+    ;({ from, to } = runMigrations(db))
+  } catch (error) {
+    // Downgrade-Guard/Migrationsfehler: Handle freigeben, damit die DB-Datei
+    // unberührt bleibt; main/index.ts zeigt den Fehler per Dialog und beendet.
+    db.close()
+    db = null
+    throw error
+  }
   if (from !== to) {
     console.log(`[db] migrated ${dbPath} from v${from} to v${to}`)
   }
@@ -47,8 +57,7 @@ export function closeDb(): void {
 
 export function getSetting(key: string): string | null {
   const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as
-    | { value: string }
-    | undefined
+    { value: string } | undefined
   return row?.value ?? null
 }
 

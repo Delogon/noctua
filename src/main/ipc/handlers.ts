@@ -149,6 +149,10 @@ export const handlers: IpcHandlers = {
   'secrets:set': ({ key, value }) => {
     assertSecretKey(key)
     setSecret(key, value)
+    // Geänderte Konto-Zugangsdaten beenden needs-reauth (Syncer liest neu)
+    void syncEngine
+      .credentialsChanged(key)
+      .catch((error) => console.warn('[sync] credentialsChanged:', error))
     return { ok: true }
   },
 

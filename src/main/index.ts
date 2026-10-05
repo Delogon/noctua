@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { openDb, closeDb } from './db'
+import { DatabaseTooNewError } from './db/migrate'
 import { registerIpcHandlers, pushToWindow } from './ipc/register'
 import { handlers, setHandlerPush } from './ipc/handlers'
 import { seedFromEnv } from './auth/seed'
@@ -337,7 +338,11 @@ app
     // hängen (unhandled rejection) — so bekommt der Fehler ein Gesicht.
     dialog.showErrorBox(
       'Noctua kann nicht starten',
-      error instanceof Error ? (error.stack ?? error.message) : String(error)
+      error instanceof DatabaseTooNewError
+        ? error.message
+        : error instanceof Error
+          ? (error.stack ?? error.message)
+          : String(error)
     )
     app.exit(1)
   })

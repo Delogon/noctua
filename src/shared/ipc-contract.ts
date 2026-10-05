@@ -487,8 +487,15 @@ export const pushContract = {
   }),
   'sync:state': z.object({
     accountId: z.number(),
-    state: z.enum(['idle', 'connecting', 'syncing', 'error', 'off']),
+    state: z.enum(['idle', 'connecting', 'syncing', 'error', 'needs-reauth', 'off']),
     detail: z.string().nullable()
+  }),
+  // Op-Queue: IMAP-Aktionen, die endgültig nicht ausgeführt werden konnten
+  // (Dead-Letter) — der Renderer zeigt eine Toast statt stillem Verlust.
+  'sync:opsDead': z.object({
+    accountId: z.number(),
+    count: z.number(),
+    reason: z.enum(['attempts', 'uidvalidity', 'no-target-folder', 'no-trash', 'folder-gone'])
   }),
   'app:openThread': z.object({ threadKey: z.string() }),
   'updates:available': z.object({ latest: z.string(), url: z.string() }),
