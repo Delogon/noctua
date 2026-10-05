@@ -15,6 +15,7 @@ import { embeddingIndexer } from './ai/embeddings'
 import { outboxWorker } from './smtp/outbox'
 import { initNotifications, notifyCalendarReminder, updateBadge } from './notifications'
 import { initCalendar, stopCalendar } from './calendar'
+import { setItipMailer } from './calendar/mailer'
 import { calendarSync } from './calendar/sync'
 import { setRuleActionExecutor } from './ai/rules'
 import { startUpdateChecks, stopUpdateChecks } from './updates'
@@ -235,6 +236,20 @@ app
     outboxWorker.start()
     initNotifications(db, push)
     initCalendar(db, push, notifyCalendarReminder)
+    // iMIP (Einladungen/Antworten) läuft über die Outbox, ohne Undo-Fenster
+    setItipMailer((accountId, mail) => {
+      outboxWorker.enqueue(
+        accountId,
+        {
+          to: mail.to,
+          cc: [],
+          subject: mail.subject,
+          textBody: mail.text,
+          icalEvent: { method: mail.method, content: mail.ics }
+        },
+        { immediate: true }
+      )
+    })
     setRuleActionExecutor((ids, action) => syncEngine.applyAction(ids, action))
     startUpdateChecks(push)
 
