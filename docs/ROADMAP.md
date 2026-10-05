@@ -7,21 +7,21 @@ follow later.
 
 ## Decisions
 
-| Topic | Decision |
-|---|---|
-| Runtime | Stay on Electron, upgrade to 44, harden (no Tauri) |
-| Audit fixes | Phase 0, before features |
-| AI APIs | OpenAI Chat Completions + OpenAI Responses |
-| AI config | Provider profiles (URL, API style, optional key, local/external flag); triage, drafting, chat, dictation each choose profile + model |
-| Local only | Soft switch: AI uses only profiles flagged local; update check, model catalog and embedding-model download become on-demand (no automatic requests); remote images stay blocked |
-| Dictation | macOS on-device speech (Swift helper) + optional Whisper URL (`/audio/transcriptions`) |
-| DB at rest | SQLCipher via `better-sqlite3-multiple-ciphers`, key in keychain (safeStorage), one-time migration with backup |
-| Distribution | Configurable branding/bundle ID, Developer ID signing + notarization, own update feed; MDM not used but not blocked |
-| Org config | `build/org-config.json` (optional) applied at build time: app name, bundle ID, update feed, preset AI profiles, Local-only default, OAuth client IDs |
-| Calendar servers | Generic CalDAV (RFC 4791/6764/6578) incl. Nextcloud |
-| Calendar UI | Full view: day/week/month, multi-calendar, recurrence, reminders, agenda in rail |
-| Invites | iMIP cards in mail (accept/tentative/decline); create meetings with attendees + free/busy; CalDAV server scheduling when supported, else iMIP via SMTP |
-| Extras | Owl suggests events from mail; availability-aware drafts; CardDAV contacts; tasks ↔ CalDAV VTODO |
+| Topic            | Decision                                                                                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime          | Stay on Electron, upgrade to 44, harden (no Tauri)                                                                                                                              |
+| Audit fixes      | Phase 0, before features                                                                                                                                                        |
+| AI APIs          | OpenAI Chat Completions + OpenAI Responses                                                                                                                                      |
+| AI config        | Provider profiles (URL, API style, optional key, local/external flag); triage, drafting, chat, dictation each choose profile + model                                            |
+| Local only       | Soft switch: AI uses only profiles flagged local; update check, model catalog and embedding-model download become on-demand (no automatic requests); remote images stay blocked |
+| Dictation        | macOS on-device speech (Swift helper) + optional Whisper URL (`/audio/transcriptions`)                                                                                          |
+| DB at rest       | SQLCipher via `better-sqlite3-multiple-ciphers`, key in keychain (safeStorage), one-time migration with backup                                                                  |
+| Distribution     | Configurable branding/bundle ID, Developer ID signing + notarization, own update feed; MDM not used but not blocked                                                             |
+| Org config       | `build/org-config.json` (optional) applied at build time: app name, bundle ID, update feed, preset AI profiles, Local-only default, OAuth client IDs                            |
+| Calendar servers | Generic CalDAV (RFC 4791/6764/6578) incl. Nextcloud                                                                                                                             |
+| Calendar UI      | Full view: day/week/month, multi-calendar, recurrence, reminders, agenda in rail                                                                                                |
+| Invites          | iMIP cards in mail (accept/tentative/decline); create meetings with attendees + free/busy; CalDAV server scheduling when supported, else iMIP via SMTP                          |
+| Extras           | Owl suggests events from mail; availability-aware drafts; CardDAV contacts; tasks ↔ CalDAV VTODO                                                                                |
 
 ## Phase 0 — Audit fixes & hardening
 
@@ -73,6 +73,19 @@ See [AUDIT.md](AUDIT.md) for finding IDs.
 - **3.1 CardDAV**: address-book discovery and sync, merge into recipient autocomplete and
   attendee lookup
 - **3.2 VTODO**: sync Noctua tasks with a CalDAV task list (two-way, ETag-based)
+
+## Status (2026-10-05)
+
+All work packages of phases 0–3 are implemented on `claude/focused-cray-wxn4ps` (lint 0/0,
+typecheck, ~1200 tests, production build green). Additional packages done along the way:
+credential re-entry / OAuth re-auth, CalDAV discovery credential hardening, visual QA under Xvfb
+with demo seeding (`scripts/demo-tour.sh`, screenshots in `docs/screenshots/company-edition/`),
+2.5 attendee editing + free/busy in the editor. Nothing has been exercised on macOS or against
+live servers yet — see [VERIFICATION.md](VERIFICATION.md) for the acceptance checklist.
+
+Next candidates: replace `hunspell-asm` (nanoid advisory), Proton Bridge cert pinning, SEC-15
+for chat/Owl prompts, imapflow 2 / openai 7 / msal 7 majors, CONDSTORE/QRESYNC for long-lived
+inboxes, upstream PRs per phase.
 
 ## Working mode
 
