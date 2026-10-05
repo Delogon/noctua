@@ -23,7 +23,8 @@ export function initCalendar(db: Database.Database, push: PushFn, notify: Notify
         push('calendar:changed', { accountId, calendarIds })
         reminderScheduler.tick()
       },
-      onConflict: (info) => push('calendar:conflict', info)
+      onConflict: (info) => push('calendar:conflict', info),
+      onContactsChanged: (accountId) => push('contacts:changed', { accountId })
     },
     (accountId, state, detail) => push('calendar:accountState', { accountId, state, detail })
   )

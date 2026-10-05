@@ -44,6 +44,7 @@ import {
   updateEvent as updateCalendarEvent
 } from '../calendar/service'
 import { calendarSync } from '../calendar/sync'
+import { contactsStatus, setAddressBookEnabled, setContactsSync } from '../contacts/accounts'
 import { getDraftModel, getTriageModel } from '../ai/openrouter'
 import { appleFmStatus } from '../ai/apple-fm'
 import { startDraftNew, startDraftNudge, startDraftReply, stylePreview } from '../ai/drafts'
@@ -772,6 +773,15 @@ export const handlers: IpcHandlers = {
   },
 
   'contacts:suggest': ({ q, limit }) => ({ contacts: suggestContacts(getDb(), q, limit) }),
+
+  'contacts:dav:status': ({ accountId }) => contactsStatus(getDb(), accountId),
+
+  'contacts:dav:setSync': ({ accountId, enabled }) => setContactsSync(getDb(), accountId, enabled),
+
+  'contacts:dav:setAddressBook': ({ addressBookId, enabled }) => {
+    setAddressBookEnabled(getDb(), addressBookId, enabled)
+    return { ok: true }
+  },
 
   'contacts:preferredAccount': ({ addr }) => ({
     accountId: preferredAccountForContact(getDb(), addr)

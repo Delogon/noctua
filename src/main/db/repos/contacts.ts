@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3-multiple-ciphers'
+import { davNamesForEmails, searchDavContacts } from '../../contacts/repo'
 
 /**
  * Baut contact_stats für ein Konto neu auf: sent_count aus den Empfängern des
@@ -95,11 +96,50 @@ export function preferredAccountForContact(db: Database.Database, address: strin
 }
 
 /**
- * Empfänger-Vorschläge aus der Kontakt-Historie (angeschrieben zählt dreifach,
- * empfangen einfach). Namen kommen aus dem häufigsten from_name der Adresse;
- * eigene Konto-Adressen werden ausgefiltert.
+ * Empfänger-Vorschläge: zuerst die lokale Kontakt-Historie (bestehendes
+ * Ranking), dann CardDAV-Kontakte. Dedupe nach Adresse; fehlt einem
+ * Historien-Treffer der Name, kommt er aus dem Adressbuch. Eigene
+ * Konto-Adressen erscheinen nie.
  */
 export function suggestContacts(
+  db: Database.Database,
+  query: string,
+  limit: number
+): ContactSuggestion[] {
+  const local = suggestFromHistory(db, query, limit)
+  let davRows: ReturnType<typeof searchDavContacts> = []
+  try {
+    davRows = searchDavContacts(db, query, limit * 2 + local.length)
+  } catch {
+    // Kontakt-Tabellen fehlen/sind gesperrt: Vorschläge bleiben ohne Adressbuch nutzbar
+  }
+  if (davRows.length === 0) return local
+
+  const davNames = new Map(davRows.map((r) => [r.addr, r.name]))
+  const missing = local.filter((c) => !c.name).map((c) => c.addr)
+  const looked = missing.length > 0 ? davNamesForEmails(db, missing) : new Map<string, string>()
+  const out: ContactSuggestion[] = local.map((c) => ({
+    addr: c.addr,
+    name: c.name ?? davNames.get(c.addr) ?? looked.get(c.addr) ?? null
+  }))
+  if (out.length >= limit) return out
+  const seen = new Set(out.map((c) => c.addr.toLowerCase()))
+  const own = new Set(
+    (
+      db.prepare('SELECT lower(email) AS email FROM accounts').all() as Array<{ email: string }>
+    ).map((r) => r.email)
+  )
+  for (const row of davRows) {
+    if (out.length >= limit) break
+    const key = row.addr.toLowerCase()
+    if (seen.has(key) || own.has(key)) continue
+    seen.add(key)
+    out.push({ addr: row.addr, name: row.name })
+  }
+  return out
+}
+
+function suggestFromHistory(
   db: Database.Database,
   query: string,
   limit: number
