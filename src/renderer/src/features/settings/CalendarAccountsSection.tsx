@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import { useT } from '@renderer/lib/i18n'
+import { hhmm } from '@renderer/features/calendar/format'
 import { usePaper } from '@renderer/stores/paper'
 import { useAccounts } from '@renderer/queries/accounts'
 import { useCalendarAccounts, useCalendars } from '@renderer/queries/calendar'
@@ -347,10 +348,7 @@ function CalendarAccountCard({
           ? t('calSyncing')
           : account.lastSync
             ? t('calSynced', {
-                time: new Date(account.lastSync).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })
+                time: hhmm(account.lastSync)
               })
             : ''
 

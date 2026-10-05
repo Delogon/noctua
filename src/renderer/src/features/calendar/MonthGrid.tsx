@@ -28,6 +28,8 @@ interface Props {
   onDayClick: (d: Date) => void
 }
 
+const NARROW_CELL_PX = 100
+
 export function MonthGrid({
   weeks,
   anchor,
@@ -45,13 +47,17 @@ export function MonthGrid({
   const lang = useI18n((s) => s.lang)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [cellH, setCellH] = useState(0)
+  const [cellW, setCellW] = useState(0)
   const nowDate = new Date(now)
 
   // Zellhöhe beobachten → Anzahl sichtbarer Einträge
   useEffect(() => {
     const el = bodyRef.current
     if (!el) return
-    const measure = (): void => setCellH(el.clientHeight / weeks.length)
+    const measure = (): void => {
+      setCellH(el.clientHeight / weeks.length)
+      setCellW(el.clientWidth / 7)
+    }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
@@ -74,6 +80,8 @@ export function MonthGrid({
       <div
         ref={bodyRef}
         className="cal-month-body min-h-0 flex-1"
+        // schmale Zellen (1180-px-Fenster): Uhrzeit weglassen, damit der Titel Platz hat
+        data-narrow={cellW > 0 && cellW < NARROW_CELL_PX}
         style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}
       >
         {weeks.flat().map((d) => {

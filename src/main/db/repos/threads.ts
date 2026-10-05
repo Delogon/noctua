@@ -268,6 +268,7 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
         isVisibleMailAttachment(
           {
             mimeType: (attachment.mime_type as string) ?? null,
+            filename: (attachment.filename as string) ?? null,
             contentId: (attachment.content_id as string) ?? null
           },
           html

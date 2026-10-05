@@ -62,6 +62,32 @@ describe('parseMail', () => {
     expect(parsed.text).toContain('Hallo Bob')
   })
 
+  it('liefert die echte Anhanggröße (postal-mime gibt Uint8Array zurück)', async () => {
+    const raw = Buffer.from(
+      [
+        'From: a@example.com',
+        'Subject: s',
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/mixed; boundary="b"',
+        '',
+        '--b',
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        'Text',
+        '--b',
+        'Content-Type: application/pdf; name="x.pdf"',
+        'Content-Disposition: attachment; filename="x.pdf"',
+        'Content-Transfer-Encoding: base64',
+        '',
+        Buffer.from('0123456789').toString('base64'),
+        '--b--'
+      ].join('\r\n'),
+      'utf8'
+    )
+    const parsed = await parseMail(raw)
+    expect(parsed.attachments[0]).toMatchObject({ filename: 'x.pdf', size: 10 })
+  })
+
   it('normalisiert Absenderadressen auf Kleinschreibung', async () => {
     const raw = Buffer.from('From: X <Mixed@Case.COM>\r\nSubject: s\r\n\r\nbody', 'utf8')
     const parsed = await parseMail(raw)

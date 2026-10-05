@@ -136,12 +136,11 @@ export async function parseMail(source: Buffer | Uint8Array): Promise<ParsedMail
         filename: att.filename ?? null,
         mimeType: att.mimeType ?? null,
         contentId: att.contentId?.replace(/[<>]/g, '') ?? null,
+        // postal-mime liefert Uint8Array (nicht ArrayBuffer) — sonst stünde überall 0 B
         size:
-          att.content instanceof ArrayBuffer
-            ? att.content.byteLength
-            : typeof att.content === 'string'
-              ? att.content.length
-              : 0
+          typeof att.content === 'string'
+            ? att.content.length
+            : ((att.content as ArrayBuffer | ArrayBufferView | undefined)?.byteLength ?? 0)
       }))
     }
   } catch (error) {

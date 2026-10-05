@@ -959,7 +959,8 @@ function SettingsList(): React.JSX.Element {
   const orStatus = useOrKeyStatus()
   const models = useModels()
 
-  const short = (id: string | undefined): string => (id ? id.split('/')[1] : '—')
+  // Lokale Modelle (z. B. „llama3.1:8b") haben keinen „anbieter/"-Präfix
+  const short = (id: string | undefined): string => (id ? (id.split('/').pop() ?? id) : '—')
   const rows: Array<{ id: SettingsSection; name: string; sub: string }> = [
     {
       id: 'accounts',
