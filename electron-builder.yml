@@ -29,9 +29,28 @@ asarUnpack:
   - '**/node_modules/sqlite-vec-darwin-arm64/**'
   - '**/node_modules/onnxruntime-node/**'
   - '**/node_modules/@huggingface/transformers/**'
+# Electron-Fuses (werden beim Packen in die Electron-Binary geschrieben).
+# grantFileProtocolExtraPrivileges bleibt bewusst auf dem Default: die App laedt
+# index.html per loadFile (file://) und das Vite-Bundle nutzt Module-Skripte
+# mit crossorigin — ohne die file://-Privilegien wuerde das Fenster leer bleiben.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
 mac:
+  # Hardened Runtime ist Voraussetzung fuer Notarisierung.
+  hardenedRuntime: true
+  # Haupt-App und Helper nutzen dieselben Entitlements (sonst greift der
+  # electron-builder-Default inkl. allow-dyld-environment-variables).
+  entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   category: public.app-category.productivity
-  notarize: false
+  # Notarisierung laeuft nur, wenn die APPLE_*-Variablen gesetzt sind (siehe
+  # README "Signing & notarization"); ohne sie wird sie uebersprungen.
+  # Signatur-Identity kommt aus CSC_NAME / CSC_LINK, lokale Builds bleiben unsigniert.
+  notarize: true
 dmg:
   artifactName: ${name}-${version}.${ext}
