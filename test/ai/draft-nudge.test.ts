@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3'
 import { startDraftNudge } from '@main/ai/drafts'
 import { upsertEnvelope } from '@main/mail/ingest'
 import { setSetting } from '@main/db'
-import { closeTestDb, createTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
+import { closeTestDb, createAiTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 
 // Stups-Entwurf (M75): Der Prompt verhält sich zur Signatur wie der
 // Antwort-Prompt — mit eingerichteter Signatur schreibt das Modell keine
@@ -11,13 +11,9 @@ import { closeTestDb, createTestDb, makeEnvelope, seedAccount, seedFolder } from
 
 const { fakeCreate } = vi.hoisted(() => ({ fakeCreate: vi.fn() }))
 
-vi.mock('@main/ai/openrouter', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@main/ai/openrouter')>()
-  return {
-    ...actual,
-    getOpenRouter: () => ({ chat: { completions: { create: fakeCreate } } })
-  }
-})
+vi.mock('@main/ai/providers/openai-factory', () => ({
+  createOpenAiClient: () => ({ chat: { completions: { create: fakeCreate } } })
+}))
 
 /** Simulierter Streaming-Response: jedes Element ein Delta-Chunk. */
 function modelStreams(...chunks: string[]): void {
@@ -62,7 +58,7 @@ describe('startDraftNudge — Signatur & Idee', () => {
   })
 
   function seedSentMail(): { accountId: number; messageId: number } {
-    db = createTestDb()
+    db = createAiTestDb()
     const accountId = seedAccount(db, { email: 'me@example.org' })
     const sent = seedFolder(db, accountId, '\\Sent')
     const sentAt = Date.now() - 5 * 24 * 3600 * 1000

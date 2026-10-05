@@ -3,8 +3,8 @@ import { currentDateLine, localStamp } from './prompt-date'
 import type Database from 'better-sqlite3'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import { htmlToText } from '../mail/parser'
-import { extractUsage, getDraftModel, getOpenRouter, providerBody } from './openrouter'
-import { isBudgetExceeded, logUsage } from './budget'
+import { requireTaskWithBudget } from './providers/registry'
+import { logUsage } from './budget'
 import {
   detectAddressForm,
   extractContactStyle,
@@ -172,9 +172,11 @@ async function runDraft(
   draftId: string,
   input: { threadKey: string; instruction?: string; idea?: string; reviseText?: string }
 ): Promise<void> {
-  const client = getOpenRouter()
-  if (!client) throw new Error('Kein OpenRouter-Key hinterlegt (⌘, Einstellungen)')
-  if (isBudgetExceeded(db)) throw new Error('AI-Budget erschöpft — Entwurf nicht gestartet')
+  const { client, model } = requireTaskWithBudget(
+    db,
+    'draft',
+    'AI-Budget erschöpft — Entwurf nicht gestartet'
+  )
 
   const messages = db
     .prepare(
@@ -261,40 +263,24 @@ ${BASE_STYLE_RULES}${profileBlock}${contactBlock}${formality}${styleInstructions
         : ''
   }`
 
-  const model = getDraftModel()
-  const stream = await client.chat.completions.create({
-    ...providerBody(),
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ],
-    temperature: 0.7,
-    max_tokens: 1500,
-    stream: true,
-    stream_options: { include_usage: true }
-  })
-
-  let charCount = 0
-  let usageLogged = false
   let signatureSafeBuffer = ''
-  for await (const part of stream) {
-    const delta = part.choices[0]?.delta?.content ?? ''
-    if (delta) {
-      charCount += delta.length
+  const { usage } = await client.stream(
+    {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.7,
+      maxTokens: 1500
+    },
+    (delta) => {
       if (replySignature.configured) signatureSafeBuffer += delta
       else push('ai:draftChunk', { draftId, chunk: delta, done: false, error: null, subject: null })
     }
-    if (part.usage) {
-      const { inputTokens, outputTokens, costUsd } = extractUsage(part.usage)
-      logUsage(db, model, inputTokens, outputTokens, costUsd)
-      usageLogged = true
-    }
-  }
-  if (!usageLogged) {
-    // Fallback-Schätzung, falls der Provider keine Usage im Stream liefert
-    logUsage(db, model, 0, Math.ceil(charCount / 4), (Math.ceil(charCount / 4) * 25) / 1_000_000)
-  }
+  )
+  // Der Adapter schätzt die Usage selbst, falls der Stream keine liefert
+  logUsage(db, model, usage.inputTokens, usage.outputTokens, usage.costUsd)
   if (replySignature.configured) {
     const safeText = stripRedundantSignatureTail(signatureSafeBuffer, replySignature.reference)
     if (safeText) {
@@ -501,9 +487,7 @@ async function runDraftNudge(
   draftId: string,
   input: { messageId: number; idea?: string }
 ): Promise<void> {
-  const client = getOpenRouter()
-  if (!client) throw new Error('Kein OpenRouter-Key hinterlegt (⌘, Einstellungen)')
-  if (isBudgetExceeded(db)) throw new Error('AI-Budget erschöpft')
+  const { client, model } = requireTaskWithBudget(db, 'draft')
 
   const sent = db
     .prepare(
@@ -556,39 +540,25 @@ ${BASE_STYLE_RULES}${profileBlock}${formality}${styleInstructionsBlock(sent.acco
       : 'Schreibe den Nachfass.'
   }`
 
-  const model = getDraftModel()
-  const stream = await client.chat.completions.create({
-    ...providerBody(),
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ],
-    temperature: 0.6,
-    max_tokens: 500,
-    stream: true,
-    stream_options: { include_usage: true }
-  })
-  let usageLogged = false
-  let chars = 0
   // Mit Signatur wird gepuffert, damit eine trotz Anweisung erzeugte
   // Grußformel/Signaturzeile vor der Anzeige entfernt werden kann (wie runDraft).
   let signatureSafeBuffer = ''
-  for await (const part of stream) {
-    const delta = part.choices[0]?.delta?.content ?? ''
-    if (delta) {
-      chars += delta.length
+  const { usage } = await client.stream(
+    {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.6,
+      maxTokens: 500
+    },
+    (delta) => {
       if (nudgeSignature.configured) signatureSafeBuffer += delta
       else push('ai:draftChunk', { draftId, chunk: delta, done: false, error: null, subject: null })
     }
-    if (part.usage) {
-      const { inputTokens, outputTokens, costUsd } = extractUsage(part.usage)
-      logUsage(db, model, inputTokens, outputTokens, costUsd)
-      usageLogged = true
-    }
-  }
-  if (!usageLogged)
-    logUsage(db, model, 0, Math.ceil(chars / 4), (Math.ceil(chars / 4) * 25) / 1_000_000)
+  )
+  logUsage(db, model, usage.inputTokens, usage.outputTokens, usage.costUsd)
   if (nudgeSignature.configured) {
     const safeText = stripRedundantSignatureTail(signatureSafeBuffer, nudgeSignature.reference)
     if (safeText) {
@@ -635,9 +605,11 @@ async function runDraftNew(
   draftId: string,
   input: DraftNewInput
 ): Promise<void> {
-  const client = getOpenRouter()
-  if (!client) throw new Error('Kein OpenRouter-Key hinterlegt (⌘, Einstellungen)')
-  if (isBudgetExceeded(db)) throw new Error('AI-Budget erschöpft — Entwurf nicht gestartet')
+  const { client, model } = requireTaskWithBudget(
+    db,
+    'draft',
+    'AI-Budget erschöpft — Entwurf nicht gestartet'
+  )
 
   const account = db
     .prepare('SELECT email, display_name, signature FROM accounts WHERE id = ?')
@@ -715,28 +687,11 @@ ${formatRule}${profileBlock}${contactBlock}${styleInstructionsBlock(input.accoun
 Idee/Diktat des Nutzers:
 ${input.idea.trim()}`
 
-  const model = getDraftModel()
-  const stream = await client.chat.completions.create({
-    ...providerBody(),
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ],
-    temperature: 0.7,
-    max_tokens: 1800,
-    stream: true,
-    stream_options: { include_usage: true }
-  })
-
   const modeParser = createCompositionModeParser()
   const subjectParser = createSubjectProtocolParser()
-  let charCount = 0
-  let usageLogged = false
   let signatureSafeBuffer = ''
   const emitText = (text: string): void => {
     if (!text) return
-    charCount += text.length
     if (signatureConfigured) signatureSafeBuffer += text
     else push('ai:draftChunk', { draftId, chunk: text, done: false, error: null, subject: null })
   }
@@ -768,15 +723,19 @@ ${input.idea.trim()}`
       else emitText(parsed.text)
     }
   }
-  for await (const part of stream) {
-    const delta = part.choices[0]?.delta?.content ?? ''
-    if (delta) emitMode(modeParser.feed(delta))
-    if (part.usage) {
-      const { inputTokens, outputTokens, costUsd } = extractUsage(part.usage)
-      logUsage(db, model, inputTokens, outputTokens, costUsd)
-      usageLogged = true
-    }
-  }
+  const { usage } = await client.stream(
+    {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.7,
+      maxTokens: 1800
+    },
+    (delta) => emitMode(modeParser.feed(delta))
+  )
+  logUsage(db, model, usage.inputTokens, usage.outputTokens, usage.costUsd)
   emitMode(modeParser.flush())
   if (needsSubject) emitSubject(subjectParser.flush())
   if (signatureConfigured) {
@@ -791,17 +750,12 @@ ${input.idea.trim()}`
       })
     }
   }
-  if (!usageLogged) {
-    logUsage(db, model, 0, Math.ceil(charCount / 4), (Math.ceil(charCount / 4) * 25) / 1_000_000)
-  }
   push('ai:draftChunk', { draftId, chunk: '', done: true, error: null, subject: null })
 }
 
 /** Beispielantwort mit dem AKTUELLEN Stil-Setup (Profil + Regeln) — Settings-Probe. */
 export async function stylePreview(db: Database.Database, accountId: number): Promise<string> {
-  const client = getOpenRouter()
-  if (!client) throw new Error('Kein OpenRouter-Key hinterlegt (⌘, Einstellungen)')
-  if (isBudgetExceeded(db)) throw new Error('AI-Budget erschöpft')
+  const { client, model } = requireTaskWithBudget(db, 'draft')
 
   const account = db
     .prepare('SELECT email, display_name FROM accounts WHERE id = ?')
@@ -825,22 +779,18 @@ ${BASE_STYLE_RULES}${profileBlock}${styleInstructionsBlock(accountId)}${
   }`
   const userPrompt = `Testnachricht:\n---\nHallo,\nkönntest du mir bis Freitag kurz Rückmeldung geben, ob der Termin am Dienstag um 15 Uhr für dich klappt?\nViele Grüße\nAlex\n---\nSchreibe eine zusagende Antwort darauf.`
 
-  const model = getDraftModel()
-  const completion = await client.chat.completions.create({
-    ...providerBody(),
+  const completion = await client.complete({
     model,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ],
     temperature: 0.7,
-    max_tokens: 400
+    maxTokens: 400
   })
-  if (completion.usage) {
-    const { inputTokens, outputTokens, costUsd } = extractUsage(completion.usage)
-    logUsage(db, model, inputTokens, outputTokens, costUsd)
-  }
-  const text = completion.choices[0]?.message?.content?.trim() ?? ''
+  const { inputTokens, outputTokens, costUsd } = completion.usage
+  logUsage(db, model, inputTokens, outputTokens, costUsd)
+  const text = completion.text.trim()
   if (!text) throw new Error('Probe kam leer zurück')
   return text
 }

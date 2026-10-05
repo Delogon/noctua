@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
-import { extractUsage, getDraftModel, getOpenRouter, providerBody } from './openrouter'
+import { requireTask } from './providers/registry'
 import { logUsage } from './budget'
 
 type RuleActionExecutor = (messageIds: number[], action: 'archive' | 'markRead' | 'flag') => void
@@ -90,25 +90,20 @@ export async function draftRule(
   db: Database.Database,
   text: string
 ): Promise<{ name: string; description: string; rule: RuleJson }> {
-  const client = getOpenRouter()
-  if (!client) throw new Error('Kein OpenRouter-Key hinterlegt')
-  const model = getDraftModel()
-  const response = await client.chat.completions.create({
-    ...providerBody(),
+  const { client, model } = requireTask('draft')
+  const result = await client.complete({
     model,
     messages: [
       { role: 'system', content: DRAFT_PROMPT },
       { role: 'user', content: text.slice(0, 1500) }
     ],
     temperature: 0.1,
-    max_tokens: 500,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...({ usage: { include: true } } as any)
+    maxTokens: 500
   })
-  const { inputTokens, outputTokens, costUsd } = extractUsage(response.usage)
+  const { inputTokens, outputTokens, costUsd } = result.usage
   logUsage(db, model, inputTokens, outputTokens, costUsd)
 
-  const raw = response.choices[0]?.message?.content ?? ''
+  const raw = result.text
   const jsonText = raw.match(/\{[\s\S]*\}/)?.[0] ?? raw
   const parsed = z
     .object({

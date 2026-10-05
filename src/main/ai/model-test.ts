@@ -1,4 +1,5 @@
-import { getOpenRouter, providerBody, extractUsage } from './openrouter'
+import { isLocalOnly } from '../privacy'
+import { getClient, getProfile } from './providers/registry'
 
 // Funktions-Test für frei gewählte OpenRouter-Modelle (M86): schickt eine
 // Beispiel-Mail durch einen triage-förmigen Prompt und prüft, ob strukturiertes
@@ -43,9 +44,18 @@ export function evaluateTestReply(raw: string): { ok: boolean; detail: string | 
   }
 }
 
-export async function runModelTest(model: string): Promise<ModelTestResult> {
-  const client = getOpenRouter()
-  if (!client) {
+export async function runModelTest(profileId: string, model: string): Promise<ModelTestResult> {
+  const profile = getProfile(profileId)
+  if (!profile) return { ok: false, latencyMs: 0, costUsd: null, detail: 'Profil nicht gefunden' }
+  if (isLocalOnly() && !profile.isLocal) {
+    return {
+      ok: false,
+      latencyMs: 0,
+      costUsd: null,
+      detail: 'Local only ist aktiv — externe Profile werden nicht angesprochen'
+    }
+  }
+  if (profile.preset === 'openrouter' && !profile.hasKey) {
     return {
       ok: false,
       latencyMs: 0,
@@ -55,25 +65,54 @@ export async function runModelTest(model: string): Promise<ModelTestResult> {
   }
   const started = Date.now()
   try {
-    const response = await client.chat.completions.create({
-      ...providerBody(),
+    const result = await getClient(profile).complete({
       model,
       messages: [
         { role: 'system', content: TEST_SYSTEM },
         { role: 'user', content: TEST_MAIL }
       ],
       temperature: 0,
-      max_tokens: 200
+      maxTokens: 200
     })
     const latencyMs = Date.now() - started
-    const { costUsd } = extractUsage(response.usage)
-    const verdict = evaluateTestReply(response.choices[0]?.message?.content ?? '')
+    const verdict = evaluateTestReply(result.text)
+    // Kosten gibt es nur bei bepreisten (OpenRouter-)Profilen
+    const costUsd = profile.preset === 'openrouter' ? result.usage.costUsd : null
     return { ok: verdict.ok, latencyMs, costUsd, detail: verdict.detail }
   } catch (err) {
     return {
       ok: false,
       latencyMs: Date.now() - started,
       costUsd: null,
+      detail: err instanceof Error ? err.message : String(err)
+    }
+  }
+}
+
+export interface ConnectionTestResult {
+  ok: boolean
+  latencyMs: number
+  modelCount: number
+  detail: string | null
+}
+
+/**
+ * Verbindungstest: Modellliste des Profils holen. Bewusst auch bei Local only
+ * für externe Profile erlaubt — es ist eine ausdrückliche Nutzeraktion ohne
+ * Mail-Inhalte, kein automatischer Request.
+ */
+export async function testProfileConnection(profileId: string): Promise<ConnectionTestResult> {
+  const profile = getProfile(profileId)
+  if (!profile) return { ok: false, latencyMs: 0, modelCount: 0, detail: 'Profil nicht gefunden' }
+  const started = Date.now()
+  try {
+    const models = await getClient(profile).listModels()
+    return { ok: true, latencyMs: Date.now() - started, modelCount: models.length, detail: null }
+  } catch (err) {
+    return {
+      ok: false,
+      latencyMs: Date.now() - started,
+      modelCount: 0,
       detail: err instanceof Error ? err.message : String(err)
     }
   }

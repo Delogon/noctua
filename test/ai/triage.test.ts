@@ -4,18 +4,14 @@ import { runTriage } from '@main/ai/triage'
 import { upsertEnvelope, storeBody } from '@main/mail/ingest'
 import { countOpenTasks } from '@main/db/repos/tasks'
 import { listThreads } from '@main/db/repos/threads'
-import { createTestDb, closeTestDb, seedAccount, seedFolder, makeEnvelope } from '../helpers/db'
+import { createAiTestDb, closeTestDb, seedAccount, seedFolder, makeEnvelope } from '../helpers/db'
 
 // OpenRouter wird gemockt — echte LLM-Antworten sind ohne API-Key nicht testbar.
 const { fakeCreate } = vi.hoisted(() => ({ fakeCreate: vi.fn() }))
 
-vi.mock('@main/ai/openrouter', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@main/ai/openrouter')>()
-  return {
-    ...actual,
-    getOpenRouter: () => ({ chat: { completions: { create: fakeCreate } } })
-  }
-})
+vi.mock('@main/ai/providers/openai-factory', () => ({
+  createOpenAiClient: () => ({ chat: { completions: { create: fakeCreate } } })
+}))
 
 function modelReply(body: Record<string, unknown>): void {
   fakeCreate.mockResolvedValueOnce({
@@ -99,7 +95,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
   })
 
   it('Akzeptanzfall (Screenshot): Verteiler + „Hallo Jannik" ⇒ keine Aufgabe', async () => {
-    db = createTestDb()
+    db = createAiTestDb()
     const msgId = seedMail(db, {
       accountEmail: 'lena.hartmann@example.org',
       to: ['verteiler@verein.de'],
@@ -115,7 +111,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
   })
 
   it('direkt adressierte Mail erzeugt weiterhin Aufgaben; addressed_to_me wird persistiert', async () => {
-    db = createTestDb()
+    db = createAiTestDb()
     const msgId = seedMail(db, {
       accountEmail: 'lena.hartmann@example.org',
       to: ['lena.hartmann@example.org'],
@@ -129,7 +125,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
   })
 
   it('Alt-Antwort ohne addressed_to_me gilt als adressiert (Schema-Default)', async () => {
-    db = createTestDb()
+    db = createAiTestDb()
     const msgId = seedMail(db, {
       accountEmail: 'lena.hartmann@example.org',
       to: ['lena.hartmann@example.org'],
@@ -143,7 +139,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
   })
 
   it('addressed_to_me=false: kein Auto-Task, aber Vorschlag bei An-Platzierung', async () => {
-    db = createTestDb()
+    db = createAiTestDb()
     const msgId = seedMail(db, {
       accountEmail: 'lena.hartmann@example.org',
       to: ['lena.hartmann@example.org'],
@@ -159,7 +155,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
   })
 
   it('„Hallo Lena" via Verteiler erzeugt die Aufgabe (Inhaber-Anrede überstimmt absent)', async () => {
-    db = createTestDb()
+    db = createAiTestDb()
     const msgId = seedMail(db, {
       accountEmail: 'lena.hartmann@example.org',
       to: ['verteiler@verein.de'],
@@ -172,7 +168,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
   })
 
   it('historische Mails (vor Konto-Einrichtung) erzeugen keine Aufgaben', async () => {
-    const db = createTestDb()
+    const db = createAiTestDb()
     // Konto JETZT eingerichtet — die Mail trägt das alte Default-Datum (2023)
     const messageId = seedMail(db, {
       accountEmail: 'lena.hartmann@example.org',
@@ -194,7 +190,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
   })
 
   it('User-Prompt enthält den EMPFÄNGER-Block mit Platzierung und Anrede', async () => {
-    db = createTestDb()
+    db = createAiTestDb()
     const msgId = seedMail(db, {
       accountEmail: 'lena.hartmann@example.org',
       to: ['verteiler@verein.de'],

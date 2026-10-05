@@ -3,14 +3,14 @@ import { z } from 'zod'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import { getSetting } from '../db'
 import { syncEngine } from '../sync/engine'
-import { extractUsage, getOpenRouter, getTriageModel, providerBody } from './openrouter'
+import { budgetBlocks, resolveTask } from './providers/registry'
 import { htmlToText } from '../mail/parser'
 import {
   isForwardWithoutRequest,
   isForwardedSubject,
   textBeforeForwardedMessage
 } from '../mail/forwarded'
-import { isBudgetExceeded, logUsage } from './budget'
+import { logUsage } from './budget'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
@@ -209,13 +209,12 @@ export class FollowupRadar {
     const text = textBeforeForwardedMessage(candidate.subject, fullText).slice(0, 2500)
     if (!text) return true
 
-    const client = getOpenRouter()
-    if (!client || isBudgetExceeded(this.db!)) return true // konservativ: anzeigen
+    const resolved = resolveTask('triage')
+    if (!resolved || budgetBlocks(this.db!, resolved)) return true // konservativ: anzeigen
 
-    const model = getTriageModel()
+    const { client, model } = resolved
     try {
-      const response = await client.chat.completions.create({
-        ...providerBody(),
+      const result = await client.complete({
         model,
         messages: [
           {
@@ -225,16 +224,13 @@ export class FollowupRadar {
           },
           { role: 'user', content: `Betreff: ${candidate.subject ?? ''}\n\n${text}` }
         ],
-        response_format: { type: 'json_object' },
+        json: true,
         temperature: 0,
-        max_tokens: 50,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ...({ usage: { include: true } } as any)
+        maxTokens: 50
       })
-      const { inputTokens, outputTokens, costUsd } = extractUsage(response.usage)
+      const { inputTokens, outputTokens, costUsd } = result.usage
       logUsage(this.db!, model, inputTokens, outputTokens, costUsd)
-      return verdictSchema.parse(JSON.parse(response.choices[0]?.message?.content ?? ''))
-        .expects_reply
+      return verdictSchema.parse(JSON.parse(result.text)).expects_reply
     } catch {
       return true // im Zweifel anzeigen
     }

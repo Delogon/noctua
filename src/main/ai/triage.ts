@@ -1,13 +1,8 @@
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
 import { htmlToText } from '../mail/parser'
-import {
-  extractUsage,
-  getOpenRouter,
-  getTriageModel,
-  getTriageProvider,
-  providerBody
-} from './openrouter'
+import { getTriageProvider } from './openrouter'
+import { resolveTask } from './providers/registry'
 import { AppleGuardrailError, appleFmStatus, appleGate, appleTriage } from './apple-fm'
 import { logUsage } from './budget'
 import { createTasksFromTriage, isUserAuthoredMail } from '../db/repos/tasks'
@@ -246,8 +241,10 @@ function neutralVerdict(subject: string | null): TriageVerdict {
 /** Klassifiziert eine Nachricht und schreibt die Annotation. Wirft bei API-Fehlern. */
 export async function runTriage(db: Database.Database, messageId: number): Promise<TriageOutcome> {
   const provider = getTriageProvider()
-  const client = getOpenRouter()
-  if (provider === 'openrouter' && !client) return 'skipped-no-client'
+  // Aufgabe → Profil: bei Local only oder ohne Key/Modell pausiert die Triage
+  // wie bei „kein Key" (Job bleibt liegen, kein verbrannter Versuch)
+  const resolved = provider === 'openrouter' ? resolveTask('triage') : null
+  if (provider === 'openrouter' && !resolved) return 'skipped-no-client'
 
   const row = db
     .prepare(
@@ -292,13 +289,12 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
     })
   }
 
-  if (!client) return 'skipped-no-client'
-  const model = getTriageModel()
+  if (!resolved) return 'skipped-no-client'
+  const { client, model } = resolved
 
   let lastError = ''
   for (let attempt = 0; attempt < 2; attempt++) {
-    const response = await client.chat.completions.create({
-      ...providerBody(),
+    const result = await client.complete({
       model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -310,21 +306,18 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
               : `${userPrompt}\n\nDeine letzte Antwort war ungültig (${lastError}). Antworte exakt nach Schema.`
         }
       ],
-      response_format: { type: 'json_object' },
+      json: true,
       temperature: 0.1,
       // Reasoning-Modelle (z. B. DeepSeek v4 Flash) verbrauchen max_tokens
       // auch für Denk-Tokens — 500 schnitt Antworten ab (finish=length)
       // und verbrannte Retries. Der Output selbst bleibt ~150 Tokens.
-      max_tokens: 1200,
-      // OpenRouter-Erweiterung: Kosten in der Response mitliefern
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...({ usage: { include: true } } as any)
+      maxTokens: 1200
     })
 
-    const { inputTokens, outputTokens, costUsd } = extractUsage(response.usage)
+    const { inputTokens, outputTokens, costUsd } = result.usage
     logUsage(db, model, inputTokens, outputTokens, costUsd)
 
-    const raw = response.choices[0]?.message?.content ?? ''
+    const raw = result.text
     let parsed: z.infer<typeof triageResultSchema> | null = null
     try {
       parsed = triageResultSchema.parse(JSON.parse(raw))

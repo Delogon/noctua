@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
-import { isBudgetExceeded } from './budget'
+import { triageBudgetBlocked } from './providers/registry'
 import { runTriage, PROMPT_VERSION } from './triage'
 import { applyRules } from './rules'
 import { maybeNotify, updateBadge } from '../notifications'
@@ -174,7 +174,7 @@ export class AiQueue {
     try {
       while (this.running < CONCURRENCY) {
         if (Date.now() < this.pausedUntil) break
-        if (isBudgetExceeded(this.db!)) break
+        if (triageBudgetBlocked(this.db!)) break
         const job = this.db!.prepare(
           `SELECT id, message_id, attempts FROM ai_jobs
              WHERE kind = 'triage' AND status = 'pending'

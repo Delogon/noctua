@@ -19,8 +19,7 @@ vi.mock('@main/ai/openrouter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@main/ai/openrouter')>()
   return {
     ...actual,
-    getTriageProvider: () => 'apple' as const,
-    getOpenRouter: () => null
+    getTriageProvider: () => 'apple' as const
   }
 })
 
