@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { isDev } from '../dev-mode'
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
 import { getSetting, setSetting } from '../db'
@@ -121,7 +121,7 @@ export async function refreshStyleProfile(
     parsed = JSON.parse(jsonText)
   } catch {
     // Antwort enthält Auszüge aus gesendeten Mails — im Release nur die Länge
-    console.warn('[style] unparsebare Antwort:', app.isPackaged ? `${raw.length} Zeichen` : raw.slice(0, 400))
+    console.warn('[style] unparsebare Antwort:', !isDev ? `${raw.length} Zeichen` : raw.slice(0, 400))
     throw new Error('Stil-Analyse lieferte kein JSON — bitte nochmal versuchen')
   }
   const profile = styleProfileSchema.parse(parsed)
