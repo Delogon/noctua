@@ -62,6 +62,7 @@ import { defaultEditContext } from '../calendar/edit'
 import { contactsStatus, setAddressBookEnabled, setContactsSync } from '../contacts/accounts'
 import { getDraftModel, getTriageModel } from '../ai/openrouter'
 import { appleFmStatus } from '../ai/apple-fm'
+import { detectLocalServers } from '../ai/detect-local'
 import { startDraftNew, startDraftNudge, startDraftReply, stylePreview } from '../ai/drafts'
 import { draftRule, ruleJsonSchema, ruleNeedsAi } from '../ai/rules'
 import { outboxWorker } from '../smtp/outbox'
@@ -636,6 +637,7 @@ export const handlers: IpcHandlers = {
     return { models: await getClient(profile).listModels(), skipped: false }
   },
 
+  'ai:detectLocal': () => detectLocalServers(),
   'ai:profiles:list': () => ({ profiles: listProfiles() }),
   'ai:profiles:create': (input) => ({ profile: createProfile(input) }),
   'ai:profiles:update': ({ id, ...patch }) => ({ profile: updateProfile(id, patch) }),

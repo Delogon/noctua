@@ -399,6 +399,20 @@ describe('ipc-contract', () => {
     ).not.toThrow()
   })
 
+  it('validiert die Erkennung lokaler KI-Server (ai:detectLocal) mit Längengrenzen', () => {
+    const spec = invokeContract['ai:detectLocal']
+    expect(() => spec.input.parse(undefined)).not.toThrow()
+    const ok = { kind: 'ollama', baseUrl: 'http://127.0.0.1:11434/v1', models: ['llama3.2:3b'] }
+    expect(() => spec.output.parse({ found: [ok] })).not.toThrow()
+    expect(() => spec.output.parse({ found: [] })).not.toThrow()
+    expect(() => spec.output.parse({ found: [{ ...ok, kind: 'cloud' }] })).toThrow()
+    expect(() => spec.output.parse({ found: [{ ...ok, models: ['m'.repeat(201)] }] })).toThrow()
+    expect(() =>
+      spec.output.parse({ found: [{ ...ok, models: Array.from({ length: 201 }, () => 'm') }] })
+    ).toThrow()
+    expect(() => spec.output.parse({ found: Array.from({ length: 9 }, () => ok) })).toThrow()
+  })
+
   it('Kanal-Listen und Contract-Keys stimmen überein', () => {
     expect(INVOKE_CHANNELS.sort()).toEqual(Object.keys(invokeContract).sort())
     expect(PUSH_CHANNELS.sort()).toEqual(Object.keys(pushContract).sort())
