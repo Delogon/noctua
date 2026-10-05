@@ -3,6 +3,7 @@ import { getSetting, setSetting } from '../db'
 import { hasSecret, setSecret } from './secrets'
 import { accountSecretKey, PROVIDER_DEFAULTS } from './providers'
 import { ACCOUNT_COLORS } from '@shared/types'
+import { isDev } from '../dev-mode'
 
 /**
  * Dev-Seeding über Umgebungsvariablen — Credentials landen direkt im
@@ -13,6 +14,8 @@ import { ACCOUNT_COLORS } from '@shared/types'
  *   NOCTUA_SEED_OPENROUTER_KEY
  */
 export function seedFromEnv(db: Database.Database): void {
+  // Zweite Absicherung neben dem Aufrufer: im Produktions-Bundle nie aus der Umgebung seeden
+  if (!isDev) return
   const gmailUser = process.env.NOCTUA_SEED_GMAIL_USER?.trim().toLowerCase()
   const gmailPass = process.env.NOCTUA_SEED_GMAIL_PASS?.replace(/\s+/g, '')
   if (gmailUser && gmailPass) {

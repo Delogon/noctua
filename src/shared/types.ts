@@ -99,7 +99,7 @@ export const semanticSearchIndexSchema = z.object({
  */
 export const owlSourceSchema = z.object({
   index: z.number().int(),
-  threadKey: z.string(),
+  threadKey: z.string().max(512),
   subject: z.string().nullable(),
   accountName: z.string().optional(),
   mailbox: z.enum(['inbox', 'sent', 'archive', 'other']).optional(),

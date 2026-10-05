@@ -1,4 +1,5 @@
 import { app, Menu, shell, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
+import { isDev } from './dev-mode'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
@@ -88,9 +89,7 @@ export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | nu
         { label: 'Suchen & die Eule fragen', click: () => send('chat') },
         { type: 'separator' },
         { role: 'togglefullscreen', label: 'Vollbild ein/aus' },
-        ...(process.env.NODE_ENV === 'development' ||
-        !app.isPackaged ||
-        process.env.NOCTUA_DEV === '1'
+        ...(isDev
           ? ([
               { type: 'separator' },
               { role: 'reload', label: 'Neu laden (Dev)' },

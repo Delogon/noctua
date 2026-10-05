@@ -29,6 +29,8 @@ vi.mock('electron', () => {
       getVersion: () => '0.0.0-test',
       setBadgeCount: vi.fn(),
       getName: () => 'noctua-test',
+      isPackaged: false,
+      getAppPath: () => process.cwd(),
       on: vi.fn()
     },
     safeStorage: {
