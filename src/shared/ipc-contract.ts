@@ -671,6 +671,24 @@ export const invokeContract = {
     input: z.object({ id: z.number(), status: z.enum(['open', 'done', 'dismissed']) }),
     output: z.object({ ok: z.literal(true) })
   },
+  'tasks:sync:get': {
+    input: z.void(),
+    output: z.object({
+      calendarId: z.number().nullable(),
+      lists: z.array(
+        z.object({
+          calendarId: z.number(),
+          accountId: z.number(),
+          accountName: z.string(),
+          name: z.string()
+        })
+      )
+    })
+  },
+  'tasks:sync:set': {
+    input: z.object({ calendarId: z.number().int().positive().nullable() }),
+    output: z.object({ ok: z.literal(true) })
+  },
   'followups:list': {
     input: z.void(),
     output: z.object({

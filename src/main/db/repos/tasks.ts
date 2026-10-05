@@ -4,6 +4,8 @@ import { getSetting } from '../index'
 import { htmlToText } from '../../mail/parser'
 import { isForwardWithoutRequest } from '../../mail/forwarded'
 import { taskAddresseeVerdict } from '../../ai/addressee'
+import { afterLocalTaskChange, loadTaskSyncStates } from '../../tasks/caldav-sync'
+import { fieldsHash } from '../../tasks/todo'
 
 export interface ExtractedActionItem {
   title: string
@@ -133,6 +135,8 @@ export function createTasksFromTriage(
     )
     created += result.changes
   }
+  // CalDAV-Aufgabenliste (falls aktiv): neue aktive Aufgaben einreihen
+  if (created > 0) afterLocalTaskChange(db)
   return created
 }
 
@@ -158,6 +162,20 @@ export function listTasks(db: Database.Database, status: 'open' | 'done'): TaskI
        LIMIT 300`
     )
     .all() as Array<Record<string, unknown>>
+  const syncStates = loadTaskSyncStates(
+    db,
+    new Map(
+      rows.map((r) => [
+        r.id as number,
+        fieldsHash({
+          title: r.title as string,
+          notes: (r.notes as string) ?? null,
+          due: (r.due_date as string) ?? null,
+          done: r.status === 'done'
+        })
+      ])
+    )
+  )
   return rows
     .filter(
       (r) =>
@@ -178,7 +196,8 @@ export function listTasks(db: Database.Database, status: 'open' | 'done'): TaskI
       status: r.status as 'open' | 'done' | 'dismissed',
       createdAt: r.created_at as number,
       sourceSubject: (r.subject as string) ?? null,
-      sourceMessageId: r.source_kind === 'mail' ? ((r.source_id as number) ?? null) : null
+      sourceMessageId: r.source_kind === 'mail' ? ((r.source_id as number) ?? null) : null,
+      syncState: syncStates.get(r.id as number) ?? null
     }))
 }
 
@@ -192,6 +211,7 @@ export function updateTaskStatus(
     status === 'open' ? null : Date.now(),
     id
   )
+  afterLocalTaskChange(db)
 }
 
 export function countOpenTasks(db: Database.Database): number {
@@ -249,7 +269,7 @@ export function cleanupForwardTasksWithoutRequest(db: Database.Database): number
     .map((row) => row.id)
   if (messageIds.length === 0) return 0
 
-  return db.transaction(() => {
+  const total = db.transaction(() => {
     const remove = db.prepare(`DELETE FROM tasks WHERE source_kind = 'mail' AND source_id = ?`)
     const clearAnnotation = db.prepare(
       `UPDATE ai_annotations SET action_items_json = '[]', needs_reply = 0 WHERE message_id = ?`
@@ -261,6 +281,8 @@ export function cleanupForwardTasksWithoutRequest(db: Database.Database): number
     }
     return removed
   })()
+  if (total > 0) afterLocalTaskChange(db)
+  return total
 }
 
 /**
@@ -312,4 +334,5 @@ export function decideSuggestion(db: Database.Database, threadKey: string, accep
     accept ? 'open' : 'dismissed',
     Date.now()
   )
+  if (accept) afterLocalTaskChange(db)
 }

@@ -35,6 +35,8 @@ export interface FakeServerOptions {
   pageSize?: number
   /** PUT liefert keinen ETag-Header (Server schreibt Inhalt um) */
   noEtagOnPut?: boolean
+  /** unterstützte Komponenten der Kalender (Default nur VEVENT) */
+  components?: string[]
 }
 
 const HOME = '/dav/calendars/anna/'
@@ -51,7 +53,13 @@ export class FakeCalDavServer {
   private etagSeq = 0
 
   constructor(options: FakeServerOptions = {}) {
-    this.options = { supportsSync: true, pageSize: 0, noEtagOnPut: false, ...options }
+    this.options = {
+      supportsSync: true,
+      pageSize: 0,
+      noEtagOnPut: false,
+      components: ['VEVENT'],
+      ...options
+    }
   }
 
   addCalendar(name: string, displayName = name): void {
@@ -154,7 +162,7 @@ export class FakeCalDavServer {
           const reports = this.options.supportsSync
             ? '<d:supported-report-set><d:supported-report><d:report><d:sync-collection/></d:report></d:supported-report></d:supported-report-set>'
             : ''
-          return `<d:response><d:href>${HOME}${c.name}/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>${c.displayName}</d:displayname><a:calendar-order>${i}</a:calendar-order><cs:getctag>${this.ctag(c)}</cs:getctag><d:sync-token>tok-${c.rev}</d:sync-token>${reports}<c:supported-calendar-component-set><c:comp name="VEVENT"/></c:supported-calendar-component-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`
+          return `<d:response><d:href>${HOME}${c.name}/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>${c.displayName}</d:displayname><a:calendar-order>${i}</a:calendar-order><cs:getctag>${this.ctag(c)}</cs:getctag><d:sync-token>tok-${c.rev}</d:sync-token>${reports}<c:supported-calendar-component-set>${this.options.components.map((n) => `<c:comp name="${n}"/>`).join('')}</c:supported-calendar-component-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`
         })
         .join('')
       return this.xml(
