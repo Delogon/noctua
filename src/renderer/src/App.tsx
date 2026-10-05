@@ -145,6 +145,23 @@ function App(): React.JSX.Element {
     []
   )
 
+  // Kalender: abgelehnte lokale Änderungen (Konflikt, Server-Version gewinnt) nie still verwerfen
+  useEffect(
+    () =>
+      onPush('calendar:conflict', ({ summary, reason }) => {
+        const key =
+          reason === 'conflict'
+            ? 'calConflictConflict'
+            : reason === 'deleted-on-server'
+              ? 'calConflictGone'
+              : reason === 'forbidden'
+                ? 'calConflictForbidden'
+                : 'calConflictAttempts'
+        toast.error(t(key, { title: summary ?? '' }))
+      }),
+    []
+  )
+
   // Native Menü-Aktionen + Notification-Klick
   useEffect(() => {
     const offMenu = onPush('app:menuAction', ({ action }) => {

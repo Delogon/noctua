@@ -43,6 +43,68 @@ const table = {
     de: '{n} Aktion(en) wurden verworfen, weil der Ordner nicht mehr existiert.'
   },
 
+  // ── Kalender-Konten (CalDAV, Phase 2.1) ──
+  calHead: { en: 'CALENDARS (CALDAV)', de: 'KALENDER (CALDAV)' },
+  calNote: {
+    en: 'Nextcloud, mailbox.org, Fastmail, Posteo, iCloud (app password) and other CalDAV servers. Sign-in works over HTTPS only.',
+    de: 'Nextcloud, mailbox.org, Fastmail, Posteo, iCloud (App-Passwort) und andere CalDAV-Server. Anmeldung nur über HTTPS.'
+  },
+  calAdd: { en: '+ ADD CALENDAR', de: '+ KALENDER HINZUFÜGEN' },
+  calEmpty: {
+    en: 'No calendar connected yet.',
+    de: 'Noch kein Kalender verbunden.'
+  },
+  calFromMail: { en: 'Use a mail account as template…', de: 'Postfach als Vorlage nutzen…' },
+  calNamePh: { en: 'name, e.g. Nextcloud', de: 'Name, z. B. Nextcloud' },
+  calServerPh: {
+    en: 'server URL, domain or e-mail address',
+    de: 'Server-URL, Domain oder E-Mail-Adresse'
+  },
+  calUserPh: { en: 'username', de: 'Benutzername' },
+  calPassPh: { en: 'password / app password', de: 'Passwort / App-Passwort' },
+  calReusePassword: {
+    en: 'Use the password of the mail account (stays in the vault, stored separately)',
+    de: 'Passwort des Postfachs übernehmen (bleibt im Vault, wird separat gespeichert)'
+  },
+  calTest: { en: 'TEST', de: 'TESTEN' },
+  calHttpsNote: { en: 'https:// only', de: 'nur https://' },
+  calFound: {
+    en: 'Found {n} calendar(s) on {host}',
+    de: '{n} Kalender auf {host} gefunden'
+  },
+  calScheduling: { en: 'server-side invitations', de: 'Einladungen über den Server' },
+  calConnected: {
+    en: 'Calendar connected ({n} calendars)',
+    de: 'Kalender verbunden ({n} Kalender)'
+  },
+  calTestOk: { en: 'Connection OK — {n} calendars', de: 'Verbindung OK — {n} Kalender' },
+  calRefresh: { en: 'SYNC NOW', de: 'JETZT ABGLEICHEN' },
+  calRemove: { en: 'DISCONNECT', de: 'TRENNEN' },
+  calRemoveConfirm: { en: 'YES, DISCONNECT', de: 'JA, TRENNEN' },
+  calSyncing: { en: 'syncing···', de: 'gleicht ab···' },
+  calSynced: { en: 'synced {time}', de: 'abgeglichen {time}' },
+  calPending: { en: '{n} waiting to upload', de: '{n} warten auf Übertragung' },
+  calDead: { en: '{n} not applied', de: '{n} nicht übernommen' },
+  calVisible: { en: 'visible', de: 'sichtbar' },
+  calHidden: { en: 'hidden', de: 'ausgeblendet' },
+  calReadOnly: { en: 'READ-ONLY', de: 'NUR LESEN' },
+  calConflictConflict: {
+    en: 'Calendar: “{title}” was changed on the server meanwhile — the server version was kept, your edit was not applied.',
+    de: 'Kalender: „{title}“ wurde inzwischen auf dem Server geändert — die Server-Version bleibt, deine Änderung wurde nicht übernommen.'
+  },
+  calConflictGone: {
+    en: 'Calendar: “{title}” was deleted on the server — your edit was not applied.',
+    de: 'Kalender: „{title}“ wurde auf dem Server gelöscht — deine Änderung wurde nicht übernommen.'
+  },
+  calConflictForbidden: {
+    en: 'Calendar: the server refused your change to “{title}”.',
+    de: 'Kalender: Der Server hat deine Änderung an „{title}“ abgelehnt.'
+  },
+  calConflictAttempts: {
+    en: 'Calendar: “{title}” could not be uploaded and was reverted.',
+    de: 'Kalender: „{title}“ ließ sich nicht übertragen und wurde zurückgesetzt.'
+  },
+
   // ── Update-Hinweis ──
   updateAvailable: { en: 'Version {v} is available', de: 'Version {v} ist verfügbar' },
   updateDownload: { en: 'Download', de: 'Herunterladen' },
@@ -1619,6 +1681,7 @@ const table = {
   techNetLocalOnlyOn: { en: 'LOCAL ONLY: ON', de: 'LOCAL ONLY: AN' },
   techNetLocalOnlyOff: { en: 'LOCAL ONLY: OFF', de: 'LOCAL ONLY: AUS' },
   techNetKindMail: { en: 'MAIL SERVER', de: 'MAILSERVER' },
+  techNetKindCalendar: { en: 'CALENDAR SERVER', de: 'KALENDERSERVER' },
   techNetKindOauth: { en: 'SIGN-IN (OAUTH)', de: 'ANMELDUNG (OAUTH)' },
   techNetKindAi: { en: 'AI PROFILE', de: 'KI-PROFIL' },
   techNetKindUpdates: { en: 'UPDATE CHECK', de: 'UPDATE-CHECK' },

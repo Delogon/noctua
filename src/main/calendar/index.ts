@@ -1,0 +1,39 @@
+import type Database from 'better-sqlite3-multiple-ciphers'
+import type { PushChannel, PushPayload } from '@shared/ipc-contract'
+import { ensureInstanceWindow } from './repo'
+import { reminderScheduler, type NotifyFn } from './reminders'
+import { setCalendarChangedHandler } from './service'
+import { calendarSync } from './sync'
+
+type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
+
+/**
+ * Verdrahtet Kalender-Sync, Domain-Service und Erinnerungen mit Push-Kanal und
+ * Benachrichtigungen. Vom Main-Bootstrap nach openDb() aufgerufen.
+ */
+export function initCalendar(db: Database.Database, push: PushFn, notify: NotifyFn): void {
+  setCalendarChangedHandler((accountId, calendarIds) => {
+    push('calendar:changed', { accountId, calendarIds })
+    reminderScheduler.tick()
+  })
+  calendarSync.init(
+    db,
+    {
+      onChanged: (accountId, calendarIds) => {
+        push('calendar:changed', { accountId, calendarIds })
+        reminderScheduler.tick()
+      },
+      onConflict: (info) => push('calendar:conflict', info)
+    },
+    (accountId, state, detail) => push('calendar:accountState', { accountId, state, detail })
+  )
+  ensureInstanceWindow(db)
+  calendarSync.startAll()
+  reminderScheduler.init(db, notify)
+  reminderScheduler.start()
+}
+
+export function stopCalendar(): void {
+  reminderScheduler.stop()
+  calendarSync.stopAll()
+}

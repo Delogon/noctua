@@ -17,6 +17,8 @@ export interface NetworkConnectionsInput {
   profiles: AiProfile[]
   /** Aufgabe → Profil-ID ('apple' = On-Device, kein Netz) */
   taskProfiles: Record<AiTask, string>
+  /** CalDAV-Konten: wie Mail-Server immer erlaubt (Local only betrifft nur KI/Updates) */
+  calendarAccounts?: Array<{ name: string; serverUrl: string }>
   localOnly: boolean
   feed: UpdateFeed
   embeddingsCached: boolean
@@ -44,6 +46,18 @@ export function buildNetworkConnections(input: NetworkConnectionsInput): Network
         tasks: []
       })
     }
+  }
+
+  for (const c of input.calendarAccounts ?? []) {
+    const host = hostOf(c.serverUrl)
+    out.push({
+      kind: 'calendar',
+      label: c.name,
+      host,
+      scope: suggestIsLocal(c.serverUrl) ? 'local' : 'external',
+      status: 'active',
+      tasks: []
+    })
   }
 
   const seenOauth = new Set<string>()

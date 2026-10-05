@@ -13,7 +13,8 @@ const KIND_LABEL: Record<NetworkConnection['kind'], StringKey> = {
   oauth: 'techNetKindOauth',
   ai: 'techNetKindAi',
   updates: 'techNetKindUpdates',
-  embeddings: 'techNetKindEmbeddings'
+  embeddings: 'techNetKindEmbeddings',
+  calendar: 'techNetKindCalendar'
 }
 
 const STATUS_LABEL: Record<NetworkConnection['status'], StringKey> = {

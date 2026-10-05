@@ -94,3 +94,31 @@ export function updateBadge(): void {
     .get(minPriority()) as { n: number }
   app.setBadgeCount(row.n)
 }
+
+/**
+ * Kalender-Erinnerung (VALARM) als macOS-Benachrichtigung. Klick fokussiert das
+ * Fenster und meldet dem Renderer, welcher Termin gemeint war.
+ */
+export function notifyCalendarReminder(notice: {
+  objectId: number
+  recurrenceId: string | null
+  title: string
+  body: string
+}): void {
+  if (!Notification.isSupported()) return
+  const notification = new Notification({
+    title: notice.title,
+    body: notice.body,
+    ...(process.platform === 'darwin' ? {} : { icon })
+  })
+  notification.on('click', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+    }
+    push('calendar:openEvent', { objectId: notice.objectId, recurrenceId: notice.recurrenceId })
+  })
+  notification.show()
+}

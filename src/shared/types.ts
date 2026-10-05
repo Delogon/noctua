@@ -259,7 +259,7 @@ export const draftItemSchema = z.object({
 export type Recipient = z.infer<typeof recipientSchema>
 /** Eine Netzwerkverbindung der App (Technik-Seite, Abschnitt „Netzwerkverbindungen"). */
 export const networkConnectionSchema = z.object({
-  kind: z.enum(['mail', 'oauth', 'ai', 'updates', 'embeddings']),
+  kind: z.enum(['mail', 'oauth', 'ai', 'updates', 'embeddings', 'calendar']),
   /** Konto/Profil/Anbieter; leer bei updates und embeddings */
   label: z.string().max(200),
   /** Zielhost; null, wenn nichts verbunden wird (Update-Check aus) */

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import { useAccounts } from '@renderer/queries/accounts'
+import { CalendarAccountsSection } from '@renderer/features/settings/CalendarAccountsSection'
 import {
   useOrKeyStatus,
   useProfileModels,
@@ -386,6 +387,8 @@ export function AccountsSheet(): React.JSX.Element {
       >
         {t('accountsFootnote')}
       </div>
+      <div className="double-rule" style={{ marginTop: 18 }} />
+      <CalendarAccountsSection />
       <div className="double-rule" style={{ marginTop: 18 }} />
       <RemoteImagesPrivacy />
     </SheetShell>

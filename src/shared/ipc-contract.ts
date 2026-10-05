@@ -16,6 +16,17 @@ import {
   threadListItemSchema
 } from './types'
 import {
+  calendarAccountStateSchema,
+  calendarAccountSummarySchema,
+  calendarEditScopeSchema,
+  calendarEventDetailSchema,
+  calendarEventInputSchema,
+  calendarEventPatchSchema,
+  calendarInstanceSchema,
+  calendarSummarySchema,
+  discoveredCalendarSchema
+} from './calendar-types'
+import {
   isRendererSecretKey,
   isRendererSettingReadable,
   isRendererSettingWritable
@@ -84,6 +95,17 @@ const taskAssignmentSchema = z.object({
   model: z.string().max(200),
   /** Warum die Aufgabe gerade nicht läuft — null, wenn sie läuft */
   blocked: z.enum(['local-only', 'no-key', 'no-profile', 'no-model']).nullable()
+})
+
+// --- Kalender (Phase 2.1) ------------------------------------------------------------
+const calendarCredentialsSchema = z.object({
+  /** Server-URL, Domain oder Mail-Adresse (Discovery nach RFC 6764) */
+  serverInput: z.string().trim().min(1).max(500),
+  username: z.string().trim().min(1).max(320),
+  /** Leer erlaubt, wenn das Passwort des Mail-Kontos übernommen wird */
+  password: z.string().max(1000).optional(),
+  mailAccountId: z.number().int().optional(),
+  reuseMailPassword: z.boolean().optional()
 })
 
 /** Sync-Zeitraum in Tagen: 0 = alles, null = Standard (90 Tage Liste / 183 Suche). */
@@ -182,6 +204,115 @@ export const invokeContract = {
   'accounts:cancelOAuth': {
     input: z.object({ provider: z.enum(['gmail', 'microsoft']) }),
     output: z.object({ canceled: z.boolean() })
+  },
+  // --- Kalender (CalDAV, Phase 2.1) -----------------------------------------------
+  'calendar:accounts:list': {
+    input: z.void(),
+    output: z.object({ accounts: z.array(calendarAccountSummarySchema) })
+  },
+  // Vorbelegung aus einem Mail-Konto (Benutzername = Adresse, Server aus der Domain)
+  'calendar:accounts:suggest': {
+    input: z.object({ mailAccountId: z.number().int() }),
+    output: z.object({
+      username: z.string(),
+      serverInput: z.string(),
+      canReusePassword: z.boolean()
+    })
+  },
+  // Verbindung prüfen und Kalender auflisten, ohne etwas zu speichern
+  'calendar:accounts:discover': {
+    input: calendarCredentialsSchema,
+    output: z.object({
+      serverUrl: z.string(),
+      autoSchedule: z.boolean(),
+      calendars: z.array(discoveredCalendarSchema)
+    })
+  },
+  'calendar:accounts:add': {
+    input: calendarCredentialsSchema.extend({ name: z.string().trim().max(60) }),
+    output: z.object({
+      accountId: z.number(),
+      calendarCount: z.number(),
+      autoSchedule: z.boolean()
+    })
+  },
+  'calendar:accounts:update': {
+    input: z.object({ accountId: z.number().int(), name: z.string().trim().min(1).max(60) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Neues Passwort für ein Kalender-Konto (needs-reauth): erst prüfen, dann speichern
+  'calendar:accounts:updatePassword': {
+    input: z.object({ accountId: z.number().int(), password: z.string().min(1).max(1000) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'calendar:accounts:remove': {
+    input: z.object({ accountId: z.number().int() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'calendar:accounts:test': {
+    input: z.object({ accountId: z.number().int() }),
+    output: z.object({ calendarCount: z.number(), autoSchedule: z.boolean() })
+  },
+  'calendar:list': {
+    input: z.object({ accountId: z.number().int().optional() }),
+    output: z.object({ calendars: z.array(calendarSummarySchema) })
+  },
+  'calendar:setVisible': {
+    input: z.object({ calendarId: z.number().int(), visible: z.boolean() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'calendar:setColor': {
+    input: z.object({
+      calendarId: z.number().int(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable()
+    }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'calendar:events:list': {
+    input: z.object({
+      rangeStart: z.number(),
+      rangeEnd: z.number(),
+      calendarIds: z.array(z.number().int()).max(200).optional(),
+      /** IANA-Zone für ganztägige Einträge (Default: Systemzone) */
+      tz: z.string().max(100).optional()
+    }),
+    output: z.object({ events: z.array(calendarInstanceSchema) })
+  },
+  'calendar:events:get': {
+    input: z.object({
+      objectId: z.number().int(),
+      recurrenceId: z.string().max(40).nullable().default(null)
+    }),
+    output: z.object({ event: calendarEventDetailSchema })
+  },
+  'calendar:events:create': {
+    input: z.object({ event: calendarEventInputSchema }),
+    output: z.object({ objectId: z.number() })
+  },
+  'calendar:events:update': {
+    input: z.object({
+      objectId: z.number().int(),
+      scope: calendarEditScopeSchema,
+      recurrenceId: z.string().max(40).nullable(),
+      patch: calendarEventPatchSchema
+    }),
+    output: z.object({ objectId: z.number(), createdObjectId: z.number().nullable() })
+  },
+  'calendar:events:delete': {
+    input: z.object({
+      objectId: z.number().int(),
+      scope: calendarEditScopeSchema,
+      recurrenceId: z.string().max(40).nullable()
+    }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Sofortiger Abgleich (ein Konto oder alle); hebt needs-reauth-Wartezeiten auf
+  'calendar:refresh': {
+    input: z.object({ accountId: z.number().int().optional() }),
+    output: z.object({ ok: z.literal(true) })
   },
   'threads:list': {
     input: z.object({
@@ -636,6 +767,27 @@ export const pushContract = {
     accountId: z.number(),
     count: z.number(),
     reason: z.enum(['attempts', 'uidvalidity', 'no-target-folder', 'no-trash', 'folder-gone'])
+  }),
+  // Kalender: Daten haben sich geändert (calendarIds leer = Kalenderliste/Sichtbarkeit)
+  'calendar:changed': z.object({ accountId: z.number(), calendarIds: z.array(z.number()) }),
+  'calendar:accountState': z.object({
+    accountId: z.number(),
+    state: calendarAccountStateSchema,
+    detail: z.string().nullable()
+  }),
+  // Lokale Änderung wurde nicht übernommen (Konflikt: Server-Version gewinnt, nie stilles Überschreiben)
+  'calendar:conflict': z.object({
+    accountId: z.number(),
+    calendarId: z.number(),
+    uid: z.string(),
+    summary: z.string().nullable(),
+    kind: z.enum(['create', 'update', 'delete']),
+    reason: z.enum(['conflict', 'deleted-on-server', 'forbidden', 'attempts'])
+  }),
+  // Klick auf eine Erinnerung
+  'calendar:openEvent': z.object({
+    objectId: z.number(),
+    recurrenceId: z.string().nullable()
   }),
   'app:openThread': z.object({ threadKey: z.string() }),
   'updates:available': z.object({ latest: z.string(), url: z.string() }),

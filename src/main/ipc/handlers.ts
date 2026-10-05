@@ -23,6 +23,27 @@ import {
   type AccountRow
 } from '../auth/providers'
 import { syncEngine } from '../sync/engine'
+import {
+  addAccount as addCalendarAccount,
+  discover as discoverCalendarAccount,
+  removeAccount as removeCalendarAccount,
+  suggestFromMailAccount,
+  testAccount as testCalendarAccount,
+  updateAccountName as renameCalendarAccount,
+  updateAccountPassword as updateCalendarPassword
+} from '../calendar/accounts'
+import {
+  createEvent as createCalendarEvent,
+  deleteEvent as deleteCalendarEvent,
+  getEvent as getCalendarEvent,
+  listAccounts as listCalendarAccounts,
+  listCalendars,
+  listEvents as listCalendarEvents,
+  setCalendarColor,
+  setCalendarVisible,
+  updateEvent as updateCalendarEvent
+} from '../calendar/service'
+import { calendarSync } from '../calendar/sync'
 import { getDraftModel, getTriageModel } from '../ai/openrouter'
 import { appleFmStatus } from '../ai/apple-fm'
 import { startDraftNew, startDraftNudge, startDraftReply, stylePreview } from '../ai/drafts'
@@ -420,6 +441,78 @@ export const handlers: IpcHandlers = {
     canceled: provider === 'gmail' ? cancelGoogleLogin() : cancelMsLogin()
   }),
 
+  // --- Kalender (CalDAV) ------------------------------------------------------------
+  'calendar:accounts:list': () => ({ accounts: listCalendarAccounts() }),
+
+  'calendar:accounts:suggest': ({ mailAccountId }) =>
+    suggestFromMailAccount(getDb(), mailAccountId),
+
+  'calendar:accounts:discover': async (input) => {
+    const found = await discoverCalendarAccount(getDb(), input)
+    return {
+      serverUrl: found.serverUrl,
+      autoSchedule: found.autoSchedule,
+      calendars: found.calendars.map((c) => ({
+        displayName: c.displayName ?? 'Kalender',
+        color: c.color,
+        readOnly: c.readOnly,
+        components: c.components
+      }))
+    }
+  },
+
+  'calendar:accounts:add': async (input) => addCalendarAccount(getDb(), input),
+
+  'calendar:accounts:update': ({ accountId, name }) => {
+    renameCalendarAccount(getDb(), accountId, name)
+    return { ok: true }
+  },
+
+  'calendar:accounts:updatePassword': async ({ accountId, password }) => {
+    await updateCalendarPassword(getDb(), accountId, password)
+    return { ok: true }
+  },
+
+  'calendar:accounts:remove': ({ accountId }) => {
+    removeCalendarAccount(getDb(), accountId)
+    return { ok: true }
+  },
+
+  'calendar:accounts:test': async ({ accountId }) => testCalendarAccount(getDb(), accountId),
+
+  'calendar:list': ({ accountId }) => ({ calendars: listCalendars(accountId) }),
+
+  'calendar:setVisible': ({ calendarId, visible }) => {
+    setCalendarVisible(calendarId, visible)
+    return { ok: true }
+  },
+
+  'calendar:setColor': ({ calendarId, color }) => {
+    setCalendarColor(calendarId, color)
+    return { ok: true }
+  },
+
+  'calendar:events:list': (input) => ({ events: listCalendarEvents(input) }),
+
+  'calendar:events:get': ({ objectId, recurrenceId }) => ({
+    event: getCalendarEvent(objectId, recurrenceId)
+  }),
+
+  'calendar:events:create': ({ event }) => createCalendarEvent(event),
+
+  'calendar:events:update': ({ objectId, scope, recurrenceId, patch }) =>
+    updateCalendarEvent(objectId, scope, recurrenceId, patch),
+
+  'calendar:events:delete': ({ objectId, scope, recurrenceId }) => {
+    deleteCalendarEvent(objectId, scope, recurrenceId)
+    return { ok: true }
+  },
+
+  'calendar:refresh': ({ accountId }) => {
+    calendarSync.refresh(accountId)
+    return { ok: true }
+  },
+
   'threads:list': ({ limit, accountId, mbox }) => ({
     threads: listThreads(getDb(), limit, accountId, mbox)
   }),
@@ -566,6 +659,10 @@ export const handlers: IpcHandlers = {
           draft: getTaskProfileId('draft'),
           stt: getTaskProfileId('stt')
         },
+        calendarAccounts: listCalendarAccounts().map((c) => ({
+          name: c.name,
+          serverUrl: c.serverUrl
+        })),
         localOnly,
         feed: resolveUpdateFeed(),
         embeddingsCached: isEmbeddingModelCached()

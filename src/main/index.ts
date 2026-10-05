@@ -13,7 +13,9 @@ import { aiQueue } from './ai/queue'
 import { followupRadar } from './ai/followups'
 import { embeddingIndexer } from './ai/embeddings'
 import { outboxWorker } from './smtp/outbox'
-import { initNotifications, updateBadge } from './notifications'
+import { initNotifications, notifyCalendarReminder, updateBadge } from './notifications'
+import { initCalendar, stopCalendar } from './calendar'
+import { calendarSync } from './calendar/sync'
 import { setRuleActionExecutor } from './ai/rules'
 import { startUpdateChecks, stopUpdateChecks } from './updates'
 import { appId, packagedAppName, productName } from './org-config'
@@ -232,6 +234,7 @@ app
     outboxWorker.init(db, push)
     outboxWorker.start()
     initNotifications(db, push)
+    initCalendar(db, push, notifyCalendarReminder)
     setRuleActionExecutor((ids, action) => syncEngine.applyAction(ids, action))
     startUpdateChecks(push)
 
@@ -327,7 +330,10 @@ app
       void import('./dev/self-test').then(({ runM10Test }) => runM10Test(db))
     }
 
-    powerMonitor.on('resume', () => syncEngine.wakeAll())
+    powerMonitor.on('resume', () => {
+      syncEngine.wakeAll()
+      calendarSync.wakeAll()
+    })
 
     app.on('browser-window-created', (_, window) => {
       optimizer.watchWindowShortcuts(window)
@@ -367,5 +373,6 @@ app.on('quit', () => {
   stopUpdateChecks()
   stopAppleFm()
   void syncEngine.stopAll()
+  stopCalendar()
   closeDb()
 })
