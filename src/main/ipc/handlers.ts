@@ -758,6 +758,9 @@ export const handlers: IpcHandlers = {
   'ai:usage': () => ({
     // „Kann die AI arbeiten?" — Entwürfe/Chat sind für den Nutzer das Maß der Dinge
     hasApiKey: taskBlockReason('draft') === null,
+    // Grund statt nur ja/nein: „Local only" ist kein fehlender Schlüssel
+    draftBlock: taskBlockReason('draft'),
+    openrouterKey: getProfile('openrouter')?.hasKey ?? false,
     triageModel: getTriageModel(),
     draftModel: getDraftModel()
   }),

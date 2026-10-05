@@ -2,12 +2,19 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import type { InvokeOutput } from '@shared/ipc-contract'
 
-/** Key-Status + aktive Modelle (aus ai:usage — dort liegt beides schon). */
-export function useOrKeyStatus(): UseQueryResult<{ hasKey: boolean }> {
+/**
+ * Key-Status + aktive Modelle (aus ai:usage — dort liegt beides schon).
+ * hasKey = OpenRouter-Schlüssel hinterlegt; ready/block = kann die AI entwerfen.
+ */
+export function useOrKeyStatus(): UseQueryResult<{
+  hasKey: boolean
+  ready: boolean
+  block: InvokeOutput<'ai:usage'>['draftBlock']
+}> {
   return useQuery({
     queryKey: ['ai', 'usage'],
     queryFn: () => invoke('ai:usage', undefined),
-    select: (d) => ({ hasKey: d.hasApiKey }),
+    select: (d) => ({ hasKey: d.openrouterKey, ready: d.hasApiKey, block: d.draftBlock }),
     staleTime: 10_000
   })
 }

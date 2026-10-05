@@ -114,14 +114,14 @@ export function OwlRail(): React.JSX.Element {
   const waiting = followups.data ?? []
 
   const orStatus = useOrKeyStatus()
-  const railPose = railOwlPose(comp.mode, orStatus.data?.hasKey)
+  const railPose = railOwlPose(comp.mode, orStatus.data?.ready)
   const owlStatus =
     comp.mode === 'listening'
       ? t('owlListening')
       : comp.mode === 'transcribing' || comp.mode === 'drafting'
         ? t('owlDraftingS')
         : railPose === 'asleep'
-          ? t('owlAsleepNoKey')
+          ? t(orStatus.data?.block === 'local-only' ? 'owlAsleepLocalOnly' : 'owlAsleepNoKey')
           : t('owlQuiet')
 
   return (

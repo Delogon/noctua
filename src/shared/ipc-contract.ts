@@ -574,6 +574,8 @@ export const invokeContract = {
     input: z.void(),
     output: z.object({
       hasApiKey: z.boolean(),
+      draftBlock: z.enum(['local-only', 'no-key', 'no-profile', 'no-model']).nullable(),
+      openrouterKey: z.boolean(),
       triageModel: z.string(),
       draftModel: z.string()
     })

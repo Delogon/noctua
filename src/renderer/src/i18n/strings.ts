@@ -643,6 +643,10 @@ const table = {
   theOwl: { en: 'THE OWL', de: 'DIE EULE' },
   owlQuiet: { en: 'working quietly', de: 'arbeitet leise' },
   owlAsleepNoKey: { en: 'asleep — no key.', de: 'schläft — kein Schlüssel.' },
+  owlAsleepLocalOnly: {
+    en: 'asleep — Local only, no local model set.',
+    de: 'schläft — Local only, kein lokales Modell gewählt.'
+  },
   owlListening: { en: 'listening…', de: 'hört zu…' },
   owlDraftingS: { en: 'drafting…', de: 'entwirft…' },
   railDrafts: { en: 'DRAFTS AWAITING YOU', de: 'ENTWÜRFE FÜR DICH' },
@@ -844,8 +848,8 @@ const table = {
   },
   intelligence: { en: 'Intelligence', de: 'Intelligenz' },
   intelSub: {
-    en: 'BRING YOUR OWN KEY · CALLS GO STRAIGHT TO OPENROUTER · NOTHING PASSES THROUGH US',
-    de: 'EIGENER SCHLÜSSEL · DIREKT ZU OPENROUTER · NICHTS LÄUFT ÜBER UNS'
+    en: 'YOUR KEYS, YOUR SERVERS · CALLS GO STRAIGHT TO THE PROVIDER YOU CHOOSE · NOTHING PASSES THROUGH US',
+    de: 'EIGENE SCHLÜSSEL, EIGENE SERVER · ANFRAGEN GEHEN DIREKT ZUM GEWÄHLTEN ANBIETER · NICHTS LÄUFT ÜBER UNS'
   },
   orKeyHead: { en: 'OPENROUTER KEY', de: 'OPENROUTER-SCHLÜSSEL' },
   save: { en: 'SAVE', de: 'SPEICHERN' },
