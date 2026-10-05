@@ -221,9 +221,10 @@ export function listThreads(
   accountId?: number,
   mbox: 'inbox' | 'sent' | 'spam' = 'inbox'
 ): ThreadListItem[] {
-  const where = `JOIN folders f ON m.folder_id = f.id WHERE f.special_use = '${MBOX_SPECIAL[mbox]}'`
+  const where = `JOIN folders f ON m.folder_id = f.id WHERE f.special_use = ?`
   const accountFilter = accountId != null ? ' AND m.account_id = ?' : ''
-  const params: unknown[] = accountId != null ? [accountId, limit] : [limit]
+  const params: unknown[] =
+    accountId != null ? [MBOX_SPECIAL[mbox], accountId, limit] : [MBOX_SPECIAL[mbox], limit]
   const rows = db
     .prepare(
       `${THREAD_AGG_SELECT} ${where}${accountFilter} GROUP BY m.thread_key ORDER BY max_date DESC LIMIT ?`

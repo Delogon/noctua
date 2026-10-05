@@ -331,6 +331,58 @@ describe('ipc-contract', () => {
     expect(() => spec.input.parse({ words: 'Haus' })).toThrow()
   })
 
+  it('settings:get/set akzeptieren nur Allowlist-Schlüssel', () => {
+    const get = invokeContract['settings:get'].input
+    const set = invokeContract['settings:set'].input
+    for (const key of ['ui.language', 'sig.12', 'ai.styleProfile.3', 'ai.styleInstructions.7']) {
+      expect(() => get.parse({ key }), key).not.toThrow()
+    }
+    // Stilprofile sind lesbar, aber nicht vom Renderer schreibbar
+    expect(() => set.parse({ key: 'ai.styleProfile.3', value: '{}' })).toThrow()
+    expect(() => set.parse({ key: 'sig.12', value: 'x' })).not.toThrow()
+    for (const key of [
+      'google.clientId',
+      'google.clientSecret',
+      'ms.clientId',
+      'ai.dailyBudgetUsd',
+      'images.allow.a@b.de',
+      'sig.',
+      'sig.0',
+      'sig.01',
+      'sig.1.2',
+      'sig.12/../x',
+      ''
+    ]) {
+      expect(() => get.parse({ key }), key).toThrow()
+      expect(() => set.parse({ key, value: 'x' }), key).toThrow()
+    }
+  })
+
+  it('secrets:set/exists akzeptieren nur openrouter.apiKey', () => {
+    const set = invokeContract['secrets:set'].input
+    const exists = invokeContract['secrets:exists'].input
+    expect(() => set.parse({ key: 'openrouter.apiKey', value: 'k' })).not.toThrow()
+    expect(() => exists.parse({ key: 'openrouter.apiKey' })).not.toThrow()
+    for (const key of ['account:1:password', 'ms.tokenCache', 'google.refresh.a@b.de']) {
+      expect(() => set.parse({ key, value: 'k' })).toThrow()
+      expect(() => exists.parse({ key })).toThrow()
+    }
+  })
+
+  it('begrenzt IDs und Thread-Keys', () => {
+    const long = 'x'.repeat(513)
+    expect(() => invokeContract['drafts:delete'].input.parse({ threadKey: long })).toThrow()
+    expect(() =>
+      invokeContract['drafts:save'].input.parse({ threadKey: long, text: 'a' })
+    ).toThrow()
+    expect(() =>
+      invokeContract['tasks:decideSuggestion'].input.parse({ threadKey: long, accept: true })
+    ).toThrow()
+    expect(() =>
+      invokeContract['threads:get'].input.parse({ threadKey: 'x'.repeat(512) })
+    ).not.toThrow()
+  })
+
   it('Kanal-Listen und Contract-Keys stimmen überein', () => {
     expect(INVOKE_CHANNELS.sort()).toEqual(Object.keys(invokeContract).sort())
     expect(PUSH_CHANNELS.sort()).toEqual(Object.keys(pushContract).sort())

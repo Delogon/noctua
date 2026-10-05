@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, powerMonitor } from 'electron'
+import { app, BrowserWindow, dialog, powerMonitor, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -19,15 +19,29 @@ import { openExternalSafe } from './util/links'
 import { installAppMenu } from './menu'
 import { cleanupForwardTasksWithoutRequest } from './db/repos/tasks'
 import { reindexHtmlOnlyMessages } from './mail/ingest'
+import { isDev } from './dev-mode'
+import {
+  APP_CSP,
+  isPermissionAllowed,
+  isTrustedAppUrl,
+  safeDevRendererUrl,
+  type TrustedAppPages
+} from './security'
 
 // Bewusst KEIN app.setName('Noctua'): das würde den bestehenden userData-/
 // Safe-Storage-Namen verändern. Im Dev liefert scripts/prepare-dev-app.mjs die
 // Noctua-Identität für macOS, ohne den internen Paketnamen umzubiegen.
 
-// Dev-Erkennung: Der gebrandete Dev-Wrapper benennt die Electron-Binary um,
-// wodurch app.isPackaged fälschlich true meldet — scripts/dev.mjs setzt darum
-// NOCTUA_DEV=1 als explizites Signal. `is.dev` (= !isPackaged) reicht nicht.
-const isDev = !app.isPackaged || process.env.NOCTUA_DEV === '1'
+// Dev-Erkennung (isDev) liegt in dev-mode.ts; ELECTRON_RENDERER_URL zählt nur
+// im Dev-Modus und nur für Loopback-Hosts — ein Produktions-Build lädt nie
+// einen entfernten Renderer.
+const devRendererUrl = isDev ? safeDevRendererUrl(process.env['ELECTRON_RENDERER_URL']) : null
+
+/** Vertrauenswürdige App-Seiten: gebaute index.html bzw. der Dev-Server. */
+const trustedPages = (): TrustedAppPages => ({
+  indexPath: join(__dirname, '../renderer/index.html'),
+  devUrl: devRendererUrl
+})
 
 // Die verpackte App bekommt ein EIGENES Datenverzeichnis (+ eigenen Safe-
 // Storage-Schlüssel): Dev belegt bereits „noctua", und da macOS-Dateisysteme
@@ -58,7 +72,9 @@ function createWindow(): BrowserWindow {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: true
+      webSecurity: true,
+      // <webview> wäre eine zweite, schwer abzusichernde Renderer-Ebene
+      webviewTag: false
     }
   })
 
@@ -81,19 +97,66 @@ function createWindow(): BrowserWindow {
     openExternalSafe(details.url)
     return { action: 'deny' }
   })
-  win.webContents.on('will-navigate', (event, url) => {
-    const devUrl = process.env['ELECTRON_RENDERER_URL']
-    if (isDev && devUrl && url.startsWith(devUrl)) return
-    event.preventDefault()
-  })
+  // Navigation und Redirects nur innerhalb der eigenen App-Seite (Reload, HMR)
+  const guardNavigation = (event: { preventDefault: () => void }, url: string): void => {
+    if (!isTrustedAppUrl(url, trustedPages())) event.preventDefault()
+  }
+  win.webContents.on('will-navigate', guardNavigation)
+  win.webContents.on('will-redirect', guardNavigation)
+  win.webContents.on('will-attach-webview', (event) => event.preventDefault())
 
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  if (devRendererUrl) {
+    win.loadURL(devRendererUrl)
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
   return win
+}
+
+/**
+ * Session-Härtung: Berechtigungen standardmäßig verboten (nur Mikrofon für das
+ * Diktat, nur für die eigene App-Seite) und CSP zusätzlich als Response-Header
+ * für die App-Seiten — die Meta-CSP in index.html bleibt als zweite Schicht.
+ */
+function installSessionSecurity(): void {
+  const ses = session.defaultSession
+  const fromMain = (wc: Electron.WebContents | null): boolean =>
+    !!wc && !!mainWindow && !mainWindow.isDestroyed() && wc === mainWindow.webContents
+
+  ses.setPermissionRequestHandler((wc, permission, callback, details) => {
+    const mediaTypes = (details as { mediaTypes?: string[] }).mediaTypes
+    callback(
+      isPermissionAllowed({
+        permission,
+        mediaTypes,
+        fromMainWindow: fromMain(wc),
+        requestingUrl: details.requestingUrl,
+        pages: trustedPages()
+      })
+    )
+  })
+  ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
+    // Check-Requests tragen mediaType statt mediaTypes
+    const mediaType = (details as { mediaType?: string }).mediaType
+    return isPermissionAllowed({
+      permission,
+      mediaTypes: mediaType ? [mediaType] : undefined,
+      fromMainWindow: fromMain(wc),
+      requestingUrl: details.requestingUrl || requestingOrigin,
+      pages: trustedPages()
+    })
+  })
+
+  ses.webRequest.onHeadersReceived((details, callback) => {
+    if (details.resourceType === 'mainFrame' && isTrustedAppUrl(details.url, trustedPages())) {
+      callback({
+        responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [APP_CSP] }
+      })
+      return
+    }
+    callback({})
+  })
 }
 
 // Zweite Instanz der installierten App: erste fokussieren, neue beendet sich.
@@ -127,7 +190,8 @@ app
     cleanupForwardTasksWithoutRequest(db)
     reindexHtmlOnlyMessages(db)
     if (isDev) seedFromEnv(db)
-    registerIpcHandlers(handlers)
+    installSessionSecurity()
+    registerIpcHandlers(handlers, () => mainWindow, trustedPages)
 
     const push: Parameters<typeof syncEngine.init>[1] = (channel, payload) => {
       if (mainWindow && !mainWindow.isDestroyed()) pushToWindow(mainWindow, channel, payload)
