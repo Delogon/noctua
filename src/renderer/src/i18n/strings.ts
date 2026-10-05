@@ -1359,6 +1359,45 @@ const table = {
     de: 'Evtl. gesendet — Gesendet-Ordner prüfen'
   },
   composeDraftRestored: { en: 'Draft restored', de: 'Entwurf wiederhergestellt' },
+  // ── Terminvorschläge aus Mails (AI) ──
+  eventSuggestHead: { en: 'ADD TO CALENDAR?', de: 'IN DEN KALENDER?' },
+  eventSuggestProposed: { en: 'PROPOSED', de: 'VORSCHLAG' },
+  eventSuggestConfirmed: { en: 'CONFIRMED', de: 'BESTÄTIGT' },
+  eventSuggestWhen: { en: 'When', de: 'Wann' },
+  eventSuggestWhere: { en: 'Where', de: 'Wo' },
+  eventSuggestAdd: { en: 'Add', de: 'Hinzufügen' },
+  eventSuggestEdit: { en: 'Edit…', de: 'Bearbeiten…' },
+  eventSuggestDismiss: { en: 'Dismiss', de: 'Verwerfen' },
+  eventSuggestAdded: { en: 'Added to your calendar', de: 'Zum Kalender hinzugefügt' },
+  eventSuggestOpen: { en: 'Open in calendar', de: 'Im Kalender öffnen' },
+  eventSuggestNoCalendar: { en: 'No writable calendar', de: 'Kein beschreibbarer Kalender' },
+  toastEventAdded: { en: 'Event added — {title}', de: 'Termin hinzugefügt — {title}' },
+  toastEventAddFailed: {
+    en: 'Event could not be added',
+    de: 'Termin konnte nicht hinzugefügt werden'
+  },
+  draftCalendarHead: { en: 'AVAILABILITY IN DRAFTS', de: 'VERFÜGBARKEIT IN ENTWÜRFEN' },
+  draftCalendarSub: {
+    en: 'Reply drafts can propose free slots',
+    de: 'Antwortentwürfe können freie Zeiten vorschlagen'
+  },
+  draftCalendarToggle: {
+    en: 'Use my calendar for meeting requests',
+    de: 'Meinen Kalender bei Terminanfragen nutzen'
+  },
+  draftCalendarNoteOn: {
+    en: 'Only free time slots (no titles, places or attendees) go into the prompt — and to the AI provider you chose.',
+    de: 'Nur freie Zeitfenster (keine Titel, Orte oder Teilnehmer) gehen in den Prompt — und damit an den gewählten KI-Anbieter.'
+  },
+  draftCalendarNoteOff: {
+    en: 'Drafts never see your calendar.',
+    de: 'Entwürfe sehen deinen Kalender nie.'
+  },
+  draftCalendarNoAccount: {
+    en: 'Takes effect once a calendar account is connected.',
+    de: 'Wirkt, sobald ein Kalender-Konto verbunden ist.'
+  },
+
   tasksAutoHead: { en: 'TASKS FROM MAIL', de: 'AUFGABEN AUS MAILS' },
   tasksAutoSub: {
     en: 'The owl spots to-dos while reading',

@@ -51,6 +51,12 @@ import {
   respondToInvitation
 } from '../calendar/invitations'
 import { queryFreeBusy, selfBusy } from '../calendar/freebusy'
+import {
+  acceptEventSuggestion,
+  dismissEventSuggestion,
+  listEventSuggestions,
+  markEventSuggestionEditing
+} from '../calendar/event-suggestions'
 import { defaultEditContext } from '../calendar/edit'
 import { contactsStatus, setAddressBookEnabled, setContactsSync } from '../contacts/accounts'
 import { getDraftModel, getTriageModel } from '../ai/openrouter'
@@ -523,6 +529,22 @@ export const handlers: IpcHandlers = {
   'calendar:invitations:get': ({ messageId }) => ({
     invitations: getInvitationsForMessage(getDb(), messageId)
   }),
+
+  'calendar:eventSuggestions:get': ({ messageId }) => ({
+    suggestions: listEventSuggestions(getDb(), messageId)
+  }),
+
+  'calendar:eventSuggestions:accept': ({ id }) => acceptEventSuggestion(getDb(), id),
+
+  'calendar:eventSuggestions:dismiss': ({ id }) => {
+    dismissEventSuggestion(getDb(), id)
+    return { ok: true }
+  },
+
+  'calendar:eventSuggestions:edit': ({ id }) => {
+    markEventSuggestionEditing(getDb(), id)
+    return { ok: true }
+  },
 
   'calendar:invitations:respond': (input) => respondToInvitation(getDb(), input),
 

@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import { triageBudgetBlocked } from './providers/registry'
 import { runTriage, PROMPT_VERSION } from './triage'
+import { EVENT_CATEGORIES, runEventExtraction } from './events'
 import { applyRules } from './rules'
 import { maybeNotify, updateBadge } from '../notifications'
 
@@ -18,6 +19,9 @@ const BREAKER_PAUSE_MS = 5 * 60_000
 const TRANSIENT_BACKOFF_BASE_MS = 30_000
 const TRANSIENT_BACKOFF_MAX_MS = 10 * 60_000
 const PROMPT_VERSION_SETTING = 'ai.queuePromptVersion'
+// Termin-Extraktion (Job 'events'): nur Mails, die NACH diesem Zeitpunkt ankamen — beim ersten
+// Lauf mit Kalender-Konto gesetzt, damit nie das 30-Tage-Fenster rückwirkend bezahlt wird.
+const EVENTS_SINCE_SETTING = 'ai.eventsSince'
 
 const TRANSIENT_NET_CODES = new Set([
   'ECONNREFUSED',
@@ -150,6 +154,7 @@ export class AiQueue {
   }
 
   private discover(): void {
+    this.discoverEvents()
     const since = Date.now() - TRIAGE_WINDOW_DAYS * 24 * 3600 * 1000
     this.db!.prepare(
       `INSERT OR IGNORE INTO ai_jobs (message_id, kind, status)
@@ -168,6 +173,43 @@ export class AiQueue {
     ).run(since, PROMPT_VERSION)
   }
 
+  /**
+   * Termin-Jobs nur für NEUE Mails (Ankunft nach ai.eventsSince), nur mit Kalender-Konto,
+   * nur für bereits getriagte Mails der Kategorien personal/work/other und ohne
+   * Einladungs-Teil (die hat die Einladungskarte). UNIQUE(message_id, kind) macht es idempotent.
+   */
+  private discoverEvents(): void {
+    const db = this.db!
+    if (!db.prepare('SELECT 1 FROM cal_accounts LIMIT 1').get()) return
+    let since = Number(
+      (
+        db.prepare('SELECT value FROM settings WHERE key = ?').get(EVENTS_SINCE_SETTING) as
+          { value: string } | undefined
+      )?.value
+    )
+    if (!Number.isFinite(since) || since <= 0) {
+      since = Date.now()
+      db.prepare(
+        'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+      ).run(EVENTS_SINCE_SETTING, String(since))
+    }
+    const categories = EVENT_CATEGORIES.map((c) => `'${c}'`).join(',')
+    db.prepare(
+      `INSERT OR IGNORE INTO ai_jobs (message_id, kind, status)
+       SELECT m.id, 'events', 'pending'
+       FROM messages m
+       JOIN folders f ON f.id = m.folder_id
+       JOIN accounts a ON a.id = m.account_id
+       JOIN ai_annotations an ON an.message_id = m.id
+       WHERE f.special_use = '\\Inbox'
+         AND m.body_state = 'full'
+         AND a.ai_enabled = 1
+         AND coalesce(m.internal_date, m.date, 0) >= ?
+         AND coalesce(an.user_override_category, an.category) IN (${categories})
+         AND NOT EXISTS (SELECT 1 FROM invitations i WHERE i.message_id = m.id)`
+    ).run(since)
+  }
+
   private async drain(): Promise<void> {
     if (this.draining) return
     this.draining = true
@@ -176,11 +218,13 @@ export class AiQueue {
         if (Date.now() < this.pausedUntil) break
         if (triageBudgetBlocked(this.db!)) break
         const job = this.db!.prepare(
-          `SELECT id, message_id, attempts FROM ai_jobs
-             WHERE kind = 'triage' AND status = 'pending'
+          `SELECT id, message_id, attempts, kind FROM ai_jobs
+             WHERE kind IN ('triage', 'events') AND status = 'pending'
                AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
-             ORDER BY id LIMIT 1`
-        ).get(Date.now()) as { id: number; message_id: number; attempts: number } | undefined
+             ORDER BY (kind = 'events'), id LIMIT 1`
+        ).get(Date.now()) as
+          | { id: number; message_id: number; attempts: number; kind: 'triage' | 'events' }
+          | undefined
         if (!job) break
 
         this.db!.prepare(`UPDATE ai_jobs SET status = 'running' WHERE id = ?`).run(job.id)
@@ -199,9 +243,25 @@ export class AiQueue {
     id: number
     message_id: number
     attempts: number
+    kind?: 'triage' | 'events'
   }): Promise<void> {
     const db = this.db!
     try {
+      if (job.kind === 'events') {
+        const outcome = await runEventExtraction(db, job.message_id)
+        if (outcome === 'skipped-no-client') {
+          db.prepare(`UPDATE ai_jobs SET status = 'pending', next_attempt_at = ? WHERE id = ?`).run(
+            Date.now() + 5 * 60_000,
+            job.id
+          )
+          return
+        }
+        this.consecutiveTransient = 0
+        db.prepare(`UPDATE ai_jobs SET status = 'done', last_error = NULL WHERE id = ?`).run(job.id)
+        // Renderer lädt die Mail-Ansicht (Terminvorschläge) neu
+        if (outcome === 'done') this.push('ai:annotated', { messageIds: [job.message_id] })
+        return
+      }
       const outcome = await runTriage(db, job.message_id)
       if (outcome === 'skipped-no-client') {
         // Kein API-Key hinterlegt — Job zurücklegen, ohne attempts zu verbrennen.

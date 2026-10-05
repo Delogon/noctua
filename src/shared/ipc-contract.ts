@@ -36,6 +36,7 @@ import {
   invitationRespondOutputSchema,
   invitationViewSchema
 } from './invitation-types'
+import { eventSuggestionViewSchema } from './event-suggestion-types'
 import {
   isRendererSecretKey,
   isRendererSettingReadable,
@@ -329,6 +330,24 @@ export const invokeContract = {
   'calendar:invitations:get': {
     input: z.object({ messageId: z.number().int() }),
     output: z.object({ invitations: z.array(invitationViewSchema) })
+  },
+  // Terminvorschläge aus Mails (AI, 2.4): nie automatisch angelegt
+  'calendar:eventSuggestions:get': {
+    input: z.object({ messageId: z.number().int() }),
+    output: z.object({ suggestions: z.array(eventSuggestionViewSchema) })
+  },
+  'calendar:eventSuggestions:accept': {
+    input: z.object({ id: z.number().int() }),
+    output: z.object({ objectId: z.number().int() })
+  },
+  'calendar:eventSuggestions:dismiss': {
+    input: z.object({ id: z.number().int() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Editor übernimmt den Vorschlag (Bearbeiten…): gilt als erledigt
+  'calendar:eventSuggestions:edit': {
+    input: z.object({ id: z.number().int() }),
+    output: z.object({ ok: z.literal(true) })
   },
   // RSVP: Server-Scheduling (nur PARTSTAT-PUT) oder iMIP-REPLY per Outbox
   'calendar:invitations:respond': {
