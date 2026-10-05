@@ -6,6 +6,7 @@ import { usePaper } from '@renderer/stores/paper'
 import { cleanIpcError } from '@renderer/features/paper/account-states'
 import {
   useAppleFm,
+  useDecisionModels,
   useEmbeddingStatus,
   useLocalOnly,
   useProfileModels,
@@ -604,7 +605,7 @@ export function ProfileModelPicker({
   const result = rawResult?.forModel === `${profile.id}/${current}` ? rawResult : null
 
   const loadManually = (): void => {
-    void invoke('ai:profileModels', { profileId: profile.id, manual: true })
+    void invoke('ai:profileModels', { profileId: profile.id, manual: true, kind: 'chat' })
       .then((data) => queryClient.setQueryData(['ai', 'profileModels', profile.id], data))
       .catch((err) => toastNow(errText(err)))
   }
@@ -716,6 +717,210 @@ export function ProfileModelPicker({
         </div>
       )}
     </div>
+  )
+}
+
+// ── Entscheidungen (Ollama System One) ──────────────────────────────────────
+
+/**
+ * Entscheidungsmodell (clef-flash, nimble …): optional, nur lokale Profile.
+ * Eigene Karte statt TaskProviderPicker — kein OpenRouter, „Aus" als Zustand,
+ * Modelle nur mit Fähigkeit `decision`.
+ */
+export function DecisionCard(): React.JSX.Element {
+  const t = useT()
+  const queryClient = useQueryClient()
+  const { toastNow } = usePaper()
+  const profiles = useProfiles()
+  const assignments = useTaskAssignments()
+  const localOnly = useLocalOnly().data === true
+  const current = assignments.data?.decision
+  const candidates = (profiles.data ?? []).filter((p) => p.preset !== 'openrouter')
+  const profile = candidates.find((p) => p.id === current?.profileId) ?? null
+  const models = useDecisionModels(profile?.id ?? null)
+  const [text, setText] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [test, setTest] = useState<{
+    forModel: string
+    ok: boolean
+    latencyMs: number
+    detail: string | null
+    answers: Array<{ name: string; text: string }>
+  } | null>(null)
+  const activeTest = test && test.forModel === `${profile?.id}/${current?.model}` ? test : null
+
+  const assign = (profileId: string, model: string): void => {
+    void invoke('ai:tasks:set', { task: 'decision', profileId, model })
+      .then(() => {
+        toastNow(model ? t('toastDecisionModel', { model }) : t('toastDecisionOff'))
+        void queryClient.invalidateQueries({ queryKey: ['ai'] })
+      })
+      .catch((err) => toastNow(errText(err)))
+  }
+
+  const changeProfile = async (profileId: string): Promise<void> => {
+    if (!profileId) return assign('', '')
+    // Vorwahl: clef-flash, sonst das erste Entscheidungsmodell des Servers
+    let model = ''
+    try {
+      const list = await invoke('ai:profileModels', { profileId, manual: false, kind: 'decision' })
+      model = (list.models.find((m) => m.id.startsWith('clef-flash')) ?? list.models[0])?.id ?? ''
+    } catch {
+      // ohne Liste bleibt die Modellwahl leer – Freitext ist möglich
+    }
+    assign(profileId, model)
+  }
+
+  const runTest = (): void => {
+    if (!profile || !current?.model || testing) return
+    setTesting(true)
+    const forModel = `${profile.id}/${current.model}`
+    void invoke('ai:decisions:test', { profileId: profile.id, model: current.model })
+      .then((r) => setTest({ ...r, forModel }))
+      .catch((err) =>
+        setTest({ forModel, ok: false, latencyMs: 0, detail: errText(err), answers: [] })
+      )
+      .finally(() => setTesting(false))
+  }
+
+  const ids = models.data?.models.map((m) => m.id) ?? []
+  const options = current?.model && !ids.includes(current.model) ? [current.model, ...ids] : ids
+  const answer = (name: string): string =>
+    activeTest?.answers.find((a) => a.name === name)?.text ?? '–'
+
+  return (
+    <>
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="mlabel" style={{ color: 'var(--ac)' }}>
+          {t('modelDecision')}
+        </span>
+        <span style={{ font: '400 9px var(--mono)', color: 'var(--faint)' }}>
+          {t('modelDecisionSub')}
+        </span>
+      </div>
+      <div className="mmeta" style={{ marginTop: 6 }}>
+        {t('decisionExplain')}
+      </div>
+      <div className="mmeta" style={{ marginTop: 4, color: 'var(--faint)' }}>
+        {t('decisionUses')}
+      </div>
+      <div className="flex items-baseline gap-2" style={{ marginTop: 10 }}>
+        <span className="mlabel flex-none" style={{ color: 'var(--muted)' }}>
+          {t('taskProvider')}
+        </span>
+        <select
+          value={profile?.id ?? ''}
+          onChange={(e) => void changeProfile(e.target.value)}
+          className="paper-input"
+          data-decision-profile
+          style={{ width: 'auto', padding: '3px 8px', font: '500 10px var(--mono)' }}
+        >
+          <option value="">{t('decisionOff')}</option>
+          {candidates.map((p) => (
+            <option key={p.id} value={p.id} disabled={localOnly && !p.isLocal}>
+              {p.name} · {p.isLocal ? t('profileLocal') : t('profileExternal')}
+            </option>
+          ))}
+        </select>
+      </div>
+      {profile && current?.blocked === 'local-only' && (
+        <div className="mmeta" style={{ marginTop: 6, color: 'var(--ac)' }}>
+          {t('taskBlockedLocalOnly')}
+        </div>
+      )}
+      {profile && (
+        <div className="flex flex-col gap-2" style={{ marginTop: 10 }}>
+          {options.length > 0 ? (
+            <select
+              value={current?.model ?? ''}
+              onChange={(e) => assign(profile.id, e.target.value)}
+              className="paper-input"
+              data-decision-model
+              style={{ font: '500 11px var(--mono)' }}
+            >
+              {!current?.model && <option value="">{t('modelPick')}</option>}
+              {options.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            </select>
+          ) : (
+            !models.isLoading && (
+              <div style={{ font: '400 9.5px var(--mono)', color: 'var(--muted)' }}>
+                {models.isError ? `✗ ${errText(models.error)}` : t('decisionNoModels')}
+              </div>
+            )
+          )}
+          <div style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}>
+            {t('decisionModelHint')}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && text.trim()) {
+                  assign(profile.id, text.trim())
+                  setText('')
+                }
+                e.stopPropagation()
+              }}
+              placeholder={t('modelFreeText')}
+              className="paper-input flex-1"
+            />
+            <button
+              type="button"
+              className="btn-bare flex-none"
+              disabled={!text.trim()}
+              onClick={() => {
+                assign(profile.id, text.trim())
+                setText('')
+              }}
+              style={text.trim() ? BTN_PRIMARY : { ...BTN_GHOST, color: 'var(--faint)' }}
+            >
+              {t('customModelApply')}
+            </button>
+          </div>
+          {current?.model && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn-bare flex-none"
+                disabled={testing}
+                onClick={runTest}
+                data-decision-test-btn
+                style={BTN_GHOST}
+              >
+                {testing ? '···' : t('decisionTest')}
+              </button>
+              {activeTest && (
+                <span
+                  data-decision-test
+                  style={{
+                    font: '400 9.5px var(--mono)',
+                    color: activeTest.ok ? 'var(--ac)' : 'var(--muted)'
+                  }}
+                >
+                  {activeTest.ok
+                    ? t('decisionTestOk', {
+                        ms: activeTest.latencyMs.toLocaleString('de-DE'),
+                        invoice: answer('invoice'),
+                        urgency: answer('urgency')
+                      })
+                    : `✗ ${activeTest.detail ?? t('customModelFailed')}`}
+                </span>
+              )}
+            </div>
+          )}
+          {profile.isLocal && (
+            <div style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}>
+              {t('decisionLocalNote')}
+            </div>
+          )}
+        </div>
+      )}
+    </>
   )
 }
 

@@ -80,10 +80,32 @@ export function useLocalOnly(): UseQueryResult<boolean> {
 export function useProfileModels(profileId: string | null): UseQueryResult<ProfileModels> {
   return useQuery({
     queryKey: ['ai', 'profileModels', profileId],
-    queryFn: () => invoke('ai:profileModels', { profileId: profileId!, manual: false }),
+    queryFn: () =>
+      invoke('ai:profileModels', { profileId: profileId!, manual: false, kind: 'chat' }),
     enabled: profileId !== null,
     staleTime: 60 * 60 * 1000,
     retry: 1
+  })
+}
+
+/** Entscheidungsmodelle (Fähigkeit `decision`) eines Profils – getrennt von der Chat-Liste. */
+export function useDecisionModels(profileId: string | null): UseQueryResult<ProfileModels> {
+  return useQuery({
+    queryKey: ['ai', 'profileModels', profileId, 'decision'],
+    queryFn: () =>
+      invoke('ai:profileModels', { profileId: profileId!, manual: false, kind: 'decision' }),
+    enabled: profileId !== null,
+    staleTime: 30_000,
+    retry: 1
+  })
+}
+
+/** Phishing-Einschätzung einer Mail (nur mit Entscheidungsmodell berechnet). */
+export function usePhishing(messageId: number): UseQueryResult<InvokeOutput<'ai:decisions:get'>> {
+  return useQuery({
+    queryKey: ['ai', 'decisions', messageId],
+    queryFn: () => invoke('ai:decisions:get', { messageId }),
+    staleTime: 60_000
   })
 }
 

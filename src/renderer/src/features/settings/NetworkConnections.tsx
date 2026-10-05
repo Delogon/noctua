@@ -29,7 +29,8 @@ const STATUS_LABEL: Record<NetworkConnection['status'], StringKey> = {
 const TASK_LABEL: Record<NetworkConnection['tasks'][number], StringKey> = {
   triage: 'techNetTaskTriage',
   draft: 'techNetTaskDraft',
-  stt: 'techNetTaskStt'
+  stt: 'techNetTaskStt',
+  decision: 'techNetTaskDecision'
 }
 
 export function NetworkConnections(): React.JSX.Element {

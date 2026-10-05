@@ -252,6 +252,7 @@ function EndpointForm({
       {ep.verified && (
         <ModelPair ep={ep} patch={patch} note={autoPickNote} nonLocalWarn={autoPickNote} />
       )}
+      {ep.verified && autoPickNote && <DecisionHint ep={ep} patch={patch} />}
     </div>
   )
 }
@@ -293,6 +294,56 @@ function ModelPair({
   )
 }
 
+/**
+ * Entscheidungsmodell (Ollama System One): vorgewählt, wenn der Server eines hat,
+ * sonst ein kleiner Tipp. Nur für Ollama — andere Server kennen die API nicht.
+ */
+function DecisionHint({
+  ep,
+  patch
+}: {
+  ep: Endpoint
+  patch: (p: Partial<Endpoint>) => void
+}): React.JSX.Element | null {
+  const t = useT()
+  if (!ep.verified) return null
+  if (ep.decisionModels.length > 0) {
+    return (
+      <div className="flex flex-col gap-1" data-ai-decision="found">
+        <div className="flex gap-3">
+          <label className="min-w-0 flex-1" style={{ display: 'block' }}>
+            <span className="mlabel" style={LABEL}>
+              {t('obAiDecisionLabel')}
+            </span>
+            <select
+              value={ep.decision}
+              onChange={(e) => patch({ decision: e.target.value })}
+              className="paper-input"
+              style={{ font: '500 11px var(--mono)', width: '100%' }}
+            >
+              <option value="">{t('decisionOff')}</option>
+              {ep.decisionModels.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div style={NOTE}>{t('obAiDecisionFound')}</div>
+      </div>
+    )
+  }
+  if (ep.label === 'Ollama' || /:11434\b/.test(ep.url)) {
+    return (
+      <div style={NOTE} data-ai-decision="tip">
+        {t('obAiDecisionTip')}
+      </div>
+    )
+  }
+  return null
+}
+
 function LocalBody({ ai }: { ai: OnboardingAi }): React.JSX.Element {
   const t = useT()
   const [dictOpen, setDictOpen] = useState(false)
@@ -319,7 +370,9 @@ function LocalBody({ ai }: { ai: OnboardingAi }): React.JSX.Element {
                   role="radio"
                   aria-checked={on}
                   data-ai-server={s.kind}
-                  onClick={() => ai.pickServer(s.baseUrl, s.models, ai.kindLabel(s.kind))}
+                  onClick={() =>
+                    ai.pickServer(s.baseUrl, s.models, ai.kindLabel(s.kind), s.decisionModels)
+                  }
                   className="btn-bare flex items-baseline gap-2 text-left"
                   style={{
                     padding: '6px 10px',
@@ -348,7 +401,10 @@ function LocalBody({ ai }: { ai: OnboardingAi }): React.JSX.Element {
       )}
 
       {!manual && ai.selectedServer && (
-        <ModelPair ep={ai.local.ep} patch={ai.local.patch} note nonLocalWarn={false} />
+        <>
+          <ModelPair ep={ai.local.ep} patch={ai.local.patch} note nonLocalWarn={false} />
+          <DecisionHint ep={ai.local.ep} patch={ai.local.patch} />
+        </>
       )}
 
       {ai.found.length === 0 && !ai.detect.isLoading && (

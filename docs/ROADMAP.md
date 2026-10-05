@@ -74,6 +74,18 @@ See [AUDIT.md](AUDIT.md) for finding IDs.
   attendee lookup
 - **3.2 VTODO**: sync Noctua tasks with a CalDAV task list (two-way, ETag-based)
 
+## Phase 4 — Decision models (Ollama System One)
+
+- **4.1 Decision task**: `decision` task per profile/model (local Ollama only), typed System One
+  client, capability detection (`/api/tags`, `/api/show`), decision-only models hidden from chat
+  pickers, Settings → AI "Decisions" card with test, onboarding preselect/hint, org config
+- **4.2 Hybrid triage**: one decision call per mail (category, priority, reply, request, meeting,
+  phishing); text model only for task titles and important summaries; extractive summary otherwise
+- **4.3 Gates & extras**: follow-up radar and event-suggestion gate via decision, phishing warning
+  banner, mail rules with an AI condition
+
+See [DECISIONS.md](DECISIONS.md).
+
 ## Status (2026-10-05)
 
 All work packages of phases 0–3 are implemented on `claude/focused-cray-wxn4ps` (lint 0/0,
@@ -86,6 +98,9 @@ live servers yet — see [VERIFICATION.md](VERIFICATION.md) for the acceptance c
 Next candidates: replace `hunspell-asm` (nanoid advisory), Proton Bridge cert pinning, SEC-15
 for chat/Owl prompts, imapflow 2 / openai 7 / msal 7 majors, CONDSTORE/QRESYNC for long-lived
 inboxes, upstream PRs per phase.
+
+Phase 4 (decision models) is implemented and unit-tested against a faked System One endpoint; it has
+not been run against a real Ollama + `clef-flash` yet (checklist in [DECISIONS.md](DECISIONS.md)).
 
 ## Working mode
 

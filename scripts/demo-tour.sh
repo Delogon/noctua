@@ -5,7 +5,10 @@
 #
 # Umgebung (optional): DEMO_LOCAL_ONLY=1  Local only einschalten
 #                      DEMO_LANG=de|en    UI-Sprache (Standard en)
-#                      DEMO_PASS=main|local|small|onboarding   Tour-Durchlauf (Standard main)
+#                      DEMO_PASS=main|local|small|onboarding|decision   Tour-Durchlauf (Standard main)
+#                        decision zeigt Entscheidungsmodelle (Fake-Ollama mit clef-flash): Karte in
+#                        Einstellungen → KI, Regel mit KI-Bedingung, Phishing-Warnung. Mit
+#                        DEMO_NO_DECISION=1 zeigt onboarding stattdessen den Tipp ohne Modell.
 #                        onboarding zeigt die KI-Wahl (Fake-Ollama auf 127.0.0.1:11434); mit einem
 #                        Build mit Org-Konfiguration stattdessen die Org-Profile:
 #                        NOCTUA_ORG_CONFIG=build/org-config.example.json pnpm exec electron-vite build
@@ -27,6 +30,7 @@ mkdir -p "$OUT"
 export TZ="${TZ:-Europe/Berlin}"
 export NOCTUA_DEV=1 NOCTUA_DEMO_SEED=1 NOCTUA_TEST_SHOTS=demo
 export NOCTUA_SHOT_DIR="$OUT" NOCTUA_DEMO_LANG="${DEMO_LANG:-en}"
+export NOCTUA_DEMO_NO_DECISION="${DEMO_NO_DECISION:-0}"
 export NOCTUA_DEMO_LOCAL_ONLY="${DEMO_LOCAL_ONLY:-0}" NOCTUA_DEMO_PASS="${DEMO_PASS:-main}"
 if [ "${DEMO_PASS:-main}" = onboarding ]; then export NOCTUA_DEMO_ONBOARDING=1; fi
 

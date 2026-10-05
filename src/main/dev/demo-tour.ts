@@ -3,6 +3,8 @@ import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, type BrowserWindow } from 'electron'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
+import { getDb } from '../db'
+import { createProfile, setTaskAssignment } from '../ai/providers/registry'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
@@ -354,19 +356,40 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
   }
 
   /**
-   * Onboarding: Schritt 3. Mit Org-Build (NOCTUA_ORG_CONFIG) die Org-Profile,
-   * sonst die KI-Wahl — dafür läuft ein Fake-Ollama auf 127.0.0.1:11434, den
-   * ai:detectLocal findet.
+   * Fake-Ollama auf 127.0.0.1:11434: Modellliste, /api/tags mit Fähigkeiten und ein
+   * plausibles /v1/systemone (Entscheidungsmodell clef-flash). withDecision=false
+   * bildet einen Ollama ohne Entscheidungsmodell nach (Onboarding-Tipp).
    */
-  const onboarding = async (): Promise<void> => {
-    await resize(1440, 900)
-    const lang = process.env.NOCTUA_DEMO_LANG === 'de' ? 'de-' : ''
+  const startFakeOllama = async (withDecision: boolean): Promise<{ close: () => void }> => {
+    const chat = [
+      { name: 'qwen3:30b', capabilities: ['completion', 'tools'] },
+      { name: 'llama3.2:3b', capabilities: ['completion'] },
+      { name: 'nomic-embed-text:latest', capabilities: ['embedding'] }
+    ]
+    const tags = withDecision
+      ? [...chat, { name: 'clef-flash:latest', capabilities: ['decision'] }]
+      : chat
     const fake = createServer((req, res) => {
       res.setHeader('Content-Type', 'application/json')
       if (req.url === '/v1/models') {
+        res.end(JSON.stringify({ data: tags.map((t) => ({ id: t.name })) }))
+      } else if (req.url === '/api/tags') {
+        res.end(JSON.stringify({ models: tags }))
+      } else if (req.url === '/v1/systemone' && req.method === 'POST') {
         res.end(
           JSON.stringify({
-            data: [{ id: 'qwen3:30b' }, { id: 'llama3.2:3b' }, { id: 'nomic-embed-text:latest' }]
+            model: 'clef-flash',
+            answers: {
+              invoice: { type: 'noul', noul: 0.974 },
+              urgency: {
+                type: 'score',
+                score: 1.62,
+                legend: { '0': 'Routine', '1': 'Bald', '2': 'Sofort' },
+                probabilities: { '0': 0.05, '1': 0.28, '2': 0.67 },
+                confidence: 0.55
+              }
+            },
+            usage: { input_tokens: 96, output_tokens: 1 }
           })
         )
       } else {
@@ -375,12 +398,95 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       }
     })
     await new Promise<void>((resolve) => fake.listen(11434, '127.0.0.1', resolve))
+    return { close: () => fake.close() }
+  }
+
+  /**
+   * Entscheidungsmodelle: Settings → KI (Karte „Entscheidungen" + Test), Regel mit
+   * KI-Bedingung und die Phishing-Warnung in der Mail-Ansicht.
+   */
+  const decision = async (): Promise<void> => {
+    await resize(1440, 900)
+    const lang = process.env.NOCTUA_DEMO_LANG === 'de' ? 'de-' : ''
+    const fake = await startFakeOllama(true)
+    const db = getDb()
+    const profile = createProfile({
+      name: 'Ollama',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      apiStyle: 'chat',
+      isLocal: true
+    })
+    setTaskAssignment('decision', profile.id, 'clef-flash:latest')
+    db.prepare(
+      `INSERT INTO rules (name, description, source_text, rule_json, needs_ai, enabled, created_at)
+       VALUES ('Rechnungen markieren', 'Markiert Rechnungen mit einem Stern.', '', ?, 1, 1, ?)`
+    ).run(
+      JSON.stringify({
+        match: { aiCondition: 'Ist das eine Rechnung?' },
+        actions: { flag: true }
+      }),
+      Date.now()
+    )
+    // Phishing-Einschätzung für die Sparkasse-Mail (die mit der Link-Abweichung)
+    const phish = db
+      .prepare(
+        `SELECT id FROM messages WHERE from_name LIKE '%Sparkasse%' OR subject LIKE '%Sparkasse%' LIMIT 1`
+      )
+      .get() as { id: number } | undefined
+    if (phish) {
+      db.prepare(
+        `INSERT OR REPLACE INTO ai_decisions (message_id, model, category, category_confidence,
+           priority_score, needs_reply, addressed_to_me, has_request, proposes_meeting, phishing,
+           phishing_signals_json, created_at)
+         VALUES (?, 'clef-flash', 'transactional', 0.8, 3.1, 0.1, 0.9, 0.7, 0.02, 1.78, ?, ?)`
+      ).run(phish.id, JSON.stringify(['link_mismatch:1', 'reply_to_differs']), Date.now())
+    }
+    await step('decision-settings', async () => {
+      await openSettings('intelligence|ki')
+      await wait(800)
+      await js(`(() => {
+        const el = document.querySelector('[data-decision-profile]')
+        if (el) el.scrollIntoView({ block: 'center' })
+      })()`)
+      await wait(500)
+      await shot(`${lang}70-settings-decisions`)
+      await clickText('[data-decision-test-btn]', '')
+      await wait(1800)
+      await shot(`${lang}71-settings-decisions-test`)
+      await scrollMain(0, true)
+      await shot(`${lang}72-settings-rules-ai-condition`)
+    })
+    await step('decision-phishing', async () => {
+      go('inbox')
+      await wait(1200)
+      await openRow('Sparkasse')
+      await wait(900)
+      await shot(`${lang}73-phishing-banner`)
+    })
+    fake.close()
+  }
+
+  /**
+   * Onboarding: Schritt 3. Mit Org-Build (NOCTUA_ORG_CONFIG) die Org-Profile,
+   * sonst die KI-Wahl — dafür läuft ein Fake-Ollama auf 127.0.0.1:11434, den
+   * ai:detectLocal findet.
+   */
+  const onboarding = async (): Promise<void> => {
+    await resize(1440, 900)
+    const lang = process.env.NOCTUA_DEMO_LANG === 'de' ? 'de-' : ''
+    // DEMO_NO_DECISION=1: Ollama ohne Entscheidungsmodell → Tipp „ollama pull clef-flash"
+    const noDecision = process.env.NOCTUA_DEMO_NO_DECISION === '1'
+    const fake = await startFakeOllama(!noDecision)
     await step('onboarding', async () => {
       await wait(1500)
       await shot(`${lang}60-onboarding-connect`)
       await clickText('button', 'continue|weiter')
       await wait(2000)
-      await shot(`${lang}62-onboarding-ai-local`)
+      await shot(`${lang}62-onboarding-ai-local${noDecision ? '-decision-tip' : ''}`)
+      if (noDecision) {
+        fake.close()
+        return
+      }
       await clickText('[data-ai-option="cloud"]', '')
       await wait(900)
       await shot(`${lang}63-onboarding-ai-cloud`)
@@ -417,6 +523,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
         if (pass === 'small') await small()
         else if (pass === 'local') await local()
         else if (pass === 'onboarding') await onboarding()
+        else if (pass === 'decision') await decision()
         else await main()
         console.log('[shots] fertig:', outDir)
       } catch (error) {

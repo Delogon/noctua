@@ -17,7 +17,8 @@ import {
   OnDemandCard,
   ProfileModelPicker,
   ProvidersCard,
-  TaskProviderPicker
+  TaskProviderPicker,
+  DecisionCard
 } from '@renderer/features/settings/AiProvidersSection'
 import { usePaper } from '@renderer/stores/paper'
 import { rowTime, useI18n, useT } from '@renderer/lib/i18n'
@@ -1624,8 +1625,12 @@ function ModelList({
             className="text-btn"
             style={{ borderBottom: '1px solid var(--hairline)' }}
             onClick={() =>
-              void invoke('ai:profileModels', { profileId: 'openrouter', manual: true }).then(
-                (data) => queryClient.setQueryData(['ai', 'profileModels', 'openrouter'], data)
+              void invoke('ai:profileModels', {
+                profileId: 'openrouter',
+                manual: true,
+                kind: 'chat'
+              }).then((data) =>
+                queryClient.setQueryData(['ai', 'profileModels', 'openrouter'], data)
               )
             }
           >
@@ -1850,6 +1855,10 @@ export function IntelSheet(): React.JSX.Element {
         </div>
         <TaskProviderPicker task="stt" />
         {renderModels('stt')}
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <DecisionCard />
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>

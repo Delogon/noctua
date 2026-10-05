@@ -53,3 +53,17 @@ a real Mac and against real servers. Tick them off before the first company roll
       syncs
 - [ ] AI: event suggestion from a mail like "Can we meet next Tuesday at 3?", reply draft proposes
       free slots
+
+## Decision models (needs Ollama >= 0.35.1 + `ollama pull clef-flash`)
+
+- [ ] Settings -> AI -> Decisions lists `clef-flash` (and only decision models), Test shows answers + latency;
+      chat/draft pickers do **not** list `clef-flash`
+- [ ] Onboarding (local server) preselects the decision model; without one it shows the pull hint
+- [ ] Newsletter/promotion: triage makes no text-model call, summary is the first sentence; request mail
+      from a person: task title + summary written by the text model; model column `clef-flash+<chat model>`
+- [ ] Priority/category plausible on ~50 real mails; compare against classic triage (thresholds in
+      `src/shared/decision-thresholds.ts`); check `prompt exceeds context` with the default `num_ctx`
+- [ ] Real phishing sample -> banner (score >= 1.4), harmless mails -> no banner; false-positive rate
+- [ ] Rule with AI condition ("Ist das eine Rechnung?") fires only on invoices; one `/v1/systemone` call per mail
+- [ ] Follow-up radar and event suggestions still work; no event extraction for mails without a meeting
+- [ ] Local only: decision profile marked external is refused; loopback Ollama keeps working

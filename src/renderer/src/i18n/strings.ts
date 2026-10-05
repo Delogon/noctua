@@ -2054,7 +2054,96 @@ const table = {
   techNetExternal: { en: 'EXTERNAL', de: 'EXTERN' },
   techNetTaskTriage: { en: 'triage', de: 'Vorsortierung' },
   techNetTaskDraft: { en: 'drafts', de: 'Entwürfe' },
-  techNetTaskStt: { en: 'dictation', de: 'Diktat' }
+  techNetTaskStt: { en: 'dictation', de: 'Diktat' },
+  techNetTaskDecision: { en: 'decisions', de: 'Entscheidungen' },
+
+  // Entscheidungsmodelle (Ollama System One: clef-flash, nimble, …)
+  modelDecision: { en: 'DECISIONS', de: 'ENTSCHEIDUNGEN' },
+  modelDecisionSub: {
+    en: 'optional · decision model on your own Ollama server',
+    de: 'optional · Entscheidungsmodell auf deinem eigenen Ollama-Server'
+  },
+  decisionExplain: {
+    en: 'Sorts, prioritizes, and checks emails without generating text — faster and cheaper.',
+    de: 'Sortiert, priorisiert und prüft E-Mails ohne Text zu erzeugen – schneller und sparsamer.'
+  },
+  decisionUses: {
+    en: 'Used for sorting, priority, reply tracking, event hints, the phishing warning, and rules with an AI condition. Your writing model only steps in where text is needed.',
+    de: 'Genutzt für Sortierung, Priorität, Nachverfolgung, Terminhinweise, die Phishing-Warnung und Regeln mit KI-Bedingung. Dein Schreibmodell springt nur ein, wo Text gebraucht wird.'
+  },
+  decisionOff: { en: 'Off', de: 'Aus' },
+  decisionModelHint: {
+    en: 'e.g. ollama pull clef-flash (Ollama 0.35.1 or newer)',
+    de: 'z. B. „ollama pull clef-flash“ (Ollama ab 0.35.1)'
+  },
+  decisionNoModels: {
+    en: 'No decision model found on this server.',
+    de: 'Auf diesem Server wurde kein Entscheidungsmodell gefunden.'
+  },
+  decisionLocalNote: {
+    en: 'Runs only on your own server — nothing leaves your device.',
+    de: 'Läuft nur auf deinem eigenen Server – nichts verlässt dein Gerät.'
+  },
+  decisionTest: { en: 'Test', de: 'Testen' },
+  decisionTestOk: {
+    en: '✓ Works · {ms} ms · invoice {invoice} · urgency {urgency}',
+    de: '✓ Funktioniert · {ms} ms · Rechnung {invoice} · Dringlichkeit {urgency}'
+  },
+  toastDecisionModel: {
+    en: 'Decisions now by {model}',
+    de: 'Entscheidungen trifft jetzt {model}'
+  },
+  toastDecisionOff: {
+    en: 'Decision model switched off',
+    de: 'Entscheidungsmodell ausgeschaltet'
+  },
+  obAiDecisionLabel: { en: 'DECISIONS', de: 'ENTSCHEIDUNGEN' },
+  obAiDecisionFound: {
+    en: 'Decision model found — it sorts your email faster, without generating text.',
+    de: 'Entscheidungsmodell gefunden – es sortiert deine E-Mails schneller, ohne Text zu erzeugen.'
+  },
+  obAiDecisionTip: {
+    en: 'Tip: ollama pull clef-flash for faster sorting',
+    de: 'Tipp: „ollama pull clef-flash“ für schnellere Sortierung'
+  },
+
+  // Phishing-Warnung in der Mail-Ansicht
+  phishingBanner: {
+    en: 'This email looks like phishing — do not click links or enter credentials.',
+    de: 'Diese E-Mail sieht nach Phishing aus – klicke keine Links, gib keine Zugangsdaten ein.'
+  },
+  phishingSignals: { en: 'Warning signs', de: 'Warnzeichen' },
+  phishingNote: {
+    en: 'Local assessment by your decision model — it can be wrong.',
+    de: 'Lokale Einschätzung deines Entscheidungsmodells – kann irren.'
+  },
+  phishReasonDisplayName: {
+    en: 'The display name shows a different domain than the real sender address',
+    de: 'Der Anzeigename nennt eine andere Domain als die echte Absenderadresse'
+  },
+  phishReasonReplyTo: {
+    en: 'Replies would go to a different domain than the sender',
+    de: 'Antworten würden an eine andere Domain gehen als die des Absenders'
+  },
+  phishReasonLinkMismatch: {
+    en: 'Links show one address but lead to another ({n})',
+    de: 'Links zeigen eine Adresse an, führen aber woandershin ({n})'
+  },
+  phishReasonIpLink: {
+    en: 'Links point to a bare IP address ({n})',
+    de: 'Links führen auf eine rohe IP-Adresse ({n})'
+  },
+  phishReasonPunycode: {
+    en: 'Links use a look-alike (punycode) domain ({n})',
+    de: 'Links nutzen eine Domain mit Ersatzzeichen (Punycode) ({n})'
+  },
+
+  // Regeln mit KI-Bedingung
+  ruleAiCondition: { en: 'AI condition', de: 'KI-Bedingung' },
+  ruleAiNeedsModel: {
+    en: 'Needs a decision model (Settings → AI) — skipped until then.',
+    de: 'Braucht ein Entscheidungsmodell (Einstellungen → KI) – wird bis dahin übersprungen.'
+  }
 } as const
 
 export type StringKey = keyof typeof table

@@ -33,6 +33,10 @@ export interface Endpoint {
   models: string[]
   triage: string
   draft: string
+  /** Entscheidungsmodelle (Ollama, Fähigkeit `decision`) des Servers; getrennt von `models` */
+  decisionModels: string[]
+  /** gewähltes Entscheidungsmodell, leer = nicht nutzen */
+  decision: string
   testing: boolean
   error: string | null
   /** Anzeigename des erkannten Servers (z. B. „Ollama") */
@@ -47,6 +51,8 @@ const EMPTY_ENDPOINT: Endpoint = {
   models: [],
   triage: '',
   draft: '',
+  decisionModels: [],
+  decision: '',
   testing: false,
   error: null,
   label: ''
@@ -60,7 +66,7 @@ export interface EndpointApi {
   ep: Endpoint
   patch: (p: Partial<Endpoint>) => void
   edit: (p: Partial<Pick<Endpoint, 'url' | 'key' | 'style'>>) => void
-  setModels: (models: string[], label?: string) => void
+  setModels: (models: string[], label?: string, decisionModels?: string[]) => void
   test: () => Promise<void>
   ensureProfile: () => Promise<string>
 }
@@ -73,14 +79,28 @@ function useEndpoint(profileName: string, autoPick: boolean): EndpointApi {
   const patch = (p: Partial<Endpoint>): void => setEp((e) => ({ ...e, ...p }))
   /** Eingaben geändert: Verifikation und Fehler verfallen. */
   const edit = (p: Partial<Pick<Endpoint, 'url' | 'key' | 'style'>>): void =>
-    setEp((e) => ({ ...e, ...p, verified: false, models: [], error: null }))
+    setEp((e) => ({
+      ...e,
+      ...p,
+      verified: false,
+      models: [],
+      decisionModels: [],
+      decision: '',
+      error: null
+    }))
 
-  const setModels = (models: string[], label = ''): void => {
+  const setModels = (models: string[], label = '', decisionModels: string[] = []): void => {
     const picked = autoPick ? pickLocalModels(models) : { triage: '', draft: '' }
     patch({
       models,
       triage: picked.triage,
       draft: picked.draft,
+      decisionModels,
+      // clef-flash zuerst, sonst das erste gefundene Entscheidungsmodell
+      decision:
+        autoPick && decisionModels.length > 0
+          ? (decisionModels.find((m) => m.startsWith('clef-flash')) ?? decisionModels[0])
+          : '',
       verified: true,
       error: null,
       label
@@ -116,8 +136,17 @@ function useEndpoint(profileName: string, autoPick: boolean): EndpointApi {
         patch({ testing: false, verified: false, error: cleanIpcError(r.detail ?? '') })
         return
       }
-      const list = await invoke('ai:profileModels', { profileId: id, manual: true })
-      setModels(list.models.map((m) => m.id))
+      const list = await invoke('ai:profileModels', { profileId: id, manual: true, kind: 'chat' })
+      const decisions = await invoke('ai:profileModels', {
+        profileId: id,
+        manual: true,
+        kind: 'decision'
+      }).catch(() => ({ models: [] }))
+      setModels(
+        list.models.map((m) => m.id),
+        '',
+        decisions.models.map((m) => m.id)
+      )
       patch({ testing: false })
     } catch (err) {
       patch({ testing: false, verified: false, error: errText(err) })
@@ -144,7 +173,7 @@ export interface OnboardingAi {
   /** baseUrl des gewählten erkannten Servers, 'manual' bei eigener Adresse */
   selectedServer: string | null
   setSelectedServer: (v: string | null) => void
-  pickServer: (url: string, models: string[], label: string) => void
+  pickServer: (url: string, models: string[], label: string, decisionModels?: string[]) => void
   kindLabel: (kind: string) => string
   dictMode: DictationMode
   setDictation: (m: DictationMode) => void
@@ -219,17 +248,22 @@ export function useOnboardingAi(active: boolean): OnboardingAi {
       localai: t('obAiKindOther')
     })[kind] ?? kind
 
-  const pickServer = (url: string, models: string[], label: string): void => {
+  const pickServer = (
+    url: string,
+    models: string[],
+    label: string,
+    decisionModels: string[] = []
+  ): void => {
     setSelectedServer(url)
     local.patch({ url, key: '' })
-    local.setModels(models, label)
+    local.setModels(models, label, decisionModels)
   }
 
   // Erster Treffer ist vorgewählt, solange der Nutzer noch nichts anderes gewählt hat
   // (State-Anpassung beim Rendern statt im Effect, wie React es empfiehlt.)
   const first = found[0]
   if (first && selectedServer === null && !local.ep.url) {
-    pickServer(first.baseUrl, first.models, kindLabel(first.kind))
+    pickServer(first.baseUrl, first.models, kindLabel(first.kind), first.decisionModels)
   }
 
   const applyLocalOnly = (value: boolean): void => {
@@ -309,6 +343,14 @@ export function useOnboardingAi(active: boolean): OnboardingAi {
           model: state.localTriageModel
         })
         await invoke('ai:tasks:set', { task: 'draft', profileId: id, model: state.localDraftModel })
+        // Entscheidungsmodell (optional): sortiert, priorisiert und prüft ohne Text zu erzeugen
+        if (local.ep.decision.trim()) {
+          await invoke('ai:tasks:set', {
+            task: 'decision',
+            profileId: id,
+            model: local.ep.decision.trim()
+          })
+        }
         if (dictMode === 'apple' && appleAvailable) {
           await invoke('ai:tasks:set', { task: 'stt', profileId: 'apple', model: '' })
         } else if (dictMode === 'whisper' && whisperUrl.trim()) {

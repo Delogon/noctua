@@ -29,6 +29,7 @@ export function useThreadInvalidation(): void {
       onPush('ai:annotated', () => {
         void queryClient.invalidateQueries({ queryKey: ['threads'] })
         void queryClient.invalidateQueries({ queryKey: ['ai', 'usage'] })
+        void queryClient.invalidateQueries({ queryKey: ['ai', 'decisions'] })
       }),
     [queryClient]
   )
