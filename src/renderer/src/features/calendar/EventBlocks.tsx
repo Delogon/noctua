@@ -1,6 +1,6 @@
 import type { CalendarInstance } from '@shared/calendar-types'
 import { useT } from '@renderer/lib/i18n'
-import { hhmm, timeRange } from './format'
+import { dayTimeLabel, timeRange } from './format'
 
 // Darstellung einzelner Termine (Zeitraster-Block, Bandleiste, Monats-Chip). Gemeinsam:
 // Kalenderfarbe als linke Kante, ↻ für Serien, Punkt für „noch nicht übertragen",
@@ -14,6 +14,9 @@ interface BlockProps {
   onOpen: (e: CalendarInstance) => void
   onSelect: (e: CalendarInstance) => void
 }
+
+/** Unter dieser Blockbreite (px) bleibt nur der Titel, einzeilig mit Ellipse. */
+const TINY_BLOCK_PX = 96
 
 function Glyphs({ event }: { event: CalendarInstance }): React.JSX.Element | null {
   const t = useT()
@@ -40,9 +43,20 @@ export function TimedBlock({
   onOpen,
   onSelect,
   style,
-  compact
-}: BlockProps & { style: React.CSSProperties; compact: boolean }): React.JSX.Element {
+  compact,
+  dayStart,
+  widthPx
+}: BlockProps & {
+  style: React.CSSProperties
+  compact: boolean
+  /** Tagesbeginn der Spalte (lokal, ms): Folgetage über Mitternacht zeigen „→ Ende" */
+  dayStart: number
+  /** Breite des Blocks in px: sehr schmale Blöcke zeigen nur den Titel (mit Ellipse) */
+  widthPx: number
+}): React.JSX.Element {
   const t = useT()
+  const title = event.summary || t('cvNoTitle')
+  const tiny = widthPx < TINY_BLOCK_PX
   return (
     <button
       type="button"
@@ -52,6 +66,8 @@ export function TimedBlock({
       data-cancelled={event.status === 'CANCELLED'}
       data-readonly={event.readOnly}
       data-compact={compact}
+      data-tiny={tiny}
+      title={title}
       data-glyphs={event.recurring || event.pending}
       style={{ ...style, ['--cal-c' as string]: color }}
       aria-label={ariaLabelOf(event, t('cvNoTitle'), t('cvPendingTip'))}
@@ -59,10 +75,10 @@ export function TimedBlock({
       onFocus={() => onSelect(event)}
       onClick={() => onOpen(event)}
     >
-      <span className="cal-event__title">{event.summary || t('cvNoTitle')}</span>
-      {!compact && (
+      <span className="cal-event__title">{title}</span>
+      {!compact && !tiny && (
         <span className="cal-event__meta">
-          {timeRange(event)}
+          {dayTimeLabel(event, dayStart)}
           {event.location ? ` · ${event.location}` : ''}
         </span>
       )}
@@ -114,9 +130,10 @@ export function MonthChip({
   color,
   selected,
   banner,
+  dayStart,
   onOpen,
   onSelect
-}: BlockProps & { banner: boolean }): React.JSX.Element {
+}: BlockProps & { banner: boolean; dayStart: number }): React.JSX.Element {
   const t = useT()
   return (
     <button
@@ -129,13 +146,14 @@ export function MonthChip({
       style={{ ['--cal-c' as string]: color }}
       aria-label={ariaLabelOf(event, t('cvNoTitle'), t('cvPendingTip'))}
       aria-pressed={selected}
+      title={event.summary || t('cvNoTitle')}
       onFocus={() => onSelect(event)}
       onClick={(e) => {
         e.stopPropagation()
         onOpen(event)
       }}
     >
-      {!banner && <span className="cal-chip__time">{hhmm(event.startUtc)}</span>}
+      {!banner && <span className="cal-chip__time">{dayTimeLabel(event, dayStart, 'start')}</span>}
       <span className="cal-chip__title">{event.summary || t('cvNoTitle')}</span>
       <Glyphs event={event} />
     </button>

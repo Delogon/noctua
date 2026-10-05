@@ -18,6 +18,25 @@ export function timeRange(e: Pick<CalendarInstance, 'startUtc' | 'endUtc'>): str
   return `${hhmm(e.startUtc)}–${hhmm(e.endUtc)}`
 }
 
+/**
+ * Zeitangabe eines Termins für EINEN Tag (Tagesbeginn `dayStartMs`, lokal). Über Mitternacht
+ * laufende Termine zeigen am ersten Tag den Start mit „→", am Folgetag nur „→ Ende" — der Start
+ * wird nicht wiederholt. `start`: am Starttag nur die Startzeit (Monatschips).
+ */
+export function dayTimeLabel(
+  e: Pick<CalendarInstance, 'startUtc' | 'endUtc'>,
+  dayStartMs: number,
+  mode: 'range' | 'start' = 'range'
+): string {
+  const dayEndMs = addDays(new Date(dayStartMs), 1).getTime()
+  const startsHere = e.startUtc >= dayStartMs
+  const endsHere = e.endUtc <= dayEndMs
+  if (startsHere && endsHere) return mode === 'start' ? hhmm(e.startUtc) : timeRange(e)
+  if (startsHere) return mode === 'start' ? hhmm(e.startUtc) : `${hhmm(e.startUtc)} →`
+  if (endsHere) return `→ ${hhmm(e.endUtc)}`
+  return '→'
+}
+
 export function weekdayShort(lang: Lang, d: Date): string {
   return d.toLocaleDateString(locale(lang), { weekday: 'short' }).replace('.', '').toUpperCase()
 }
