@@ -20,6 +20,7 @@ import { applyFilters, filterCounts } from '@renderer/features/paper/inbox-filte
 import { InboxFilterMenu } from '@renderer/features/paper/InboxFilterMenu'
 import { OwlConversationsPane } from '@renderer/features/owl/OwlConversationsPane'
 import { useOwl } from '@renderer/stores/owl'
+import { CalendarSidebar } from '@renderer/features/calendar/CalendarSidebar'
 import {
   taskIdAfterCompletion,
   taskIdAfterVisibilityChange,
@@ -1058,13 +1059,29 @@ export function ListPane(): React.JSX.Element {
       {(view === 'inbox' || view === 'compose') && <InboxList />}
       {view === 'waiting' && <WaitingList />}
       {view === 'tasks' && <TasksList />}
+      {view === 'calendar' && <CalendarSidebar />}
       {view === 'chat' && <OwlConversationsPane />}
       {view === 'settings' && <SettingsList />}
       <div
         className="flex flex-none items-baseline gap-3 border-t border-ink"
         style={{ padding: '10px 18px', font: '400 9.5px var(--mono)', color: 'var(--muted)' }}
       >
-        {view === 'chat' ? (
+        {view === 'calendar' ? (
+          <>
+            <span>
+              <span style={{ color: 'var(--ink)' }}>d/w/m</span> {t('cvKeyView')}
+            </span>
+            <span>
+              <span style={{ color: 'var(--ink)' }}>t</span> {t('cvKeyToday')}
+            </span>
+            <span>
+              <span style={{ color: 'var(--ink)' }}>n</span> {t('cvKeyNew')}
+            </span>
+            <span>
+              <span style={{ color: 'var(--ink)' }}>?</span> {t('keyKeys')}
+            </span>
+          </>
+        ) : view === 'chat' ? (
           <>
             <span>
               <span style={{ color: 'var(--ink)' }}>j/k</span> {t('keyMove')}

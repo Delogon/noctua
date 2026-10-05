@@ -152,6 +152,12 @@ export function Masthead(): React.JSX.Element {
           onClick={() => setView('tasks')}
         />
         <NavItem
+          label={t('navCalendar')}
+          kbd="⌘4"
+          active={view === 'calendar'}
+          onClick={() => setView('calendar')}
+        />
+        <NavItem
           label={t('navSettings')}
           kbd="⌘,"
           active={view === 'settings'}

@@ -836,6 +836,7 @@ export const pushContract = {
       'chat',
       'inbox',
       'tasks',
+      'calendar',
       'waiting'
     ])
   }),

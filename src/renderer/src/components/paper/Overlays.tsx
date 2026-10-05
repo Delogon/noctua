@@ -132,6 +132,13 @@ function PaperPaletteOpen(): React.JSX.Element {
       act: () => paper.setView('tasks')
     })
     list.push({
+      id: 'go-calendar',
+      label: t('cmdGoCalendar'),
+      note: '',
+      key: '⌘4',
+      act: () => paper.setView('calendar')
+    })
+    list.push({
       id: 'style',
       label: t('cmdYourStyle'),
       note: t('cmdOnePerAddress'),
@@ -476,7 +483,10 @@ export function HelpOverlay(): React.JSX.Element | null {
     ['0 / 1…9', t('helpFilter')],
     ['/', t('helpSearch')],
     ['⌘k', t('helpPalette')],
-    ['⌘1/2/3', t('helpViews')],
+    ['⌘1/2/3/4', t('helpViews')],
+    ['d / w / m · t', t('helpCalView')],
+    ['j / k · ← / →', t('helpCalMove')],
+    ['n · ↵ · ⌫', t('helpCalEvent')],
     ['⌘,', t('helpSettings')]
   ]
 

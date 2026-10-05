@@ -3,12 +3,16 @@ import { useUiStore } from '@renderer/stores/ui'
 import { useOwl } from '@renderer/stores/owl'
 import { useToast } from '@renderer/stores/toast'
 import { accountFilterForHotkey } from './account-hotkeys'
+import { calendarKeyAction } from '@renderer/features/calendar/keys'
 
 // Letterpress-Keymap — direkter Port des Behavior-Specs (Component.onKey im
 // Handoff-Prototyp): kontextuelle Enter-Praezedenz und Esc-Kaskade.
 // (Die fruehere g-Sequenz wurde in 0.49 ersatzlos ausgebaut.)
 
-function dispatch(scope: 'mail' | 'waiting' | 'task' | 'owl' | 'compose', action: string): void {
+function dispatch(
+  scope: 'mail' | 'waiting' | 'task' | 'owl' | 'compose' | 'calendar',
+  action: string
+): void {
   window.dispatchEvent(new CustomEvent(`paper:${scope}`, { detail: action }))
 }
 
@@ -38,9 +42,11 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
       }
       return
     }
-    if ((e.metaKey || e.ctrlKey) && ['1', '2', '3'].includes(e.key)) {
+    if ((e.metaKey || e.ctrlKey) && ['1', '2', '3', '4'].includes(e.key)) {
       e.preventDefault()
-      paper.setView(e.key === '1' ? 'inbox' : e.key === '2' ? 'waiting' : 'tasks')
+      paper.setView(
+        e.key === '1' ? 'inbox' : e.key === '2' ? 'waiting' : e.key === '3' ? 'tasks' : 'calendar'
+      )
       return
     }
     // ⌘F = Suchen: öffnet die Owl-View mit fokussiertem Feld (läuft
@@ -117,6 +123,11 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
         useOwl.getState().setQuery('')
         return
       }
+      // Kalender: Esc schließt der Reihe nach Löschen-Dialog, Schnell-Anlegen, Editor, Auswahl
+      if (paper.view === 'calendar') {
+        dispatch('calendar', 'escape')
+        return
+      }
       // Compose-Ansicht: Esc legt den Entwurf ab und kehrt in den Posteingang
       // zurück (Design 3a). Menüs/Dropdowns stoppen das Event vorher selbst.
       if (paper.view === 'compose') {
@@ -144,6 +155,20 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
     if (e.metaKey || e.ctrlKey || e.altKey) return
     const k = e.key
     const view = paper.view
+
+    // Kalender-Tasten (d/w/m, t, j/k, ←/→, n, ↵, e, ⌫): nur in der Kalenderansicht und nicht
+    // aus dem Editor/Dialog heraus — dort gehören Enter/Rücktaste den Bedienelementen.
+    if (view === 'calendar' && !e.shiftKey && !target?.closest('[data-cal-modal]')) {
+      const action = calendarKeyAction(k)
+      // Enter auf einem fokussierten Knopf löst dessen eigenen Klick aus (Termin-Block, Seitenleiste)
+      if (action && !(k === 'Enter' && tag === 'BUTTON')) {
+        e.preventDefault()
+        // Neuer Termin/Öffnen/Löschen nicht per Tastenwiederholung mehrfach auslösen
+        if (e.repeat && (action === 'new' || action === 'open' || action === 'delete')) return
+        dispatch('calendar', action)
+        return
+      }
+    }
 
     const accountFilter =
       view === 'inbox' && !withinComposer && !e.shiftKey

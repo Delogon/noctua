@@ -126,6 +126,168 @@ const table = {
     de: 'Kalender: „{title}“ ließ sich nicht übertragen und wurde zurückgesetzt.'
   },
 
+  // ── Kalenderansicht (Phase 2.2) ──
+  navCalendar: { en: 'CALENDAR', de: 'KALENDER' },
+  cmdGoCalendar: { en: 'Go to Calendar', de: 'Zum Kalender' },
+  helpCalView: {
+    en: 'calendar: day · week · month · today',
+    de: 'Kalender: Tag · Woche · Monat · Heute'
+  },
+  helpCalMove: { en: 'calendar: previous / next period', de: 'Kalender: Zeitraum zurück / vor' },
+  helpCalEvent: {
+    en: 'calendar: new · open · delete event',
+    de: 'Kalender: Termin neu · öffnen · löschen'
+  },
+  railAgendaHead: { en: 'TODAY', de: 'HEUTE' },
+  railAgendaArrow: { en: 'calendar →', de: 'Kalender →' },
+  railAgendaNone: { en: 'Nothing more on the calendar today.', de: 'Heute steht nichts mehr an.' },
+  cvTomorrow: { en: 'TOMORROW', de: 'MORGEN' },
+  cvMore: { en: '+{n} more', de: '+{n} weitere' },
+  cvKeyView: { en: 'view', de: 'Ansicht' },
+  cvKeyToday: { en: 'today', de: 'heute' },
+  cvKeyNew: { en: 'new', de: 'neu' },
+  cvRecurring: { en: 'Repeating event', de: 'Wiederkehrender Termin' },
+  cvPendingTip: { en: 'Not synced to the server yet', de: 'Noch nicht auf dem Server' },
+  cvPending: { en: 'NOT SYNCED YET', de: 'NOCH NICHT ÜBERTRAGEN' },
+  cvNoTitle: { en: '(No title)', de: '(Ohne Titel)' },
+  cvAllDayShort: { en: 'ALL DAY', de: 'GANZTÄGIG' },
+  cvAllDay: { en: 'All day', de: 'Ganztägig' },
+  cvNewAllDayOn: { en: 'New all-day event on {day}', de: 'Neuer ganztägiger Termin am {day}' },
+  cvNoAccount: { en: 'No calendar connected yet.', de: 'Noch kein Kalender verbunden.' },
+  cvNoAccountSub: {
+    en: 'Connect a CalDAV calendar — Nextcloud, Fastmail, iCloud …',
+    de: 'Verbinde einen CalDAV-Kalender — Nextcloud, Fastmail, iCloud …'
+  },
+  cvOpenSettings: {
+    en: 'SET UP IN SETTINGS → ACCOUNTS',
+    de: 'IN EINSTELLUNGEN → KONTEN EINRICHTEN'
+  },
+  cvNoWritable: {
+    en: 'No writable calendar available.',
+    de: 'Kein beschreibbarer Kalender vorhanden.'
+  },
+  cvNoCalendars: {
+    en: 'No calendars yet — they appear after the first sync.',
+    de: 'Noch keine Kalender — sie erscheinen nach dem ersten Abgleich.'
+  },
+  cvPrev: { en: 'Previous', de: 'Zurück' },
+  cvNext: { en: 'Next', de: 'Weiter' },
+  cvToday: { en: 'TODAY', de: 'HEUTE' },
+  cvViewSwitch: { en: 'Calendar view', de: 'Kalenderansicht' },
+  cvDay: { en: 'DAY', de: 'TAG' },
+  cvWeek: { en: 'WEEK', de: 'WOCHE' },
+  cvMonth: { en: 'MONTH', de: 'MONAT' },
+  cvNew: { en: '+ NEW', de: '+ NEU' },
+  cvHead: { en: 'CALENDAR', de: 'KALENDER' },
+  cvCalendars: { en: 'CALENDARS', de: 'KALENDER' },
+  cvPrevMonth: { en: 'Previous month', de: 'Vorheriger Monat' },
+  cvNextMonth: { en: 'Next month', de: 'Nächster Monat' },
+  cvMiniLabel: { en: 'Month overview', de: 'Monatsübersicht' },
+  cvColor: { en: 'Colour', de: 'Farbe' },
+  cvColorFor: { en: 'Colour of {name}', de: 'Farbe von {name}' },
+  cvColorDefault: { en: 'DEFAULT', de: 'STANDARD' },
+  cvQuickTitle: { en: 'NEW EVENT', de: 'NEUER TERMIN' },
+  cvTitle: { en: 'Title', de: 'Titel' },
+  cvTitlePh: { en: 'Add a title', de: 'Titel hinzufügen' },
+  cvSave: { en: 'SAVE', de: 'SPEICHERN' },
+  cvMoreOptions: { en: 'MORE …', de: 'MEHR …' },
+  cvSaveFailed: {
+    en: 'Could not save the event: {err}',
+    de: 'Termin konnte nicht gespeichert werden: {err}'
+  },
+  cvDeleteFailed: {
+    en: 'Could not delete the event: {err}',
+    de: 'Termin konnte nicht gelöscht werden: {err}'
+  },
+  cvErrEnd: { en: 'The end must be after the start.', de: 'Das Ende muss nach dem Beginn liegen.' },
+  cvErrUntil: {
+    en: 'The end of the repeat must not be before the start.',
+    de: 'Das Ende der Wiederholung darf nicht vor dem Beginn liegen.'
+  },
+  cvErrTime: {
+    en: 'Please enter valid dates and times (HH:mm).',
+    de: 'Bitte gültige Daten und Zeiten (HH:mm) angeben.'
+  },
+  cvEditorNew: { en: 'NEW EVENT', de: 'NEUER TERMIN' },
+  cvEditorEdit: { en: 'EVENT', de: 'TERMIN' },
+  cvClose: { en: 'CLOSE', de: 'SCHLIESSEN' },
+  cvCalendar: { en: 'Calendar', de: 'Kalender' },
+  cvCalendarFixed: {
+    en: 'An existing event cannot be moved to another calendar.',
+    de: 'Ein bestehender Termin lässt sich nicht in einen anderen Kalender verschieben.'
+  },
+  cvWhen: { en: 'WHEN', de: 'WANN' },
+  cvFrom: { en: 'FROM', de: 'VON' },
+  cvTo: { en: 'TO', de: 'BIS' },
+  cvFromTime: { en: 'Start time', de: 'Beginn (Uhrzeit)' },
+  cvToTime: { en: 'End time', de: 'Ende (Uhrzeit)' },
+  cvTimezone: { en: 'ZONE', de: 'ZONE' },
+  cvTimezoneShow: { en: 'TIME ZONE …', de: 'ZEITZONE …' },
+  cvTimezoneFloating: { en: 'Floating (no zone)', de: 'Schwebend (ohne Zone)' },
+  cvRepeat: { en: 'REPEAT', de: 'WIEDERHOLUNG' },
+  cvRecNone: { en: 'Does not repeat', de: 'Keine Wiederholung' },
+  cvRecDaily: { en: 'Daily', de: 'Täglich' },
+  cvRecWeekly: { en: 'Weekly', de: 'Wöchentlich' },
+  cvRecMonthly: { en: 'Monthly', de: 'Monatlich' },
+  cvRecYearly: { en: 'Yearly', de: 'Jährlich' },
+  cvEvery: { en: 'every', de: 'alle' },
+  cvUnitDay: { en: 'day(s)', de: 'Tag(e)' },
+  cvUnitWeek: { en: 'week(s)', de: 'Woche(n)' },
+  cvUnitMonth: { en: 'month(s)', de: 'Monat(e)' },
+  cvUnitYear: { en: 'year(s)', de: 'Jahr(e)' },
+  cvOnDays: { en: 'On weekdays', de: 'An Wochentagen' },
+  cvRecEnds: { en: 'Repeat ends', de: 'Wiederholung endet' },
+  cvEndNever: { en: 'never', de: 'nie' },
+  cvEndUntil: { en: 'on date', de: 'am Datum' },
+  cvEndCount: { en: 'after n times', de: 'nach n Terminen' },
+  cvRecCustom: {
+    en: 'Custom repeat rule (kept as is):',
+    de: 'Eigene Wiederholungsregel (bleibt unverändert):'
+  },
+  cvRecReplace: { en: 'REPLACE WITH A SIMPLE RULE', de: 'DURCH EINFACHE REGEL ERSETZEN' },
+  cvAlarm: { en: 'REMINDER', de: 'ERINNERUNG' },
+  cvAlarmNone: { en: 'None', de: 'Keine' },
+  cvAlarmAtStart: { en: 'At start', de: 'Zum Beginn' },
+  cvAlarm5: { en: '5 minutes before', de: '5 Minuten vorher' },
+  cvAlarm10: { en: '10 minutes before', de: '10 Minuten vorher' },
+  cvAlarm15: { en: '15 minutes before', de: '15 Minuten vorher' },
+  cvAlarm30: { en: '30 minutes before', de: '30 Minuten vorher' },
+  cvAlarm60: { en: '1 hour before', de: '1 Stunde vorher' },
+  cvAlarm1440: { en: '1 day before', de: '1 Tag vorher' },
+  cvAlarmCustom: { en: 'Custom ({n}) — kept', de: 'Eigene ({n}) — bleibt erhalten' },
+  cvShowAs: { en: 'SHOW AS', de: 'ANZEIGEN ALS' },
+  cvBusy: { en: 'Busy', de: 'Beschäftigt' },
+  cvFree: { en: 'Free', de: 'Frei' },
+  cvLocation: { en: 'LOCATION', de: 'ORT' },
+  cvDescription: { en: 'NOTES', de: 'NOTIZEN' },
+  cvAttendees: { en: 'ATTENDEES', de: 'TEILNEHMER' },
+  cvAttendeesNote: {
+    en: 'Invitations can be edited in a later version.',
+    de: 'Einladungen lassen sich in einer späteren Version bearbeiten.'
+  },
+  cvOrganizer: { en: 'ORGANIZER', de: 'ORGANISATOR' },
+  cvPartAccepted: { en: 'accepted', de: 'zugesagt' },
+  cvPartDeclined: { en: 'declined', de: 'abgesagt' },
+  cvPartTentative: { en: 'tentative', de: 'vielleicht' },
+  cvPartNeeds: { en: 'no reply', de: 'offen' },
+  cvPartDelegated: { en: 'delegated', de: 'weitergeleitet' },
+  cvDelete: { en: 'DELETE', de: 'LÖSCHEN' },
+  cvDeleteConfirm: { en: 'Delete this event?', de: 'Diesen Termin löschen?' },
+  cvDeleteTitle: { en: 'DELETE EVENT', de: 'TERMIN LÖSCHEN' },
+  cvScopeEditHead: {
+    en: 'REPEATING EVENT — APPLY CHANGE TO',
+    de: 'WIEDERKEHRENDER TERMIN — ÄNDERUNG GILT FÜR'
+  },
+  cvScopeDeleteHead: { en: 'REPEATING EVENT — DELETE', de: 'WIEDERKEHRENDER TERMIN — LÖSCHEN' },
+  cvScopeThis: { en: 'Only this event', de: 'Nur diesen Termin' },
+  cvScopeFollowing: { en: 'This and following events', de: 'Diesen und alle folgenden' },
+  cvScopeAll: { en: 'All events', de: 'Alle Termine' },
+  cvLoading: { en: 'Loading …', de: 'Lädt …' },
+  cvLoadFailed: {
+    en: 'The event could not be loaded.',
+    de: 'Der Termin konnte nicht geladen werden.'
+  },
+
   // ── Update-Hinweis ──
   updateAvailable: { en: 'Version {v} is available', de: 'Version {v} ist verfügbar' },
   updateDownload: { en: 'Download', de: 'Herunterladen' },
@@ -961,8 +1123,8 @@ const table = {
   },
   helpPalette: { en: 'commands', de: 'Befehle' },
   helpViews: {
-    en: 'go straight to inbox · waiting · tasks',
-    de: 'direkt zu Posteingang · Wartet · Aufgaben'
+    en: 'go straight to inbox · waiting · tasks · calendar',
+    de: 'direkt zu Posteingang · Wartet · Aufgaben · Kalender'
   },
   helpSettings: {
     en: 'settings — accounts · key · models',

@@ -10,6 +10,7 @@ import { useVoiceTag } from '@renderer/features/paper/useVoiceTag'
 import { removeDraft } from '@renderer/features/paper/draft-autosave'
 import { useOrKeyStatus } from '@renderer/queries/intel'
 import { OwlGlyph, type OwlPose } from '@renderer/components/paper/OwlGlyph'
+import { RailAgenda } from '@renderer/features/calendar/RailAgenda'
 
 const RAIL_DRAFT_LIMIT = 5
 
@@ -262,6 +263,8 @@ export function OwlRail(): React.JSX.Element {
           </div>
         ))}
       </RailCard>
+
+      <RailAgenda />
 
       <RailCard>
         <div className="flex items-baseline">
