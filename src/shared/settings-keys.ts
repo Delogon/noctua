@@ -37,8 +37,17 @@ const WRITABLE_PATTERNS = [
   new RegExp(`^ai\\.style\\.learn\\.${ID}$`)
 ]
 
-/** Zusätzlich nur lesbar: vom Main berechnete Stilprofile. */
-const READONLY_EXACT = new Set(['ai.styleProfile', 'ai.styleMeta'])
+/** Zusätzlich nur lesbar: vom Main berechnete Stilprofile, Profil-Zuordnung, Local only. */
+const READONLY_EXACT = new Set([
+  'ai.styleProfile',
+  'ai.styleMeta',
+  // Profil-Zuordnung und Local only schreibt nur der Main über eigene Kanäle
+  // (ai:tasks:set, privacy:setLocalOnly) — der Renderer darf sie lesen.
+  'ai.triageProfile',
+  'ai.draftProfile',
+  'ai.sttProfile',
+  'privacy.localOnly'
+])
 const READONLY_PATTERNS = [
   new RegExp(`^ai\\.styleProfile\\.${ID}$`),
   new RegExp(`^ai\\.styleMeta\\.${ID}$`)

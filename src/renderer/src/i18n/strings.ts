@@ -640,6 +640,120 @@ const table = {
     de: 'Kein Schlüssel? Mail läuft trotzdem — die Eule schläft nur: keine Gists, keine Entwürfe, kein Zählen.'
   },
 
+  // ── KI-Anbieter (Profile), Aufgaben-Zuordnung, Local only ──
+  profilesHead: { en: 'AI PROVIDERS', de: 'KI-ANBIETER' },
+  profilesSub: {
+    en: 'OpenRouter or any OpenAI-compatible server — Ollama, LM Studio, vLLM, LiteLLM …',
+    de: 'OpenRouter oder jeder OpenAI-kompatible Server — Ollama, LM Studio, vLLM, LiteLLM …'
+  },
+  profileLocal: { en: 'LOCAL', de: 'LOKAL' },
+  profileExternal: { en: 'EXTERNAL', de: 'EXTERN' },
+  profileName: { en: 'NAME', de: 'NAME' },
+  profileUrl: { en: 'BASE URL', de: 'BASIS-URL' },
+  profileStyle: { en: 'API STYLE', de: 'API-STIL' },
+  profileStyleChat: { en: 'OpenAI Chat Completions', de: 'OpenAI Chat Completions' },
+  profileStyleResponses: { en: 'OpenAI Responses', de: 'OpenAI Responses' },
+  profileKey: { en: 'API KEY', de: 'API-SCHLÜSSEL' },
+  profileKeyPh: { en: 'optional', de: 'optional' },
+  profileKeySaved: { en: '✓ saved — type to replace', de: '✓ gespeichert — tippen zum Ersetzen' },
+  profileNoKey: { en: 'no key saved', de: 'kein Schlüssel gespeichert' },
+  profileKeyRemove: { en: 'remove key', de: 'Schlüssel entfernen' },
+  profileIsLocal: {
+    en: 'Runs locally or on-prem',
+    de: 'Läuft lokal bzw. im eigenen Netz'
+  },
+  profileIsLocalNote: {
+    en: 'Counts as local for “Local only”. Suggested from the address — you decide.',
+    de: 'Zählt bei „Nur lokal“ als lokal. Vorschlag aus der Adresse — du entscheidest.'
+  },
+  profileTest: { en: 'TEST CONNECTION', de: 'VERBINDUNG TESTEN' },
+  profileTestOk: {
+    en: '✓ connected — {n} models · {ms} ms',
+    de: '✓ verbunden — {n} Modelle · {ms} ms'
+  },
+  profileAdd: { en: '+ add provider', de: '+ Anbieter hinzufügen' },
+  profileEdit: { en: 'edit', de: 'bearbeiten' },
+  profileClose: { en: 'close', de: 'schließen' },
+  profileDelete: { en: 'delete provider', de: 'Anbieter löschen' },
+  profileBlockedLocalOnly: { en: 'blocked — Local only', de: 'gesperrt — Nur lokal' },
+  toastProfileSaved: { en: '✓ {name} saved', de: '✓ {name} gespeichert' },
+  taskProvider: { en: 'PROVIDER', de: 'ANBIETER' },
+  taskBlockedLocalOnly: {
+    en: 'External provider — paused while Local only is on. Pick a local one.',
+    de: 'Externer Anbieter — pausiert, solange „Nur lokal“ an ist. Wähle einen lokalen.'
+  },
+  taskBlockedNoKey: {
+    en: 'No key yet — this task is paused until you add one.',
+    de: 'Noch kein Schlüssel — diese Aufgabe pausiert, bis du einen hinterlegst.'
+  },
+  taskBlockedNoModel: {
+    en: 'No model chosen yet — pick one below.',
+    de: 'Noch kein Modell gewählt — wähle unten eins.'
+  },
+  taskBlockedNoProfile: {
+    en: 'This provider no longer exists — pick another.',
+    de: 'Dieser Anbieter existiert nicht mehr — wähle einen anderen.'
+  },
+  toastTaskProfile: { en: 'Now using {name}', de: 'Nutzt jetzt {name}' },
+  modelsFrom: { en: 'models from {name}', de: 'Modelle von {name}' },
+  modelListSkipped: {
+    en: 'Local only: the model list is not fetched automatically.',
+    de: 'Nur lokal: die Modellliste wird nicht automatisch geholt.'
+  },
+  modelListLoad: { en: 'LOAD MODEL LIST', de: 'MODELLLISTE LADEN' },
+  modelPick: { en: 'choose a model…', de: 'Modell wählen…' },
+  modelFreeText: { en: 'or type a model id…', de: 'oder Modell-ID eintippen…' },
+  localOnlyHead: { en: 'LOCAL ONLY', de: 'NUR LOKAL' },
+  localOnlyLabel: {
+    en: 'KEEP AI AND LOOKUPS ON THIS DEVICE',
+    de: 'KI UND ABRUFE NUR AUF DIESEM GERÄT'
+  },
+  localOnlyNote: {
+    en: 'AI uses only providers marked local. Nothing is fetched automatically from the internet: no update check, no model catalog, no search-model download, no remote images. Your mail servers and sign-in are not affected.',
+    de: 'Die KI nutzt nur als lokal markierte Anbieter. Es wird nichts automatisch aus dem Internet geholt: kein Update-Check, kein Modellkatalog, kein Suchmodell-Download, keine Remote-Bilder. Mailserver und Anmeldung sind nicht betroffen.'
+  },
+  localOnlyBadge: { en: 'LOCAL ONLY', de: 'NUR LOKAL' },
+  localOnlyBadgeTip: {
+    en: 'Local only is on — click for settings',
+    de: '„Nur lokal“ ist an — Klick öffnet die Einstellungen'
+  },
+  toastLocalOnlyOn: {
+    en: 'Local only is on — AI and lookups stay on this device',
+    de: 'Nur lokal ist an — KI und Abrufe bleiben auf diesem Gerät'
+  },
+  toastLocalOnlyOff: { en: 'Local only is off', de: 'Nur lokal ist aus' },
+  onDemandHead: { en: 'ON DEMAND', de: 'AUF ANFORDERUNG' },
+  onDemandNote: {
+    en: 'These run by themselves in the background. With Local only they wait for your click.',
+    de: 'Das läuft von selbst im Hintergrund. Mit „Nur lokal“ wartet es auf deinen Klick.'
+  },
+  onDemandNoteLocal: {
+    en: 'Local only is on — nothing below runs by itself. Use the buttons when you want it.',
+    de: '„Nur lokal“ ist an — nichts davon läuft von selbst. Nutze die Knöpfe, wenn du es willst.'
+  },
+  updatesHead: { en: 'UPDATES', de: 'UPDATES' },
+  updateCheckBtn: { en: 'CHECK FOR UPDATES', de: 'AUF UPDATES PRÜFEN' },
+  updateUpToDate: { en: 'You are up to date.', de: 'Du bist auf dem neuesten Stand.' },
+  embedHead: { en: 'SEARCH MODEL', de: 'SUCHMODELL' },
+  embedReady: {
+    en: 'ready — semantic search on ({n}/{total} mails indexed)',
+    de: 'bereit — semantische Suche an ({n}/{total} Mails indexiert)'
+  },
+  embedMissing: {
+    en: 'not downloaded yet — it loads by itself, or start it now',
+    de: 'noch nicht geladen — lädt von selbst, oder jetzt starten'
+  },
+  embedMissingLocal: {
+    en: 'not downloaded — search uses full text only',
+    de: 'nicht geladen — die Suche nutzt nur Volltext'
+  },
+  embedDownload: { en: 'DOWNLOAD SEARCH MODEL (~120 MB)', de: 'SUCHMODELL LADEN (~120 MB)' },
+  embedDownloading: { en: 'DOWNLOADING…', de: 'LÄDT…' },
+  toastEmbedReady: {
+    en: '✓ Search model ready — indexing starts',
+    de: '✓ Suchmodell bereit — Indexierung startet'
+  },
+
   // ── Palette (nur Befehle — die Mailsuche wohnt bei der Eule) ──
   palPlaceholder: { en: 'Type a command…', de: 'Befehl eingeben…' },
   palAria: { en: 'Command palette', de: 'Befehlspalette' },

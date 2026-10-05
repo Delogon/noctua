@@ -31,13 +31,60 @@ export function useAppleFm(): UseQueryResult<InvokeOutput<'ai:appleFm'>> {
   })
 }
 
-/** Live-Modellliste von OpenRouter (main-seitig gecacht). */
-export function useModelCatalog(): UseQueryResult<InvokeOutput<'ai:models'>['models']> {
+export type AiProfile = InvokeOutput<'ai:profiles:list'>['profiles'][number]
+export type TaskAssignments = InvokeOutput<'ai:tasks:get'>
+export type AiTaskName = keyof TaskAssignments
+export type ProfileModels = InvokeOutput<'ai:profileModels'>
+
+/** Alle Provider-Profile (eingebautes OpenRouter zuerst). */
+export function useProfiles(): UseQueryResult<AiProfile[]> {
   return useQuery({
-    queryKey: ['ai', 'models'],
-    queryFn: () => invoke('ai:models', undefined),
-    select: (d) => d.models,
+    queryKey: ['ai', 'profiles'],
+    queryFn: () => invoke('ai:profiles:list', undefined),
+    select: (d) => d.profiles,
+    staleTime: 10_000
+  })
+}
+
+/** Zuordnung Aufgabe → Profil + Modell (inkl. Blockiergrund). */
+export function useTaskAssignments(): UseQueryResult<TaskAssignments> {
+  return useQuery({
+    queryKey: ['ai', 'tasks'],
+    queryFn: () => invoke('ai:tasks:get', undefined),
+    staleTime: 10_000
+  })
+}
+
+/** „Local only": globaler Schalter (Masthead-Anzeige + Einstellungen). */
+export function useLocalOnly(): UseQueryResult<boolean> {
+  return useQuery({
+    queryKey: ['privacy', 'localOnly'],
+    queryFn: () => invoke('privacy:getLocalOnly', undefined),
+    select: (d) => d.localOnly,
+    staleTime: 30_000
+  })
+}
+
+/**
+ * Modellliste eines Profils (OpenRouter: Live-Katalog, sonst GET /models).
+ * Bei Local only liefert Main für externe Profile `skipped` — die Oberfläche
+ * bietet dann einen ausdrücklichen „Liste laden"-Knopf (manual) an.
+ */
+export function useProfileModels(profileId: string | null): UseQueryResult<ProfileModels> {
+  return useQuery({
+    queryKey: ['ai', 'profileModels', profileId],
+    queryFn: () => invoke('ai:profileModels', { profileId: profileId!, manual: false }),
+    enabled: profileId !== null,
     staleTime: 60 * 60 * 1000,
     retry: 1
+  })
+}
+
+/** Status des lokalen Suchmodells (Embeddings). */
+export function useEmbeddingStatus(): UseQueryResult<InvokeOutput<'embeddings:status'>> {
+  return useQuery({
+    queryKey: ['ai', 'embeddings'],
+    queryFn: () => invoke('embeddings:status', undefined),
+    staleTime: 5_000
   })
 }

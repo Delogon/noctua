@@ -220,13 +220,18 @@ describe('ipc-contract', () => {
     ).toBe(1_752_576_600_000)
   })
 
-  it('ai:testModel verlangt eine OpenRouter-ID in anbieter/modell-Form (M86)', () => {
+  it('ai:testModel verlangt Profil und Modell-ID (beliebiges Format, z. B. llama3.2:latest)', () => {
     const spec = invokeContract['ai:testModel']
-    expect(spec.input.parse({ model: ' moonshotai/kimi-k2 ' })).toEqual({
+    expect(spec.input.parse({ profileId: 'openrouter', model: ' moonshotai/kimi-k2 ' })).toEqual({
+      profileId: 'openrouter',
       model: 'moonshotai/kimi-k2'
     })
-    expect(() => spec.input.parse({ model: 'ohne-slash' })).toThrow()
-    expect(() => spec.input.parse({ model: 'a/b c' })).toThrow()
+    expect(spec.input.parse({ profileId: 'p_ab12', model: 'llama3.2:latest' }).model).toBe(
+      'llama3.2:latest'
+    )
+    expect(() => spec.input.parse({ model: 'moonshotai/kimi-k2' })).toThrow()
+    expect(() => spec.input.parse({ profileId: 'Ungültig!', model: 'x' })).toThrow()
+    expect(() => spec.input.parse({ profileId: 'openrouter', model: '' })).toThrow()
     expect(spec.output.parse({ ok: true, latencyMs: 812, costUsd: 0.0004, detail: null }).ok).toBe(
       true
     )

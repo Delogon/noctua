@@ -2,7 +2,20 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import { useAccounts } from '@renderer/queries/accounts'
-import { useAppleFm, useModelCatalog, useModels, useOrKeyStatus } from '@renderer/queries/intel'
+import {
+  useOrKeyStatus,
+  useProfileModels,
+  useProfiles,
+  useTaskAssignments,
+  type AiTaskName
+} from '@renderer/queries/intel'
+import {
+  LocalOnlyCard,
+  OnDemandCard,
+  ProfileModelPicker,
+  ProvidersCard,
+  TaskProviderPicker
+} from '@renderer/features/settings/AiProvidersSection'
 import { usePaper } from '@renderer/stores/paper'
 import { rowTime, useI18n, useT } from '@renderer/lib/i18n'
 import { useStyleMeta, useStyleProfile } from '@renderer/features/paper/useVoiceTag'
@@ -1218,7 +1231,7 @@ function CustomModelRow({ onPick }: { onPick: (id: string) => void }): React.JSX
     if (!valid || testing) return
     setTesting(true)
     setResult(null)
-    void invoke('ai:testModel', { model: id.trim() })
+    void invoke('ai:testModel', { profileId: 'openrouter', model: id.trim() })
       .then(setResult)
       .catch((err) =>
         setResult({
@@ -1333,14 +1346,17 @@ function ModelList({
   current: string
   onPick: (id: string) => void
 }): React.JSX.Element {
-  const catalog = useModelCatalog()
+  const t = useT()
+  const queryClient = useQueryClient()
+  const catalog = useProfileModels('openrouter')
+  const catalogModels = catalog.data?.models
   const rows = useMemo(() => {
     // Nischen-Varianten raus (Bild/Video/Realtime, Spezial-SKUs)
     const NICHE = /(image|video|realtime|tts|transcribe|search|-fast|computer-use)/
     const models =
       kind === 'stt'
-        ? (catalog.data ?? []).filter((m) => m.audioIn && !/(image|video|realtime)/.test(m.id))
-        : (catalog.data ?? []).filter(
+        ? (catalogModels ?? []).filter((m) => m.audioIn && !/(image|video|realtime)/.test(m.id))
+        : (catalogModels ?? []).filter(
             (m) =>
               !m.audioIn &&
               !/audio/.test(m.id) &&
@@ -1390,7 +1406,7 @@ function ModelList({
       ].slice(0, 5)
     }
     return pick
-  }, [catalog.data, kind, current])
+  }, [catalogModels, kind, current])
 
   return (
     <div className="flex flex-col gap-1.5" style={{ marginTop: 10 }}>
@@ -1443,6 +1459,26 @@ function ModelList({
       {catalog.isLoading && (
         <span style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}>…</span>
       )}
+      {/* Local only: der Katalog kommt nie automatisch — nur auf Klick */}
+      {catalog.data?.skipped && (
+        <div className="flex items-center gap-2">
+          <span style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}>
+            {t('modelListSkipped')}
+          </span>
+          <button
+            type="button"
+            className="text-btn"
+            style={{ borderBottom: '1px solid var(--hairline)' }}
+            onClick={() =>
+              void invoke('ai:profileModels', { profileId: 'openrouter', manual: true }).then(
+                (data) => queryClient.setQueryData(['ai', 'profileModels', 'openrouter'], data)
+              )
+            }
+          >
+            {t('modelListLoad')}
+          </button>
+        </div>
+      )}
       {kind !== 'stt' && <CustomModelRow onPick={onPick} />}
     </div>
   )
@@ -1490,7 +1526,6 @@ export function IntelSheet(): React.JSX.Element {
   const queryClient = useQueryClient()
   const { toastNow } = usePaper()
   const orStatus = useOrKeyStatus()
-  const models = useModels()
   const accounts = useAccounts()
   const [key, setKey] = useState('')
 
@@ -1524,10 +1559,16 @@ export function IntelSheet(): React.JSX.Element {
     })
   }
 
-  const KEYS = { scan: 'ai.triageModel', write: 'ai.draftModel', stt: 'ai.sttModel' } as const
+  const profiles = useProfiles()
+  const assignments = useTaskAssignments()
+
+  // Modell einer Aufgabe wählen: Profil bleibt, nur das Modell wechselt
+  const TASK_OF = { scan: 'triage', write: 'draft', stt: 'stt' } as const
   const pick = (kind: 'scan' | 'write' | 'stt') => (id: string) => {
-    void invoke('settings:set', { key: KEYS[kind], value: id }).then(() => {
-      const model = id.split('/')[1]
+    const task = TASK_OF[kind]
+    const profileId = assignments.data?.[task].profileId ?? 'openrouter'
+    void invoke('ai:tasks:set', { task, profileId, model: id }).then(() => {
+      const model = id.split('/')[1] ?? id
       toastNow(
         kind === 'scan'
           ? t('toastScanModel', { model })
@@ -1538,41 +1579,28 @@ export function IntelSheet(): React.JSX.Element {
       void queryClient.invalidateQueries({ queryKey: ['ai'] })
     })
   }
-  const [sttModel, setSttModel] = useState('openai/gpt-audio-mini')
-  useEffect(() => {
-    void invoke('settings:get', { key: 'ai.sttModel' }).then((r) => {
-      if (r.value) setSttModel(r.value)
-    })
-  }, [])
 
-  // Triage-Rechner: OpenRouter (Cloud) oder Apple Intelligence (On-Device).
-  const appleFm = useAppleFm()
-  const [scanProvider, setScanProvider] = useState<'openrouter' | 'apple'>('openrouter')
-  useEffect(() => {
-    void invoke('settings:get', { key: 'ai.triageProvider' }).then((r) => {
-      if (r.value === 'apple') setScanProvider('apple')
-    })
-  }, [])
-  const pickProvider = (provider: 'openrouter' | 'apple'): void => {
-    setScanProvider(provider)
-    void invoke('settings:set', { key: 'ai.triageProvider', value: provider }).then(() => {
-      toastNow(
-        provider === 'apple'
-          ? t('toastScanApple')
-          : t('toastScanModel', { model: (models.data?.scanModel ?? '').split('/')[1] ?? '' })
+  /** Modellwahl je nach Profil: OpenRouter kuratiert, eigene Profile aus /models. */
+  const renderModels = (kind: 'scan' | 'write' | 'stt'): React.JSX.Element | null => {
+    const task: AiTaskName = TASK_OF[kind]
+    const a = assignments.data?.[task]
+    if (!a) return null
+    if (a.profileId === 'apple') {
+      return (
+        <div className="mmeta" style={{ marginTop: 8 }}>
+          {t('fmCloudDimmed')}
+        </div>
       )
-      void queryClient.invalidateQueries({ queryKey: ['ai'] })
-    })
+    }
+    const profile = profiles.data?.find((p) => p.id === a.profileId)
+    if (!profile) return null
+    if (profile.preset === 'openrouter') {
+      return <ModelList kind={kind} current={a.model} onPick={pick(kind)} />
+    }
+    return (
+      <ProfileModelPicker task={task} profile={profile} current={a.model} onPick={pick(kind)} />
+    )
   }
-  const fmStateLabel = {
-    available: t('fmStateAvailable'),
-    'apple-intelligence-off': t('fmStateOff'),
-    'model-not-ready': t('fmStateNotReady'),
-    'device-unsupported': t('fmStateUnsupported'),
-    'helper-missing': t('fmStateHelperMissing'),
-    error: t('fmStateError')
-  }[appleFm.data?.state ?? 'error']
-  const fmAvailable = appleFm.data?.state === 'available'
 
   return (
     <SheetShell title={t('intelligence')} sub={t('intelSub')}>
@@ -1624,6 +1652,14 @@ export function IntelSheet(): React.JSX.Element {
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <LocalOnlyCard />
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <ProvidersCard />
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
         <div className="flex flex-wrap items-baseline gap-2">
           <span className="mlabel" style={{ color: 'var(--ac)' }}>
             {t('modelScan')}
@@ -1632,58 +1668,8 @@ export function IntelSheet(): React.JSX.Element {
             {t('modelScanSub')}
           </span>
         </div>
-
-        {/* On-Device-Option: erscheint nur, wo der Helper überhaupt existiert */}
-        {appleFm.data && appleFm.data.state !== 'device-unsupported' && (
-          <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
-            <label
-              className="flex items-start gap-2 cursor-pointer"
-              style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}
-            >
-              <input
-                type="radio"
-                name="scan-provider"
-                checked={scanProvider === 'apple'}
-                disabled={!fmAvailable}
-                onChange={() => pickProvider('apple')}
-                style={{ marginTop: 2 }}
-              />
-              <span style={{ display: 'grid', gap: 2 }}>
-                <strong style={{ font: '500 10px var(--mono)' }}>{t('fmProviderApple')}</strong>
-                <span style={{ color: 'var(--faint)', font: '400 9px var(--mono)' }}>
-                  {t('fmProviderAppleSub')} ·{' '}
-                  <span style={{ color: fmAvailable ? 'var(--ink)' : 'var(--ac)' }}>
-                    {fmStateLabel}
-                  </span>
-                </span>
-              </span>
-            </label>
-            <label
-              className="flex items-start gap-2 cursor-pointer"
-              style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}
-            >
-              <input
-                type="radio"
-                name="scan-provider"
-                checked={scanProvider === 'openrouter'}
-                onChange={() => pickProvider('openrouter')}
-                style={{ marginTop: 2 }}
-              />
-              <strong style={{ font: '500 10px var(--mono)' }}>{t('fmProviderCloud')}</strong>
-            </label>
-          </div>
-        )}
-
-        <div
-          style={scanProvider === 'apple' ? { opacity: 0.45, pointerEvents: 'none' } : undefined}
-        >
-          {scanProvider === 'apple' && (
-            <div className="mmeta" style={{ marginTop: 8 }}>
-              {t('fmCloudDimmed')}
-            </div>
-          )}
-          <ModelList kind="scan" current={models.data?.scanModel ?? ''} onPick={pick('scan')} />
-        </div>
+        <TaskProviderPicker task="triage" />
+        {renderModels('scan')}
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
@@ -1695,7 +1681,8 @@ export function IntelSheet(): React.JSX.Element {
             {t('modelWriteSub')}
           </span>
         </div>
-        <ModelList kind="write" current={models.data?.writeModel ?? ''} onPick={pick('write')} />
+        <TaskProviderPicker task="draft" />
+        {renderModels('write')}
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
@@ -1707,14 +1694,12 @@ export function IntelSheet(): React.JSX.Element {
             {t('modelSttSub')}
           </span>
         </div>
-        <ModelList
-          kind="stt"
-          current={sttModel}
-          onPick={(id) => {
-            setSttModel(id)
-            pick('stt')(id)
-          }}
-        />
+        <TaskProviderPicker task="stt" />
+        {renderModels('stt')}
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <OnDemandCard />
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>

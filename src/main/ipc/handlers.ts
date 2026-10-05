@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { ImapFlow } from 'imapflow'
-import type { IpcHandlers } from '@shared/ipc-contract'
+import type { InvokeOutput, IpcHandlers } from '@shared/ipc-contract'
 import type { AccountSummary } from '@shared/types'
 import { ACCOUNT_COLORS, PASTEL_COLORS } from '@shared/types'
 import { getDb, getSetting, setSetting } from '../db'
@@ -32,8 +32,26 @@ import { cancelMsLogin, msInteractiveLogin } from '../auth/msal'
 import { cancelGoogleLogin, googleInteractiveLogin } from '../auth/google'
 import { startChat } from '../ai/chat'
 import { refreshStyleProfile } from '../ai/style'
-import { listModels } from '../ai/models'
-import { runModelTest } from '../ai/model-test'
+import { runModelTest, testProfileConnection } from '../ai/model-test'
+import {
+  clearProfileKey,
+  createProfile,
+  deleteProfile,
+  getClient,
+  getProfile,
+  getTaskModel,
+  getTaskProfileId,
+  listProfiles,
+  setProfileKey,
+  setTaskAssignment,
+  taskBlockReason,
+  updateProfile
+} from '../ai/providers/registry'
+import type { AiTask } from '../ai/providers/types'
+import { embeddingIndexer, isEmbeddingModelCached } from '../ai/embeddings'
+import { aiQueue } from '../ai/queue'
+import { checkForUpdates } from '../updates'
+import { isLocalOnly, setLocalOnly } from '../privacy'
 import { transcribeAudio } from '../ai/transcribe'
 import { followupRadar } from '../ai/followups'
 import { openExternalSafe } from '../util/links'
@@ -407,11 +425,82 @@ export const handlers: IpcHandlers = {
     return { ok: true }
   },
 
-  'ai:models': async () => ({ models: await listModels() }),
+  'ai:profileModels': async ({ profileId, manual }) => {
+    const profile = getProfile(profileId)
+    if (!profile) throw new Error('Profil nicht gefunden')
+    // Local only: externe Kataloge nie automatisch holen
+    if (isLocalOnly() && !profile.isLocal && !manual) return { models: [], skipped: true }
+    return { models: await getClient(profile).listModels(), skipped: false }
+  },
+
+  'ai:profiles:list': () => ({ profiles: listProfiles() }),
+  'ai:profiles:create': (input) => ({ profile: createProfile(input) }),
+  'ai:profiles:update': ({ id, ...patch }) => ({ profile: updateProfile(id, patch) }),
+  'ai:profiles:delete': ({ id }) => {
+    deleteProfile(id)
+    return { ok: true }
+  },
+  'ai:profiles:setKey': ({ id, key }) => {
+    setProfileKey(id, key)
+    return { ok: true }
+  },
+  'ai:profiles:clearKey': ({ id }) => {
+    clearProfileKey(id)
+    return { ok: true }
+  },
+  'ai:profiles:test': ({ id }) => testProfileConnection(id),
+
+  'ai:tasks:get': () => {
+    const assignment = (task: AiTask): InvokeOutput<'ai:tasks:get'>['triage'] => {
+      const profileId = getTaskProfileId(task)
+      const profile = getProfile(profileId)
+      return {
+        profileId,
+        model: profile ? (getTaskModel(task, profile) ?? '') : '',
+        // Apple On-Device (Pseudo-Profil) zählt als lokal und ist nie blockiert
+        blocked: profileId === 'apple' ? null : taskBlockReason(task)
+      }
+    }
+    return { triage: assignment('triage'), draft: assignment('draft'), stt: assignment('stt') }
+  },
+  'ai:tasks:set': ({ task, profileId, model }) => {
+    setTaskAssignment(task, profileId, model)
+    // Neue Zuordnung kann pausierte Triage wieder freigeben
+    aiQueue.kick()
+    return { ok: true }
+  },
+
+  'privacy:getLocalOnly': () => ({ localOnly: isLocalOnly() }),
+  'privacy:setLocalOnly': ({ localOnly }) => {
+    setLocalOnly(localOnly)
+    if (!localOnly) {
+      // Pausiertes wieder anstoßen: Triage und Embedding-Indexierung
+      aiQueue.kick()
+      embeddingIndexer.kick()
+    }
+    return { localOnly: isLocalOnly() }
+  },
+
+  'updates:checkNow': () => checkForUpdates({ manual: true }),
+
+  'embeddings:status': () => {
+    const status = embeddingIndexer.getStatus()
+    return {
+      state: status.model.state,
+      cached: isEmbeddingModelCached(),
+      error: status.model.error,
+      eligible: status.eligible,
+      indexed: status.indexed
+    }
+  },
+  'embeddings:downloadModel': async () => {
+    await embeddingIndexer.downloadModel()
+    return { ok: true }
+  },
 
   'ai:appleFm': async (input) => appleFmStatus(input?.force ?? false),
 
-  'ai:testModel': ({ model }) => runModelTest(model),
+  'ai:testModel': ({ profileId, model }) => runModelTest(profileId, model),
 
   'ai:stylePreview': async ({ accountId }) => ({ text: await stylePreview(getDb(), accountId) }),
 
@@ -420,7 +509,8 @@ export const handlers: IpcHandlers = {
   }),
 
   'ai:usage': () => ({
-    hasApiKey: hasSecret('openrouter.apiKey'),
+    // „Kann die AI arbeiten?" — Entwürfe/Chat sind für den Nutzer das Maß der Dinge
+    hasApiKey: taskBlockReason('draft') === null,
     triageModel: getTriageModel(),
     draftModel: getDraftModel()
   }),

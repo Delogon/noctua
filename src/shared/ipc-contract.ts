@@ -45,6 +45,45 @@ const writableSettingKey = z
   .refine(isRendererSettingWritable, 'Schlüssel nicht erlaubt')
 const secretKey = z.string().max(200).refine(isRendererSecretKey, 'Schlüssel nicht erlaubt')
 
+// --- AI-Provider-Profile (Phase 1.1) -----------------------------------------
+const profileIdSchema = z.string().regex(/^[a-z0-9_-]{1,40}$/)
+
+export const aiProfileSchema = z.object({
+  id: profileIdSchema,
+  name: z.string().max(60),
+  baseUrl: z.string().max(500),
+  apiStyle: z.enum(['chat', 'responses']),
+  isLocal: z.boolean(),
+  preset: z.enum(['openrouter', 'custom']),
+  hasKey: z.boolean()
+})
+
+const profileFieldsSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  baseUrl: z.string().trim().min(1).max(500),
+  apiStyle: z.enum(['chat', 'responses']),
+  isLocal: z.boolean()
+})
+
+export const aiTaskSchema = z.enum(['triage', 'draft', 'stt'])
+
+const modelInfoSchema = z.object({
+  id: z.string(),
+  promptPerM: z.number(),
+  completionPerM: z.number(),
+  context: z.number(),
+  audioIn: z.boolean().default(false)
+})
+
+const taskAssignmentSchema = z.object({
+  /** Profil-ID oder 'apple' (On-Device, nur Triage) */
+  profileId: z.string().max(40),
+  /** gewähltes Modell; leer = Default (nur OpenRouter) */
+  model: z.string().max(200),
+  /** Warum die Aufgabe gerade nicht läuft — null, wenn sie läuft */
+  blocked: z.enum(['local-only', 'no-key', 'no-profile', 'no-model']).nullable()
+})
+
 /** Sync-Zeitraum in Tagen: 0 = alles, null = Standard (90 Tage Liste / 183 Suche). */
 const syncDaysSchema = z.union([z.literal(0), z.number().int().min(7).max(3650)]).nullable()
 
@@ -181,13 +220,9 @@ export const invokeContract = {
   },
   'ai:testModel': {
     input: z.object({
-      /** OpenRouter-Modell-ID, z. B. moonshotai/kimi-k2 */
-      model: z
-        .string()
-        .trim()
-        .min(3)
-        .max(200)
-        .regex(/^[\w.:-]+\/[\w.:-]+$/)
+      profileId: profileIdSchema,
+      /** Modell-ID des Profils, z. B. moonshotai/kimi-k2 oder llama3.2:latest */
+      model: z.string().trim().min(1).max(200)
     }),
     output: z.object({
       ok: z.boolean(),
@@ -196,19 +231,96 @@ export const invokeContract = {
       detail: z.string().nullable()
     })
   },
-  'ai:models': {
+  // Modellliste eines Profils (OpenRouter: Live-Katalog, sonst GET /models).
+  // Bei Local only holt ein externes Profil sie nur auf ausdrückliche Anfrage
+  // (`manual`) — sonst `skipped: true` und keine Netzverbindung.
+  'ai:profileModels': {
+    input: z.object({ profileId: profileIdSchema, manual: z.boolean().default(false) }),
+    output: z.object({ models: z.array(modelInfoSchema), skipped: z.boolean() })
+  },
+  'ai:profiles:list': {
+    input: z.void(),
+    output: z.object({ profiles: z.array(aiProfileSchema) })
+  },
+  'ai:profiles:create': {
+    input: profileFieldsSchema,
+    output: z.object({ profile: aiProfileSchema })
+  },
+  'ai:profiles:update': {
+    input: profileFieldsSchema.partial().extend({ id: profileIdSchema }),
+    output: z.object({ profile: aiProfileSchema })
+  },
+  'ai:profiles:delete': {
+    input: z.object({ id: profileIdSchema }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Profil-Keys: write-only über einen eigenen Kanal (nicht über secrets:set)
+  'ai:profiles:setKey': {
+    input: z.object({ id: profileIdSchema, key: z.string().trim().min(1).max(500) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'ai:profiles:clearKey': {
+    input: z.object({ id: profileIdSchema }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'ai:profiles:test': {
+    input: z.object({ id: profileIdSchema }),
+    output: z.object({
+      ok: z.boolean(),
+      latencyMs: z.number(),
+      modelCount: z.number(),
+      detail: z.string().nullable()
+    })
+  },
+  'ai:tasks:get': {
     input: z.void(),
     output: z.object({
-      models: z.array(
-        z.object({
-          id: z.string(),
-          promptPerM: z.number(),
-          completionPerM: z.number(),
-          context: z.number(),
-          audioIn: z.boolean().default(false)
-        })
-      )
+      triage: taskAssignmentSchema,
+      draft: taskAssignmentSchema,
+      stt: taskAssignmentSchema
     })
+  },
+  'ai:tasks:set': {
+    input: z.object({
+      task: aiTaskSchema,
+      profileId: z.string().max(40),
+      model: z.string().trim().max(200)
+    }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Local only (privacy.localOnly): weicher Schalter, siehe src/main/privacy.ts
+  'privacy:getLocalOnly': {
+    input: z.void(),
+    output: z.object({ localOnly: z.boolean() })
+  },
+  'privacy:setLocalOnly': {
+    input: z.object({ localOnly: z.boolean() }),
+    output: z.object({ localOnly: z.boolean() })
+  },
+  // Update-Check auf Anforderung (bei Local only der einzige Weg)
+  'updates:checkNow': {
+    input: z.void(),
+    output: z.object({
+      updateAvailable: z.boolean(),
+      latest: z.string().nullable(),
+      url: z.string(),
+      note: z.string().nullable()
+    })
+  },
+  // Lokales Suchmodell (Embeddings): Status + ausdrücklicher Download
+  'embeddings:status': {
+    input: z.void(),
+    output: z.object({
+      state: z.enum(['not_loaded', 'loading', 'ready', 'error']),
+      cached: z.boolean(),
+      error: z.string().nullable(),
+      eligible: z.number(),
+      indexed: z.number()
+    })
+  },
+  'embeddings:downloadModel': {
+    input: z.void(),
+    output: z.object({ ok: z.literal(true) })
   },
   // Verfügbarkeit des On-Device-Modells (Apple Intelligence) für die Triage
   'ai:appleFm': {
