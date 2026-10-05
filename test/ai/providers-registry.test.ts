@@ -53,6 +53,7 @@ describe('Migration 026: OpenRouter-Profil', () => {
         apiStyle: 'chat',
         isLocal: false,
         preset: 'openrouter',
+        managed: false,
         hasKey: false
       }
     ])

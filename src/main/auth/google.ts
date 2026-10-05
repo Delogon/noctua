@@ -2,6 +2,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { createHash, randomBytes } from 'node:crypto'
 import { shell } from 'electron'
 import { getSetting } from '../db'
+import { getOrgConfig } from '../org-config'
+import type { OrgConfig } from '@shared/org-config'
 import { deleteSecret, getSecret, setSecret } from './secrets'
 import { isGoogleReauthCode, ReauthRequiredError } from './reauth'
 
@@ -29,12 +31,49 @@ export const GOOGLE_MAIL_SCOPE = 'https://mail.google.com/ openid email'
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000
 const EXPIRY_MARGIN_MS = 60_000
 
+/**
+ * Client-Auflösung: explizite Main-Settings > Org-Konfiguration > Thunderbird-
+ * Default. Ein Org-Client bekommt NIE das Thunderbird-Secret: ohne eigenes
+ * clientSecret bleibt es leer (öffentlicher Client, wird nicht mitgeschickt).
+ */
+export function resolveGoogleClient(
+  settings: { clientId: string | null; clientSecret: string | null },
+  org: OrgConfig | null
+): { clientId: string; clientSecret: string } {
+  const orgGoogle = org?.oauth?.google
+  const settingId = settings.clientId?.trim()
+  const settingSecret = settings.clientSecret?.trim()
+  if (settingId) {
+    return {
+      clientId: settingId,
+      clientSecret: settingSecret || orgGoogle?.clientSecret || THUNDERBIRD_GOOGLE_CLIENT_SECRET
+    }
+  }
+  if (orgGoogle) {
+    return {
+      clientId: orgGoogle.clientId,
+      clientSecret: settingSecret || orgGoogle.clientSecret || ''
+    }
+  }
+  return {
+    clientId: THUNDERBIRD_GOOGLE_CLIENT_ID,
+    clientSecret: settingSecret || THUNDERBIRD_GOOGLE_CLIENT_SECRET
+  }
+}
+
+function googleClient(): { clientId: string; clientSecret: string } {
+  return resolveGoogleClient(
+    { clientId: getSetting('google.clientId'), clientSecret: getSetting('google.clientSecret') },
+    getOrgConfig()
+  )
+}
+
 function clientId(): string {
-  return getSetting('google.clientId')?.trim() || THUNDERBIRD_GOOGLE_CLIENT_ID
+  return googleClient().clientId
 }
 
 function clientSecret(): string {
-  return getSetting('google.clientSecret')?.trim() || THUNDERBIRD_GOOGLE_CLIENT_SECRET
+  return googleClient().clientSecret
 }
 
 function refreshSecretKey(email: string): string {
@@ -107,7 +146,9 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
   const response = await fetch(TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(params).toString()
+    body: new URLSearchParams(
+      Object.entries(params).filter(([key, value]) => key !== 'client_secret' || value !== '')
+    ).toString()
   })
   const body = (await response.json().catch(() => null)) as TokenResponse | null
   // Google meldet Fehler (z. B. invalid_grant) als HTTP 400 mit JSON-Body —

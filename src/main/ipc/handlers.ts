@@ -51,6 +51,9 @@ import type { AiTask } from '../ai/providers/types'
 import { embeddingIndexer, isEmbeddingModelCached } from '../ai/embeddings'
 import { aiQueue } from '../ai/queue'
 import { checkForUpdates } from '../updates'
+import { buildNetworkConnections } from '../network-connections'
+import { getOrgConfig, productName, resolveUpdateFeed } from '../org-config'
+import { defaultAiEnabledForNewAccounts } from '../org-defaults'
 import { isLocalOnly, setLocalOnly } from '../privacy'
 import { transcribeAudio } from '../ai/transcribe'
 import { followupRadar } from '../ai/followups'
@@ -211,7 +214,7 @@ export const handlers: IpcHandlers = {
       .prepare(
         `INSERT INTO accounts (email, account_name, display_name, provider, credential_type,
           imap_host, imap_port, smtp_host, smtp_port, ai_enabled, color, created_at, sync_days)
-         VALUES (?, ?, ?, ?, 'password', ?, ?, ?, ?, 1, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, 'password', ?, ?, ?, ?, ${defaultAiEnabledForNewAccounts()}, ?, ?, ?)`
       )
       .run(
         input.email.toLowerCase(),
@@ -252,7 +255,7 @@ export const handlers: IpcHandlers = {
       .prepare(
         `INSERT INTO accounts (email, account_name, display_name, provider, credential_type,
           imap_host, imap_port, smtp_host, smtp_port, ai_enabled, color, created_at, sync_days)
-         VALUES (?, ?, NULL, 'microsoft', 'oauth-ms', ?, ?, ?, ?, 1, ?, ?, ?)`
+         VALUES (?, ?, NULL, 'microsoft', 'oauth-ms', ?, ?, ?, ?, ${defaultAiEnabledForNewAccounts()}, ?, ?, ?)`
       )
       .run(
         email,
@@ -299,7 +302,7 @@ export const handlers: IpcHandlers = {
       .prepare(
         `INSERT INTO accounts (email, account_name, display_name, provider, credential_type,
           imap_host, imap_port, smtp_host, smtp_port, ai_enabled, color, created_at, sync_days)
-         VALUES (?, ?, NULL, 'gmail', 'oauth-google', ?, ?, ?, ?, 1, ?, ?, ?)`
+         VALUES (?, ?, NULL, 'gmail', 'oauth-google', ?, ?, ?, ?, ${defaultAiEnabledForNewAccounts()}, ?, ?, ?)`
       )
       .run(
         email,
@@ -534,6 +537,49 @@ export const handlers: IpcHandlers = {
       embeddingIndexer.kick()
     }
     return { localOnly: isLocalOnly() }
+  },
+
+  'privacy:networkConnections': () => {
+    const accounts = (
+      getDb()
+        .prepare('SELECT email, credential_type, imap_host, smtp_host FROM accounts ORDER BY id')
+        .all() as Array<{
+        email: string
+        credential_type: string
+        imap_host: string
+        smtp_host: string
+      }>
+    ).map((a) => ({
+      email: a.email,
+      credentialType: a.credential_type,
+      imapHost: a.imap_host,
+      smtpHost: a.smtp_host
+    }))
+    const localOnly = isLocalOnly()
+    return {
+      localOnly,
+      connections: buildNetworkConnections({
+        accounts,
+        profiles: listProfiles(),
+        taskProfiles: {
+          triage: getTaskProfileId('triage'),
+          draft: getTaskProfileId('draft'),
+          stt: getTaskProfileId('stt')
+        },
+        localOnly,
+        feed: resolveUpdateFeed(),
+        embeddingsCached: isEmbeddingModelCached()
+      })
+    }
+  },
+
+  'org:info': () => {
+    const org = getOrgConfig()
+    return {
+      productName: productName(),
+      hideOpenRouterOnboarding: org?.hideOpenRouterOnboarding === true,
+      edition: org ? ('organisation' as const) : ('upstream' as const)
+    }
   },
 
   'updates:checkNow': () => checkForUpdates({ manual: true }),
