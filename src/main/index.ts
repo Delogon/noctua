@@ -191,7 +191,7 @@ if (!isDev) {
 
 app
   .whenReady()
-  .then(() => {
+  .then(async () => {
     electronApp.setAppUserModelId(appId())
 
     const db = openDb()
@@ -200,6 +200,9 @@ app
     cleanupForwardTasksWithoutRequest(db)
     reindexHtmlOnlyMessages(db)
     if (isDev) seedFromEnv(db)
+    // Dev-only Demo-Daten (NOCTUA_DEMO_SEED=1): kein IMAP-/CalDAV-Sync für Demo-Konten
+    const demo = isDev && process.env.NOCTUA_DEMO_SEED === '1'
+    if (demo) await (await import('./dev/demo-seed')).seedDemoData(db)
     installSessionSecurity()
     registerIpcHandlers(handlers, () => mainWindow, trustedPages)
 
@@ -215,10 +218,10 @@ app
         updateBadge()
       }
     })
-    syncEngine.startAll()
+    if (!demo) syncEngine.startAll()
 
     aiQueue.init(db, push)
-    aiQueue.start()
+    if (!demo) aiQueue.start()
     setHandlerPush(push)
     installAppMenu(push, () => mainWindow)
     if (isDev && process.platform === 'darwin') {
@@ -230,12 +233,12 @@ app
     followupRadar.start()
 
     embeddingIndexer.init(db)
-    embeddingIndexer.start()
+    if (!demo) embeddingIndexer.start()
 
     outboxWorker.init(db, push)
     outboxWorker.start()
     initNotifications(db, push)
-    initCalendar(db, push, notifyCalendarReminder)
+    initCalendar(db, push, notifyCalendarReminder, { startSync: !demo })
     // iMIP (Einladungen/Antworten) läuft über die Outbox, ohne Undo-Fenster
     setItipMailer((accountId, mail) => {
       outboxWorker.enqueue(
@@ -251,13 +254,16 @@ app
       )
     })
     setRuleActionExecutor((ids, action) => syncEngine.applyAction(ids, action))
-    startUpdateChecks(push)
+    if (!demo) startUpdateChecks(push)
 
     if (isDev && process.env.NOCTUA_TEST_SELF_SEND === '1') {
       void import('./dev/self-test').then(({ runSelfSendTest }) => runSelfSendTest(db))
     }
     if (isDev && process.env.NOCTUA_TEST_DRAFT === '1') {
       void import('./dev/self-test').then(({ runDraftTest }) => runDraftTest(db))
+    }
+    if (isDev && process.env.NOCTUA_TEST_SHOTS === 'demo') {
+      void import('./dev/demo-tour').then(({ runDemoTour }) => runDemoTour(() => mainWindow, push))
     }
     if (isDev && process.env.NOCTUA_TEST_SHOTS === '1') {
       void import('./dev/screenshot-tour').then(({ runScreenshotTour }) =>

@@ -12,7 +12,12 @@ type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => vo
  * Verdrahtet Kalender-Sync, Domain-Service und Erinnerungen mit Push-Kanal und
  * Benachrichtigungen. Vom Main-Bootstrap nach openDb() aufgerufen.
  */
-export function initCalendar(db: Database.Database, push: PushFn, notify: NotifyFn): void {
+export function initCalendar(
+  db: Database.Database,
+  push: PushFn,
+  notify: NotifyFn,
+  opts: { startSync?: boolean } = {}
+): void {
   setCalendarChangedHandler((accountId, calendarIds) => {
     push('calendar:changed', { accountId, calendarIds })
     reminderScheduler.tick()
@@ -36,7 +41,8 @@ export function initCalendar(db: Database.Database, push: PushFn, notify: Notify
     onConflict: (info) => push('calendar:conflict', { ...info, kind: 'update', reason: 'conflict' })
   })
   ensureInstanceWindow(db)
-  calendarSync.startAll()
+  // startSync=false: nur der Dev-Demo-Modus (keine Server hinter den Demo-Konten)
+  if (opts.startSync !== false) calendarSync.startAll()
   reminderScheduler.init(db, notify)
   reminderScheduler.start()
 }
