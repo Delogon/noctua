@@ -33,6 +33,7 @@ import {
   type ComposerActivity
 } from '@renderer/features/composer/composer-state'
 import { MessageAttachments } from '@renderer/features/paper/MessageAttachments'
+import { InvitationCards } from '@renderer/features/paper/InvitationCard'
 import { OverrideMenu } from '@renderer/features/inbox/OverrideMenu'
 import { useUiStore } from '@renderer/stores/ui'
 import {
@@ -520,6 +521,7 @@ function MessageBox({
         )}
       </div>
       <div style={{ padding: '4px 14px 12px' }}>
+        <InvitationCards messageId={message.id} />
         {message.bodyHtml ? (
           <InlineMailFrame message={message} html={parts.visible} />
         ) : (
