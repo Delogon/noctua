@@ -189,6 +189,17 @@ describe('ipc-contract', () => {
     expect(spec.output.parse({ canceled: false })).toEqual({ canceled: false })
   })
 
+  it('validiert accounts:updatePassword / reauthorize (Längenlimit, keine Extras)', () => {
+    const pw = invokeContract['accounts:updatePassword']
+    expect(pw.input.parse({ accountId: 1, password: 'x' })).toEqual({ accountId: 1, password: 'x' })
+    expect(() => pw.input.parse({ accountId: 1, password: '' })).toThrow()
+    expect(() => pw.input.parse({ accountId: 1, password: 'x'.repeat(1001) })).toThrow()
+    expect(() => pw.input.parse({ password: 'x' })).toThrow()
+    const re = invokeContract['accounts:reauthorize']
+    expect(re.input.parse({ accountId: 2 })).toEqual({ accountId: 2 })
+    expect(() => re.input.parse({ accountId: 'a' })).toThrow()
+  })
+
   it('sync:trigger nimmt optional ein einzelnes Konto (RETRY, Design 3b)', () => {
     const spec = invokeContract['sync:trigger']
     // Bestandsaufrufer ohne Eingabe bleiben gültig

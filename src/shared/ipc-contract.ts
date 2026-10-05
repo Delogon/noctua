@@ -121,6 +121,17 @@ export const invokeContract = {
     }),
     output: z.object({ ok: z.literal(true), accountName: z.string().optional() })
   },
+  // Neues Passwort für ein Passwort-/Bridge-Konto (needs-reauth): Login wird
+  // geprüft, bevor das Vault-Geheimnis überschrieben und der Syncer neu gestartet wird.
+  'accounts:updatePassword': {
+    input: z.object({ accountId: z.number().int(), password: z.string().min(1).max(1000) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Erneute Browser-Anmeldung für Google-/Microsoft-Konten (gleiche Adresse Pflicht).
+  'accounts:reauthorize': {
+    input: z.object({ accountId: z.number().int() }),
+    output: z.object({ ok: z.literal(true), email: z.string() })
+  },
   'accounts:remove': {
     input: z.object({ accountId: z.number() }),
     output: z.object({ ok: z.literal(true) })

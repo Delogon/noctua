@@ -90,7 +90,7 @@ describe('google-auth', () => {
   it('verlangt ohne Refresh-Token einen Re-Login', async () => {
     db = createTestDb()
     await expect(googleAccessToken('unbekannt@gmail.com')).rejects.toThrow(
-      /nicht angemeldet.*neu verbinden/
+      /nicht angemeldet.*erneut anmelden/
     )
   })
 

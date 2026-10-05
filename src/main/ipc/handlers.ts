@@ -28,7 +28,7 @@ import { appleFmStatus } from '../ai/apple-fm'
 import { startDraftNew, startDraftNudge, startDraftReply, stylePreview } from '../ai/drafts'
 import { draftRule, ruleJsonSchema, ruleNeedsAi } from '../ai/rules'
 import { outboxWorker } from '../smtp/outbox'
-import { cancelMsLogin, msInteractiveLogin } from '../auth/msal'
+import { cancelMsLogin, msForgetAccount, msInteractiveLogin } from '../auth/msal'
 import { cancelGoogleLogin, googleInteractiveLogin } from '../auth/google'
 import { startChat } from '../ai/chat'
 import { refreshStyleProfile } from '../ai/style'
@@ -72,6 +72,19 @@ async function testImapLogin(
   await client.logout()
 }
 
+function getAccountRow(accountId: number): AccountRow {
+  const row = getDb().prepare('SELECT * FROM accounts WHERE id = ?').get(accountId) as
+    AccountRow | undefined
+  if (!row) throw new Error('Postfach nicht gefunden')
+  return row
+}
+
+/** Syncer mit neuen Zugangsdaten (neu) starten — auch wenn er gar nicht lief (z. B. Passwort fehlte). */
+async function restartSyncer(row: AccountRow, secretKey: string): Promise<void> {
+  await syncEngine.credentialsChanged(secretKey)
+  syncEngine.startAccount(row) // no-op, falls credentialsChanged ihn schon gestartet hat
+}
+
 function toSummary(row: AccountRow): AccountSummary {
   const { state, detail, errorSince } = syncEngine.getState(row.id)
   return {
@@ -80,6 +93,7 @@ function toSummary(row: AccountRow): AccountSummary {
     accountName: row.account_name,
     displayName: row.display_name,
     provider: row.provider,
+    credentialType: row.credential_type,
     color: row.color ?? ACCOUNT_COLORS[0],
     syncState: state,
     lastError: detail,
@@ -323,6 +337,47 @@ export const handlers: IpcHandlers = {
       }
     }
     return { ok: true, accountName: savedAccountName }
+  },
+
+  'accounts:updatePassword': async ({ accountId, password: rawPassword }) => {
+    const row = getAccountRow(accountId)
+    if (row.credential_type !== 'password' && row.credential_type !== 'bridge') {
+      throw new Error('Dieses Postfach meldet sich per Browser an — bitte „Erneut anmelden" nutzen')
+    }
+    // App-Passwörter kommen oft mit Leerzeichen formatiert (wie bei accounts:add)
+    const password = rawPassword.replace(/\s+/g, '')
+    // Erst prüfen, dann speichern: ein falsches Passwort überschreibt nichts
+    await testImapLogin(row.email, password, row.imap_host, row.imap_port)
+    const key = accountSecretKey(accountId)
+    setSecret(key, password)
+    await restartSyncer(row, key)
+    return { ok: true }
+  },
+
+  'accounts:reauthorize': async ({ accountId }) => {
+    const row = getAccountRow(accountId)
+    if (row.credential_type !== 'oauth-google' && row.credential_type !== 'oauth-ms') {
+      throw new Error('Dieses Postfach nutzt ein Passwort — bitte „Passwort neu eingeben" nutzen')
+    }
+    const google = row.credential_type === 'oauth-google'
+    const { email } = google ? await googleInteractiveLogin() : await msInteractiveLogin()
+    if (email.toLowerCase() !== row.email.toLowerCase()) {
+      // Falsches Konto im Browser gewählt: dessen Token nicht behalten, sofern
+      // es nicht ohnehin zu einem anderen verbundenen Postfach gehört.
+      const other = getDb()
+        .prepare('SELECT 1 FROM accounts WHERE lower(email) = lower(?)')
+        .get(email)
+      if (!other) {
+        if (google) deleteSecret(`google:refresh:${email.toLowerCase()}`)
+        else await msForgetAccount(email).catch(() => {})
+      }
+      throw new Error(
+        `Angemeldet als ${email}, erwartet war ${row.email} — bitte mit dem richtigen Konto anmelden`
+      )
+    }
+    // Token/Cache hat der Login bereits ersetzt; Syncer verlässt needs-reauth
+    await restartSyncer(row, accountSecretKey(accountId))
+    return { ok: true, email: row.email }
   },
 
   'accounts:remove': async ({ accountId }) => {
