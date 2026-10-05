@@ -227,8 +227,12 @@ export async function candidateUrlsForDomain(
     const srv = (await resolver.resolveSrv(`_caldavs._tcp.${lower}`))
       .slice()
       .sort((a, b) => a.priority - b.priority || b.weight - a.weight)[0]
-    if (srv?.name) {
-      const host = srv.name.replace(/\.$/, '')
+    const srvHost = srv?.name?.replace(/\.$/, '').toLowerCase()
+    // RFC 6764 §8: unsigniertes DNS darf Zugangsdaten nicht still auf einen
+    // fremden Host lenken — SRV-Ziele nur innerhalb der eigenen Domain nutzen,
+    // sonst muss der Nutzer die Server-Adresse selbst eingeben.
+    if (srvHost && (srvHost === lower || srvHost.endsWith(`.${lower}`))) {
+      const host = srvHost
       const port = srv.port && srv.port !== 443 ? `:${srv.port}` : ''
       let path = '/.well-known/caldav'
       try {

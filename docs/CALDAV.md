@@ -6,11 +6,11 @@ Accounts only offers account setup, connection test and calendar visibility.
 
 ## Libraries
 
-| Library | Why |
-|---|---|
-| `ical.js` ^2 (Mozilla) | ICS parse/serialize, RRULE iterator, VTIMEZONE support. Zero dependencies. |
-| own WebDAV client (`src/main/dav/`) | `tsdav` was not used: it pulls in several dependencies and a bundled fetch/XML stack, and we need tight control over redirects, size limits, DTD handling and credentials. The needed protocol surface (PROPFIND, REPORT, PUT, DELETE, OPTIONS, sync-collection) is small and is shared with CardDAV later. |
-| own XML parser (`src/main/dav/xml.ts`) | Namespace-aware subset parser, **no DTD/DOCTYPE/ENTITY processing** (XXE and entity-expansion impossible by construction), depth/node limits. No XML dependency. |
+| Library                                | Why                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ical.js` ^2 (Mozilla)                 | ICS parse/serialize, RRULE iterator, VTIMEZONE support. Zero dependencies.                                                                                                                                                                                                                                  |
+| own WebDAV client (`src/main/dav/`)    | `tsdav` was not used: it pulls in several dependencies and a bundled fetch/XML stack, and we need tight control over redirects, size limits, DTD handling and credentials. The needed protocol surface (PROPFIND, REPORT, PUT, DELETE, OPTIONS, sync-collection) is small and is shared with CardDAV later. |
+| own XML parser (`src/main/dav/xml.ts`) | Namespace-aware subset parser, **no DTD/DOCTYPE/ENTITY processing** (XXE and entity-expansion impossible by construction), depth/node limits. No XML dependency.                                                                                                                                            |
 
 Time zones are computed with `Intl` (full ICU in Node/Electron), not with ical.js
 timezone objects: IANA TZIDs work with or without an embedded VTIMEZONE. Unknown TZIDs fall
@@ -65,14 +65,14 @@ can be reused (`reuseMailPassword`); it is copied to the calendar account's own 
 
 ## Schema (migration 028)
 
-| Table | Purpose |
-|---|---|
-| `cal_accounts` | server/principal/home URLs, username, optional `mail_account_id`, `schedule_inbox_url`, `schedule_outbox_url`, `user_addresses`, `auto_schedule`, `dav_capabilities`, state, last_error, last_sync |
-| `calendars` | url (absolute, trailing slash), display_name, color (+`color_user_set`), components, read_only, supports_sync, ctag, sync_token, visible, sort_order |
-| `cal_objects` | href (normalised path), etag, uid, component, raw `ics`, summary, location, dtstart/dtend UTC, tzid, all_day, has_rrule, status, organizer, sequence, last_modified, `pending_op` |
-| `cal_instances` | materialised occurrences: recurrence_id, start/end UTC, all_day, start_day/end_day, is_override, summary/location/status. Indexes for range queries |
-| `cal_pending_ops` | create/update/delete queue: base_etag, attempts, `status pending/dead`, last_error, local `ics` of discarded edits |
-| `cal_reminders_fired` | fired alarms (object, recurrence, alarm key, fire time) |
+| Table                 | Purpose                                                                                                                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cal_accounts`        | server/principal/home URLs, username, optional `mail_account_id`, `schedule_inbox_url`, `schedule_outbox_url`, `user_addresses`, `auto_schedule`, `dav_capabilities`, state, last_error, last_sync |
+| `calendars`           | url (absolute, trailing slash), display_name, color (+`color_user_set`), components, read_only, supports_sync, ctag, sync_token, visible, sort_order                                               |
+| `cal_objects`         | href (normalised path), etag, uid, component, raw `ics`, summary, location, dtstart/dtend UTC, tzid, all_day, has_rrule, status, organizer, sequence, last_modified, `pending_op`                  |
+| `cal_instances`       | materialised occurrences: recurrence_id, start/end UTC, all_day, start_day/end_day, is_override, summary/location/status. Indexes for range queries                                                |
+| `cal_pending_ops`     | create/update/delete queue: base_etag, attempts, `status pending/dead`, last_error, local `ics` of discarded edits                                                                                 |
+| `cal_reminders_fired` | fired alarms (object, recurrence, alarm key, fire time)                                                                                                                                            |
 
 Instances: non-recurring objects are always materialised; recurring ones for a rolling window of
 −6 / +18 months (`calendar.window` setting, advanced about monthly by `ensureInstanceWindow`,
@@ -92,6 +92,7 @@ new password or the user's refresh). Missing vault password → `needs-reauth`. 
 wakes loops (not needs-reauth). Local edits (`kick`) and `calendar:refresh` run immediately.
 
 One run:
+
 1. **Push pending ops** (create/update/delete in order).
 2. **Calendar list** refresh; new calendars inserted, removed ones deleted (not when the server
    returns an empty list), user colour kept.

@@ -185,6 +185,18 @@ describe('discovery', () => {
     expect(urls).toContain('https://example.org/.well-known/caldav')
   })
 
+  it('ignoriert SRV-Ziele außerhalb der eigenen Domain (Credential-Umlenkung)', async () => {
+    const dns: DnsResolver = {
+      resolveSrv: async () => [
+        { name: 'dav.attacker.example.', port: 443, priority: 0, weight: 0 }
+      ],
+      resolveTxt: async () => []
+    }
+    const urls = await candidateUrlsForDomain('example.org', dns)
+    expect(urls.some((u) => u.includes('attacker'))).toBe(false)
+    expect(urls).toContain('https://example.org/.well-known/caldav')
+  })
+
   it('Voller URL-Pfad wird zuerst probiert; Fallback auf remote.php/dav', async () => {
     const calls: string[] = []
     const { fetch } = createMockFetch((req) => {

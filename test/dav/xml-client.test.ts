@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { parseXml, XmlParseError, NS, child, children, escapeXml } from '@main/dav/xml'
 import { parseMultistatus, okPropText } from '@main/dav/multistatus'
-import { DavAuthError, DavClient, DavHttpError, DavTransportError } from '@main/dav/client'
+import {
+  DavAuthError,
+  DavClient,
+  DavCrossOriginAuthError,
+  DavHttpError,
+  DavTransportError
+} from '@main/dav/client'
 import { assertSecureUrl, InsecureUrlError, normalizeHref, parseServerInput } from '@main/dav/url'
 import { createMockFetch } from '../helpers/dav-mock'
 import {
@@ -197,6 +203,32 @@ describe('DavClient', () => {
       fetch: createMockFetch(redirect).fetch
     })
     await expect(lenient.propfind('https://a.example/x', '<x/>')).resolves.toBeDefined()
+  })
+
+  it('schickt Zugangsdaten nie an einen fremden Host nach Umleitung', async () => {
+    const { fetch, calls } = createMockFetch((req) =>
+      req.url.startsWith('https://a.example')
+        ? { status: 302, headers: { location: 'https://evil.example/dav/' } }
+        : { status: 207, body: '<d:multistatus xmlns:d="DAV:"/>' }
+    )
+    const client = new DavClient({ ...creds, fetch, followCrossOrigin: true })
+    await client.propfind('https://a.example/x', '<x/>')
+    expect(calls[0].headers.authorization).toBeDefined()
+    expect(calls[1].url).toBe('https://evil.example/dav/')
+    expect(calls[1].headers.authorization).toBeUndefined()
+  })
+
+  it('verlangt ausdrückliche Bestätigung, wenn der fremde Host Anmeldung fordert', async () => {
+    const { fetch } = createMockFetch((req) =>
+      req.url.startsWith('https://a.example')
+        ? { status: 301, headers: { location: 'https://dav.other.example/caldav/' } }
+        : { status: 401 }
+    )
+    const client = new DavClient({ ...creds, fetch, followCrossOrigin: true })
+    const error = await client.propfind('https://a.example/x', '<x/>').catch((e) => e)
+    expect(error).toBeInstanceOf(DavCrossOriginAuthError)
+    expect(error).toBeInstanceOf(DavAuthError)
+    expect((error as DavCrossOriginAuthError).targetUrl).toBe('https://dav.other.example/caldav/')
   })
 
   it('lehnt Redirect von https auf http ab', async () => {

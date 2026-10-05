@@ -39,6 +39,20 @@ export class DavHttpError extends DavError {
   }
 }
 
+/**
+ * 401 nach einer Umleitung auf einen anderen Host: Zugangsdaten werden dorthin
+ * nie automatisch geschickt (DNS-SRV/Redirect könnten gefälscht sein). Der
+ * Nutzer muss die neue Adresse ausdrücklich bestätigen bzw. eingeben.
+ */
+export class DavCrossOriginAuthError extends DavAuthError {
+  constructor(readonly targetUrl: string) {
+    super(
+      `Der Server leitet zu ${new URL(targetUrl).host} weiter — bitte diese Adresse ausdrücklich als Server angeben (${targetUrl})`
+    )
+    this.name = 'DavCrossOriginAuthError'
+  }
+}
+
 export class DavTransportError extends DavError {
   constructor(message: string) {
     super(message)
@@ -109,7 +123,8 @@ export class DavClient {
         Accept: '*/*',
         ...init.headers
       }
-      headers.Authorization = this.authHeader
+      // Zugangsdaten nur an den Ursprung, den der Nutzer angegeben hat
+      if (sameOrigin(current, origin)) headers.Authorization = this.authHeader
       if (init.depth !== undefined) headers.Depth = init.depth
 
       let response: Response
@@ -160,7 +175,10 @@ export class DavClient {
   /** Request mit Fehlerabbildung: 401 → DavAuthError, ≥ 400 → DavHttpError. */
   async request(method: string, url: string, init: DavRequestInit = {}): Promise<DavResponseRaw> {
     const res = await this.raw(method, url, init)
-    if (res.status === 401) throw new DavAuthError()
+    if (res.status === 401) {
+      if (!sameOrigin(new URL(res.url), new URL(url))) throw new DavCrossOriginAuthError(res.url)
+      throw new DavAuthError()
+    }
     if (res.status >= 400) throw httpError(res)
     return res
   }
