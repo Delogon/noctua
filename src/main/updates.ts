@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
+import { isLocalOnly } from './privacy'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
@@ -24,13 +25,24 @@ export function newer(latest: string, current: string): boolean {
  * Update-Check über die GitHub-Releases-API (anonym). Solange das Repo privat
  * ist, liefert die API 404 — der Check bleibt dann still. Vollautomatische
  * Installation braucht eine Apple-Signatur und ist bewusst nicht verbaut.
+ *
+ * Local only: automatische Checks entfallen komplett; nur ein ausdrücklicher
+ * Aufruf (`manual: true`, Button in den Einstellungen) geht ins Netz.
  */
-export async function checkForUpdates(): Promise<{
+export async function checkForUpdates(options: { manual?: boolean } = {}): Promise<{
   updateAvailable: boolean
   latest: string | null
   url: string
   note: string | null
 }> {
+  if (!options.manual && isLocalOnly()) {
+    return {
+      updateAvailable: false,
+      latest: null,
+      url: RELEASES_PAGE,
+      note: 'Local only: automatischer Update-Check aus'
+    }
+  }
   try {
     const response = await fetch(RELEASES_API, {
       headers: { Accept: 'application/vnd.github+json' },
@@ -64,6 +76,8 @@ export async function checkForUpdates(): Promise<{
 
 export function startUpdateChecks(pushFn: PushFn): void {
   push = pushFn
+  // checkForUpdates() prüft Local only bei jedem Lauf selbst — der Schalter
+  // kann zur Laufzeit wechseln.
   setTimeout(() => void checkForUpdates(), 60_000)
   timer = setInterval(() => void checkForUpdates(), CHECK_INTERVAL_MS)
 }

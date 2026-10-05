@@ -256,6 +256,10 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
      ORDER BY CAST(part_id AS INTEGER), id`
   )
   const allowStmt = db.prepare('SELECT value FROM settings WHERE key = ?')
+  // Local only: keine automatischen Remote-Bilder — weder Absender-Freigabe noch
+  // globaler Default greifen; „Bilder anzeigen" pro Nachricht bleibt möglich.
+  const localOnly =
+    (allowStmt.get('privacy.localOnly') as { value: string } | undefined)?.value === '1'
   return rows.map((r) => {
     const bodyState = (r.body_state as 'none' | 'full') ?? 'none'
     const html = (r.html_raw as string) ?? null
@@ -279,16 +283,17 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
     return {
       listUnsubscribe: r.list_unsubscribe === 1,
       remoteImagesAllowed:
+        !localOnly &&
         // Default BLOCKIERT (Design 3b, Privacy-Versprechen): Remote-Bilder
         // laden nur, wenn der Nutzer es global erlaubt hat ('1') ODER der
         // Absender auf der Freigabeliste steht. Explizit gespeicherte Werte
         // ('1'/'0') behalten ihre Bedeutung — nur der ungesetzte Default dreht.
-        (allowStmt.get('mail.remoteImagesDefault') as { value: string } | undefined)?.value ===
+        ((allowStmt.get('mail.remoteImagesDefault') as { value: string } | undefined)?.value ===
           '1' ||
-        (
-          allowStmt.get(imagesAllowKey((r.from_addr as string) ?? '')) as
-            { value: string } | undefined
-        )?.value === '1',
+          (
+            allowStmt.get(imagesAllowKey((r.from_addr as string) ?? '')) as
+              { value: string } | undefined
+          )?.value === '1'),
       id: r.id as number,
       accountId: r.account_id as number,
       folderId: r.folder_id as number,

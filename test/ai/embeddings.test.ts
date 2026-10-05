@@ -53,7 +53,7 @@ describe('EmbeddingIndexer status', () => {
       indexed: 0,
       pending: 3,
       running: false,
-      model: { id: EMBEDDING_MODEL, state: 'not_loaded', error: null }
+      model: { id: EMBEDDING_MODEL, state: 'not_loaded', cached: expect.any(Boolean), error: null }
     })
 
     const current = db

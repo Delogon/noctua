@@ -4,6 +4,7 @@ import { useI18n, useT, mastheadDate } from '@renderer/lib/i18n'
 import { useMboxCounts } from '@renderer/queries/threads'
 import { useFollowups } from '@renderer/queries/followups'
 import { useTasks } from '@renderer/queries/tasks'
+import { useLocalOnly } from '@renderer/queries/intel'
 
 function NavItem({
   label,
@@ -74,7 +75,8 @@ function PanelIcon({
 export function Masthead(): React.JSX.Element {
   const t = useT()
   const lang = useI18n((s) => s.lang)
-  const { view, setView, showList, showRail, toggleList, toggleRail } = usePaper()
+  const { view, setView, setSetSel, showList, showRail, toggleList, toggleRail } = usePaper()
+  const localOnly = useLocalOnly().data === true
   const counts = useMboxCounts(null)
   const followups = useFollowups()
   const tasks = useTasks('open')
@@ -90,6 +92,21 @@ export function Masthead(): React.JSX.Element {
       <div className="mmeta" style={{ letterSpacing: '1px' }}>
         {mastheadDate(lang)}
       </div>
+      {/* „Nur lokal" ist an: klar sichtbar, Klick führt zum Schalter */}
+      {localOnly && (
+        <button
+          type="button"
+          className="titlebar-no-drag localonly-badge"
+          title={t('localOnlyBadgeTip')}
+          onClick={() => {
+            setSetSel('intel')
+            setView('settings')
+          }}
+        >
+          <span aria-hidden="true" className="localonly-badge__dot" />
+          {t('localOnlyBadge')}
+        </button>
+      )}
       <div
         className="titlebar-no-drag ml-auto flex items-center gap-3.5"
         style={{ font: '400 10px var(--mono)' }}

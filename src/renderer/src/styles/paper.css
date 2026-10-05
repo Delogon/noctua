@@ -3746,3 +3746,24 @@ kbd,
   color: var(--faint);
   cursor: default;
 }
+
+/* ── „Nur lokal"-Anzeige im Masthead ───────────────────────────────── */
+
+.localonly-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--ac);
+  color: var(--ac);
+  padding: 2px 8px;
+  font: 500 9px var(--mono);
+  letter-spacing: 0.8px;
+}
+
+.localonly-badge__dot {
+  width: 6px;
+  height: 6px;
+  background: var(--ac);
+}

@@ -1,8 +1,10 @@
 import { app } from 'electron'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type Database from 'better-sqlite3'
 import { htmlToText } from '../mail/parser'
 import { cleanupSearchOrphans, refreshMessageSearchIndex } from '../mail/ingest'
+import { isLocalOnly } from '../privacy'
 
 export const EMBEDDING_MODEL = 'Xenova/multilingual-e5-base'
 const DIMS = 768
@@ -22,13 +24,35 @@ let extractorPromise: Promise<Extractor> | null = null
  * Download in userData/models). Mail-Inhalte verlassen den Rechner fürs
  * Indexieren nicht. E5 verlangt "passage:"/"query:"-Präfixe.
  */
-async function getExtractor(): Promise<Extractor> {
+
+function modelCacheDir(): string {
+  return process.env.NOCTUA_MODEL_CACHE_DIR?.trim() || join(app.getPath('userData'), 'models')
+}
+
+/** Liegt das (quantisierte) Modell schon im lokalen Cache? Dann braucht es kein Netz. */
+export function isEmbeddingModelCached(): boolean {
+  return existsSync(join(modelCacheDir(), EMBEDDING_MODEL, 'onnx', 'model_quantized.onnx'))
+}
+
+/** Ohne Download-Erlaubnis (Local only) und ohne Cache steht das Modell nicht bereit. */
+export class EmbeddingModelUnavailableError extends Error {
+  constructor() {
+    super('Suchmodell nicht geladen (Local only: Download nur auf Anforderung)')
+    this.name = 'EmbeddingModelUnavailableError'
+  }
+}
+
+async function getExtractor(allowDownload = !isLocalOnly()): Promise<Extractor> {
   if (!extractorPromise) {
+    if (!allowDownload && !isEmbeddingModelCached()) throw new EmbeddingModelUnavailableError()
     extractorPromise = (async () => {
       const { env, pipeline } = await import('@huggingface/transformers')
-      env.cacheDir =
-        process.env.NOCTUA_MODEL_CACHE_DIR?.trim() || join(app.getPath('userData'), 'models')
-      const pipe = await pipeline('feature-extraction', EMBEDDING_MODEL, { dtype: 'q8' })
+      env.cacheDir = modelCacheDir()
+      const pipe = await pipeline('feature-extraction', EMBEDDING_MODEL, {
+        dtype: 'q8',
+        // Ohne Download-Erlaubnis: nur Cache, keine Hugging-Face-Anfrage
+        local_files_only: !allowDownload
+      })
       return pipe as unknown as Extractor
     })()
     extractorPromise.catch(() => {
@@ -91,6 +115,8 @@ export interface EmbeddingIndexStatus {
   model: {
     id: typeof EMBEDDING_MODEL
     state: EmbeddingModelState
+    /** Modelldateien liegen lokal vor (Suche funktioniert ohne Netz) */
+    cached: boolean
     error: string | null
   }
 }
@@ -155,7 +181,12 @@ export class EmbeddingIndexer {
         indexed: 0,
         pending: 0,
         running: this.running,
-        model: { id: EMBEDDING_MODEL, state: this.modelState, error: this.modelError }
+        model: {
+          id: EMBEDDING_MODEL,
+          state: this.modelState,
+          cached: isEmbeddingModelCached(),
+          error: this.modelError
+        }
       }
     }
     // Der Zustand kommt allein aus message_embedding_state (indiziert). Ein
@@ -183,7 +214,12 @@ export class EmbeddingIndexer {
       indexed: counts.indexed,
       pending: Math.max(0, counts.eligible - counts.indexed),
       running: this.running,
-      model: { id: EMBEDDING_MODEL, state: this.modelState, error: this.modelError }
+      model: {
+        id: EMBEDDING_MODEL,
+        state: this.modelState,
+        cached: isEmbeddingModelCached(),
+        error: this.modelError
+      }
     }
   }
 
@@ -199,6 +235,25 @@ export class EmbeddingIndexer {
       .finally(() => {
         this.running = false
       })
+  }
+
+  /**
+   * Ausdrücklicher Download des Suchmodells (Einstellungen → „Suchmodell laden").
+   * Der einzige Weg, der bei Local only ins Netz darf — danach läuft die
+   * Indexierung wie gewohnt.
+   */
+  async downloadModel(): Promise<void> {
+    this.modelState = 'loading'
+    this.modelError = null
+    try {
+      await getExtractor(true)
+      this.modelState = 'ready'
+    } catch (error) {
+      this.modelState = 'error'
+      this.modelError = error instanceof Error ? error.message : String(error)
+      throw error
+    }
+    this.kick()
   }
 
   /** Migrationen kennen keine SHA-256-Funktion; bestehende Bodies hier nachziehen. */
@@ -280,6 +335,12 @@ export class EmbeddingIndexer {
   }
 
   private async drain(): Promise<void> {
+    // Local only: ohne gecachtes Modell kein automatischer Download — die
+    // Suche läuft dann nur über FTS, bis der Nutzer das Modell ausdrücklich lädt.
+    if (isLocalOnly() && !isEmbeddingModelCached()) {
+      if (this.modelState !== 'loading') this.modelState = 'not_loaded'
+      return
+    }
     this.reconcileMissingVectors()
     let rows = this.pendingRows()
     // Der Waisen-Abgleich scannt FTS- und Vektortabelle komplett. Im
