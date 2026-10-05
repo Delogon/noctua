@@ -151,6 +151,14 @@ export function deleteProfile(id: string, db: Database.Database = getDb()): void
   db.transaction(() => {
     for (const task of TASKS) {
       if (getTaskProfileId(task) === id) {
+        if (task === 'decision') {
+          // Entscheidungen sind optional: ohne Profil einfach aus
+          db.prepare('DELETE FROM settings WHERE key IN (?, ?)').run(
+            profileKey(task),
+            modelKey(task)
+          )
+          continue
+        }
         setSetting(profileKey(task), OPENROUTER_PROFILE_ID)
         // Modell gehörte zum gelöschten Profil — OpenRouter-Default greift wieder
         db.prepare('DELETE FROM settings WHERE key = ?').run(modelKey(task))
@@ -178,7 +186,7 @@ export function clearProfileKey(id: string): void {
 
 // --- Aufgaben-Zuordnung -------------------------------------------------------
 
-export const TASKS: readonly AiTask[] = ['triage', 'draft', 'stt']
+export const TASKS: readonly AiTask[] = ['triage', 'draft', 'stt', 'decision']
 
 function profileKey(task: AiTask): string {
   return `ai.${task}Profile`
@@ -194,6 +202,8 @@ function modelKey(task: AiTask): string {
  * behandeln sie vorher selbst.
  */
 export function getTaskProfileId(task: AiTask): string {
+  // Entscheidungen sind optional: nicht gesetzt = leere ID (kein Standard-Profil)
+  if (task === 'decision') return getSetting(profileKey(task))?.trim() ?? ''
   if (task === 'triage' && getSetting('ai.triageProvider') === 'apple') return 'apple'
   const id = getSetting(profileKey(task))?.trim() || OPENROUTER_PROFILE_ID
   // stt: Apple-Spracherkennung als Pseudo-Profil (ai.sttProfile = 'apple')
@@ -204,10 +214,30 @@ export function getTaskProfileId(task: AiTask): string {
 export function getTaskModel(task: AiTask, profile: Pick<AiProfile, 'preset'>): string | null {
   const configured = getSetting(modelKey(task))?.trim()
   if (configured) return configured
+  if (task === 'decision') return null
   return profile.preset === 'openrouter' ? OPENROUTER_DEFAULT_MODELS[task] : null
 }
 
 export function setTaskAssignment(task: AiTask, profileId: string, model: string): void {
+  if (task === 'decision') {
+    if (!profileId) {
+      // „Aus": Zuordnung entfernen
+      getDb()
+        .prepare('DELETE FROM settings WHERE key IN (?, ?)')
+        .run(profileKey(task), modelKey(task))
+      return
+    }
+    const target = getProfile(profileId)
+    if (!target) throw new Error('Anbieter nicht gefunden')
+    if (target.preset === 'openrouter') {
+      throw new Error(
+        'Entscheidungsmodelle laufen nur auf lokalen Ollama-Servern, nicht über OpenRouter'
+      )
+    }
+    setSetting(profileKey(task), profileId)
+    setSetting(modelKey(task), model.trim())
+    return
+  }
   if (profileId !== 'apple' && !getProfile(profileId)) throw new Error('Anbieter nicht gefunden')
   if (profileId === 'apple' && task === 'draft') {
     throw new Error('Apple On-Device ist nur für Vorsortierung und Diktat verfügbar')
@@ -265,7 +295,30 @@ export function resolveTask(task: AiTask): ResolvedTask | null {
 const TASK_LABEL: Record<AiTask, string> = {
   triage: 'Vorsortierung',
   draft: 'Entwürfe',
-  stt: 'Diktat'
+  stt: 'Diktat',
+  decision: 'Entscheidungen'
+}
+
+/**
+ * Entscheidungsmodell (System One) oder null: nicht eingerichtet, Local only mit
+ * externem Profil, kein Modell. Kein Chat-Client nötig – systemone.ts spricht
+ * den Server direkt.
+ */
+export interface ResolvedDecision {
+  profile: AiProfile
+  model: string
+  apiKey: string | null
+}
+
+export function resolveDecision(): ResolvedDecision | null {
+  if (taskBlockReason('decision') !== null) return null
+  const profile = getProfile(getTaskProfileId('decision'))!
+  if (profile.preset === 'openrouter') return null
+  return {
+    profile,
+    model: getTaskModel('decision', profile)!,
+    apiKey: getSecret(profileSecretKey(profile))
+  }
 }
 
 /** Verständliche Fehlermeldung für ein blockiertes Task (Main wirft sie an den Renderer). */
@@ -310,6 +363,8 @@ export function requireTaskWithBudget(
 /** Pausiert die Hintergrund-Triage am Budget? Apple/lokale/geblockte Profile nie. */
 export function triageBudgetBlocked(db: Database.Database): boolean {
   if (getTaskProfileId('triage') === 'apple') return false
+  // Mit Entscheidungsmodell läuft die Triage lokal weiter; das Budget bremst nur das Textmodell
+  if (resolveDecision() !== null) return false
   const profile = getProfile(getTaskProfileId('triage'))
   if (!profile) return false
   return profile.preset === 'openrouter' && !profile.isLocal && isBudgetExceeded(db)

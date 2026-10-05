@@ -3,7 +3,7 @@ import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import { triageBudgetBlocked } from './providers/registry'
 import { runTriage, PROMPT_VERSION } from './triage'
 import { EVENT_CATEGORIES, runEventExtraction } from './events'
-import { applyRules } from './rules'
+import { applyRulesPostTriage } from './rules'
 import { maybeNotify, updateBadge } from '../notifications'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
@@ -274,7 +274,7 @@ export class AiQueue {
       this.consecutiveTransient = 0
       db.prepare(`UPDATE ai_jobs SET status = 'done', last_error = NULL WHERE id = ?`).run(job.id)
       try {
-        applyRules(db, job.message_id, 'post-triage')
+        await applyRulesPostTriage(db, job.message_id)
         maybeNotify(job.message_id)
         updateBadge()
       } catch (error) {

@@ -206,7 +206,9 @@ describe('Local only: Modellkatalog (Handler ai:profileModels)', () => {
     expect(getProfile(cloud.id)).not.toBeNull()
     setLocalOnly(true)
 
-    expect(await handlers['ai:profileModels']({ profileId: cloud.id, manual: false })).toEqual({
+    expect(
+      await handlers['ai:profileModels']({ profileId: cloud.id, manual: false, kind: 'chat' })
+    ).toEqual({
       models: [],
       skipped: true
     })
@@ -214,18 +216,26 @@ describe('Local only: Modellkatalog (Handler ai:profileModels)', () => {
 
     // OpenRouter-Katalog ebenso
     expect(
-      await handlers['ai:profileModels']({ profileId: 'openrouter', manual: false })
+      await handlers['ai:profileModels']({ profileId: 'openrouter', manual: false, kind: 'chat' })
     ).toMatchObject({ skipped: true })
     expect(fetchMock).not.toHaveBeenCalled()
 
-    const localResult = await handlers['ai:profileModels']({ profileId: local.id, manual: false })
+    const localResult = await handlers['ai:profileModels']({
+      profileId: local.id,
+      manual: false,
+      kind: 'chat'
+    })
     expect(localResult.skipped).toBe(false)
     expect(localResult.models.map((m) => m.id)).toEqual(['m1'])
 
     // ausdrücklich angefordert
-    const manual = await handlers['ai:profileModels']({ profileId: cloud.id, manual: true })
+    const manual = await handlers['ai:profileModels']({
+      profileId: cloud.id,
+      manual: true,
+      kind: 'chat'
+    })
     expect(manual.skipped).toBe(false)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
     vi.unstubAllGlobals()
   })
 

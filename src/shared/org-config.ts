@@ -48,7 +48,9 @@ export const orgAiProfileSchema = z
       .object({
         triage: modelName.optional(),
         draft: modelName.optional(),
-        stt: modelName.optional()
+        stt: modelName.optional(),
+        /** Entscheidungsmodell (Ollama System One, z. B. clef-flash) */
+        decision: modelName.optional()
       })
       .strict()
       .optional()

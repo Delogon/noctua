@@ -20,6 +20,7 @@ import {
   deleteProfile,
   getProfile,
   getTaskProfileId,
+  resolveDecision,
   listProfiles,
   setProfileKey,
   setTaskAssignment,
@@ -233,6 +234,24 @@ describe('Org-AI-Profile: Seeding', () => {
     seedOrgProfiles(db)
     expect(getProfile('stt-local')).toMatchObject({ isLocal: true, managed: true })
     expect(getTaskProfileId('stt')).toBe('stt-local')
+  })
+
+  it('Aufgabe decision (Entscheidungsmodell auf lokalem Ollama)', () => {
+    __setOrgConfigForTest({
+      aiProfiles: [
+        {
+          id: 'ollama-org',
+          name: 'Ollama (Firma)',
+          baseUrl: 'http://ollama.intern:11434/v1',
+          apiStyle: 'chat',
+          isLocal: true,
+          tasks: { decision: 'clef-flash' }
+        }
+      ]
+    })
+    seedOrgProfiles(db)
+    expect(getTaskProfileId('decision')).toBe('ollama-org')
+    expect(resolveDecision()?.model).toBe('clef-flash')
   })
 })
 

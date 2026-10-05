@@ -2,6 +2,8 @@
 // fest verdrahtete Loopback-Adressen — kein Host aus Nutzereingaben, keine
 // Zugangsdaten, keine Redirects. Daher auch unter „Local only" erlaubt.
 
+import { isDecisionCapable, isDecisionOnly, listOllamaModelCaps } from './providers/ollama-caps'
+
 export type LocalServerKind = 'ollama' | 'lmstudio' | 'llamacpp' | 'localai'
 
 export interface DetectedLocalServer {
@@ -9,6 +11,8 @@ export interface DetectedLocalServer {
   /** Basis-URL für ein Profil, inkl. /v1 */
   baseUrl: string
   models: string[]
+  /** nur Ollama: Entscheidungsmodelle (Fähigkeit `decision`), nicht in `models` enthalten */
+  decisionModels: string[]
 }
 
 interface Probe {
@@ -28,6 +32,8 @@ const PROBES: readonly Probe[] = [
 const PROBE_TIMEOUT_MS = 800
 const MAX_MODELS = 200
 const MAX_ID_LEN = 200
+/** Fähigkeiten-Abfrage beim Onboarding: kurz halten, die Erkennung soll flott bleiben */
+const CAPS_SHOW_LIMIT = 12
 
 async function probeOne(probe: Probe): Promise<DetectedLocalServer | null> {
   try {
@@ -50,7 +56,26 @@ async function probeOne(probe: Probe): Promise<DetectedLocalServer | null> {
       if (typeof id === 'string' && id.length <= MAX_ID_LEN) seen.add(id)
       if (seen.size >= MAX_MODELS) break
     }
-    return { kind: probe.kind, baseUrl: probe.base, models: [...seen].sort() }
+    let models = [...seen].sort()
+    let decisionModels: string[] = []
+    if (probe.kind === 'ollama') {
+      // Entscheidungsmodelle (clef-flash, nimble …) melden nur `decision` und gehören nicht in
+      // die Chat-Auswahl; fehlt `capabilities` in /api/tags, fragt /api/show kurz nach.
+      const caps = await listOllamaModelCaps(probe.base, {
+        tagsTimeoutMs: PROBE_TIMEOUT_MS,
+        showTimeoutMs: 600,
+        showLimit: CAPS_SHOW_LIMIT
+      })
+      decisionModels = caps
+        .filter((m) => isDecisionCapable(m.capabilities))
+        .map((m) => m.name)
+        .sort()
+      const decisionOnly = new Set(
+        caps.filter((m) => isDecisionOnly(m.capabilities)).map((m) => m.name)
+      )
+      models = models.filter((id) => !decisionOnly.has(id))
+    }
+    return { kind: probe.kind, baseUrl: probe.base, models, decisionModels }
   } catch {
     return null
   }

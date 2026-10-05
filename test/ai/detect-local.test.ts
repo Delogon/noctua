@@ -63,7 +63,7 @@ describe('detectLocalServers', () => {
     )
     const { found } = await detectLocalServers()
     expect(found).toEqual([
-      { kind: 'localai', baseUrl: 'http://127.0.0.1:8000/v1', models: ['ok'] }
+      { kind: 'localai', baseUrl: 'http://127.0.0.1:8000/v1', models: ['ok'], decisionModels: [] }
     ])
   })
 })

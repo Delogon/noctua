@@ -64,18 +64,18 @@ import { getDraftModel, getTriageModel } from '../ai/openrouter'
 import { appleFmStatus } from '../ai/apple-fm'
 import { detectLocalServers } from '../ai/detect-local'
 import { startDraftNew, startDraftNudge, startDraftReply, stylePreview } from '../ai/drafts'
-import { draftRule, ruleJsonSchema, ruleNeedsAi } from '../ai/rules'
+import { aiConditionOf, draftRule, ruleJsonSchema, ruleNeedsAi } from '../ai/rules'
 import { outboxWorker } from '../smtp/outbox'
 import { cancelMsLogin, msForgetAccount, msInteractiveLogin } from '../auth/msal'
 import { cancelGoogleLogin, googleInteractiveLogin } from '../auth/google'
 import { startChat } from '../ai/chat'
 import { refreshStyleProfile } from '../ai/style'
 import { runModelTest, testProfileConnection } from '../ai/model-test'
+import { getPhishing, listProfileModels, runDecisionTest } from '../ai/decision-service'
 import {
   clearProfileKey,
   createProfile,
   deleteProfile,
-  getClient,
   getProfile,
   getTaskModel,
   getTaskProfileId,
@@ -631,13 +631,15 @@ export const handlers: IpcHandlers = {
     return { ok: true }
   },
 
-  'ai:profileModels': async ({ profileId, manual }) => {
+  'ai:profileModels': async ({ profileId, manual, kind }) => {
     const profile = getProfile(profileId)
     if (!profile) throw new Error('Anbieter nicht gefunden')
     // Local only: externe Kataloge nie automatisch holen
     if (isLocalOnly() && !profile.isLocal && !manual) return { models: [], skipped: true }
-    return { models: await getClient(profile).listModels(), skipped: false }
+    return { models: await listProfileModels(profile, kind), skipped: false }
   },
+  'ai:decisions:test': ({ profileId, model }) => runDecisionTest(profileId, model),
+  'ai:decisions:get': ({ messageId }) => ({ phishing: getPhishing(getDb(), messageId) }),
 
   'ai:detectLocal': () => detectLocalServers(),
   'ai:profiles:list': () => ({ profiles: listProfiles() }),
@@ -668,7 +670,12 @@ export const handlers: IpcHandlers = {
         blocked: profileId === 'apple' ? null : taskBlockReason(task)
       }
     }
-    return { triage: assignment('triage'), draft: assignment('draft'), stt: assignment('stt') }
+    return {
+      triage: assignment('triage'),
+      draft: assignment('draft'),
+      stt: assignment('stt'),
+      decision: assignment('decision')
+    }
   },
   'ai:tasks:set': ({ task, profileId, model }) => {
     setTaskAssignment(task, profileId, model)
@@ -713,7 +720,8 @@ export const handlers: IpcHandlers = {
         taskProfiles: {
           triage: getTaskProfileId('triage'),
           draft: getTaskProfileId('draft'),
-          stt: getTaskProfileId('stt')
+          stt: getTaskProfileId('stt'),
+          decision: getTaskProfileId('decision')
         },
         calendarAccounts: listCalendarAccounts().map((c) => ({
           name: c.name,
@@ -807,15 +815,22 @@ export const handlers: IpcHandlers = {
   'rules:list': () => ({
     rules: (
       getDb()
-        .prepare('SELECT id, name, description, enabled, hits FROM rules ORDER BY id DESC')
+        .prepare(
+          'SELECT id, name, description, enabled, hits, rule_json FROM rules ORDER BY id DESC'
+        )
         .all() as Array<{
         id: number
         name: string
         description: string | null
         enabled: number
         hits: number
+        rule_json: string
       }>
-    ).map((r) => ({ ...r, description: r.description, enabled: r.enabled === 1 }))
+    ).map(({ rule_json, ...r }) => ({
+      ...r,
+      enabled: r.enabled === 1,
+      aiCondition: aiConditionOf(rule_json)
+    }))
   }),
 
   'rules:toggle': ({ id, enabled }) => {

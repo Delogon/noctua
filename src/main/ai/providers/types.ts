@@ -3,7 +3,8 @@
 
 export type ApiStyle = 'chat' | 'responses'
 export type ProfilePreset = 'openrouter' | 'custom'
-export type AiTask = 'triage' | 'draft' | 'stt'
+/** `decision`: Entscheidungsmodell (Ollama System One), optional und nur lokal sinnvoll */
+export type AiTask = 'triage' | 'draft' | 'stt' | 'decision'
 
 export const OPENROUTER_PROFILE_ID = 'openrouter'
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'

@@ -48,6 +48,7 @@ const READONLY_EXACT = new Set([
   'ai.triageProfile',
   'ai.draftProfile',
   'ai.sttProfile',
+  'ai.decisionProfile',
   'privacy.localOnly'
 ])
 const READONLY_PATTERNS = [

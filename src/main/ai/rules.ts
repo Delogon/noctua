@@ -1,6 +1,15 @@
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
-import { requireTask } from './providers/registry'
+import { requireTask, resolveDecision } from './providers/registry'
+import { decide, isDecisionConfigError, MAX_QUESTIONS, type Questions } from './providers/systemone'
+import { RULE_AI_CONDITION_THRESHOLD } from '@shared/decision-thresholds'
+import { htmlToText } from '../mail/parser'
+import {
+  UNTRUSTED_SYSTEM_NOTE,
+  sanitizeUntrusted,
+  sanitizeUntrustedLine,
+  wrapUntrusted
+} from './untrusted'
 import { logUsage } from './budget'
 
 type RuleActionExecutor = (messageIds: number[], action: 'archive' | 'markRead' | 'flag') => void
@@ -32,7 +41,12 @@ export const ruleJsonSchema = z.object({
         .max(7)
         .optional(),
       minPriority: z.number().int().min(1).max(5).optional(),
-      maxPriority: z.number().int().min(1).max(5).optional()
+      maxPriority: z.number().int().min(1).max(5).optional(),
+      /**
+       * Ja/Nein-Frage in natürlicher Sprache („Ist das eine Rechnung?"), vom
+       * Entscheidungsmodell beantwortet. Ohne Entscheidungsmodell trifft die Regel nie zu.
+       */
+      aiCondition: z.string().trim().min(1).max(200).optional()
     })
     .refine((m) => Object.keys(m).length > 0, 'Regel braucht mindestens ein Match-Kriterium'),
   actions: z
@@ -58,11 +72,22 @@ export const ruleJsonSchema = z.object({
 
 export type RuleJson = z.infer<typeof ruleJsonSchema>
 
+/** KI-Bedingung aus gespeichertem rule_json (null bei keiner/kaputtem JSON). */
+export function aiConditionOf(ruleJson: string): string | null {
+  try {
+    const parsed = ruleJsonSchema.safeParse(JSON.parse(ruleJson))
+    return parsed.success ? (parsed.data.match.aiCondition ?? null) : null
+  } catch {
+    return null
+  }
+}
+
 export function ruleNeedsAi(rule: RuleJson): boolean {
   return (
     rule.match.category !== undefined ||
     rule.match.minPriority !== undefined ||
-    rule.match.maxPriority !== undefined
+    rule.match.maxPriority !== undefined ||
+    rule.match.aiCondition !== undefined
   )
 }
 
@@ -86,6 +111,11 @@ Antworte NUR mit JSON, exakt in dieser Form (nur benötigte Felder angeben):
 Nutze category/priority NUR, wenn die Regel wirklich auf AI-Einordnung Bezug nimmt —
 Absender-/Betreff-Regeln sind robuster. Erfinde keine Kriterien, die der Nutzer nicht nannte.`
 
+const AI_CONDITION_HINT = `
+Zusätzliches optionales Match-Feld "aiCondition": eine Ja/Nein-Frage auf Deutsch (max. 200 Zeichen)
+zum Inhalt der Mail, z. B. "Ist das eine Rechnung?". NUR verwenden, wenn der Nutzer ein inhaltliches
+Kriterium nennt, das sich nicht aus Absender, Betreff oder Kategorie ergibt.`
+
 export async function draftRule(
   db: Database.Database,
   text: string
@@ -94,7 +124,10 @@ export async function draftRule(
   const result = await client.complete({
     model,
     messages: [
-      { role: 'system', content: DRAFT_PROMPT },
+      {
+        role: 'system',
+        content: resolveDecision() ? `${DRAFT_PROMPT}${AI_CONDITION_HINT}` : DRAFT_PROMPT
+      },
       { role: 'user', content: text.slice(0, 1500) }
     ],
     temperature: 0.1,
@@ -125,7 +158,16 @@ export interface MessageFacts {
   priority: number | null
 }
 
-export function matches(rule: RuleJson, m: MessageFacts): boolean {
+/**
+ * `aiProbability`: P(true) der KI-Bedingung dieser Regel (Entscheidungsmodell).
+ * Fehlt sie (kein Entscheidungsmodell, Fehler), trifft eine Regel mit
+ * aiCondition nie zu. `'skip'` ignoriert die KI-Bedingung (Vorfilter).
+ */
+export function matches(
+  rule: RuleJson,
+  m: MessageFacts,
+  aiProbability: number | null | 'skip' = null
+): boolean {
   const from = `${m.from_name ?? ''} ${m.from_addr ?? ''}`.toLowerCase()
   const domain = (m.from_addr ?? '').split('@')[1]?.toLowerCase() ?? ''
   const subject = (m.subject ?? '').toLowerCase()
@@ -152,7 +194,119 @@ export function matches(rule: RuleJson, m: MessageFacts): boolean {
     return false
   if (match.maxPriority !== undefined && (m.priority === null || m.priority > match.maxPriority))
     return false
+  if (match.aiCondition !== undefined && aiProbability !== 'skip') {
+    if (aiProbability === null || aiProbability < RULE_AI_CONDITION_THRESHOLD) return false
+  }
   return true
+}
+
+function loadFacts(db: Database.Database, messageId: number): MessageFacts | undefined {
+  return db
+    .prepare(
+      `SELECT m.id, m.from_addr, m.from_name, m.subject, m.list_unsubscribe,
+              coalesce(a.user_override_category, a.category) AS category, a.priority
+       FROM messages m LEFT JOIN ai_annotations a ON a.message_id = m.id
+       WHERE m.id = ?`
+    )
+    .get(messageId) as MessageFacts | undefined
+}
+
+/** Frage-Name einer Regel im gebündelten System-One-Aufruf. */
+export const ruleQuestionName = (ruleId: number): string => `rule_${ruleId}`
+
+/**
+ * KI-Bedingungen ALLER aktiven Regeln einer Mail in EINEM System-One-Aufruf
+ * (eine noul-Frage je Regel, höchstens 64). Nur Regeln, deren übrige Kriterien
+ * schon zutreffen, werden gefragt – das spart Kontext. Liefert P(true) je
+ * Regel-ID; ohne Entscheidungsmodell oder bei Fehler leer (= Regeln pausieren).
+ * Die Bedingung stammt vom Nutzer (vertrauenswürdig), die Mail steht als
+ * unvertrauenswürdige Daten im state.
+ */
+export async function evaluateAiConditions(
+  db: Database.Database,
+  messageId: number
+): Promise<Record<number, number>> {
+  const rows = db
+    .prepare(`SELECT id, rule_json FROM rules WHERE enabled = 1 AND needs_ai = 1 ORDER BY id`)
+    .all() as Array<{ id: number; rule_json: string }>
+  if (rows.length === 0) return {}
+  const m = loadFacts(db, messageId)
+  if (!m) return {}
+
+  const questions: Questions = {}
+  for (const row of rows) {
+    if (Object.keys(questions).length >= MAX_QUESTIONS) break
+    let rule: RuleJson
+    try {
+      rule = ruleJsonSchema.parse(JSON.parse(row.rule_json))
+    } catch {
+      continue
+    }
+    const condition = rule.match.aiCondition
+    if (!condition || !matches(rule, m, 'skip')) continue
+    questions[ruleQuestionName(row.id)] = {
+      type: 'noul',
+      instructions: condition,
+      criteria: { false: 'Nein, trifft nicht zu', true: 'Ja, trifft zu' }
+    }
+  }
+  if (Object.keys(questions).length === 0) return {}
+
+  const cfg = resolveDecision()
+  if (!cfg) return {}
+  const body = db
+    .prepare(
+      `SELECT m.subject, m.from_name, m.from_addr, b.text_plain, b.html_raw
+       FROM messages m LEFT JOIN message_bodies b ON b.message_id = m.id WHERE m.id = ?`
+    )
+    .get(messageId) as
+    | {
+        subject: string | null
+        from_name: string | null
+        from_addr: string | null
+        text_plain: string | null
+        html_raw: string | null
+      }
+    | undefined
+  if (!body) return {}
+  const text = body.text_plain?.trim() || htmlToText(body.html_raw ?? '')
+  const state = [
+    UNTRUSTED_SYSTEM_NOTE,
+    '',
+    `Von: ${sanitizeUntrustedLine(body.from_name, 120)} <${sanitizeUntrustedLine(body.from_addr ?? 'unbekannt', 200)}>`,
+    `Betreff: ${sanitizeUntrustedLine(body.subject, 300) || '(kein Betreff)'}`,
+    '',
+    wrapUntrusted('MAIL', sanitizeUntrusted(text, 6000) || '(kein Textinhalt)')
+  ].join('\n')
+
+  try {
+    const result = await decide({
+      baseUrl: cfg.profile.baseUrl,
+      apiKey: cfg.apiKey,
+      model: cfg.model,
+      state,
+      questions
+    })
+    logUsage(db, cfg.model, result.usage.inputTokens, result.usage.outputTokens, 0)
+    const out: Record<number, number> = {}
+    for (const name of Object.keys(questions)) {
+      const answer = result.answers[name]
+      if (answer?.type === 'noul') out[Number(name.slice('rule_'.length))] = answer.noul
+    }
+    return out
+  } catch (error) {
+    if (!isDecisionConfigError(error)) console.warn('[rules] KI-Bedingungen:', error)
+    return {}
+  }
+}
+
+/** Post-Triage-Regeln inkl. KI-Bedingungen (asynchron, ein Entscheidungs-Aufruf je Mail). */
+export async function applyRulesPostTriage(
+  db: Database.Database,
+  messageId: number
+): Promise<void> {
+  const probabilities = await evaluateAiConditions(db, messageId)
+  applyRules(db, messageId, 'post-triage', probabilities)
 }
 
 /**
@@ -164,21 +318,15 @@ export function matches(rule: RuleJson, m: MessageFacts): boolean {
 export function applyRules(
   db: Database.Database,
   messageId: number,
-  phase: 'ingest' | 'post-triage'
+  phase: 'ingest' | 'post-triage',
+  aiProbabilities: Record<number, number> = {}
 ): void {
   const rules = db
     .prepare(`SELECT id, rule_json, needs_ai FROM rules WHERE enabled = 1`)
     .all() as Array<{ id: number; rule_json: string; needs_ai: number }>
   if (rules.length === 0) return
 
-  const m = db
-    .prepare(
-      `SELECT m.id, m.from_addr, m.from_name, m.subject, m.list_unsubscribe,
-              coalesce(a.user_override_category, a.category) AS category, a.priority
-       FROM messages m LEFT JOIN ai_annotations a ON a.message_id = m.id
-       WHERE m.id = ?`
-    )
-    .get(messageId) as MessageFacts | undefined
+  const m = loadFacts(db, messageId)
   if (!m) return
 
   for (const row of rules) {
@@ -190,7 +338,7 @@ export function applyRules(
     } catch {
       continue
     }
-    if (!matches(rule, m)) continue
+    if (!matches(rule, m, aiProbabilities[row.id] ?? null)) continue
 
     db.prepare('UPDATE rules SET hits = hits + 1 WHERE id = ?').run(row.id)
     const { actions } = rule

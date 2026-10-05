@@ -45,7 +45,7 @@ Alle Felder sind optional. Unbekannte Felder sind ein Fehler.
 | `defaults`                 | siehe unten                       | Voreinstellungen, die nur gelten, solange der Nutzer nichts gewählt hat.                                                                                   |
 | `aiProfiles`               | Liste                             | Von der Organisation bereitgestellte KI-Profile (managed).                                                                                                 |
 | `oauth`                    | `{ google?, microsoft? }`         | Eigene OAuth-Clients statt der Thunderbird-Defaults.                                                                                                       |
-| `hideOpenRouterOnboarding` | boolean                           | Onboarding-Schritt 3 zeigt die Org-Profile statt der KI-Wahl (lokaler Server / Apple / Cloud / Überspringen).                                                                                   |
+| `hideOpenRouterOnboarding` | boolean                           | Onboarding-Schritt 3 zeigt die Org-Profile statt der KI-Wahl (lokaler Server / Apple / Cloud / Überspringen).                                              |
 
 ### `updates`
 
@@ -88,7 +88,12 @@ Nutzerwahlen werden nie überschrieben.
   "baseUrl": "https://llm.example.com/v1",
   "apiStyle": "chat",
   "isLocal": false,
-  "tasks": { "triage": "small-model", "draft": "large-model", "stt": "whisper-1" }
+  "tasks": {
+    "triage": "small-model",
+    "draft": "large-model",
+    "stt": "whisper-1",
+    "decision": "clef-flash"
+  }
 }
 ```
 
@@ -102,6 +107,9 @@ Nutzerwahlen werden nie überschrieben.
   API-Key bleibt editierbar (er liegt im Vault, nie in der Konfiguration).
 - `tasks` (Aufgabe → Modell) wird **nur beim allerersten Anlegen** des Profils
   zugewiesen. Spätere Änderungen des Nutzers bleiben bestehen.
+- `tasks.decision` weist ein **Entscheidungsmodell** zu (Ollama System One, z. B.
+  `clef-flash`, siehe `docs/DECISIONS.md`). Das Profil muss ein Ollama-Server
+  sein (≥ 0.35); nicht über OpenRouter.
 - `isLocal` steuert „Local only": externe Profile werden dort gesperrt.
 
 ### `oauth`

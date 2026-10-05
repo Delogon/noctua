@@ -269,7 +269,7 @@ export const networkConnectionSchema = z.object({
   scope: z.enum(['external', 'local']),
   status: z.enum(['active', 'blocked', 'manual-only', 'on-demand', 'cached', 'off']),
   /** nur bei kind = ai: bediente Aufgaben */
-  tasks: z.array(z.enum(['triage', 'draft', 'stt'])).max(3)
+  tasks: z.array(z.enum(['triage', 'draft', 'stt', 'decision'])).max(4)
 })
 export const networkConnectionsSchema = z.object({
   localOnly: z.boolean(),

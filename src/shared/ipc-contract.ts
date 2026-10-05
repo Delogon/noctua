@@ -91,7 +91,7 @@ const profileFieldsSchema = z.object({
   isLocal: z.boolean()
 })
 
-export const aiTaskSchema = z.enum(['triage', 'draft', 'stt'])
+export const aiTaskSchema = z.enum(['triage', 'draft', 'stt', 'decision'])
 
 const modelInfoSchema = z.object({
   id: z.string(),
@@ -446,8 +446,39 @@ export const invokeContract = {
   // Bei Local only holt ein externes Profil sie nur auf ausdrückliche Anfrage
   // (`manual`) — sonst `skipped: true` und keine Netzverbindung.
   'ai:profileModels': {
-    input: z.object({ profileId: profileIdSchema, manual: z.boolean().default(false) }),
+    // kind: 'chat' (Standard) schließt reine Entscheidungsmodelle aus (sie antworten im Chat mit
+    // Fehlern); 'decision' liefert nur Modelle mit Fähigkeit `decision` (Ollama /api/tags, /api/show)
+    input: z.object({
+      profileId: profileIdSchema,
+      manual: z.boolean().default(false),
+      kind: z.enum(['chat', 'decision']).default('chat')
+    }),
     output: z.object({ models: z.array(modelInfoSchema), skipped: z.boolean() })
+  },
+  // Funktions-Test eines Entscheidungsmodells: zwei Mini-Fragen, Antworten + Latenz
+  'ai:decisions:test': {
+    input: z.object({ profileId: profileIdSchema, model: z.string().trim().min(1).max(200) }),
+    output: z.object({
+      ok: z.boolean(),
+      latencyMs: z.number(),
+      detail: z.string().nullable(),
+      answers: z.array(z.object({ name: z.string(), text: z.string() })).max(8)
+    })
+  },
+  // Phishing-Einschätzung einer Mail (nur mit Entscheidungsmodell berechnet)
+  'ai:decisions:get': {
+    input: z.object({ messageId: z.number().int() }),
+    output: z.object({
+      phishing: z
+        .object({
+          /** 0 (unauffällig) … 2 (wahrscheinlich Phishing) */
+          score: z.number(),
+          high: z.boolean(),
+          /** lokale Signale, z. B. "reply_to_differs", "link_mismatch:2" */
+          signals: z.array(z.string().max(60)).max(10)
+        })
+        .nullable()
+    })
   },
   // Lokale KI-Server erkennen (Onboarding): Main sondiert nur fest verdrahtete
   // Loopback-Adressen (Ollama, LM Studio, llama.cpp, LocalAI/vLLM) — erlaubt auch
@@ -460,7 +491,9 @@ export const invokeContract = {
           z.object({
             kind: z.enum(['ollama', 'lmstudio', 'llamacpp', 'localai']),
             baseUrl: z.string().max(200),
-            models: z.array(z.string().max(200)).max(200)
+            models: z.array(z.string().max(200)).max(200),
+            /** nur Ollama: Modelle mit Fähigkeit `decision` (nicht in `models` enthalten) */
+            decisionModels: z.array(z.string().max(200)).max(50).default([])
           })
         )
         .max(8)
@@ -505,7 +538,8 @@ export const invokeContract = {
     output: z.object({
       triage: taskAssignmentSchema,
       draft: taskAssignmentSchema,
-      stt: taskAssignmentSchema
+      stt: taskAssignmentSchema,
+      decision: taskAssignmentSchema
     })
   },
   'ai:tasks:set': {
@@ -673,7 +707,9 @@ export const invokeContract = {
           name: z.string(),
           description: z.string().nullable(),
           enabled: z.boolean(),
-          hits: z.number()
+          hits: z.number(),
+          /** KI-Bedingung der Regel (Entscheidungsmodell), sonst null */
+          aiCondition: z.string().nullable()
         })
       )
     })

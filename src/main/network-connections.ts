@@ -79,9 +79,10 @@ export function buildNetworkConnections(input: NetworkConnectionsInput): Network
 
   // AI-Profile, die mindestens eine Aufgabe bedienen (Apple On-Device: kein Netz)
   const tasksByProfile = new Map<string, AiTask[]>()
-  for (const task of ['triage', 'draft', 'stt'] as AiTask[]) {
+  for (const task of ['triage', 'draft', 'stt', 'decision'] as AiTask[]) {
     const id = input.taskProfiles[task]
-    if (id === 'apple') continue
+    // Entscheidungen sind optional: leer = nicht eingerichtet
+    if (id === 'apple' || !id) continue
     tasksByProfile.set(id, [...(tasksByProfile.get(id) ?? []), task])
   }
   for (const profile of input.profiles) {

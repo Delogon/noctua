@@ -5,7 +5,7 @@ import {
   mailFrameCsp,
   sanitizeInlineStyle
 } from '@renderer/lib/mail-sanitize'
-import { linkHostMismatch } from '@renderer/lib/link-check'
+import { linkHostMismatch } from '@shared/link-check'
 
 describe('sanitizeInlineStyle', () => {
   it('behält harmlose Deklarationen', () => {

@@ -3,7 +3,7 @@ import DOMPurify, { type Config } from 'dompurify'
 import { invoke } from '@renderer/lib/ipc'
 import { t, useT } from '@renderer/lib/i18n'
 import { toast } from '@renderer/stores/toast'
-import { linkHostMismatch } from '@renderer/lib/link-check'
+import { linkHostMismatch } from '@shared/link-check'
 import { buildMailSrcdoc, isTrackingPixel, sanitizeInlineStyle } from '@renderer/lib/mail-sanitize'
 
 /**
