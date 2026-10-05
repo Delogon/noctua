@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type Database from 'better-sqlite3'
 import PostalMime from 'postal-mime'
 import { syncEngine } from '../sync/engine'
+import { sanitizeFilename } from './filename'
 
 interface AttachmentRow {
   id: number
@@ -47,7 +48,7 @@ export async function saveAttachment(
   if (!row) throw new Error('Anhang nicht gefunden')
 
   const { canceled, filePath } = await dialog.showSaveDialog({
-    defaultPath: join(app.getPath('downloads'), row.filename ?? 'anhang'),
+    defaultPath: join(app.getPath('downloads'), sanitizeFilename(row.filename)),
     securityScopedBookmarks: false
   })
   if (canceled || !filePath) return null

@@ -49,6 +49,11 @@ const table = {
   },
   remoteImagesShow: { en: 'Show', de: 'Anzeigen' },
   remoteImagesAllowSender: { en: 'Always for {addr}', de: 'Immer für {addr}' },
+  linkMismatchWarn: {
+    en: 'Link text says {shown}, but it leads to {actual}',
+    de: 'Der Linktext nennt {shown}, der Link führt aber zu {actual}'
+  },
+  linkMismatchOpen: { en: 'Open anyway', de: 'Trotzdem öffnen' },
 
   // ── Owl-View (Suchen + Fragen in einem Eingabefeld) ──
   chatEmptyTitle: { en: 'Ask your mailbox.', de: 'Frag dein Postfach.' },
