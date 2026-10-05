@@ -8,7 +8,11 @@ import { fileURLToPath } from 'node:url'
 // meldet den fehlenden Helper dann sauber in den Einstellungen.
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
-const source = join(root, 'native', 'fm-helper', 'main.swift')
+const srcDir = join(root, 'native', 'fm-helper')
+const sources = ['main.swift', 'speech.swift'].map((file) => join(srcDir, file))
+// Info.plist wird ins Binary eingebettet: TCC liest daraus den Speech-
+// Nutzungstext, auch wenn der Helper als Kindprozess der App läuft.
+const infoPlist = join(srcDir, 'Info.plist')
 const binDir = join(root, 'native', 'fm-helper', 'bin')
 const binary = join(binDir, 'noctua-fm')
 
@@ -16,8 +20,9 @@ const binary = join(binDir, 'noctua-fm')
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- .mjs ohne TS-Syntax
 export function buildFmHelper({ log = console.log } = {}) {
   if (process.platform !== 'darwin') return false
-  if (!existsSync(source)) return false
-  if (existsSync(binary) && statSync(binary).mtimeMs >= statSync(source).mtimeMs) return true
+  if (![...sources, infoPlist].every((file) => existsSync(file))) return false
+  const newest = Math.max(...[...sources, infoPlist].map((file) => statSync(file).mtimeMs))
+  if (existsSync(binary) && statSync(binary).mtimeMs >= newest) return true
 
   try {
     const sdkVersion = execFileSync('xcrun', ['--show-sdk-version'], { encoding: 'utf8' }).trim()
@@ -26,7 +31,11 @@ export function buildFmHelper({ log = console.log } = {}) {
       return false
     }
     mkdirSync(binDir, { recursive: true })
-    execFileSync('swiftc', ['-parse-as-library', '-O', source, '-o', binary], {
+    // Frameworks (FoundationModels, Speech, AVFoundation) löst `import` auf.
+    const sectcreate = ['__TEXT', '__info_plist', infoPlist].flatMap((arg, i) =>
+      i === 0 ? ['-Xlinker', '-sectcreate', '-Xlinker', arg] : ['-Xlinker', arg]
+    )
+    execFileSync('swiftc', ['-parse-as-library', '-O', ...sources, ...sectcreate, '-o', binary], {
       stdio: ['ignore', 'inherit', 'inherit']
     })
     log('[fm-helper] gebaut: native/fm-helper/bin/noctua-fm')
