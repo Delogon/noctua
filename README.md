@@ -78,7 +78,7 @@ Requirements: macOS, [Node.js](https://nodejs.org) ≥ 22,
 ```bash
 git clone https://github.com/Schereo/noctua.git
 cd noctua
-pnpm install        # dependencies + native rebuild (better-sqlite3)
+pnpm install        # dependencies
 pnpm dev            # run the app in dev mode (HMR)
 ```
 
@@ -110,17 +110,18 @@ normalization, JWZ-light), MIME parsing, ingest incl. Gmail dedupe, FTS
 search, rule matching, budget math, outbox/undo-send, the IPC contract, and
 all migrations (in-memory DB). Electron is mocked in `test/setup.ts`.
 
-**better-sqlite3 ABI:** the native module is ABI-bound — the app runs under
-Electron's Node, tests under system Node. `pnpm test` automatically rebuilds
-it for Node, runs the tests, and restores the Electron build afterwards. If
-a test run dies hard, `pnpm run rebuild:electron` repairs the app build.
+**Native SQLite module:** `better-sqlite3-multiple-ciphers` ships Node-API
+prebuilds (ABI-stable), so the same binary runs under Electron and under the
+system Node used by the tests — no rebuild step. The database is encrypted
+with SQLCipher 4; the key lives in the macOS keychain via Electron
+safeStorage (`userData/noctua.dbkey`).
 
 CI (`.github/workflows/ci.yml`) runs typecheck + tests on every push and PR.
 
 ## Architecture
 
 - **Main process**: IMAP sync (imapflow, IDLE + polling), SQLite with FTS5
-  and sqlite-vec (better-sqlite3), AI queue (OpenRouter), credentials in a
+  and sqlite-vec (better-sqlite3-multiple-ciphers, SQLCipher-encrypted), AI queue (OpenRouter), credentials in a
   safeStorage vault, SMTP (nodemailer) with outbox and undo window
 - **Renderer**: React 19, sandboxed with no Node access; data flows
   exclusively through the typed IPC contract (`src/shared/ipc-contract.ts`,

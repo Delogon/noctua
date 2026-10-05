@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { upsertEnvelope } from '@main/mail/ingest'
 import { deleteDraft, listDrafts, saveDraft } from '@main/db/repos/drafts'
 import { createTestDb, closeTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'

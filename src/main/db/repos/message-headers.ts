@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import type { MailAuthenticationStatus, MessageHeaderDetails, Recipient } from '@shared/types'
 
 const MAX_RAW_HEADER_BYTES = 512 * 1024

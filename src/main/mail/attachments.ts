@@ -1,7 +1,7 @@
 import { app, dialog } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import PostalMime from 'postal-mime'
 import { syncEngine } from '../sync/engine'
 

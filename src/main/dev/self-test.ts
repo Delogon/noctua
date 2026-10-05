@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { sendMail } from '../smtp/sender'
 import { syncEngine } from '../sync/engine'
 import { startDraftNew, startDraftReply } from '../ai/drafts'

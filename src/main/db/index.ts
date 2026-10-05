@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { join } from 'path'
-import Database from 'better-sqlite3'
+import Database from 'better-sqlite3-multiple-ciphers'
 import * as sqliteVec from 'sqlite-vec'
 import { runMigrations } from './migrate'
 

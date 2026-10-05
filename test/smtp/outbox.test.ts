@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { outboxWorker } from '@main/smtp/outbox'
 import { setSetting } from '@main/db'
 import { createTestDb, closeTestDb, seedAccount } from '../helpers/db'

@@ -1,5 +1,5 @@
 import { ImapFlow, type FetchMessageObject, type MessageAddressObject } from 'imapflow'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { buildImapOptions, type AccountRow, type MailCredentials } from '../auth/providers'
 import { parseMail } from '../mail/parser'
 import {
