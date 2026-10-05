@@ -32,6 +32,9 @@ importers:
       hunspell-asm:
         specifier: ^4.0.2
         version: 4.0.2
+      ical.js:
+        specifier: ^2.2.1
+        version: 2.2.1
       imapflow:
         specifier: ^1.4.3
         version: 1.4.3
@@ -2405,6 +2408,9 @@ packages:
   hunspell-asm@4.0.2:
     resolution: {integrity: sha512-u3ZuEYKGYnLZlIs+k5S+KdY+Q57mYD46fTwZJCiSXdES+fhxcLNF5mJ0nxjqrPAgE/8Kow6XLxRdRd/HDUPQZg==}
     engines: {node: '>=4'}
+
+  ical.js@2.2.1:
+    resolution: {integrity: sha512-yK/UlPbEs316igb/tjRgbFA8ZV75rCsBJp/hWOatpyaPNlgw0dGDmU+FoicOcwX4xXkeXOkYiOmCqNPFpNPkQg==}
 
   iconv-lite@0.7.2:
     resolution: {integrity: sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==}
@@ -6240,6 +6246,8 @@ snapshots:
     dependencies:
       emscripten-wasm-loader: 3.0.3
       nanoid: 2.1.11
+
+  ical.js@2.2.1: {}
 
   iconv-lite@0.7.2:
     dependencies:
