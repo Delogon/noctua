@@ -23,6 +23,7 @@ import m022 from './022_embeddings_base.sql?raw'
 import m023 from './023_contact_display_name.sql?raw'
 import m024 from './024_outbox_reliability.sql?raw'
 import m025 from './025_op_queue_dead_letter.sql?raw'
+import m026 from './026_ai_profiles.sql?raw'
 
 /**
  * Migrationen als ?raw-Importe, damit sie in das Main-Bundle eingebettet werden
@@ -54,5 +55,6 @@ export const migrations: ReadonlyArray<{ version: number; name: string; sql: str
   { version: 22, name: '022_embeddings_base', sql: m022 },
   { version: 23, name: '023_contact_display_name', sql: m023 },
   { version: 24, name: '024_outbox_reliability', sql: m024 },
-  { version: 25, name: '025_op_queue_dead_letter', sql: m025 }
+  { version: 25, name: '025_op_queue_dead_letter', sql: m025 },
+  { version: 26, name: '026_ai_profiles', sql: m026 }
 ]

@@ -17,7 +17,7 @@ describe('migrations', () => {
 
   it('wenden alle Migrationen sauber an und setzen user_version', () => {
     db = createTestDb()
-    expect(db.pragma('user_version', { simple: true })).toBe(25)
+    expect(db.pragma('user_version', { simple: true })).toBe(26)
   })
 
   it('erzwingt eindeutige Postfachnamen unabhängig von Großschreibung', () => {
@@ -225,7 +225,7 @@ describe('migrations', () => {
     db = createTestDb()
     const { runMigrations } = await import('@main/db/migrate')
     const result = runMigrations(db)
-    expect(result).toEqual({ from: 25, to: 25 })
+    expect(result).toEqual({ from: 26, to: 26 })
   })
 
   it('bereinigt Aufgaben aus kontenuebergreifenden Selbst-Sends', async () => {
@@ -281,7 +281,7 @@ describe('migrations', () => {
     `)
     db.pragma('user_version = 11')
     const { runMigrations } = await import('@main/db/migrate')
-    expect(runMigrations(db)).toEqual({ from: 11, to: 25 })
+    expect(runMigrations(db)).toEqual({ from: 11, to: 26 })
     expect(db.prepare('SELECT count(*) count FROM tasks').get()).toEqual({ count: 0 })
     expect(
       db
@@ -328,7 +328,7 @@ describe('migrations', () => {
       conn.exec(`ALTER TABLE op_queue DROP COLUMN last_error`)
       conn.pragma('user_version = 22')
 
-      expect(runMigrations(conn)).toEqual({ from: 22, to: 25 })
+      expect(runMigrations(conn)).toEqual({ from: 22, to: 26 })
       const backup = `${path}.bak-v22`
       expect(existsSync(backup)).toBe(true)
       const bak = new Database(backup)
