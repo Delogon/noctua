@@ -45,7 +45,7 @@ Alle Felder sind optional. Unbekannte Felder sind ein Fehler.
 | `defaults`                 | siehe unten                       | Voreinstellungen, die nur gelten, solange der Nutzer nichts gewählt hat.                                                                                   |
 | `aiProfiles`               | Liste                             | Von der Organisation bereitgestellte KI-Profile (managed).                                                                                                 |
 | `oauth`                    | `{ google?, microsoft? }`         | Eigene OAuth-Clients statt der Thunderbird-Defaults.                                                                                                       |
-| `hideOpenRouterOnboarding` | boolean                           | Onboarding-Schritt 3 zeigt die Org-Profile statt der OpenRouter-Abfrage.                                                                                   |
+| `hideOpenRouterOnboarding` | boolean                           | Onboarding-Schritt 3 zeigt die Org-Profile statt der KI-Wahl (lokaler Server / Apple / Cloud / Überspringen).                                                                                   |
 
 ### `updates`
 

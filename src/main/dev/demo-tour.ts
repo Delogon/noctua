@@ -1,3 +1,4 @@
+import { createServer } from 'node:http'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, type BrowserWindow } from 'electron'
@@ -352,16 +353,42 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
     })
   }
 
-  /** Onboarding mit Org-Profilen (Build mit NOCTUA_ORG_CONFIG, siehe scripts/demo-tour.sh). */
+  /**
+   * Onboarding: Schritt 3. Mit Org-Build (NOCTUA_ORG_CONFIG) die Org-Profile,
+   * sonst die KI-Wahl — dafür läuft ein Fake-Ollama auf 127.0.0.1:11434, den
+   * ai:detectLocal findet.
+   */
   const onboarding = async (): Promise<void> => {
     await resize(1440, 900)
+    const lang = process.env.NOCTUA_DEMO_LANG === 'de' ? 'de-' : ''
+    const fake = createServer((req, res) => {
+      res.setHeader('Content-Type', 'application/json')
+      if (req.url === '/v1/models') {
+        res.end(
+          JSON.stringify({
+            data: [{ id: 'qwen3:30b' }, { id: 'llama3.2:3b' }, { id: 'nomic-embed-text:latest' }]
+          })
+        )
+      } else {
+        res.statusCode = 404
+        res.end('{}')
+      }
+    })
+    await new Promise<void>((resolve) => fake.listen(11434, '127.0.0.1', resolve))
     await step('onboarding', async () => {
       await wait(1500)
-      await shot('60-onboarding-connect')
+      await shot(`${lang}60-onboarding-connect`)
       await clickText('button', 'continue|weiter')
-      await wait(1200)
-      await shot('61-onboarding-org-profiles')
+      await wait(2000)
+      await shot(`${lang}62-onboarding-ai-local`)
+      await clickText('[data-ai-option="cloud"]', '')
+      await wait(900)
+      await shot(`${lang}63-onboarding-ai-cloud`)
+      await clickText('[data-ai-option="skip"]', '')
+      await wait(900)
+      await shot(`${lang}64-onboarding-ai-skip`)
     })
+    fake.close()
   }
 
   const local = async (): Promise<void> => {

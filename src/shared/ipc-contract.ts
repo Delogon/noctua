@@ -449,6 +449,23 @@ export const invokeContract = {
     input: z.object({ profileId: profileIdSchema, manual: z.boolean().default(false) }),
     output: z.object({ models: z.array(modelInfoSchema), skipped: z.boolean() })
   },
+  // Lokale KI-Server erkennen (Onboarding): Main sondiert nur fest verdrahtete
+  // Loopback-Adressen (Ollama, LM Studio, llama.cpp, LocalAI/vLLM) — erlaubt auch
+  // unter Local only, da nie ein Nicht-Loopback-Host angefragt wird.
+  'ai:detectLocal': {
+    input: z.void(),
+    output: z.object({
+      found: z
+        .array(
+          z.object({
+            kind: z.enum(['ollama', 'lmstudio', 'llamacpp', 'localai']),
+            baseUrl: z.string().max(200),
+            models: z.array(z.string().max(200)).max(200)
+          })
+        )
+        .max(8)
+    })
+  },
   'ai:profiles:list': {
     input: z.void(),
     output: z.object({ profiles: z.array(aiProfileSchema) })
