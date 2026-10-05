@@ -48,7 +48,9 @@ describe('tz (Europe/Berlin)', () => {
       '2025-07-01T10:00:00.000Z'
     )
     expect(
-      iso(resolveZone('/freeassociation.sourceforge.net/Europe/Berlin').wallToUtc(w(2025, 7, 1, 12)))
+      iso(
+        resolveZone('/freeassociation.sourceforge.net/Europe/Berlin').wallToUtc(w(2025, 7, 1, 12))
+      )
     ).toBe('2025-07-01T10:00:00.000Z')
 
     const vtz = new ICAL.Component(

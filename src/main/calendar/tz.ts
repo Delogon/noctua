@@ -31,7 +31,7 @@ export function isValidIana(tzid: string): boolean {
   if (hit !== undefined) return hit
   let ok = false
   // Intl akzeptiert auch Offsets ('+01:00') und alte Aliase; wir wollen Region/Stadt-IDs und UTC
-  if (/^[A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+){0,2}$/.test(tzid)) {
+  if (/^[A-Za-z_]+(?:\/[A-Za-z0-9_+]+){0,2}$/.test(tzid)) {
     try {
       new Intl.DateTimeFormat('en-US', { timeZone: tzid })
       ok = true
@@ -167,7 +167,7 @@ const WINDOWS_ZONES: Record<string, string> = {
   'Israel Standard Time': 'Asia/Jerusalem',
   'South Africa Standard Time': 'Africa/Johannesburg',
   'E. South America Standard Time': 'America/Sao_Paulo',
-  'UTC': 'UTC'
+  UTC: 'UTC'
 }
 
 /** Gespeicherte VTIMEZONE-Komponenten einer ICS, nach TZID. */
@@ -344,4 +344,3 @@ function yearlyRule(locals: Wall[]): string | null {
   if (same((d) => d.nth)) return `FREQ=YEARLY;BYMONTH=${d0.m};BYDAY=${d0.nth}${days[d0.dow]}`
   return null
 }
-

@@ -1,9 +1,5 @@
 import ICAL from 'ical.js'
-import type {
-  CalendarAlarm,
-  CalendarAttendee,
-  CalendarEventFields
-} from '@shared/calendar-types'
+import type { CalendarAlarm, CalendarAttendee, CalendarEventFields } from '@shared/calendar-types'
 import { resolveZone, UTC_ZONE, wallAsUtcMs, type VTimezones, type Wall, type Zone } from './tz'
 
 /**
@@ -20,6 +16,11 @@ export function parseCalendar(text: string): ICAL.Component {
   const root = new ICAL.Component(ICAL.parse(text))
   if (root.name !== 'vcalendar') throw new Error('Kein VCALENDAR')
   return root
+}
+
+/** ICS-Text mit abschließendem CRLF (RFC 5545). */
+export function serializeCalendar(root: ICAL.Component): string {
+  return `${root.toString()}\r\n`
 }
 
 export function vtimezonesOf(root: ICAL.Component): VTimezones {
@@ -57,11 +58,7 @@ function isUtcTime(t: ICAL.Time): boolean {
   return t.zone === ICAL.Timezone.utcTimezone || t.zone?.tzid === 'UTC'
 }
 
-export function timeInfoFrom(
-  t: ICAL.Time,
-  tzidParam: string | null,
-  vtz: VTimezones
-): TimeInfo {
+export function timeInfoFrom(t: ICAL.Time, tzidParam: string | null, vtz: VTimezones): TimeInfo {
   const wall: Wall = { y: t.year, m: t.month, d: t.day, h: t.hour, mi: t.minute, s: t.second }
   if (t.isDate) {
     return {
@@ -158,7 +155,8 @@ export function eventTimes(
   let explicit = true
   if (dtend) {
     endUtc = dtend.utcMs
-    if (start.allDay && !dtend.allDay) endUtc = Date.UTC(dtend.wall.y, dtend.wall.m - 1, dtend.wall.d)
+    if (start.allDay && !dtend.allDay)
+      endUtc = Date.UTC(dtend.wall.y, dtend.wall.m - 1, dtend.wall.d)
     if (endUtc < start.utcMs) endUtc = start.utcMs
   } else {
     const dur = comp.getFirstPropertyValue('duration')
@@ -223,7 +221,8 @@ export function extractObjectFields(root: ICAL.Component): ObjectFields {
   const uid = strProp(primary, 'uid')
   if (!uid) throw new Error('UID fehlt')
   const times = kind === 'vjournal' ? null : eventTimes(primary, vtz)
-  const lm = primary.getFirstPropertyValue('last-modified') ?? primary.getFirstPropertyValue('dtstamp')
+  const lm =
+    primary.getFirstPropertyValue('last-modified') ?? primary.getFirstPropertyValue('dtstamp')
   const organizer = mailtoAddress(primary.getFirstPropertyValue('organizer'))
   const seq = Number(primary.getFirstPropertyValue('sequence') ?? 0)
   return {
@@ -268,13 +267,13 @@ export interface ExpandOptions {
 }
 
 /** UNTIL → UTC-ms-Grenze (inklusiv) bzw. Tag für Datumswerte. */
-function untilLimit(
-  rule: ICAL.Recur,
-  start: TimeInfo
-): { utcMs: number } | { day: string } | null {
+function untilLimit(rule: ICAL.Recur, start: TimeInfo): { utcMs: number } | { day: string } | null {
   const until = rule.until
   if (!until) return null
-  if (until.isDate) return { day: wallToDateString({ y: until.year, m: until.month, d: until.day, h: 0, mi: 0, s: 0 }) }
+  if (until.isDate)
+    return {
+      day: wallToDateString({ y: until.year, m: until.month, d: until.day, h: 0, mi: 0, s: 0 })
+    }
   const wall: Wall = {
     y: until.year,
     m: until.month,
@@ -346,7 +345,9 @@ export function expandResource(root: ICAL.Component, opts: ExpandOptions): Occur
   const { master, overrides } = splitComponents(root, 'vevent')
   const out: Occurrence[] = []
   const inWindow = (s: number, e: number): boolean =>
-    opts.all === true || (e > opts.windowStart && s < opts.windowEnd) || (s === e && s >= opts.windowStart && s < opts.windowEnd)
+    opts.all === true ||
+    (e > opts.windowStart && s < opts.windowEnd) ||
+    (s === e && s >= opts.windowStart && s < opts.windowEnd)
 
   const masterTimes = master ? eventTimes(master, vtz) : null
   const recurring = !!master && (master.hasProperty('rrule') || master.hasProperty('rdate'))
@@ -365,9 +366,7 @@ export function expandResource(root: ICAL.Component, opts: ExpandOptions): Occur
   if (master && masterTimes && !recurring) {
     const s = masterTimes.start
     if (inWindow(s.utcMs, masterTimes.endUtc)) {
-      out.push(
-        occurrenceFrom(s, s.utcMs, s.wall, masterTimes.durationMs, master, false, null)
-      )
+      out.push(occurrenceFrom(s, s.utcMs, s.wall, masterTimes.durationMs, master, false, null))
     }
     return out
   }
@@ -475,7 +474,8 @@ export function readAlarms(comp: ICAL.Component): CalendarAlarm[] {
       const related = triggerProp.getParameter('related')
       out.push({
         action,
-        relativeTo: typeof related === 'string' && related.toUpperCase() === 'END' ? 'END' : 'START',
+        relativeTo:
+          typeof related === 'string' && related.toUpperCase() === 'END' ? 'END' : 'START',
         offsetSeconds: value.toSeconds(),
         absoluteUtc: null,
         description
@@ -580,7 +580,8 @@ export function readFields(
     description: propText(comp, 'description'),
     time,
     rrule: ruleString(comp),
-    status: status === 'CONFIRMED' || status === 'TENTATIVE' || status === 'CANCELLED' ? status : null,
+    status:
+      status === 'CONFIRMED' || status === 'TENTATIVE' || status === 'CANCELLED' ? status : null,
     transparency: transp === 'TRANSPARENT' ? 'TRANSPARENT' : transp === 'OPAQUE' ? 'OPAQUE' : null,
     alarms: readAlarms(comp),
     attendees: readAttendees(comp),
