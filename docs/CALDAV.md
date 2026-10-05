@@ -185,9 +185,8 @@ servers: mailbox.org, Fastmail, Posteo, SOGo, Baïkal (the generic RFC 4791/6578
 
 ## Limitations
 
-- Invitations/iMIP, free/busy, CardDAV: not part of the CalDAV core (VTODOs: see "Tasks" below).
-- RFC 6638 scheduling is only detected/stored (`auto_schedule`, inbox/outbox URLs, user
-  addresses); ATTENDEE/ORGANIZER are written as given, no PARTSTAT replies yet.
+- No VTODO two-way sync beyond "Tasks" below, no CardDAV in this document.
+- Scheduling and invitations: see "Scheduling & invitations" below.
 - Moving an event between calendars is not supported by `updateEvent`.
 - Floating times follow the current system zone; a zone change is picked up on re-materialisation.
 - Alarms further than 31 days ahead are not scheduled; reminder snooze does not survive a restart.
@@ -195,6 +194,90 @@ servers: mailbox.org, Fastmail, Posteo, SOGo, Baïkal (the generic RFC 4791/6578
 - A server that answers an empty calendar list does not delete local calendars (guards against
   glitches); delete the account to drop them.
 - Discovery by SRV needs DNS access; blocked DNS falls back to well-known.
+
+## Scheduling & invitations (Phase 2.3)
+
+Code: `src/main/calendar/` `itip.ts` (pure iTIP: parse, REPLY/REQUEST/CANCEL, free/busy),
+`invitations.ts` (ingest, card data, RSVP), `organizer.ts` (outgoing invites + queue),
+`freebusy.ts`, `identity.ts` ("me"), `mailer.ts` (iMIP texts + outbox hook); UI:
+`InvitationCard.tsx` (mounted once in `EmailSheet`). Migration 031.
+
+### Incoming (attendee side)
+
+`parseMail` collects `text/calendar` / `application/ics` parts (and `.ics` attachments) with the
+MIME `method` parameter (max 4 parts, 256 KB each). `storeBody` → `storeInvitations` parses them into
+table `invitations` (one row per message part; METHOD, UID, SEQUENCE, DTSTAMP, organizer, times
+resolved to UTC incl. Windows TZIDs, RRULE, RECURRENCE-ID, attendees, my address + PARTSTAT, raw ICS,
+matched `cal_objects` row by UID, state). Cards show REQUEST / CANCEL / REPLY / COUNTER.
+
+"Me" = all mail account addresses + calendar account username/`user_addresses`. The address used for
+a reply is the attendee entry that matches, else the receiving mail account.
+
+An invitation is **outdated** when the calendar copy has a higher SEQUENCE or another invitation for
+the same UID/RECURRENCE-ID has a higher (SEQUENCE, DTSTAMP). Outdated cards cannot be answered.
+
+### RSVP decision (`respondToInvitation`)
+
+1. Event with this UID already in a calendar of an account with `calendar-auto-schedule`, we are not
+   organizer and we are an ATTENDEE there → **server path**: change only our PARTSTAT in the server
+   copy (existing `enqueueUpdate`, i.e. `PUT` with `If-Match` via the sync queue; for a single
+   occurrence an override is created). The server sends the REPLY. **No iMIP mail.** Decline keeps
+   the event with PARTSTAT=DECLINED (this is what makes the server send the reply).
+2. Otherwise → **iMIP path**: accept/tentative store the event (target calendar: chosen, else first
+   writable VEVENT calendar of the account matching the recipient, else `calendar.defaultCalendarId`,
+   else first writable) with our PARTSTAT, `SCHEDULE-AGENT=CLIENT` on ORGANIZER (so a scheduling
+   server does not also reply), VALARM/ATTACH stripped; and an iMIP REPLY goes through the outbox
+   (no undo delay) from the mail account that received the invitation: `multipart/mixed` →
+   `multipart/alternative` (text + `text/calendar; charset=utf-8; method=REPLY`) + `.ics` attachment
+   (nodemailer `icalEvent`). REPLY contains only our ATTENDEE, DTSTAMP, SEQUENCE, UID, ORGANIZER,
+   UTC DTSTART/DTEND, RECURRENCE-ID for single occurrences and the optional COMMENT.
+   Decline removes an existing non-organizer copy and only sends the mail.
+3. The same answer is never sent twice (state `responded` + same PARTSTAT without a new comment).
+
+CANCEL: "remove from calendar" is only allowed when the stored organizer equals the CANCEL's
+organizer and the CANCEL is not outdated.
+
+### Replies to our events (organizer side)
+
+REPLY mails are applied automatically — the only automatic change — if we are organizer of the
+stored event, the **mail's From address equals the replying ATTENDEE**, that attendee exists in the
+event and the reply's SEQUENCE is not older than the event's. Everything else is marked
+`reply-ignored` (spoofing protection). Only PARTSTAT changes.
+
+### Outgoing invitations
+
+`createEvent/updateEvent/deleteEvent(..., { notifyAttendees })` (IPC `notifyAttendees?`, default true).
+With attendees and no organizer the account's main address becomes organizer. Updates normalise
+SEQUENCE (RFC 5546 §2.1.4): only schedule/status/location changes bump it; rescheduling resets the
+attendees' PARTSTAT to NEEDS-ACTION.
+
+- Account with `calendar-auto-schedule`: only the normal PUT/DELETE; the server delivers.
+- Otherwise: REQUEST / CANCEL (removed attendees get a CANCEL listing only them; deleting a single
+  occurrence sends a CANCEL with RECURRENCE-ID) are stored in `cal_itip_queue` and sent through the
+  outbox only after the PUT/DELETE reached the server (no pending op for the UID). A dead op drops the
+  queued mail; an event deleted before it was ever uploaded sends nothing.
+
+### Free/busy
+
+`calendar:freebusy {accountId, attendees, rangeStart, rangeEnd}` (max 50 addresses, ≤ 62 days):
+own addresses come from the local DB, all others via `POST` of a VFREEBUSY REQUEST to the
+schedule-outbox (headers `Originator`, `Recipient`; RFC 6638 §5), response parsed from
+`schedule-response`. Servers without outbox: `source: 'unavailable'`. `calendar:freebusy:self` returns
+own busy intervals (excludes CANCELLED, TRANSPARENT, events declined by me; TENTATIVE separate).
+
+### Security
+
+Invitation content is untrusted: size/attendee caps, description stored as capped plain text and
+rendered without links, VALARM/ATTACH dropped when storing, nothing is added to a calendar without a
+click. Sender checks: `senderMismatch` hint on cards, REPLY sender == ATTENDEE, CANCEL organizer ==
+stored organizer. The From header itself is unauthenticated (SPF/DKIM are not evaluated here).
+
+### Not verified against live servers
+
+Nextcloud/sabre behaviour on attendee PARTSTAT PUT (reply delivery), decline via PARTSTAT, race
+between our created copy and the server's own inbox delivery (uid conflict → dead op shown as
+conflict), schedule-outbox responses of real servers, delivery/rendering of the iMIP mails in
+Outlook/Gmail/Apple Mail.
 
 ## Tasks <-> VTODO (3.2)
 

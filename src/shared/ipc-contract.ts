@@ -28,6 +28,15 @@ import {
 } from './calendar-types'
 import { davContactsStatusSchema } from './contacts-types'
 import {
+  freeBusyInputSchema,
+  freeBusyResultSchema,
+  freeBusySelfInputSchema,
+  busyIntervalSchema,
+  invitationRespondInputSchema,
+  invitationRespondOutputSchema,
+  invitationViewSchema
+} from './invitation-types'
+import {
   isRendererSecretKey,
   isRendererSettingReadable,
   isRendererSettingWritable
@@ -290,7 +299,11 @@ export const invokeContract = {
     output: z.object({ event: calendarEventDetailSchema })
   },
   'calendar:events:create': {
-    input: z.object({ event: calendarEventInputSchema }),
+    input: z.object({
+      event: calendarEventInputSchema,
+      /** Teilnehmer benachrichtigen (Standard: ja, wenn Teilnehmer vorhanden und der Nutzer Organisator ist) */
+      notifyAttendees: z.boolean().optional()
+    }),
     output: z.object({ objectId: z.number() })
   },
   'calendar:events:update': {
@@ -298,7 +311,8 @@ export const invokeContract = {
       objectId: z.number().int(),
       scope: calendarEditScopeSchema,
       recurrenceId: z.string().max(40).nullable(),
-      patch: calendarEventPatchSchema
+      patch: calendarEventPatchSchema,
+      notifyAttendees: z.boolean().optional()
     }),
     output: z.object({ objectId: z.number(), createdObjectId: z.number().nullable() })
   },
@@ -306,9 +320,35 @@ export const invokeContract = {
     input: z.object({
       objectId: z.number().int(),
       scope: calendarEditScopeSchema,
-      recurrenceId: z.string().max(40).nullable()
+      recurrenceId: z.string().max(40).nullable(),
+      notifyAttendees: z.boolean().optional()
     }),
     output: z.object({ ok: z.literal(true) })
+  },
+  // Einladungskarten (iMIP) einer Mail
+  'calendar:invitations:get': {
+    input: z.object({ messageId: z.number().int() }),
+    output: z.object({ invitations: z.array(invitationViewSchema) })
+  },
+  // RSVP: Server-Scheduling (nur PARTSTAT-PUT) oder iMIP-REPLY per Outbox
+  'calendar:invitations:respond': {
+    input: invitationRespondInputSchema,
+    output: invitationRespondOutputSchema
+  },
+  // Absage übernehmen: Termin aus dem Kalender entfernen
+  'calendar:invitations:removeCancelled': {
+    input: z.object({ invitationId: z.number().int() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Free/Busy anderer Teilnehmer (Scheduling-Outbox), „ich" aus den eigenen Kalendern
+  'calendar:freebusy': {
+    input: freeBusyInputSchema,
+    output: z.object({ results: z.array(freeBusyResultSchema) })
+  },
+  // Eigene Belegung aus der lokalen DB (z. B. für KI-Entwürfe)
+  'calendar:freebusy:self': {
+    input: freeBusySelfInputSchema,
+    output: z.object({ busy: z.array(busyIntervalSchema) })
   },
   // Sofortiger Abgleich (ein Konto oder alle); hebt needs-reauth-Wartezeiten auf
   'calendar:refresh': {

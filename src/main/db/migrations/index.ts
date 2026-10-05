@@ -28,6 +28,7 @@ import m027 from './027_ai_profiles_managed.sql?raw'
 import m028 from './028_caldav.sql?raw'
 import m029 from './029_task_caldav.sql?raw'
 import m030 from './030_carddav.sql?raw'
+import m031 from './031_invitations.sql?raw'
 
 /**
  * Migrationen als ?raw-Importe, damit sie in das Main-Bundle eingebettet werden
@@ -64,5 +65,6 @@ export const migrations: ReadonlyArray<{ version: number; name: string; sql: str
   { version: 27, name: '027_ai_profiles_managed', sql: m027 },
   { version: 28, name: '028_caldav', sql: m028 },
   { version: 29, name: '029_task_caldav', sql: m029 },
-  { version: 30, name: '030_carddav', sql: m030 }
+  { version: 30, name: '030_carddav', sql: m030 },
+  { version: 31, name: '031_invitations', sql: m031 }
 ]

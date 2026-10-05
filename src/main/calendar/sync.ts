@@ -15,6 +15,7 @@ import {
   type FetchLike
 } from '../dav'
 import { getSecret } from '../auth/secrets'
+import { flushItipQueue } from './organizer'
 import { syncAccountContacts } from '../contacts/sync'
 import {
   calSecretKey,
@@ -501,6 +502,14 @@ export async function pushPendingOps(ctx: SyncContext, account: CalAccountRow): 
     }
   }
   if (touched.size > 0) ctx.events.onChanged(account.id, [...touched])
+  // Einladungen (iMIP) erst nach erfolgreicher Übertragung versenden
+  try {
+    flushItipQueue(ctx.db, account.id)
+  } catch (error) {
+    console.warn(
+      `[calendar] iMIP-Warteschlange: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
   return pushed
 }
 

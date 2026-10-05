@@ -45,6 +45,13 @@ import {
   updateEvent as updateCalendarEvent
 } from '../calendar/service'
 import { calendarSync } from '../calendar/sync'
+import {
+  getInvitationsForMessage,
+  removeCancelledEvent,
+  respondToInvitation
+} from '../calendar/invitations'
+import { queryFreeBusy, selfBusy } from '../calendar/freebusy'
+import { defaultEditContext } from '../calendar/edit'
 import { contactsStatus, setAddressBookEnabled, setContactsSync } from '../contacts/accounts'
 import { getDraftModel, getTriageModel } from '../ai/openrouter'
 import { appleFmStatus } from '../ai/apple-fm'
@@ -500,15 +507,33 @@ export const handlers: IpcHandlers = {
     event: getCalendarEvent(objectId, recurrenceId)
   }),
 
-  'calendar:events:create': ({ event }) => createCalendarEvent(event),
+  'calendar:events:create': ({ event, notifyAttendees }) =>
+    createCalendarEvent(event, getDb(), undefined, { notifyAttendees }),
 
-  'calendar:events:update': ({ objectId, scope, recurrenceId, patch }) =>
-    updateCalendarEvent(objectId, scope, recurrenceId, patch),
+  'calendar:events:update': ({ objectId, scope, recurrenceId, patch, notifyAttendees }) =>
+    updateCalendarEvent(objectId, scope, recurrenceId, patch, getDb(), undefined, {
+      notifyAttendees
+    }),
 
-  'calendar:events:delete': ({ objectId, scope, recurrenceId }) => {
-    deleteCalendarEvent(objectId, scope, recurrenceId)
+  'calendar:events:delete': ({ objectId, scope, recurrenceId, notifyAttendees }) => {
+    deleteCalendarEvent(objectId, scope, recurrenceId, getDb(), undefined, { notifyAttendees })
     return { ok: true }
   },
+
+  'calendar:invitations:get': ({ messageId }) => ({
+    invitations: getInvitationsForMessage(getDb(), messageId)
+  }),
+
+  'calendar:invitations:respond': (input) => respondToInvitation(getDb(), input),
+
+  'calendar:invitations:removeCancelled': ({ invitationId }) => {
+    removeCancelledEvent(getDb(), invitationId, defaultEditContext())
+    return { ok: true }
+  },
+
+  'calendar:freebusy': async (input) => ({ results: await queryFreeBusy(input) }),
+
+  'calendar:freebusy:self': (input) => ({ busy: selfBusy(input) }),
 
   'calendar:refresh': ({ accountId }) => {
     calendarSync.refresh(accountId)

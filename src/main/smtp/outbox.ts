@@ -16,6 +16,8 @@ export interface OutboxPayload {
   textBody: string
   htmlBody?: string
   replyToMessageId?: number
+  /** Kalendereinladung/-antwort (iMIP, RFC 6047): wird als text/calendar-Alternative gesendet. */
+  icalEvent?: { method: string; content: string }
 }
 
 /** Maximale Sendeversuche (inkl. des ersten) bei transienten Fehlern. */
@@ -134,8 +136,13 @@ class OutboxWorker {
     return row !== undefined
   }
 
-  enqueue(accountId: number, payload: OutboxPayload): { outboxId: number; sendAt: number } {
-    const sendAt = Date.now() + undoSeconds() * 1000
+  enqueue(
+    accountId: number,
+    payload: OutboxPayload,
+    opts: { immediate?: boolean } = {}
+  ): { outboxId: number; sendAt: number } {
+    // Systemnachrichten (iMIP-Antworten) brauchen kein Undo-Fenster
+    const sendAt = Date.now() + (opts.immediate ? 0 : undoSeconds() * 1000)
     // Stabile Message-ID schon beim Einreihen: übersteht Neustarts und macht
     // die Mail im Gesendet-Ordner wiedererkennbar.
     const account = this.db!.prepare('SELECT email FROM accounts WHERE id = ?').get(accountId) as

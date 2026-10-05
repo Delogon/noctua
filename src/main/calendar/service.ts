@@ -26,6 +26,7 @@ import {
   enqueueCreate,
   enqueueDelete,
   enqueueUpdate,
+  getCalAccount,
   getCalendar,
   getInstanceWindow,
   getObject,
@@ -33,6 +34,14 @@ import {
   type CalendarRow,
   type CalObjectRow
 } from './repo'
+import {
+  dropQueuedItip,
+  planUpdate,
+  queueForCreate,
+  queueForDelete,
+  withDefaultOrganizer,
+  type SchedulingOptions
+} from './organizer'
 import { calendarSync } from './sync'
 import { systemTimeZone, resolveZone } from './tz'
 
@@ -400,15 +409,21 @@ function afterWrite(cal: CalendarRow): void {
 export function createEvent(
   input: CalendarEventInput,
   db: Database.Database = getDb(),
-  ctx?: EditContext
+  ctx?: EditContext,
+  scheduling: SchedulingOptions = {}
 ): { objectId: number } {
   const cal = writableCalendar(db, input.calendarId)
-  const { calendarId: _calendarId, ...fields } = input
+  const account = getCalAccount(db, cal.account_id)
+  const { calendarId: _calendarId, ...rawFields } = input
   void _calendarId
+  // Mit Teilnehmern ist der Nutzer Organisator (Standard: Hauptadresse des Kontos)
+  const fields = account ? withDefaultOrganizer(db, account, rawFields) : rawFields
   const { ics, uid } = createEventIcs(fields, ctx)
   let objectId = 0
   db.transaction(() => {
     objectId = enqueueCreate(db, cal, uid, ics)
+    // Ohne Server-Scheduling: Einladung geht nach erfolgreichem PUT per Mail raus
+    if (account) queueForCreate(db, account, uid, ics, scheduling, ctx?.now)
   })()
   afterWrite(cal)
   return { objectId }
@@ -426,17 +441,25 @@ export function updateEvent(
   recurrenceId: string | null,
   patch: CalendarEventPatch,
   db: Database.Database = getDb(),
-  ctx?: EditContext
+  ctx?: EditContext,
+  scheduling: SchedulingOptions = {}
 ): { objectId: number; createdObjectId: number | null } {
   const obj = getObject(db, objectId)
   if (!obj || obj.pending_op === 'delete') throw new Error('Ereignis nicht gefunden')
   const cal = writableCalendar(db, obj.calendar_id)
+  const account = getCalAccount(db, cal.account_id)
   const result = updateIcs(obj.ics, { scope, recurrenceId, patch }, ctx)
   let createdObjectId: number | null = null
   db.transaction(() => {
-    enqueueUpdate(db, obj, cal, result.ics)
-    if (result.created)
+    // Organisator mit Teilnehmern: SEQUENCE/PARTSTAT nach RFC 5546 führen, Mails einreihen
+    const plan = account
+      ? planUpdate(db, account, obj.uid, obj.ics, result.ics, scheduling, ctx?.now)
+      : { ics: result.ics }
+    enqueueUpdate(db, obj, cal, plan.ics)
+    if (result.created) {
       createdObjectId = enqueueCreate(db, cal, result.created.uid, result.created.ics)
+      if (account) queueForCreate(db, account, result.created.uid, result.created.ics, scheduling)
+    }
   })()
   afterWrite(cal)
   return { objectId, createdObjectId }
@@ -448,15 +471,73 @@ export function deleteEvent(
   scope: CalendarEditScope,
   recurrenceId: string | null,
   db: Database.Database = getDb(),
-  ctx?: EditContext
+  ctx?: EditContext,
+  scheduling: SchedulingOptions = {}
 ): void {
   const obj = getObject(db, objectId)
   if (!obj || obj.pending_op === 'delete') throw new Error('Ereignis nicht gefunden')
   const cal = writableCalendar(db, obj.calendar_id)
+  const account = getCalAccount(db, cal.account_id)
   const result = deleteFromIcs(obj.ics, { scope, recurrenceId }, ctx)
   db.transaction(() => {
-    if (result.kind === 'delete') enqueueDelete(db, obj, cal)
-    else enqueueUpdate(db, obj, cal, result.ics)
+    if (result.kind === 'delete') {
+      if (account) {
+        if (obj.pending_op === 'create') {
+          // Nie übertragen, nie eingeladen: wartende Einladung verwerfen, nichts absagen
+          dropQueuedItip(db, account.id, obj.uid)
+        } else {
+          queueForDelete(db, account, obj.uid, obj.ics, { range: 'all' }, scheduling, ctx?.now)
+        }
+      }
+      enqueueDelete(db, obj, cal)
+    } else {
+      if (account && recurrenceId !== null && scope !== 'all') {
+        queueForDelete(
+          db,
+          account,
+          obj.uid,
+          obj.ics,
+          { range: scope, recurrenceId },
+          scheduling,
+          ctx?.now
+        )
+      }
+      enqueueUpdate(db, obj, cal, result.ics)
+    }
   })()
   afterWrite(cal)
+}
+
+/**
+ * Setzt eine fertig gebaute ICS-Fassung für ein vorhandenes Objekt (z. B.
+ * PARTSTAT-Änderung durch RSVP oder eine eingegangene Antwort). Optimistisch
+ * lokal, Übertragung per Sync; kein Teilnehmer-Versand (der Aufrufer
+ * entscheidet über den Antwortweg).
+ */
+export function applyIcsToObject(
+  objectId: number,
+  ics: string,
+  db: Database.Database = getDb()
+): void {
+  const obj = getObject(db, objectId)
+  if (!obj || obj.pending_op === 'delete') throw new Error('Ereignis nicht gefunden')
+  const cal = writableCalendar(db, obj.calendar_id)
+  db.transaction(() => enqueueUpdate(db, obj, cal, ics))()
+  afterWrite(cal)
+}
+
+/** Legt eine fertig gebaute ICS-Ressource im Kalender an (Einladung angenommen). */
+export function createObjectFromIcs(
+  calendarId: number,
+  uid: string,
+  ics: string,
+  db: Database.Database = getDb()
+): number {
+  const cal = writableCalendar(db, calendarId)
+  let objectId = 0
+  db.transaction(() => {
+    objectId = enqueueCreate(db, cal, uid, ics)
+  })()
+  afterWrite(cal)
+  return objectId
 }

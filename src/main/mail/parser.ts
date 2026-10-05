@@ -12,6 +12,22 @@ export interface ParsedAttachment {
   size: number
 }
 
+/** text/calendar-Teil (Einladung, iMIP): Methode aus dem MIME-Parameter + ICS-Text. */
+export interface ParsedCalendarPart {
+  method: string | null
+  content: string
+}
+
+const MAX_CALENDAR_PART_BYTES = 256 * 1024
+const MAX_CALENDAR_PARTS = 4
+
+function isCalendarAttachment(att: { mimeType?: string; filename?: string | null }): boolean {
+  const type = (att.mimeType ?? '').toLowerCase()
+  if (type === 'text/calendar' || type === 'application/ics') return true
+  // Manche Clients senden .ics als application/octet-stream
+  return /\.ics$/i.test(att.filename ?? '') && (type === '' || type === 'application/octet-stream')
+}
+
 export interface ParsedMail {
   messageId: string | null
   inReplyTo: string | null
@@ -28,6 +44,8 @@ export interface ParsedMail {
   html: string | null
   snippet: string | null
   attachments: ParsedAttachment[]
+  /** Einladungsteile (text/calendar, application/ics) — unvertrauenswürdig, begrenzt */
+  calendarParts?: ParsedCalendarPart[]
 }
 
 function toAddress(a: { name?: string; address?: string } | undefined): ParsedAddress | null {
@@ -66,6 +84,28 @@ export function makeSnippet(text: string | null, html: string | null): string | 
   return source.replace(/\s+/g, ' ').slice(0, 180)
 }
 
+function extractCalendarParts(
+  attachments: Array<{
+    mimeType?: string
+    filename?: string | null
+    method?: string
+    content?: ArrayBuffer | string | Uint8Array
+  }>
+): ParsedCalendarPart[] {
+  const out: ParsedCalendarPart[] = []
+  for (const att of attachments) {
+    if (out.length >= MAX_CALENDAR_PARTS) break
+    if (!isCalendarAttachment(att) || att.content === undefined) continue
+    const size = typeof att.content === 'string' ? att.content.length : att.content.byteLength
+    if (size === 0 || size > MAX_CALENDAR_PART_BYTES) continue
+    const content =
+      typeof att.content === 'string' ? att.content : new TextDecoder('utf-8').decode(att.content)
+    if (!/BEGIN:VCALENDAR/i.test(content)) continue
+    out.push({ method: att.method?.toUpperCase() ?? null, content })
+  }
+  return out
+}
+
 /** Parst eine rohe RFC822-Mail. Wirft nie — kaputte Mails liefern ein Minimal-Resultat. */
 export async function parseMail(source: Buffer | Uint8Array): Promise<ParsedMail> {
   try {
@@ -91,6 +131,7 @@ export async function parseMail(source: Buffer | Uint8Array): Promise<ParsedMail
       text,
       html,
       snippet: makeSnippet(text, html),
+      calendarParts: extractCalendarParts(email.attachments ?? []),
       attachments: (email.attachments ?? []).map((att) => ({
         filename: att.filename ?? null,
         mimeType: att.mimeType ?? null,

@@ -23,6 +23,8 @@ export interface OutgoingMail {
   textBody: string
   htmlBody?: string
   replyToMessageId?: number
+  /** iMIP: Kalenderteil (multipart/alternative mit text/calendar; method=…, RFC 6047) */
+  icalEvent?: { method: string; content: string }
   /** Stabile Message-ID (aus der Outbox) — macht eine gesendete Mail wiedererkennbar. */
   messageId?: string
 }
@@ -216,6 +218,7 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
       text: plainText,
       ...(html ? { html, attachments } : {}),
       ...(mail.messageId ? { messageId: mail.messageId } : {}),
+      ...(mail.icalEvent ? { icalEvent: mail.icalEvent } : {}),
       inReplyTo,
       references
     })
