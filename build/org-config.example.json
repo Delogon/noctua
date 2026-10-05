@@ -1,0 +1,39 @@
+{
+  "productName": "Acme Mail",
+  "appId": "com.example.acme-mail",
+  "executableName": "acme-mail",
+  "updates": { "mode": "url", "url": "https://updates.example.com/acme-mail/latest.json" },
+  "links": {
+    "homepage": "https://intranet.example.com/mail",
+    "support": "https://intranet.example.com/mail/support"
+  },
+  "defaults": {
+    "localOnly": false,
+    "aiEnabledForNewAccounts": true,
+    "remoteImagesDefault": "block",
+    "language": "de"
+  },
+  "aiProfiles": [
+    {
+      "id": "acme-llm",
+      "name": "Acme LLM",
+      "baseUrl": "https://llm.example.com/v1",
+      "apiStyle": "chat",
+      "isLocal": false,
+      "tasks": { "triage": "small-model", "draft": "large-model" }
+    },
+    {
+      "id": "acme-whisper",
+      "name": "Acme Diktat",
+      "baseUrl": "https://stt.example.com/v1",
+      "apiStyle": "chat",
+      "isLocal": false,
+      "tasks": { "stt": "whisper-1" }
+    }
+  ],
+  "oauth": {
+    "google": { "clientId": "123456789-example.apps.googleusercontent.com" },
+    "microsoft": { "clientId": "00000000-0000-0000-0000-000000000000" }
+  },
+  "hideOpenRouterOnboarding": true
+}

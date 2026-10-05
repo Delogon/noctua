@@ -41,7 +41,7 @@ Weitere Modi: `stt-check <locale>` (Verfügbarkeit, ohne Download/Dialog) und
 
 ## Berechtigungen
 
-- `NSSpeechRecognitionUsageDescription` steht in `electron-builder.yml`
+- `NSSpeechRecognitionUsageDescription` steht in `electron-builder.config.mjs`
   (`mac.extendInfo`) und zusätzlich als eingebettetes Info.plist im Helper
   (`native/fm-helper/Info.plist`, per `-sectcreate __TEXT __info_plist`).
   Bei Kindprozessen ordnet macOS die Anfrage dem verantwortlichen Prozess (der
