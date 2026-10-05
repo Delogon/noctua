@@ -6,7 +6,8 @@
 # Umgebung (optional): DEMO_LOCAL_ONLY=1  Local only einschalten
 #                      DEMO_LANG=de|en    UI-Sprache (Standard en)
 #                      DEMO_PASS=main|local|small|onboarding   Tour-Durchlauf (Standard main)
-#                        onboarding braucht einen Build mit Org-Konfiguration:
+#                        onboarding zeigt die KI-Wahl (Fake-Ollama auf 127.0.0.1:11434); mit einem
+#                        Build mit Org-Konfiguration stattdessen die Org-Profile:
 #                        NOCTUA_ORG_CONFIG=build/org-config.example.json pnpm exec electron-vite build
 #                      DEMO_TIMEOUT=240   Abbruch in Sekunden
 #

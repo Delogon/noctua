@@ -5,8 +5,8 @@ named `de-*`. Window 1440x900, the `4x` series 1180x760 (minimum width). Demo da
 Mon 5 Oct 2026; "now" in the calendar is the capture time.
 
 Regenerate: `pnpm exec electron-vite build && scripts/demo-tour.sh <outdir>`
-(`DEMO_PASS=local DEMO_LOCAL_ONLY=1`, `DEMO_PASS=small`, `DEMO_LANG=de`; the onboarding pass needs a
-build with `NOCTUA_ORG_CONFIG=build/org-config.example.json`). See `src/main/dev/demo-seed.ts`.
+(`DEMO_PASS=local DEMO_LOCAL_ONLY=1`, `DEMO_PASS=small`, `DEMO_LANG=de`; the onboarding pass shows the AI step; with a
+company build (`NOCTUA_ORG_CONFIG=build/org-config.example.json`) the organisation profiles instead). See `src/main/dev/demo-seed.ts`.
 
 | File | Shows |
 | --- | --- |
@@ -27,7 +27,8 @@ build with `NOCTUA_ORG_CONFIG=build/org-config.example.json`). See `src/main/dev
 | 40-45 | 1180 px window: inbox, calendar week/month/day, editor (44b: attendees + availability), settings |
 | 50-52 | Local only ON: LOCAL ONLY badge, blocked external profile, "on request" connections |
 | 60, 61 | Onboarding with organisation AI profiles (company build) |
-| de-* | German UI (invitation, calendar week, accounts) |
+| 62, 63, 64 | Onboarding step 3 "Where should the AI run?": local server detected (Ollama on 127.0.0.1, models auto-picked, Local only on), cloud provider (OpenRouter key, privacy note), skip (Local only off). The pass starts a fake Ollama on 127.0.0.1:11434 |
+| de-* | German UI (invitation, calendar week, accounts, onboarding AI step: de-62, de-63) |
 
 ## Known remaining visual issues
 
