@@ -252,7 +252,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       // Fokus weg (unvollständige Eingabe wird verworfen), nicht Escape: das würde den Editor schließen
       await js(`(() => { if (document.activeElement) document.activeElement.blur() })()`)
       await wait(300)
-      await clickText('.cal-editor button.text-btn', 'next free slot|nächster gemeinsamer')
+      await clickText('.cal-editor button.text-btn', 'next free slot|nächste freie zeit')
       await wait(1500)
       await js(
         `(() => { const e = document.querySelector('.cal-editor .overflow-y-auto'); if (e) e.scrollTop = 9999 })()`
@@ -300,7 +300,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       await shot('30b-settings-accounts-end')
     })
     await step('settings-intel', async () => {
-      await openSettings('intelligence|intelligenz')
+      await openSettings('intelligence|ki')
       await shot('31-settings-intelligence')
       await scrollMain(650)
       await shot('31b-settings-intelligence-models')
@@ -308,7 +308,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       await shot('31c-settings-intelligence-end')
     })
     await step('settings-tech', async () => {
-      await openSettings('under the hood|technik')
+      await openSettings('under the hood|unter der haube')
       await shot('32-settings-tech')
       await scrollMain(0, true)
       await shot('32b-settings-tech-network')
@@ -399,13 +399,13 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       await shot('50-local-only-inbox')
     })
     await step('intel', async () => {
-      await openSettings('intelligence|intelligenz')
+      await openSettings('intelligence|ki')
       await shot('51-local-only-intelligence')
       await scrollMain(0, true)
       await shot('51b-local-only-intelligence-end')
     })
     await step('tech', async () => {
-      await openSettings('under the hood|technik')
+      await openSettings('under the hood|unter der haube')
       await scrollMain(0, true)
       await shot('52-local-only-tech-network')
     })

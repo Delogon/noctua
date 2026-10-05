@@ -707,7 +707,7 @@ const table = {
   owlAsleepNoKey: { en: 'asleep — no key.', de: 'schläft – kein Schlüssel.' },
   owlAsleepLocalOnly: {
     en: 'asleep — Local only, no local model set.',
-    de: 'schläft – „Nur lokal“ ist an, aber kein lokales Modell gewählt.'
+    de: 'schläft – kein lokales Modell.'
   },
   owlListening: { en: 'listening…', de: 'hört zu…' },
   owlDraftingS: { en: 'drafting…', de: 'entwirft…' },
@@ -1944,7 +1944,7 @@ const table = {
   techSpellTitle: { en: 'Spelling — offline, honest', de: 'Rechtschreibung – offline und ehrlich' },
   techSpellSample: { en: 'definately', de: 'Rechtschreibpürfung' },
   techSpellEngine: { en: 'HUNSPELL · WASM', de: 'HUNSPELL · WASM' },
-  techSpellDictNote: { en: 'BUNDLED LOCALLY', de: 'LOKAL MITGELIEFERT' },
+  techSpellDictNote: { en: 'BUNDLED LOCALLY', de: 'LOKAL IM PAKET' },
   techSpellSuggest: { en: 'SUGGESTIONS', de: 'VORSCHLÄGE' },
   techSpellFix: { en: 'definitely', de: 'Rechtschreibprüfung' },
   techSpellIgnoreNote: { en: 'IGNORE — THIS SESSION ONLY', de: 'IGNORIEREN – NUR DIESE SITZUNG' },
@@ -1977,7 +1977,7 @@ const table = {
     en: 'EVERY EMAIL — DETERMINISTIC · 0 AI CALLS',
     de: 'BEI JEDER E-MAIL – DETERMINISTISCH · 0 KI-AUFRUFE'
   },
-  techRulesMatch: { en: 'DOES IT MATCH?', de: 'TRIFFT DIE REGEL ZU?' },
+  techRulesMatch: { en: 'DOES IT MATCH?', de: 'PASST DIE REGEL?' },
   techRulesMatchNote: { en: 'PLAIN COMPARISONS', de: 'REINE VERGLEICHE' },
   techRulesAct1: { en: 'ARCHIVE', de: 'ARCHIVIEREN' },
   techRulesAct2: { en: 'TASK', de: 'AUFGABE' },
@@ -1989,7 +1989,7 @@ const table = {
 
   // 09 · Follow-up-Radar
   techRadarTitle: { en: 'The follow-up radar', de: 'Das Nachfass-Radar' },
-  techRadarSent1: { en: 'YOUR SENT', de: 'DEINE GESENDETE' },
+  techRadarSent1: { en: 'YOUR SENT', de: 'GESENDETE' },
   techRadarSent2: { en: 'EMAIL', de: 'E-MAIL' },
   techRadarDays: { en: '3 DAYS OF SILENCE', de: '3 TAGE OHNE ANTWORT' },
   techRadarDaysNote1: { en: 'THRESHOLD ADJUSTABLE', de: 'SCHWELLE EINSTELLBAR' },

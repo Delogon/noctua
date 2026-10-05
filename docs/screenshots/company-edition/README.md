@@ -8,27 +8,27 @@ Regenerate: `pnpm exec electron-vite build && scripts/demo-tour.sh <outdir>`
 (`DEMO_PASS=local DEMO_LOCAL_ONLY=1`, `DEMO_PASS=small`, `DEMO_LANG=de`; the onboarding pass shows the AI step; with a
 company build (`NOCTUA_ORG_CONFIG=build/org-config.example.json`) the organisation profiles instead). See `src/main/dev/demo-seed.ts`.
 
-| File | Shows |
-| --- | --- |
-| 01-inbox-newsletter, 01b | Inbox, HTML newsletter in the sandboxed iframe (inline styles, blocked remote image banner, tracking pixel removed), Owl rail with Tasks and "Today" agenda |
-| 02-invitation | iMIP invitation card (accept/tentative/decline, conflict hint, calendar picker) |
-| 03-link-mismatch, 03b | Mail whose link text names another host than its target; warning toast on click |
-| 04-remote-images-blocked, 04b | Order mail with remote image, blocked and after "Show" (the image cannot load offline) |
-| 05-mail-attachment-task | Attachment row with real size, "in your tasks" strip |
-| 10-calendar-week, 11-day, 12-month | Calendar views: overlapping events, all-day and multi-day banners, recurring (with a moved occurrence), event across midnight |
-| 13-quick-create | Quick-create popover on a time slot |
-| 14-event-editor-attendees, 14b-14d | Event editor: attendee list (role required/optional, partstat, remove), add field, availability strip 08-20 per attendee (Marta without information), autocomplete from the address book (14c), "next free slot for everyone" (14d) |
-| 15-event-editor-recurring, 16-scope-choice | Recurrence editor and "only this / this and following / all" dialog |
-| 17-calendar-colour-palette | Calendar sidebar with colour palette |
-| 20-tasks | Tasks with CalDAV sync glyphs (synced, pending, conflict) |
-| 30, 30b | Settings, Accounts: mail account, CalDAV account with calendars, address books, tasks sync list, privacy |
-| 31, 31b, 31c | Settings, Intelligence: profiles (OpenRouter, local Ollama), task pickers, Local only, on-demand cards |
-| 32, 32b, 32c | Under the hood: pipelines and the live network connections list (Local only off) |
-| 40-45 | 1180 px window: inbox, calendar week/month/day, editor (44b: attendees + availability), settings |
-| 50-52 | Local only ON: LOCAL ONLY badge, blocked external profile, "on request" connections |
-| 60, 61 | Onboarding with organisation AI profiles (company build) |
-| 62, 63, 64 | Onboarding step 3 "Where should the AI run?": local server detected (Ollama on 127.0.0.1, models auto-picked, Local only on), cloud provider (OpenRouter key, privacy note), skip (Local only off). The pass starts a fake Ollama on 127.0.0.1:11434 |
-| de-* | German UI (invitation, calendar week, accounts, onboarding AI step: de-62, de-63) |
+| File                                       | Shows                                                                                                                                                                                                                                                |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 01-inbox-newsletter, 01b                   | Inbox, HTML newsletter in the sandboxed iframe (inline styles, blocked remote image banner, tracking pixel removed), Owl rail with Tasks and "Today" agenda                                                                                          |
+| 02-invitation                              | iMIP invitation card (accept/tentative/decline, conflict hint, calendar picker)                                                                                                                                                                      |
+| 03-link-mismatch, 03b                      | Mail whose link text names another host than its target; warning toast on click                                                                                                                                                                      |
+| 04-remote-images-blocked, 04b              | Order mail with remote image, blocked and after "Show" (the image cannot load offline)                                                                                                                                                               |
+| 05-mail-attachment-task                    | Attachment row with real size, "in your tasks" strip                                                                                                                                                                                                 |
+| 10-calendar-week, 11-day, 12-month         | Calendar views: overlapping events, all-day and multi-day banners, recurring (with a moved occurrence), event across midnight                                                                                                                        |
+| 13-quick-create                            | Quick-create popover on a time slot                                                                                                                                                                                                                  |
+| 14-event-editor-attendees, 14b-14d         | Event editor: attendee list (role required/optional, partstat, remove), add field, availability strip 08-20 per attendee (Marta without information), autocomplete from the address book (14c), "next free slot for everyone" (14d)                  |
+| 15-event-editor-recurring, 16-scope-choice | Recurrence editor and "only this / this and following / all" dialog                                                                                                                                                                                  |
+| 17-calendar-colour-palette                 | Calendar sidebar with colour palette                                                                                                                                                                                                                 |
+| 20-tasks                                   | Tasks with CalDAV sync glyphs (synced, pending, conflict)                                                                                                                                                                                            |
+| 30, 30b                                    | Settings, Accounts: mail account, CalDAV account with calendars, address books, tasks sync list, privacy                                                                                                                                             |
+| 31, 31b, 31c                               | Settings, Intelligence: profiles (OpenRouter, local Ollama), task pickers, Local only, on-demand cards                                                                                                                                               |
+| 32, 32b, 32c                               | Under the hood: pipelines and the live network connections list (Local only off)                                                                                                                                                                     |
+| 40-45                                      | 1180 px window: inbox, calendar week/month/day, editor (44b: attendees + availability), settings                                                                                                                                                     |
+| 50-52                                      | Local only ON: LOCAL ONLY badge, blocked external profile, "on request" connections                                                                                                                                                                  |
+| 60, 61                                     | Onboarding with organisation AI profiles (company build)                                                                                                                                                                                             |
+| 62, 63, 64                                 | Onboarding step 3 "Where should the AI run?": local server detected (Ollama on 127.0.0.1, models auto-picked, Local only on), cloud provider (OpenRouter key, privacy note), skip (Local only off). The pass starts a fake Ollama on 127.0.0.1:11434 |
+| de-*                                       | German UI after the copy review (docs/GLOSSARY.md): inbox, invitation, calendar week/month, event editor, tasks, settings (accounts, AI, under the hood), Local only (`NUR LOKAL`), onboarding (connect de-60, AI step de-62 to de-64)               |
 
 ## Known remaining visual issues
 
