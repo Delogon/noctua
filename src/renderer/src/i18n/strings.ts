@@ -85,6 +85,15 @@ const table = {
   calSynced: { en: 'synced {time}', de: 'abgeglichen {time}' },
   calPending: { en: '{n} waiting to upload', de: '{n} warten auf Übertragung' },
   calDead: { en: '{n} not applied', de: '{n} nicht übernommen' },
+  cardSync: { en: 'Sync contacts (CardDAV)', de: 'Kontakte synchronisieren (CardDAV)' },
+  cardNote: {
+    en: 'Read-only: address books feed recipient suggestions. Edit contacts in Nextcloud.',
+    de: 'Nur lesend: Adressbücher füllen die Empfänger-Vorschläge. Kontakte bearbeitest du in Nextcloud.'
+  },
+  cardCount: { en: '{n} contacts', de: '{n} Kontakte' },
+  cardSynced: { en: 'contacts synced {time}', de: 'Kontakte abgeglichen {time}' },
+  cardOn: { en: 'on', de: 'an' },
+  cardOff: { en: 'off', de: 'aus' },
   calVisible: { en: 'visible', de: 'sichtbar' },
   calHidden: { en: 'hidden', de: 'ausgeblendet' },
   calReadOnly: { en: 'READ-ONLY', de: 'NUR LESEN' },
