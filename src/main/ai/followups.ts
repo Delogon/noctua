@@ -3,7 +3,15 @@ import { z } from 'zod'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import { getSetting } from '../db'
 import { syncEngine } from '../sync/engine'
-import { budgetBlocks, resolveTask } from './providers/registry'
+import { budgetBlocks, resolveDecision, resolveTask } from './providers/registry'
+import { decide, noulOf, type Questions } from './providers/systemone'
+import { FOLLOWUP_EXPECTS_REPLY_THRESHOLD } from '@shared/decision-thresholds'
+import {
+  UNTRUSTED_SYSTEM_NOTE,
+  sanitizeUntrusted,
+  sanitizeUntrustedLine,
+  wrapUntrusted
+} from './untrusted'
 import { htmlToText } from '../mail/parser'
 import {
   isForwardWithoutRequest,
@@ -17,6 +25,16 @@ type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => vo
 const SCAN_INTERVAL_MS = 30 * 60_000
 const MAX_AGE_DAYS = 21
 const CHECK_BATCH = 10
+
+/** Follow-up per Entscheidungsmodell: erwartet die GESENDETE Mail eine Antwort? */
+export const EXPECTS_REPLY_QUESTIONS: Questions = {
+  expects_reply: {
+    type: 'noul',
+    instructions:
+      'Der Nutzer hat diese E-Mail GESENDET. Erwartet er darauf realistisch eine Antwort (Frage gestellt, Bitte geäußert, Angebot gemacht)? Reine Danksagungen, Bestätigungen und Informationen erwarten keine Antwort.',
+    criteria: { false: 'Keine Antwort erwartet', true: 'Der Nutzer erwartet eine Antwort' }
+  }
+}
 
 const verdictSchema = z.object({ expects_reply: z.boolean() })
 
@@ -208,6 +226,24 @@ export class FollowupRadar {
     if (isForwardWithoutRequest(candidate.subject, fullText)) return false
     const text = textBeforeForwardedMessage(candidate.subject, fullText).slice(0, 2500)
     if (!text) return true
+
+    // Entscheidungsmodell: eine Ja/Nein-Wahrscheinlichkeit statt Textgenerierung
+    const decision = resolveDecision()
+    if (decision) {
+      try {
+        const result = await decide({
+          baseUrl: decision.profile.baseUrl,
+          apiKey: decision.apiKey,
+          model: decision.model,
+          state: `${UNTRUSTED_SYSTEM_NOTE}\n\nBetreff: ${sanitizeUntrustedLine(candidate.subject, 300)}\n\n${wrapUntrusted('MAIL', sanitizeUntrusted(text, 2500))}`,
+          questions: EXPECTS_REPLY_QUESTIONS
+        })
+        logUsage(this.db!, decision.model, result.usage.inputTokens, result.usage.outputTokens, 0)
+        return noulOf(result.answers, 'expects_reply') >= FOLLOWUP_EXPECTS_REPLY_THRESHOLD
+      } catch {
+        return true // im Zweifel anzeigen
+      }
+    }
 
     const resolved = resolveTask('triage')
     if (!resolved || budgetBlocks(this.db!, resolved)) return true // konservativ: anzeigen

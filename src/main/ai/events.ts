@@ -15,6 +15,7 @@ import {
   wrapUntrusted
 } from './untrusted'
 import { localStamp } from './prompt-date'
+import { PROPOSES_MEETING_THRESHOLD } from '@shared/decision-thresholds'
 
 /**
  * Terminvorschläge aus Mails (2.4). Eigener Job-Typ 'events' (nicht Teil der
@@ -348,6 +349,19 @@ export async function runEventExtraction(
   const full = row.text_plain?.trim() || htmlToText(row.html_raw ?? '')
   const body = textBeforeForwardedMessage(row.subject, full)
   if (body.trim().length < 15) return 'skipped-unsupported'
+
+  // Gate: hat die Triage per Entscheidungsmodell „kein Termin" gesagt, spart der Job die Extraktion.
+  // Ohne gespeicherte Entscheidung (klassische Triage, ältere Mails) läuft sie wie bisher.
+  const decision = db
+    .prepare('SELECT proposes_meeting FROM ai_decisions WHERE message_id = ?')
+    .get(messageId) as { proposes_meeting: number | null } | undefined
+  if (
+    decision &&
+    decision.proposes_meeting !== null &&
+    decision.proposes_meeting < PROPOSES_MEETING_THRESHOLD
+  ) {
+    return 'skipped-unsupported'
+  }
 
   // Local only / fehlender Key / kein Modell → wie die Triage: pausieren, nicht verbrennen
   const resolved = resolveTask('triage')
