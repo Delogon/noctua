@@ -40,9 +40,7 @@ export async function renderSignatureImage(
     left?: number
     top?: number
     blend?: 'dest-in'
-  }> = [
-    { input: image, left: layout.padding, top: layout.padding }
-  ]
+  }> = [{ input: image, left: layout.padding, top: layout.padding }]
   if (shape === 'circle' || shape === 'rounded') {
     const radius =
       shape === 'circle'

@@ -55,10 +55,12 @@ function signatureText(sig: StoredSignature): string {
 function signatureBlocksHtml(sig: StoredSignature): string {
   return (sig.blocks ?? [])
     .map((key) => {
-      if (key === 'rule') return '<div style="width:220px;max-width:100%;border-top:1px solid #17150f;margin:7px 0"></div>'
+      if (key === 'rule')
+        return '<div style="width:220px;max-width:100%;border-top:1px solid #17150f;margin:7px 0"></div>'
       const value = escapeHtml((sig.values?.[key] ?? '').trim())
       if (!value) return ''
-      if (key === 'name') return `<div style="font-weight:600;font-size:14px;color:#17150f">${value}</div>`
+      if (key === 'name')
+        return `<div style="font-weight:600;font-size:14px;color:#17150f">${value}</div>`
       if (key === 'title' || key === 'claim') {
         return `<div style="font-style:italic;font-size:12px;color:#57503f;margin-top:3px">${value}</div>`
       }
@@ -85,8 +87,7 @@ function safeBodyHtml(html: string): string {
  */
 export async function sendMail(db: Database.Database, mail: OutgoingMail): Promise<void> {
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(mail.accountId) as
-    | AccountRow
-    | undefined
+    AccountRow | undefined
   if (!account) throw new Error('Konto nicht gefunden')
 
   let auth: { user: string; pass: string } | { type: 'OAuth2'; user: string; accessToken: string }
@@ -168,18 +169,22 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
         layout = fitSignatureImage(sig.imgWidth, sig.imgHeight, sig.imgShape, sig.imgPadding)
         const source = Buffer.from(b64, 'base64')
         const background = signatureImageBackground(sig.imgBackground)
-        attachments = [{
-          cid: 'noctua-sig',
-          filename: 'signatur.png',
-          content: await renderSignatureImage(source, layout, sig.imgShape, background)
-        }]
+        attachments = [
+          {
+            cid: 'noctua-sig',
+            filename: 'signatur.png',
+            content: await renderSignatureImage(source, layout, sig.imgShape, background)
+          }
+        ]
         const border = sig.imgBorder === false ? 'none' : '1px solid #17150f'
         imageHtml = `<img src="cid:noctua-sig" width="${layout.width}" height="${layout.height}" style="display:block!important;box-sizing:border-box!important;width:${layout.width}px!important;height:${layout.height}px!important;max-width:${layout.width}px!important;max-height:${layout.height}px!important;padding:0!important;border:${border};border-radius:${radius};object-fit:contain;background:transparent!important" alt="">`
       }
 
-      const blocks = sig ? signatureBlocksHtml(sig) : plainSignature
-        ? `<div style="white-space:pre-wrap">${escapeHtml(plainSignature)}</div>`
-        : ''
+      const blocks = sig
+        ? signatureBlocksHtml(sig)
+        : plainSignature
+          ? `<div style="white-space:pre-wrap">${escapeHtml(plainSignature)}</div>`
+          : ''
       let signatureHtml = ''
       if (blocks || imageHtml) {
         if (!imageHtml) signatureHtml = `<div style="margin-top:14px">${blocks}</div>`

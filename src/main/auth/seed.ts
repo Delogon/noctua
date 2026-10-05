@@ -20,8 +20,7 @@ export function seedFromEnv(db: Database.Database): void {
   const gmailPass = process.env.NOCTUA_SEED_GMAIL_PASS?.replace(/\s+/g, '')
   if (gmailUser && gmailPass) {
     const existing = db.prepare('SELECT id FROM accounts WHERE email = ?').get(gmailUser) as
-      | { id: number }
-      | undefined
+      { id: number } | undefined
     if (!existing) {
       const g = PROVIDER_DEFAULTS.gmail
       const count = (db.prepare('SELECT count(*) AS c FROM accounts').get() as { c: number }).c
@@ -54,6 +53,5 @@ export function seedFromEnv(db: Database.Database): void {
 
   if (getSetting('ai.triageModel') === null)
     setSetting('ai.triageModel', 'deepseek/deepseek-v4-flash')
-  if (getSetting('ai.draftModel') === null)
-    setSetting('ai.draftModel', 'anthropic/claude-opus-4.8')
+  if (getSetting('ai.draftModel') === null) setSetting('ai.draftModel', 'anthropic/claude-opus-4.8')
 }

@@ -27,8 +27,7 @@ export function setSecret(key: string, value: string): void {
 
 export function getSecret(key: string): string | null {
   const row = getDb().prepare('SELECT ciphertext FROM secrets WHERE key = ?').get(key) as
-    | { ciphertext: Buffer }
-    | undefined
+    { ciphertext: Buffer } | undefined
   if (!row) return null
   try {
     ensureAvailable()

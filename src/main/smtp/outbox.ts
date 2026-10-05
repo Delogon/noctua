@@ -88,7 +88,9 @@ class OutboxWorker {
     try {
       this.recoverInterrupted()
     } catch (error) {
-      console.warn(`[outbox] Wiederherstellung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`)
+      console.warn(
+        `[outbox] Wiederherstellung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`
+      )
     }
     this.timer = setInterval(() => void this.tick(), 1000)
   }
@@ -104,19 +106,18 @@ class OutboxWorker {
    * 'sent'. Sonst 'unknown' — der Nutzer entscheidet, wir senden nie blind neu.
    */
   recoverInterrupted(): void {
-    const rows = this.db!
-      .prepare(
-        `SELECT id, account_id, message_id, state FROM outbox WHERE state IN ('sending', 'unknown')`
-      )
-      .all() as Array<{ id: number; account_id: number; message_id: string | null; state: string }>
+    const rows = this.db!.prepare(
+      `SELECT id, account_id, message_id, state FROM outbox WHERE state IN ('sending', 'unknown')`
+    ).all() as Array<{ id: number; account_id: number; message_id: string | null; state: string }>
     for (const row of rows) {
       if (row.message_id && this.isInSentFolder(row.account_id, row.message_id)) {
         this.db!.prepare(`UPDATE outbox SET state = 'sent' WHERE id = ?`).run(row.id)
         this.push('outbox:changed', { outboxId: row.id, state: 'sent' })
       } else if (row.state === 'sending') {
-        this.db!
-          .prepare(`UPDATE outbox SET state = 'unknown', last_error = ? WHERE id = ?`)
-          .run('Versand unterbrochen — Ausgang ungewiss', row.id)
+        this.db!.prepare(`UPDATE outbox SET state = 'unknown', last_error = ? WHERE id = ?`).run(
+          'Versand unterbrochen — Ausgang ungewiss',
+          row.id
+        )
         this.push('outbox:changed', { outboxId: row.id, state: 'unknown' })
       } else {
         this.push('outbox:changed', { outboxId: row.id, state: 'unknown' })
@@ -126,12 +127,10 @@ class OutboxWorker {
 
   private isInSentFolder(accountId: number, messageId: string): boolean {
     const bare = messageId.replace(/^<|>$/g, '')
-    const row = this.db!
-      .prepare(
-        `SELECT 1 FROM messages m JOIN folders f ON f.id = m.folder_id
+    const row = this.db!.prepare(
+      `SELECT 1 FROM messages m JOIN folders f ON f.id = m.folder_id
          WHERE m.account_id = ? AND f.special_use = '\\Sent' AND m.message_id IN (?, ?) LIMIT 1`
-      )
-      .get(accountId, bare, `<${bare}>`)
+    ).get(accountId, bare, `<${bare}>`)
     return row !== undefined
   }
 
@@ -140,16 +139,13 @@ class OutboxWorker {
     // Stabile Message-ID schon beim Einreihen: übersteht Neustarts und macht
     // die Mail im Gesendet-Ordner wiedererkennbar.
     const account = this.db!.prepare('SELECT email FROM accounts WHERE id = ?').get(accountId) as
-      | { email: string }
-      | undefined
+      { email: string } | undefined
     const domain = account?.email.split('@')[1] || 'noctua.local'
     const messageId = `<${randomUUID()}@${domain}>`
-    const result = this.db!
-      .prepare(
-        `INSERT INTO outbox (account_id, payload_json, send_at, state, created_at, message_id)
+    const result = this.db!.prepare(
+      `INSERT INTO outbox (account_id, payload_json, send_at, state, created_at, message_id)
          VALUES (?, ?, ?, 'pending', ?, ?)`
-      )
-      .run(accountId, JSON.stringify(payload), sendAt, Date.now(), messageId)
+    ).run(accountId, JSON.stringify(payload), sendAt, Date.now(), messageId)
     const outboxId = Number(result.lastInsertRowid)
     this.push('outbox:changed', { outboxId, state: 'pending' })
     return { outboxId, sendAt }
@@ -161,9 +157,9 @@ class OutboxWorker {
     accountId: number | null
     draft: (OutboxPayload & { bcc: string[] }) | null
   } {
-    const row = this.db!
-      .prepare(`SELECT account_id, payload_json, state FROM outbox WHERE id = ?`)
-      .get(outboxId) as { account_id: number; payload_json: string; state: string } | undefined
+    const row = this.db!.prepare(
+      `SELECT account_id, payload_json, state FROM outbox WHERE id = ?`
+    ).get(outboxId) as { account_id: number; payload_json: string; state: string } | undefined
     if (!row || row.state !== 'pending') return { ok: false, accountId: null, draft: null }
     this.db!.prepare(`UPDATE outbox SET state = 'canceled' WHERE id = ? AND state = 'pending'`).run(
       outboxId
@@ -186,12 +182,10 @@ class OutboxWorker {
   }
 
   private async processDue(): Promise<void> {
-    const due = this.db!
-      .prepare(
-        `SELECT id, account_id, payload_json, message_id, attempts FROM outbox
+    const due = this.db!.prepare(
+      `SELECT id, account_id, payload_json, message_id, attempts FROM outbox
          WHERE state = 'pending' AND send_at <= ? ORDER BY id LIMIT 5`
-      )
-      .all(Date.now()) as Array<{
+    ).all(Date.now()) as Array<{
       id: number
       account_id: number
       payload_json: string
@@ -201,18 +195,18 @@ class OutboxWorker {
 
     for (const row of due) {
       // Claim gegen Doppel-Versand (idempotent bei parallelem Tick)
-      const claimed = this.db!
-        .prepare(
-          `UPDATE outbox SET state = 'sending', attempts = attempts + 1 WHERE id = ? AND state = 'pending'`
-        )
-        .run(row.id)
+      const claimed = this.db!.prepare(
+        `UPDATE outbox SET state = 'sending', attempts = attempts + 1 WHERE id = ? AND state = 'pending'`
+      ).run(row.id)
       if (claimed.changes === 0) continue
       const attempts = row.attempts + 1
       // Auch 'sending' pushen — das Gesendet-Echo im Renderer kennt den
       // Zustand, bekam ihn bisher aber nie zu sehen (QA-Befund).
       this.push('outbox:changed', { outboxId: row.id, state: 'sending' })
 
-      const payload = JSON.parse(row.payload_json) as Omit<OutboxPayload, 'bcc'> & { bcc?: string[] }
+      const payload = JSON.parse(row.payload_json) as Omit<OutboxPayload, 'bcc'> & {
+        bcc?: string[]
+      }
       const mail: OutgoingMail = {
         accountId: row.account_id,
         ...payload,
@@ -240,17 +234,21 @@ class OutboxWorker {
         const kind = classifySendError(error)
         if (kind === 'retry' && attempts < MAX_SEND_ATTEMPTS) {
           // Transienter Fehler: zurück auf pending mit Backoff, gleiche Message-ID
-          this.db!
-            .prepare(`UPDATE outbox SET state = 'pending', send_at = ?, last_error = ? WHERE id = ?`)
-            .run(Date.now() + retryDelayMs(attempts), message, row.id)
+          this.db!.prepare(
+            `UPDATE outbox SET state = 'pending', send_at = ?, last_error = ? WHERE id = ?`
+          ).run(Date.now() + retryDelayMs(attempts), message, row.id)
           this.push('outbox:changed', { outboxId: row.id, state: 'pending' })
-          console.warn(`[outbox] Versand #${row.id} Versuch ${attempts} fehlgeschlagen, neuer Versuch folgt: ${message}`)
+          console.warn(
+            `[outbox] Versand #${row.id} Versuch ${attempts} fehlgeschlagen, neuer Versuch folgt: ${message}`
+          )
           continue
         }
         const state = kind === 'unknown' ? 'unknown' : 'error'
-        this.db!
-          .prepare(`UPDATE outbox SET state = ?, last_error = ? WHERE id = ?`)
-          .run(state, message, row.id)
+        this.db!.prepare(`UPDATE outbox SET state = ?, last_error = ? WHERE id = ?`).run(
+          state,
+          message,
+          row.id
+        )
         this.push('outbox:changed', { outboxId: row.id, state })
         console.warn(`[outbox] Versand fehlgeschlagen (#${row.id}): ${message}`)
       }

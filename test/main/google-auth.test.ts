@@ -15,7 +15,11 @@ function fakeIdToken(payload: Record<string, unknown>): string {
 }
 
 function tokenFetch(body: Record<string, unknown>): typeof fetch {
-  return vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(body) }) as unknown as typeof fetch
+  return vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(body)
+  }) as unknown as typeof fetch
 }
 
 describe('google-auth', () => {
@@ -109,7 +113,14 @@ describe('google-auth', () => {
   it('räumt bei widerrufenem Zugriff auf und verlangt einen Re-Login', async () => {
     db = createTestDb()
     setSecret('google:refresh:widerrufen@gmail.com', 'refresh-alt')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({ error: 'invalid_grant' }) }) as unknown as typeof fetch)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: 'invalid_grant' })
+      }) as unknown as typeof fetch
+    )
 
     await expect(googleAccessToken('widerrufen@gmail.com')).rejects.toThrow(/widerrufen/)
     expect(getSecret('google:refresh:widerrufen@gmail.com')).toBeNull()

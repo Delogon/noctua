@@ -107,7 +107,9 @@ describe('outbox (Zuverlässigkeit)', () => {
     return seedAccount(db, { email: 'me@test.de' })
   }
 
-  const row = (id: number): { state: string; attempts: number; message_id: string; send_at: number } =>
+  const row = (
+    id: number
+  ): { state: string; attempts: number; message_id: string; send_at: number } =>
     db.prepare('SELECT state, attempts, message_id, send_at FROM outbox WHERE id = ?').get(id) as {
       state: string
       attempts: number
