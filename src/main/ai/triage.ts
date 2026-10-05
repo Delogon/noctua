@@ -344,7 +344,9 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
     })
   }
 
-  throw new Error(`Triage-Output ungültig nach Retry: ${lastError}`)
+  throw new Error(
+    `Ungültige Antwort des Modells (Vorsortierung) nach erneutem Versuch: ${lastError}`
+  )
 }
 
 /** Deterministische Nachverarbeitung + Persistenz — für beide Provider gleich:

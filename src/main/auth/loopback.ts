@@ -31,7 +31,7 @@ export class CancelableLoopbackClient implements ILoopbackClient {
       this.timeout = setTimeout(() => {
         this.rejectListener = null
         this.closeServer()
-        reject(new Error('Microsoft-Anmeldung abgelaufen (Zeitüberschreitung)'))
+        reject(new Error('Die Microsoft-Anmeldung ist abgelaufen – bitte versuche es erneut'))
       }, LOGIN_TIMEOUT_MS)
       this.timeout.unref?.()
       this.server = createServer((req, res) => {

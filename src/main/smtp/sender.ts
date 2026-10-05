@@ -107,7 +107,7 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
     }
   } else {
     const password = getSecret(accountSecretKey(account.id))
-    if (!password) throw new Error('Kein Passwort im Vault für dieses Konto')
+    if (!password) throw new Error('Kein Passwort im Tresor für dieses Konto')
     auth = { user: account.email, pass: password }
   }
 

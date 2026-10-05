@@ -155,9 +155,9 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
   // den reichen wir durch, die Aufrufer werten error/error_description aus.
   // Ohne verwertbaren Body (Proxy-Fehlerseite, 5xx) gibt es einen klaren Fehler.
   if (!response.ok && !body?.error) {
-    throw new Error(`Google-Token-Anfrage fehlgeschlagen (HTTP ${response.status})`)
+    throw new Error(`Die Anmeldung bei Google ist fehlgeschlagen (HTTP ${response.status})`)
   }
-  if (!body) throw new Error('Google-Token-Anfrage lieferte keine gültige Antwort')
+  if (!body) throw new Error('Google hat keine gültige Antwort geliefert')
   return body
 }
 
@@ -262,7 +262,8 @@ export async function googleInteractiveLogin(): Promise<{ email: string }> {
     })
 
     const timeout = setTimeout(
-      () => finish(new Error('Google-Anmeldung: Zeitüberschreitung — bitte erneut versuchen')),
+      () =>
+        finish(new Error('Die Google-Anmeldung hat zu lange gedauert – bitte versuche es erneut')),
       LOGIN_TIMEOUT_MS
     )
 

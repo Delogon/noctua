@@ -37,7 +37,7 @@ export function isEmbeddingModelCached(): boolean {
 /** Ohne Download-Erlaubnis (Local only) und ohne Cache steht das Modell nicht bereit. */
 export class EmbeddingModelUnavailableError extends Error {
   constructor() {
-    super('Suchmodell nicht geladen (Local only: Download nur auf Anforderung)')
+    super('Suchmodell nicht geladen („Nur lokal“: Download nur auf Anfrage)')
     this.name = 'EmbeddingModelUnavailableError'
   }
 }

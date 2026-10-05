@@ -106,7 +106,7 @@ export function setTasksSyncCalendar(db: Database.Database, calendarId: number |
     if (!cal) throw new Error('Kalender nicht gefunden')
     if (cal.read_only === 1) throw new Error('Dieser Kalender ist schreibgeschützt')
     if (!cal.components.split(',').includes('VTODO'))
-      throw new Error('Kalender nimmt keine Aufgaben auf')
+      throw new Error('Dieser Kalender unterstützt keine Aufgaben')
   }
   const previous = readSetting(db, TASKS_CALENDAR_KEY)
   db.transaction(() => {

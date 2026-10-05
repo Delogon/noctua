@@ -35,14 +35,14 @@ function resolvePassword(db: Database.Database, req: DiscoverRequest): string {
   if (req.reuseMailPassword && req.mailAccountId !== undefined) {
     const mail = db.prepare('SELECT * FROM accounts WHERE id = ?').get(req.mailAccountId) as
       AccountRow | undefined
-    if (!mail) throw new Error('Postfach nicht gefunden')
+    if (!mail) throw new Error('Konto nicht gefunden')
     if (mail.credential_type !== 'password' && mail.credential_type !== 'bridge') {
       throw new Error(
-        'Dieses Postfach meldet sich per Browser an — bitte ein App-Passwort für den Kalender eingeben'
+        'Dieses Konto meldet sich über den Browser an – bitte gib für den Kalender ein App-Passwort ein'
       )
     }
     const secret = getSecret(accountSecretKey(mail.id))
-    if (!secret) throw new Error('Kein Passwort im Vault für dieses Postfach')
+    if (!secret) throw new Error('Kein Passwort im Tresor für dieses Konto')
     return secret
   }
   const pw = cleanPassword(req.password ?? '')
@@ -57,7 +57,7 @@ export function suggestFromMailAccount(
 ): { username: string; serverInput: string; canReusePassword: boolean } {
   const mail = db.prepare('SELECT * FROM accounts WHERE id = ?').get(mailAccountId) as
     AccountRow | undefined
-  if (!mail) throw new Error('Postfach nicht gefunden')
+  if (!mail) throw new Error('Konto nicht gefunden')
   return {
     username: mail.email,
     // Die Discovery löst Adresse → Server auf (Anbieter-Tabelle, well-known, SRV)
@@ -148,7 +148,7 @@ export async function testAccount(
   const account = getCalAccount(db, accountId)
   if (!account) throw new Error('Kalender-Konto nicht gefunden')
   const password = getSecret(calSecretKey(accountId))
-  if (!password) throw new Error('Kein Passwort im Vault')
+  if (!password) throw new Error('Kein Passwort im Tresor')
   const client = new DavClient({ username: account.username, password, fetch: deps.fetch })
   const calendars = await listCalendars(client, account.home_url)
   return { calendarCount: calendars.length, autoSchedule: account.auto_schedule === 1 }

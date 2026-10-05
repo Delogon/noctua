@@ -66,7 +66,7 @@ describe('transcribeAudio — eigenes Profil (Whisper-kompatibel)', () => {
   it('Local only blockiert externe Profile mit klarer Meldung', async () => {
     setSecret('openrouter.apiKey', 'k')
     setLocalOnly(true)
-    await expect(transcribeAudio(db, 'QUJD', 'wav')).rejects.toThrow(/Local only/)
+    await expect(transcribeAudio(db, 'QUJD', 'wav')).rejects.toThrow(/Nur lokal/)
     expect(createMock).not.toHaveBeenCalled()
   })
 })

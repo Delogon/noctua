@@ -44,7 +44,7 @@ export async function checkForUpdates(options: { manual?: boolean } = {}): Promi
       updateAvailable: false,
       latest: null,
       url: feed.pageUrl,
-      note: 'Update-Check ist deaktiviert (Organisations-Konfiguration)'
+      note: 'Die Update-Prüfung ist durch die Organisationskonfiguration deaktiviert'
     }
   }
   if (!options.manual && isLocalOnly()) {
@@ -52,7 +52,7 @@ export async function checkForUpdates(options: { manual?: boolean } = {}): Promi
       updateAvailable: false,
       latest: null,
       url: feed.pageUrl,
-      note: 'Local only: automatischer Update-Check aus'
+      note: '„Nur lokal“: automatische Update-Prüfung ist aus'
     }
   }
   try {
@@ -63,7 +63,7 @@ export async function checkForUpdates(options: { manual?: boolean } = {}): Promi
       })
       if (!response.ok) throw new Error(`Update-Feed ${response.status}`)
       const manifest = updateManifestSchema.safeParse(await response.json())
-      if (!manifest.success) throw new Error('Update-Feed hat ein ungültiges Format')
+      if (!manifest.success) throw new Error('Der Update-Feed hat ein ungültiges Format')
       const { version, url, notes } = manifest.data
       const updateAvailable = newer(version, app.getVersion())
       if (updateAvailable) push('updates:available', { latest: version, url })
@@ -83,7 +83,7 @@ export async function checkForUpdates(options: { manual?: boolean } = {}): Promi
         updateAvailable: false,
         latest: null,
         url: feed.pageUrl,
-        note: 'Repo ist privat — Update-Check braucht ein öffentliches Repo'
+        note: 'Das Repository ist privat – die Update-Prüfung braucht ein öffentliches Repository'
       }
     }
     if (!response.ok) throw new Error(`GitHub API ${response.status}`)
@@ -99,7 +99,7 @@ export async function checkForUpdates(options: { manual?: boolean } = {}): Promi
       updateAvailable: false,
       latest: null,
       url: feed.pageUrl,
-      note: `Check fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`
+      note: `Prüfung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`
     }
   }
 }

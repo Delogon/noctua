@@ -47,7 +47,7 @@ const SUBJECT_PREFIX: Record<MailLang, Record<string, string>> = {
   },
   de: {
     ACCEPTED: 'Zugesagt',
-    TENTATIVE: 'Vorläufig zugesagt',
+    TENTATIVE: 'Mit Vorbehalt zugesagt',
     DECLINED: 'Abgesagt',
     REQUEST: 'Einladung',
     UPDATE: 'Aktualisierte Einladung',
@@ -113,9 +113,9 @@ export function replyBody(
   const line =
     lang === 'de'
       ? {
-          ACCEPTED: `${opts.who} hat die Einladung angenommen.`,
-          TENTATIVE: `${opts.who} hat die Einladung vorläufig angenommen.`,
-          DECLINED: `${opts.who} hat die Einladung abgelehnt.`
+          ACCEPTED: `${opts.who} hat zugesagt.`,
+          TENTATIVE: `${opts.who} hat mit Vorbehalt zugesagt.`,
+          DECLINED: `${opts.who} hat abgesagt.`
         }[opts.partstat]
       : {
           ACCEPTED: `${opts.who} has accepted this invitation.`,
@@ -142,7 +142,7 @@ export function inviteBody(
   const head =
     lang === 'de'
       ? {
-          REQUEST: `${opts.organizer} lädt Sie zu einem Termin ein.`,
+          REQUEST: `${opts.organizer} hat zu einem Termin eingeladen.`,
           UPDATE: `${opts.organizer} hat einen Termin geändert.`,
           CANCEL: `${opts.organizer} hat einen Termin abgesagt.`
         }[opts.kind]

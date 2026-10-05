@@ -244,7 +244,7 @@ describe('getEvent', () => {
   it('wirft bei unbekanntem Objekt/Vorkommen', () => {
     const { objectId } = createEvent(input({ rrule: 'FREQ=DAILY;COUNT=2' }))
     expect(() => getEvent(9999)).toThrow()
-    expect(() => getEvent(objectId, '2099-03-23T12:34:56Z')).toThrow(/Vorkommen/)
+    expect(() => getEvent(objectId, '2099-03-23T12:34:56Z')).toThrow(/Serie/)
   })
 })
 

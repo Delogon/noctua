@@ -67,7 +67,7 @@ class SyncEngine {
     } else {
       const password = getSecret(accountSecretKey(account.id))
       if (!password) {
-        this.states.set(account.id, { state: 'error', detail: 'Kein Passwort im Vault' })
+        this.states.set(account.id, { state: 'error', detail: 'Kein Passwort im Tresor' })
         // Auch dieser Fehler bekommt seinen Zeitpunkt (Design 3b: „seit 11:42")
         if (!this.errorSince.has(account.id)) this.errorSince.set(account.id, Date.now())
         return

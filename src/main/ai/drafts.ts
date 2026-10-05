@@ -182,7 +182,7 @@ async function runDraft(
   const { client, model } = requireTaskWithBudget(
     db,
     'draft',
-    'AI-Budget erschöpft — Entwurf nicht gestartet'
+    'KI-Budget aufgebraucht – Entwurf nicht gestartet'
   )
 
   const messages = db
@@ -194,7 +194,7 @@ async function runDraft(
        ORDER BY coalesce(m.date, m.internal_date, 0) DESC LIMIT 10`
     )
     .all(input.threadKey) as ThreadMessageRow[]
-  if (messages.length === 0) throw new Error('Thread nicht gefunden')
+  if (messages.length === 0) throw new Error('Unterhaltung nicht gefunden')
 
   const accountId = messages[0].account_id
   const account = db
@@ -527,7 +527,7 @@ async function runDraftNudge(
         text_plain: string | null
       }
     | undefined
-  if (!sent) throw new Error('Gesendete Mail nicht gefunden')
+  if (!sent) throw new Error('Gesendete E-Mail nicht gefunden')
 
   const account = db
     .prepare('SELECT email, display_name, signature FROM accounts WHERE id = ?')
@@ -631,7 +631,7 @@ async function runDraftNew(
   const { client, model } = requireTaskWithBudget(
     db,
     'draft',
-    'AI-Budget erschöpft — Entwurf nicht gestartet'
+    'KI-Budget aufgebraucht – Entwurf nicht gestartet'
   )
 
   const account = db
@@ -814,6 +814,6 @@ ${BASE_STYLE_RULES}${profileBlock}${styleInstructionsBlock(accountId)}${
   const { inputTokens, outputTokens, costUsd } = completion.usage
   logUsage(db, model, inputTokens, outputTokens, costUsd)
   const text = completion.text.trim()
-  if (!text) throw new Error('Probe kam leer zurück')
+  if (!text) throw new Error('Das Beispiel kam leer zurück')
   return text
 }

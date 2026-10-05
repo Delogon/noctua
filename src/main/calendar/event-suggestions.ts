@@ -202,7 +202,7 @@ export function acceptEventSuggestion(
   if (!row) throw new Error('Terminvorschlag nicht gefunden')
   if (row.state === 'accepted' && row.cal_object_id) return { objectId: row.cal_object_id }
   const calendarId = suggestCalendarId(db, row.account_id, null)
-  if (calendarId === null) throw new Error('Kein beschreibbarer Kalender')
+  if (calendarId === null) throw new Error('Kein Kalender mit Schreibzugriff')
   const msg = db.prepare('SELECT subject FROM messages WHERE id = ?').get(row.message_id) as
     { subject: string | null } | undefined
   const input = eventInputFromSuggestion(row, calendarId, msg?.subject ?? null)

@@ -123,7 +123,7 @@ export function updateProfile(
   db: Database.Database = getDb()
 ): AiProfile {
   const current = getProfile(id, db)
-  if (!current) throw new Error('Profil nicht gefunden')
+  if (!current) throw new Error('Anbieter nicht gefunden')
   const builtin = current.preset === 'openrouter'
   if (current.managed) return current
   const next = {
@@ -145,9 +145,9 @@ export function deleteProfile(id: string, db: Database.Database = getDb()): void
   const current = getProfile(id, db)
   if (!current) return
   if (current.preset === 'openrouter')
-    throw new Error('Das OpenRouter-Profil kann nicht gelöscht werden')
+    throw new Error('Der OpenRouter-Anbieter kann nicht gelöscht werden')
   if (current.managed)
-    throw new Error('Von der Organisation bereitgestelltes Profil kann nicht gelöscht werden')
+    throw new Error('Ein von der Organisation bereitgestellter Anbieter kann nicht gelöscht werden')
   db.transaction(() => {
     for (const task of TASKS) {
       if (getTaskProfileId(task) === id) {
@@ -164,14 +164,14 @@ export function deleteProfile(id: string, db: Database.Database = getDb()): void
 
 export function setProfileKey(id: string, key: string): void {
   const profile = getProfile(id)
-  if (!profile) throw new Error('Profil nicht gefunden')
+  if (!profile) throw new Error('Anbieter nicht gefunden')
   setSecret(profileSecretKey(profile), key)
   clientCache.delete(id)
 }
 
 export function clearProfileKey(id: string): void {
   const profile = getProfile(id)
-  if (!profile) throw new Error('Profil nicht gefunden')
+  if (!profile) throw new Error('Anbieter nicht gefunden')
   deleteSecret(profileSecretKey(profile))
   clientCache.delete(id)
 }
@@ -208,9 +208,9 @@ export function getTaskModel(task: AiTask, profile: Pick<AiProfile, 'preset'>): 
 }
 
 export function setTaskAssignment(task: AiTask, profileId: string, model: string): void {
-  if (profileId !== 'apple' && !getProfile(profileId)) throw new Error('Profil nicht gefunden')
+  if (profileId !== 'apple' && !getProfile(profileId)) throw new Error('Anbieter nicht gefunden')
   if (profileId === 'apple' && task === 'draft') {
-    throw new Error('Apple On-Device nur für Triage und Diktat')
+    throw new Error('Apple On-Device ist nur für Vorsortierung und Diktat verfügbar')
   }
   if (task === 'triage') {
     setSetting('ai.triageProvider', profileId === 'apple' ? 'apple' : 'openrouter')
@@ -263,7 +263,7 @@ export function resolveTask(task: AiTask): ResolvedTask | null {
 }
 
 const TASK_LABEL: Record<AiTask, string> = {
-  triage: 'Sortierung',
+  triage: 'Vorsortierung',
   draft: 'Entwürfe',
   stt: 'Diktat'
 }
@@ -272,13 +272,13 @@ const TASK_LABEL: Record<AiTask, string> = {
 export function blockMessage(task: AiTask, reason: BlockReason): string {
   switch (reason) {
     case 'local-only':
-      return `Local only ist aktiv — „${TASK_LABEL[task]}" nutzt ein externes Profil (⌘, Einstellungen → Intelligenz)`
+      return `„Nur lokal“ ist aktiv – „${TASK_LABEL[task]}“ nutzt einen externen Anbieter (⌘, Einstellungen → KI)`
     case 'no-key':
-      return 'Kein OpenRouter-Key hinterlegt (⌘, Einstellungen)'
+      return 'Kein OpenRouter-Schlüssel hinterlegt (⌘, Einstellungen)'
     case 'no-model':
-      return `Für „${TASK_LABEL[task]}" ist kein Modell gewählt (⌘, Einstellungen → Intelligenz)`
+      return `Für „${TASK_LABEL[task]}“ ist kein Modell gewählt (⌘, Einstellungen → KI)`
     case 'no-profile':
-      return `Für „${TASK_LABEL[task]}" ist kein gültiges Profil gewählt (⌘, Einstellungen → Intelligenz)`
+      return `Für „${TASK_LABEL[task]}“ ist kein gültiger Anbieter gewählt (⌘, Einstellungen → KI)`
   }
 }
 
@@ -300,7 +300,7 @@ export function budgetBlocks(db: Database.Database, resolved: ResolvedTask): boo
 export function requireTaskWithBudget(
   db: Database.Database,
   task: AiTask,
-  budgetMessage = 'AI-Budget erschöpft'
+  budgetMessage = 'KI-Budget aufgebraucht'
 ): ResolvedTask {
   const resolved = requireTask(task)
   if (budgetBlocks(db, resolved)) throw new Error(budgetMessage)

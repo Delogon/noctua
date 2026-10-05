@@ -102,7 +102,7 @@ export async function msInteractiveLogin(): Promise<{ email: string }> {
       errorTemplate:
         '<html><body style="font-family:sans-serif;padding:2rem"><h3>Anmeldung fehlgeschlagen.</h3>Bitte in Noctua erneut versuchen.</body></html>'
     })
-    if (!result?.account?.username) throw new Error('Microsoft-Anmeldung lieferte kein Konto')
+    if (!result?.account?.username) throw new Error('Microsoft hat kein Konto zurückgegeben')
     return { email: result.account.username.toLowerCase() }
   } finally {
     if (activeLoopback === loopback) activeLoopback = null

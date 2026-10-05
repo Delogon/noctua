@@ -31,7 +31,7 @@ describe('accounts:addGoogle / addMicrosoft — Dedupe', () => {
       (handlers['accounts:addGoogle'] as (input: { accountName: string }) => Promise<unknown>)({
         accountName: 'Nochmal'
       })
-    ).rejects.toThrow(/bereits als „Testkonto \d+" verbunden.*trennen/)
+    ).rejects.toThrow(/bereits als „Testkonto \d+“ verbunden.*trenne das Konto/)
 
     // Konto läuft per Passwort — das überflüssige Google-Token darf nicht liegen bleiben
     expect(getSecret('google:refresh:bestand@gmail.com')).toBeNull()
@@ -45,6 +45,6 @@ describe('accounts:addGoogle / addMicrosoft — Dedupe', () => {
       (handlers['accounts:addMicrosoft'] as (input: { accountName: string }) => Promise<unknown>)({
         accountName: 'Nochmal'
       })
-    ).rejects.toThrow(/bereits als „Testkonto \d+" verbunden/)
+    ).rejects.toThrow(/bereits als „Testkonto \d+“ verbunden/)
   })
 })

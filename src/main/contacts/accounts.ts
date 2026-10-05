@@ -57,7 +57,7 @@ export async function setContactsSync(
   }
 
   const password = getSecret(calSecretKey(accountId))
-  if (!password) throw new Error('Kein Passwort im Vault')
+  if (!password) throw new Error('Kein Passwort im Tresor')
   const found = await discoverCardDav(account.server_url, account.username, password, {
     ...deps,
     hints: account.principal_url ? [account.principal_url] : []

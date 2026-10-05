@@ -59,7 +59,7 @@ export function maybeNotify(messageId: number): void {
   if (!row.date || Date.now() - row.date > FRESH_WINDOW_MS) return
 
   const notification = new Notification({
-    title: row.from_name ?? row.from_addr ?? 'Neue Mail',
+    title: row.from_name ?? row.from_addr ?? 'Neue E-Mail',
     subtitle: row.subject ?? undefined,
     body: row.summary ?? row.subject ?? '',
     silent: row.priority < 5,

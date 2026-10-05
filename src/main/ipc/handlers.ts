@@ -133,7 +133,7 @@ async function testImapLogin(
 function getAccountRow(accountId: number): AccountRow {
   const row = getDb().prepare('SELECT * FROM accounts WHERE id = ?').get(accountId) as
     AccountRow | undefined
-  if (!row) throw new Error('Postfach nicht gefunden')
+  if (!row) throw new Error('Konto nicht gefunden')
   return row
 }
 
@@ -171,7 +171,7 @@ function assertAccountNameAvailable(accountName: string, exceptAccountId?: numbe
     )
     .get(accountName.trim(), exceptAccountId ?? null, exceptAccountId ?? null) as
     { id: number } | undefined
-  if (conflict) throw new Error(`Der Postfachname „${accountName.trim()}“ ist bereits vergeben`)
+  if (conflict) throw new Error(`Der Kontoname „${accountName.trim()}“ ist bereits verwendet`)
 }
 
 function countThreads(accountId: number): number {
@@ -241,7 +241,7 @@ export const handlers: IpcHandlers = {
     const imapPort = input.imapPort ?? gmail?.imapPort ?? 993
     const smtpHost = input.smtpHost ?? gmail?.smtpHost
     const smtpPort = input.smtpPort ?? gmail?.smtpPort ?? 465
-    if (!imapHost || !smtpHost) throw new Error('IMAP-/SMTP-Host fehlt')
+    if (!imapHost || !smtpHost) throw new Error('IMAP- oder SMTP-Host fehlt')
 
     // App-Passwörter kommen oft mit Leerzeichen formatiert
     const password = input.password.replace(/\s+/g, '')
@@ -284,7 +284,7 @@ export const handlers: IpcHandlers = {
       .get(email) as { id: number; account_name: string } | undefined
     if (existing) {
       // Doppelt verbinden ist praktisch immer ein Versehen — klar blocken
-      throw new Error(`${email} ist bereits als „${existing.account_name}" verbunden`)
+      throw new Error(`${email} ist bereits als „${existing.account_name}“ verbunden`)
     }
 
     const ms = PROVIDER_DEFAULTS.microsoft
@@ -330,7 +330,7 @@ export const handlers: IpcHandlers = {
         deleteSecret(`google:refresh:${email}`)
       }
       throw new Error(
-        `${email} ist bereits als „${existing.account_name}" verbunden — zum Umstellen auf den Google-Login das Postfach erst trennen`
+        `${email} ist bereits als „${existing.account_name}“ verbunden – trenne das Konto zuerst, um auf die Google-Anmeldung umzustellen`
       )
     }
 
@@ -400,7 +400,9 @@ export const handlers: IpcHandlers = {
   'accounts:updatePassword': async ({ accountId, password: rawPassword }) => {
     const row = getAccountRow(accountId)
     if (row.credential_type !== 'password' && row.credential_type !== 'bridge') {
-      throw new Error('Dieses Postfach meldet sich per Browser an — bitte „Erneut anmelden" nutzen')
+      throw new Error(
+        'Dieses Konto meldet sich über den Browser an – bitte „Erneut anmelden“ verwenden'
+      )
     }
     // App-Passwörter kommen oft mit Leerzeichen formatiert (wie bei accounts:add)
     const password = rawPassword.replace(/\s+/g, '')
@@ -415,7 +417,7 @@ export const handlers: IpcHandlers = {
   'accounts:reauthorize': async ({ accountId }) => {
     const row = getAccountRow(accountId)
     if (row.credential_type !== 'oauth-google' && row.credential_type !== 'oauth-ms') {
-      throw new Error('Dieses Postfach nutzt ein Passwort — bitte „Passwort neu eingeben" nutzen')
+      throw new Error('Dieses Konto nutzt ein Passwort – bitte „Passwort neu eingeben“ verwenden')
     }
     const google = row.credential_type === 'oauth-google'
     const { email } = google ? await googleInteractiveLogin() : await msInteractiveLogin()
@@ -630,7 +632,7 @@ export const handlers: IpcHandlers = {
 
   'ai:profileModels': async ({ profileId, manual }) => {
     const profile = getProfile(profileId)
-    if (!profile) throw new Error('Profil nicht gefunden')
+    if (!profile) throw new Error('Anbieter nicht gefunden')
     // Local only: externe Kataloge nie automatisch holen
     if (isLocalOnly() && !profile.isLocal && !manual) return { models: [], skipped: true }
     return { models: await getClient(profile).listModels(), skipped: false }

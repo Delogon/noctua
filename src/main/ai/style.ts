@@ -127,7 +127,7 @@ export async function refreshStyleProfile(
       '[style] unparsebare Antwort:',
       !isDev ? `${raw.length} Zeichen` : raw.slice(0, 400)
     )
-    throw new Error('Stil-Analyse lieferte kein JSON — bitte nochmal versuchen')
+    throw new Error('Die Stil-Analyse hat kein JSON geliefert – bitte versuche es noch einmal')
   }
   const profile = styleProfileSchema.parse(parsed)
   setSetting(styleKey(accountId), JSON.stringify(profile))

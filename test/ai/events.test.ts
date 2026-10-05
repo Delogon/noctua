@@ -330,7 +330,7 @@ describe('Extraktions-Job', () => {
       choices: [{ message: { content: 'nope' } }],
       usage: { prompt_tokens: 1, completion_tokens: 1, cost: 0 }
     })
-    await expect(runEventExtraction(db, id)).rejects.toThrow(/ungültig/)
+    await expect(runEventExtraction(db, id)).rejects.toThrow(/Ungültige Antwort/)
     expect(fakeCreate).toHaveBeenCalledTimes(2)
   })
 

@@ -24,7 +24,7 @@ export async function transcribeAudio(
   }
   const { client, model, profile } = requireTaskWithBudget(db, 'stt')
   if (!client.transcribe) {
-    throw new Error(`Profil „${profile.name}" unterstützt keine Transkription`)
+    throw new Error(`Anbieter „${profile.name}“ unterstützt keine Transkription`)
   }
   const result = await client.transcribe(audioBase64, format, model)
   const { inputTokens, outputTokens, costUsd } = result.usage

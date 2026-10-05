@@ -12,31 +12,31 @@ const table = {
   // ── Die eine Toast-Leiste (Design 1c) ──
   toastUndo: { en: 'Undo', de: 'Rückgängig' },
   toastDismiss: { en: 'Dismiss', de: 'Schließen' },
-  toastSendingIn: { en: 'Sending as {addr} in {n}s', de: 'Geht in {n}s als {addr} raus' },
-  toastSending: { en: 'Sending…', de: 'Geht gerade raus…' },
+  toastSendingIn: { en: 'Sending as {addr} in {n}s', de: 'Wird in {n} s als {addr} gesendet' },
+  toastSending: { en: 'Sending…', de: 'Wird gesendet…' },
   toastSentAs: { en: 'Sent as {addr}', de: 'Gesendet als {addr}' },
   toastSendFailed: {
     en: 'Send failed — your draft is safe.',
-    de: 'Senden fehlgeschlagen — dein Entwurf ist noch da.'
+    de: 'Senden fehlgeschlagen – dein Entwurf ist gesichert.'
   },
   toastSendUnknown: {
     en: 'Sending was interrupted — it may have been sent. Check your Sent folder.',
-    de: 'Senden unterbrochen — evtl. schon gesendet. Prüfe den Gesendet-Ordner.'
+    de: 'Senden unterbrochen – die E-Mail wurde möglicherweise trotzdem gesendet. Sieh im Ordner „Gesendet“ nach.'
   },
   toastOpenDraft: { en: 'Open draft', de: 'Entwurf öffnen' },
 
   // ── Op-Queue: nicht ausführbare Aktionen (Dead-Letter) ──
   opsDeadAttempts: {
     en: '{n} action(s) could not be synced to the server and were dropped.',
-    de: '{n} Aktion(en) ließen sich nicht mit dem Server abgleichen und wurden verworfen.'
+    de: '{n} Aktion(en) konnten nicht mit dem Server abgeglichen werden und wurden verworfen.'
   },
   opsDeadUidvalidity: {
     en: '{n} action(s) were dropped because the server folder was reset.',
-    de: '{n} Aktion(en) wurden verworfen, weil der Serverordner zurückgesetzt wurde.'
+    de: '{n} Aktion(en) wurden verworfen, weil der Ordner auf dem Server zurückgesetzt wurde.'
   },
   opsDeadNoTarget: {
     en: '{n} action(s) failed: the Archive/Trash folder was not found on the server.',
-    de: '{n} Aktion(en) gescheitert: Archiv-/Papierkorb-Ordner nicht auf dem Server gefunden.'
+    de: '{n} Aktion(en) fehlgeschlagen: Archiv- oder Papierkorb-Ordner auf dem Server nicht gefunden.'
   },
   opsDeadFolderGone: {
     en: '{n} action(s) were dropped because the folder no longer exists.',
@@ -44,29 +44,29 @@ const table = {
   },
 
   // ── Kalender-Konten (CalDAV, Phase 2.1) ──
-  taskSyncHead: { en: 'SYNC TASKS WITH (CALDAV)', de: 'AUFGABEN SYNCHRONISIEREN MIT (CALDAV)' },
+  taskSyncHead: { en: 'SYNC TASKS WITH (CALDAV)', de: 'AUFGABEN SYNCHRONISIEREN (CALDAV)' },
   taskSyncNote: {
     en: 'Accepted tasks and the task list of one calendar stay in step both ways. Owl suggestions you have not accepted are never uploaded; dismissing or deleting a task removes it on the server too.',
-    de: 'Übernommene Aufgaben und die Aufgabenliste eines Kalenders bleiben in beide Richtungen gleich. Nicht übernommene Eulen-Vorschläge werden nie hochgeladen; Verwerfen oder Löschen entfernt die Aufgabe auch auf dem Server.'
+    de: 'Übernommene Aufgaben und die Aufgabenliste eines Kalenders werden in beide Richtungen abgeglichen. Nicht übernommene Vorschläge der Eule werden nie hochgeladen. Wenn du eine Aufgabe verwirfst oder löschst, verschwindet sie auch auf dem Server.'
   },
   taskSyncOff: { en: 'Off', de: 'Aus' },
   taskSyncPending: { en: 'Waiting to sync', de: 'Wartet auf Abgleich' },
   taskSyncSynced: { en: 'In sync with CalDAV', de: 'Mit CalDAV abgeglichen' },
   taskSyncConflict: {
     en: 'Conflict — the server version was kept',
-    de: 'Konflikt — die Server-Fassung wurde behalten'
+    de: 'Konflikt – die Version vom Server wurde behalten'
   },
   calHead: { en: 'CALENDARS (CALDAV)', de: 'KALENDER (CALDAV)' },
   calNote: {
     en: 'Nextcloud, mailbox.org, Fastmail, Posteo, iCloud (app password) and other CalDAV servers. Sign-in works over HTTPS only.',
-    de: 'Nextcloud, mailbox.org, Fastmail, Posteo, iCloud (App-Passwort) und andere CalDAV-Server. Anmeldung nur über HTTPS.'
+    de: 'Nextcloud, mailbox.org, Fastmail, Posteo, iCloud (App-Passwort) und andere CalDAV-Server. Die Anmeldung funktioniert nur über HTTPS.'
   },
   calAdd: { en: '+ ADD CALENDAR', de: '+ KALENDER HINZUFÜGEN' },
   calEmpty: {
     en: 'No calendar connected yet.',
     de: 'Noch kein Kalender verbunden.'
   },
-  calFromMail: { en: 'Use a mail account as template…', de: 'Postfach als Vorlage nutzen…' },
+  calFromMail: { en: 'Use a mail account as template…', de: 'E-Mail-Konto als Vorlage verwenden…' },
   calNamePh: { en: 'name, e.g. Nextcloud', de: 'Name, z. B. Nextcloud' },
   calServerPh: {
     en: 'server URL, domain or e-mail address',
@@ -76,7 +76,7 @@ const table = {
   calPassPh: { en: 'password / app password', de: 'Passwort / App-Passwort' },
   calReusePassword: {
     en: 'Use the password of the mail account (stays in the vault, stored separately)',
-    de: 'Passwort des Postfachs übernehmen (bleibt im Vault, wird separat gespeichert)'
+    de: 'Passwort des E-Mail-Kontos übernehmen (bleibt im Tresor, wird separat gespeichert)'
   },
   calTest: { en: 'TEST', de: 'TESTEN' },
   calHttpsNote: { en: 'https:// only', de: 'nur https://' },
@@ -89,18 +89,18 @@ const table = {
     en: 'Calendar connected ({n} calendars)',
     de: 'Kalender verbunden ({n} Kalender)'
   },
-  calTestOk: { en: 'Connection OK — {n} calendars', de: 'Verbindung OK — {n} Kalender' },
+  calTestOk: { en: 'Connection OK — {n} calendars', de: 'Verbindung OK – {n} Kalender' },
   calRefresh: { en: 'SYNC NOW', de: 'JETZT ABGLEICHEN' },
   calRemove: { en: 'DISCONNECT', de: 'TRENNEN' },
   calRemoveConfirm: { en: 'YES, DISCONNECT', de: 'JA, TRENNEN' },
   calSyncing: { en: 'syncing···', de: 'gleicht ab···' },
   calSynced: { en: 'synced {time}', de: 'abgeglichen {time}' },
-  calPending: { en: '{n} waiting to upload', de: '{n} warten auf Übertragung' },
+  calPending: { en: '{n} waiting to upload', de: '{n} warten auf den Upload' },
   calDead: { en: '{n} not applied', de: '{n} nicht übernommen' },
   cardSync: { en: 'Sync contacts (CardDAV)', de: 'Kontakte synchronisieren (CardDAV)' },
   cardNote: {
     en: 'Read-only: address books feed recipient suggestions. Edit contacts in Nextcloud.',
-    de: 'Nur lesend: Adressbücher füllen die Empfänger-Vorschläge. Kontakte bearbeitest du in Nextcloud.'
+    de: 'Nur Lesezugriff: Adressbücher liefern die Vorschläge für Empfänger. Kontakte bearbeitest du z. B. in Nextcloud.'
   },
   cardCount: { en: '{n} contacts', de: '{n} Kontakte' },
   cardSynced: { en: 'contacts synced {time}', de: 'Kontakte abgeglichen {time}' },
@@ -111,11 +111,11 @@ const table = {
   calReadOnly: { en: 'READ-ONLY', de: 'NUR LESEN' },
   calConflictConflict: {
     en: 'Calendar: “{title}” was changed on the server meanwhile — the server version was kept, your edit was not applied.',
-    de: 'Kalender: „{title}“ wurde inzwischen auf dem Server geändert — die Server-Version bleibt, deine Änderung wurde nicht übernommen.'
+    de: 'Kalender: „{title}“ wurde zwischenzeitlich auf dem Server geändert – die Serverversion bleibt erhalten, deine Änderung wurde nicht übernommen.'
   },
   calConflictGone: {
     en: 'Calendar: “{title}” was deleted on the server — your edit was not applied.',
-    de: 'Kalender: „{title}“ wurde auf dem Server gelöscht — deine Änderung wurde nicht übernommen.'
+    de: 'Kalender: „{title}“ wurde auf dem Server gelöscht – deine Änderung wurde nicht übernommen.'
   },
   calConflictForbidden: {
     en: 'Calendar: the server refused your change to “{title}”.',
@@ -123,7 +123,7 @@ const table = {
   },
   calConflictAttempts: {
     en: 'Calendar: “{title}” could not be uploaded and was reverted.',
-    de: 'Kalender: „{title}“ ließ sich nicht übertragen und wurde zurückgesetzt.'
+    de: 'Kalender: „{title}“ konnte nicht hochgeladen werden und wurde zurückgesetzt.'
   },
 
   // ── Kalenderansicht (Phase 2.2) ──
@@ -146,29 +146,29 @@ const table = {
   cvKeyView: { en: 'view', de: 'Ansicht' },
   cvKeyToday: { en: 'today', de: 'heute' },
   cvKeyNew: { en: 'new', de: 'neu' },
-  cvRecurring: { en: 'Repeating event', de: 'Wiederkehrender Termin' },
-  cvPendingTip: { en: 'Not synced to the server yet', de: 'Noch nicht auf dem Server' },
-  cvPending: { en: 'NOT SYNCED YET', de: 'NOCH NICHT ÜBERTRAGEN' },
+  cvRecurring: { en: 'Repeating event', de: 'Serientermin' },
+  cvPendingTip: { en: 'Not synced to the server yet', de: 'Noch nicht mit dem Server abgeglichen' },
+  cvPending: { en: 'NOT SYNCED YET', de: 'NICHT ABGEGLICHEN' },
   cvNoTitle: { en: '(No title)', de: '(Ohne Titel)' },
-  cvAllDayShort: { en: 'ALL DAY', de: 'GANZTAG' },
+  cvAllDayShort: { en: 'ALL DAY', de: 'GANZTÄGIG' },
   cvAllDay: { en: 'All day', de: 'Ganztägig' },
   cvNewAllDayOn: { en: 'New all-day event on {day}', de: 'Neuer ganztägiger Termin am {day}' },
   cvNoAccount: { en: 'No calendar connected yet.', de: 'Noch kein Kalender verbunden.' },
   cvNoAccountSub: {
     en: 'Connect a CalDAV calendar — Nextcloud, Fastmail, iCloud …',
-    de: 'Verbinde einen CalDAV-Kalender — Nextcloud, Fastmail, iCloud …'
+    de: 'Verbinde einen CalDAV-Kalender – Nextcloud, Fastmail, iCloud …'
   },
   cvOpenSettings: {
     en: 'SET UP IN SETTINGS → ACCOUNTS',
-    de: 'IN EINSTELLUNGEN → KONTEN EINRICHTEN'
+    de: 'IN DEN EINSTELLUNGEN → KONTEN EINRICHTEN'
   },
   cvNoWritable: {
     en: 'No writable calendar available.',
-    de: 'Kein beschreibbarer Kalender vorhanden.'
+    de: 'Kein Kalender mit Schreibzugriff vorhanden.'
   },
   cvNoCalendars: {
     en: 'No calendars yet — they appear after the first sync.',
-    de: 'Noch keine Kalender — sie erscheinen nach dem ersten Abgleich.'
+    de: 'Noch keine Kalender – sie erscheinen nach dem ersten Abgleich.'
   },
   cvPrev: { en: 'Previous', de: 'Zurück' },
   cvNext: { en: 'Next', de: 'Weiter' },
@@ -193,11 +193,11 @@ const table = {
   cvMoreOptions: { en: 'MORE …', de: 'MEHR …' },
   cvSaveFailed: {
     en: 'Could not save the event: {err}',
-    de: 'Termin konnte nicht gespeichert werden: {err}'
+    de: 'Der Termin konnte nicht gespeichert werden: {err}'
   },
   cvDeleteFailed: {
     en: 'Could not delete the event: {err}',
-    de: 'Termin konnte nicht gelöscht werden: {err}'
+    de: 'Der Termin konnte nicht gelöscht werden: {err}'
   },
   cvErrEnd: { en: 'The end must be after the start.', de: 'Das Ende muss nach dem Beginn liegen.' },
   cvErrUntil: {
@@ -206,7 +206,7 @@ const table = {
   },
   cvErrTime: {
     en: 'Please enter valid dates and times (HH:mm).',
-    de: 'Bitte gültige Daten und Zeiten (HH:mm) angeben.'
+    de: 'Bitte gib gültige Daten und Uhrzeiten (HH:mm) ein.'
   },
   cvEditorNew: { en: 'NEW EVENT', de: 'NEUER TERMIN' },
   cvEditorEdit: { en: 'EVENT', de: 'TERMIN' },
@@ -214,16 +214,16 @@ const table = {
   cvCalendar: { en: 'Calendar', de: 'Kalender' },
   cvCalendarFixed: {
     en: 'An existing event cannot be moved to another calendar.',
-    de: 'Ein bestehender Termin lässt sich nicht in einen anderen Kalender verschieben.'
+    de: 'Ein vorhandener Termin kann nicht in einen anderen Kalender verschoben werden.'
   },
   cvWhen: { en: 'WHEN', de: 'WANN' },
   cvFrom: { en: 'FROM', de: 'VON' },
   cvTo: { en: 'TO', de: 'BIS' },
-  cvFromTime: { en: 'Start time', de: 'Beginn (Uhrzeit)' },
-  cvToTime: { en: 'End time', de: 'Ende (Uhrzeit)' },
+  cvFromTime: { en: 'Start time', de: 'Startzeit' },
+  cvToTime: { en: 'End time', de: 'Endzeit' },
   cvTimezone: { en: 'ZONE', de: 'ZONE' },
   cvTimezoneShow: { en: 'TIME ZONE …', de: 'ZEITZONE …' },
-  cvTimezoneFloating: { en: 'Floating (no zone)', de: 'Schwebend (ohne Zone)' },
+  cvTimezoneFloating: { en: 'Floating (no zone)', de: 'Ohne Zeitzone (gleitend)' },
   cvRepeat: { en: 'REPEAT', de: 'WIEDERHOLUNG' },
   cvRecNone: { en: 'Does not repeat', de: 'Keine Wiederholung' },
   cvRecDaily: { en: 'Daily', de: 'Täglich' },
@@ -238,7 +238,7 @@ const table = {
   cvOnDays: { en: 'On weekdays', de: 'An Wochentagen' },
   cvRecEnds: { en: 'Repeat ends', de: 'Wiederholung endet' },
   cvEndNever: { en: 'never', de: 'nie' },
-  cvEndUntil: { en: 'on date', de: 'am Datum' },
+  cvEndUntil: { en: 'on date', de: 'an einem Datum' },
   cvEndCount: { en: 'after n times', de: 'nach n Terminen' },
   cvRecCustom: {
     en: 'Custom repeat rule (kept as is):',
@@ -247,92 +247,98 @@ const table = {
   cvRecReplace: { en: 'REPLACE WITH A SIMPLE RULE', de: 'DURCH EINFACHE REGEL ERSETZEN' },
   cvAlarm: { en: 'REMINDER', de: 'ERINNERUNG' },
   cvAlarmNone: { en: 'None', de: 'Keine' },
-  cvAlarmAtStart: { en: 'At start', de: 'Zum Beginn' },
+  cvAlarmAtStart: { en: 'At start', de: 'Zu Beginn' },
   cvAlarm5: { en: '5 minutes before', de: '5 Minuten vorher' },
   cvAlarm10: { en: '10 minutes before', de: '10 Minuten vorher' },
   cvAlarm15: { en: '15 minutes before', de: '15 Minuten vorher' },
   cvAlarm30: { en: '30 minutes before', de: '30 Minuten vorher' },
   cvAlarm60: { en: '1 hour before', de: '1 Stunde vorher' },
   cvAlarm1440: { en: '1 day before', de: '1 Tag vorher' },
-  cvAlarmCustom: { en: 'Custom ({n}) — kept', de: 'Eigene ({n}) — bleibt erhalten' },
+  cvAlarmCustom: { en: 'Custom ({n}) — kept', de: 'Eigene ({n}) – bleibt erhalten' },
   cvShowAs: { en: 'SHOW AS', de: 'ANZEIGEN ALS' },
   cvBusy: { en: 'Busy', de: 'Beschäftigt' },
   cvFree: { en: 'Free', de: 'Frei' },
   cvLocation: { en: 'LOCATION', de: 'ORT' },
   cvDescription: { en: 'NOTES', de: 'NOTIZEN' },
-  cvAttendees: { en: 'ATTENDEES', de: 'TEILNEHMER' },
+  cvAttendees: { en: 'ATTENDEES', de: 'TEILNEHMENDE' },
   cvAttendeeAddPh: {
     en: 'Add attendee: name or address',
-    de: 'Teilnehmer hinzufügen: Name oder Adresse'
+    de: 'Teilnehmende hinzufügen: Name oder Adresse'
   },
   cvAttendeeRemove: { en: 'Remove {addr}', de: '{addr} entfernen' },
   cvAttendeeRole: { en: 'Role of {addr}', de: 'Rolle von {addr}' },
-  cvRoleReq: { en: 'required', de: 'Pflicht' },
+  cvRoleReq: { en: 'required', de: 'erforderlich' },
   cvRoleOpt: { en: 'optional', de: 'optional' },
-  cvRoleOther: { en: 'observer', de: 'Beobachter' },
-  cvYou: { en: 'you', de: 'ich' },
+  cvRoleOther: { en: 'observer', de: 'zur Info' },
+  cvYou: { en: 'you', de: 'du' },
   cvPartNew: { en: 'new', de: 'neu' },
   cvOrganizerOnly: {
     en: 'Only the organizer can change attendees.',
-    de: 'Nur der Organisator kann Teilnehmer ändern.'
+    de: 'Nur der Organisator kann Teilnehmende ändern.'
   },
   cvNotify: {
     en: 'Send invitations and updates to attendees',
-    de: 'Einladungen und Änderungen an Teilnehmer senden'
+    de: 'Einladungen und Änderungen an Teilnehmende senden'
   },
   cvNotifyDelete: {
     en: 'Notify attendees of the cancellation',
-    de: 'Teilnehmer über die Absage informieren'
+    de: 'Teilnehmende über die Absage informieren'
   },
   cvNotifyServer: {
     en: 'Your calendar server sends the invitations.',
     de: 'Dein Kalenderserver verschickt die Einladungen.'
   },
-  cvDiffAdded: { en: 'Invitation to {n} new', de: 'Einladung an {n} neue' },
-  cvDiffRemoved: { en: 'cancellation to {n} removed', de: 'Absage an {n} entfernte' },
+  cvDiffAdded: { en: 'Invitation to {n} new', de: '{n} neue Einladung(en)' },
+  cvDiffRemoved: { en: 'cancellation to {n} removed', de: '{n} Absage(n)' },
   cvRsvpHead: { en: 'YOUR RESPONSE', de: 'DEINE ANTWORT' },
   cvRsvpYes: { en: 'Accept', de: 'Zusagen' },
-  cvRsvpMaybe: { en: 'Tentative', de: 'Vielleicht' },
+  cvRsvpMaybe: { en: 'Tentative', de: 'Mit Vorbehalt' },
   cvRsvpNo: { en: 'Decline', de: 'Absagen' },
-  cvRsvpFailed: { en: 'Reply failed: {err}', de: 'Antwort fehlgeschlagen: {err}' },
+  cvRsvpFailed: {
+    en: 'Reply failed: {err}',
+    de: 'Die Antwort konnte nicht gesendet werden: {err}'
+  },
   cvRsvpSent: { en: 'Reply sent', de: 'Antwort gesendet' },
   cvFbHead: { en: 'AVAILABILITY 08–20', de: 'VERFÜGBARKEIT 08–20' },
-  cvFbUnavailable: { en: 'no information', de: 'keine Auskunft' },
-  cvFbLoading: { en: 'loading…', de: 'lädt …' },
-  cvFbNext: { en: 'Next free slot for everyone', de: 'Nächster gemeinsamer freier Termin' },
+  cvFbUnavailable: { en: 'no information', de: 'keine Angaben' },
+  cvFbLoading: { en: 'loading…', de: 'lädt…' },
+  cvFbNext: { en: 'Next free slot for everyone', de: 'Nächste freie Zeit für alle' },
   cvFbNone: {
     en: 'No common free slot in the next 10 working days.',
-    de: 'Kein gemeinsamer freier Termin in den nächsten 10 Arbeitstagen.'
+    de: 'In den nächsten 10 Arbeitstagen gibt es keine gemeinsame freie Zeit.'
   },
   cvFbUnknown: {
     en: 'Not considered (no availability information): {n}',
-    de: 'Nicht berücksichtigt (keine Auskunft): {n}'
+    de: 'Nicht berücksichtigt (keine Angaben): {n}'
   },
-  cvFbFailed: { en: 'Availability could not be loaded.', de: 'Verfügbarkeit nicht abrufbar.' },
+  cvFbFailed: {
+    en: 'Availability could not be loaded.',
+    de: 'Die Verfügbarkeit konnte nicht abgerufen werden.'
+  },
   cvFbTentative: { en: 'tentative', de: 'vorläufig' },
   cvFbThisEvent: { en: 'this event', de: 'dieser Termin' },
   cvOrganizer: { en: 'ORGANIZER', de: 'ORGANISATOR' },
   cvPartAccepted: { en: 'accepted', de: 'zugesagt' },
   cvPartDeclined: { en: 'declined', de: 'abgesagt' },
-  cvPartTentative: { en: 'tentative', de: 'vielleicht' },
+  cvPartTentative: { en: 'tentative', de: 'mit Vorbehalt' },
   cvPartNeeds: { en: 'no reply', de: 'offen' },
-  cvPartDelegated: { en: 'delegated', de: 'weitergeleitet' },
+  cvPartDelegated: { en: 'delegated', de: 'delegiert' },
   cvDelete: { en: 'DELETE', de: 'LÖSCHEN' },
   cvDeleteConfirm: { en: 'Delete this event?', de: 'Diesen Termin löschen?' },
   cvDeleteTitle: { en: 'DELETE EVENT', de: 'TERMIN LÖSCHEN' },
   cvDeleteHasAttendees: {
     en: 'This event has {n} attendee(s).',
-    de: 'Dieser Termin hat {n} Teilnehmer.'
+    de: 'Dieser Termin hat {n} Teilnehmende.'
   },
   cvScopeEditHead: {
     en: 'REPEATING EVENT — APPLY CHANGE TO',
-    de: 'WIEDERKEHRENDER TERMIN — ÄNDERUNG GILT FÜR'
+    de: 'SERIENTERMIN – ÄNDERUNG GILT FÜR'
   },
-  cvScopeDeleteHead: { en: 'REPEATING EVENT — DELETE', de: 'WIEDERKEHRENDER TERMIN — LÖSCHEN' },
+  cvScopeDeleteHead: { en: 'REPEATING EVENT — DELETE', de: 'SERIENTERMIN – LÖSCHEN' },
   cvScopeThis: { en: 'Only this event', de: 'Nur diesen Termin' },
   cvScopeFollowing: { en: 'This and following events', de: 'Diesen und alle folgenden' },
   cvScopeAll: { en: 'All events', de: 'Alle Termine' },
-  cvLoading: { en: 'Loading …', de: 'Lädt …' },
+  cvLoading: { en: 'Loading …', de: 'Lädt…' },
   cvLoadFailed: {
     en: 'The event could not be loaded.',
     de: 'Der Termin konnte nicht geladen werden.'
@@ -343,37 +349,37 @@ const table = {
   updateDownload: { en: 'Download', de: 'Herunterladen' },
 
   // ── Kategorie-Override (Taste l, Design 3d) ──
-  overrideTitle: { en: 'Set category', de: 'Kategorie setzen' },
-  overrideReset: { en: 'Let the owl decide again', de: 'Override zurücksetzen' },
-  overrideFooterSet: { en: '1–7 / 0 SET', de: '1–7 / 0 SETZEN' },
+  overrideTitle: { en: 'Set category', de: 'Kategorie festlegen' },
+  overrideReset: { en: 'Let the owl decide again', de: 'Die Eule wieder entscheiden lassen' },
+  overrideFooterSet: { en: '1–7 / 0 SET', de: '1–7 / 0 WÄHLEN' },
   overrideFooterClose: { en: 'ESC CLOSE', de: 'ESC SCHLIESSEN' },
   catPersonal: { en: 'Personal', de: 'Persönlich' },
   catWork: { en: 'Work', de: 'Arbeit' },
   catNewsletter: { en: 'Newsletter', de: 'Newsletter' },
   catPromotions: { en: 'Promotions', de: 'Werbung' },
   catNotifications: { en: 'Notification', de: 'Benachrichtigung' },
-  catTransactional: { en: 'Transaction', de: 'Transaktion' },
+  catTransactional: { en: 'Transaction', de: 'Belege' },
   catOther: { en: 'Other', de: 'Sonstiges' },
 
   // ── Remote-Bilder (Tracking-Schutz) ──
   remoteImagesBlockedOne: {
     en: '1 remote image blocked (tracking protection)',
-    de: '1 Remote-Bild blockiert (Tracking-Schutz)'
+    de: '1 externes Bild blockiert (Tracking-Schutz)'
   },
   remoteImagesBlocked: {
     en: '{n} remote images blocked (tracking protection)',
-    de: '{n} Remote-Bilder blockiert (Tracking-Schutz)'
+    de: '{n} externe Bilder blockiert (Tracking-Schutz)'
   },
   remoteImagesShow: { en: 'Show', de: 'Anzeigen' },
-  remoteImagesAllowSender: { en: 'Always for {addr}', de: 'Immer für {addr}' },
+  remoteImagesAllowSender: { en: 'Always for {addr}', de: 'Immer von {addr}' },
   linkMismatchWarn: {
     en: 'Link text says {shown}, but it leads to {actual}',
-    de: 'Der Linktext nennt {shown}, der Link führt aber zu {actual}'
+    de: 'Der Linktext zeigt {shown}, der Link führt aber zu {actual}'
   },
   linkMismatchOpen: { en: 'Open anyway', de: 'Trotzdem öffnen' },
 
   // ── Owl-View (Suchen + Fragen in einem Eingabefeld) ──
-  chatEmptyTitle: { en: 'Ask your mailbox.', de: 'Frag dein Postfach.' },
+  chatEmptyTitle: { en: 'Ask your mailbox.', de: 'Frag deine E-Mails.' },
   chatSuggestion1: {
     en: 'Which invoices did I receive this month?',
     de: 'Welche Rechnungen habe ich diesen Monat bekommen?'
@@ -384,13 +390,13 @@ const table = {
   },
   chatSuggestion3: {
     en: 'Summarize my unread mail',
-    de: 'Fasse meine ungelesenen Mails zusammen'
+    de: 'Fasse meine ungelesenen E-Mails zusammen'
   },
   chatError: { en: 'Error: {msg}', de: 'Fehler: {msg}' },
   owlConvHead: { en: 'CONVERSATIONS', de: 'GESPRÄCHE' },
   owlNewChat: { en: 'NEW', de: 'NEU' },
   owlNewChatHint: { en: 'New question (n)', de: 'Neue Frage (n)' },
-  owlConvSub: { en: "↳ = THE OWL'S ANSWER", de: '↳ = DIE ANTWORT DER EULE' },
+  owlConvSub: { en: "↳ = THE OWL'S ANSWER", de: '↳ = ANTWORT DER EULE' },
   owlConvEmpty: { en: 'Nothing asked yet.', de: 'Noch nichts gefragt.' },
   owlConvEmptySub: {
     en: 'THE OWL REMEMBERS EVERY ANSWER',
@@ -401,79 +407,82 @@ const table = {
   owlDeleteConv: { en: 'Delete conversation', de: 'Gespräch löschen' },
   owlInputPh: {
     en: 'Search your mail — ↵ asks the owl…',
-    de: 'Durchsuch deine Post — ↵ fragt die Eule…'
+    de: 'E-Mails durchsuchen – ↵ fragt die Eule…'
   },
-  owlFollowUpPh: { en: 'Ask a follow-up…', de: 'Frag weiter…' },
+  owlFollowUpPh: { en: 'Ask a follow-up…', de: 'Stell eine Folgefrage…' },
   owlEscClear: { en: 'ESC CLEAR', de: 'ESC LEEREN' },
   owlAskLabel: { en: 'Ask the owl:', de: 'Frag die Eule:' },
   owlAskNote: {
     en: 'SYNTHESIZED ANSWER · CITES THE HITS BELOW',
-    de: 'FORMULIERTE ANTWORT · ZITIERT DIE TREFFER UNTEN'
+    de: 'ANTWORT MIT QUELLEN AUS DEN TREFFERN UNTEN'
   },
   owlAskDisabled: {
     en: 'the owl sleeps — add a key in Intelligence',
-    de: 'Die Eule schläft — Schlüssel unter Intelligenz hinterlegen'
+    de: 'Die Eule schläft – hinterlege einen Schlüssel unter Einstellungen → KI'
   },
-  owlHitsLabel: { en: 'MAIL · BEST MATCHES', de: 'MAIL · BESTE TREFFER' },
+  owlHitsLabel: { en: 'MAIL · BEST MATCHES', de: 'E-MAILS · BESTE TREFFER' },
   owlHitsNote: {
     en: 'LIVE FROM YOUR INDEX, NO TOKENS SPENT',
-    de: 'LIVE AUS DEINEM INDEX, KEINE TOKENS VERBRAUCHT'
+    de: 'LIVE AUS DEINEM INDEX · KEINE TOKENS VERBRAUCHT'
   },
   owlHitOpen: { en: '↵ OPEN', de: '↵ ÖFFNEN' },
   owlEmptySub: {
     en: 'THE OWL ANSWERS FROM YOUR MAIL — WITH SOURCES',
-    de: 'DIE EULE ANTWORTET AUS DEINER POST — MIT QUELLEN'
+    de: 'DIE EULE ANTWORTET AUS DEINEN E-MAILS – MIT QUELLEN'
   },
-  owlYouAsked: { en: 'YOU ASKED · {time}', de: 'DU FRAGTEST · {time}' },
-  owlAnsweredFrom: { en: 'answered from {n} threads', de: 'antwortete aus {n} Threads' },
-  owlAnsweredFromOne: { en: 'answered from one thread', de: 'antwortete aus einem Thread' },
-  owlAnsweredFromSources: { en: 'answered from {n} sources', de: 'antwortete aus {n} Quellen' },
-  owlAnsweredFromOneSource: { en: 'answered from one source', de: 'antwortete aus einer Quelle' },
+  owlYouAsked: { en: 'YOU ASKED · {time}', de: 'DEINE FRAGE · {time}' },
+  owlAnsweredFrom: { en: 'answered from {n} threads', de: 'beantwortet aus {n} Unterhaltungen' },
+  owlAnsweredFromOne: { en: 'answered from one thread', de: 'beantwortet aus einer Unterhaltung' },
+  owlAnsweredFromSources: { en: 'answered from {n} sources', de: 'beantwortet aus {n} Quellen' },
+  owlAnsweredFromOneSource: { en: 'answered from one source', de: 'beantwortet aus einer Quelle' },
   owlSourcesAlsoChecked: {
     en: '+ {n} more threads checked, not cited in the answer',
-    de: '+ {n} weitere Threads geprüft, in der Antwort nicht zitiert'
+    de: '+ {n} weitere Unterhaltungen geprüft, in der Antwort nicht zitiert'
   },
-  owlAnswering: { en: 'reading your mail…', de: 'liest deine Post…' },
+  owlAnswering: { en: 'reading your mail…', de: 'liest deine E-Mails…' },
   owlSources: { en: 'SOURCES', de: 'QUELLEN' },
   owlSourceOpen: { en: 'OPEN →', de: 'ÖFFNEN →' },
   owlYou: { en: 'YOU · {time}', de: 'DU · {time}' },
   owlFooterHits: { en: 'HITS', de: 'TREFFER' },
   owlFooterOpen: {
     en: 'OPEN SELECTED · ASK WHEN NONE',
-    de: 'ÖFFNET DIE AUSWAHL · SONST FRAGT DIE EULE'
+    de: 'ÖFFNET DIE AUSWAHL · OHNE AUSWAHL FRAGT DIE EULE'
   },
   owlIndexStatus: {
     en: 'THE OWL INDEXES {n} MAILS · {coverage}% EMBEDDED · LOCAL',
-    de: 'DIE EULE INDEXIERT {n} MAILS · {coverage}% EINGEBETTET · LOKAL'
+    de: 'DIE EULE INDEXIERT {n} E-MAILS · {coverage}% SEMANTISCH · LOKAL'
   },
 
   // ── Konto-Dialog (Onboarding) ──
   addAccountTitle: { en: 'Add account', de: 'Konto hinzufügen' },
-  addImapGeneric: { en: 'IMAP (generic)', de: 'IMAP (generisch)' },
+  addImapGeneric: { en: 'IMAP (generic)', de: 'Anderer Anbieter (IMAP)' },
   addMicrosoftButton: { en: 'Sign in with Microsoft', de: 'Mit Microsoft anmelden' },
   addMicrosoftNote: {
     en: 'Sign-in happens in your browser with Microsoft — Noctua never sees your password. Works with Hotmail, Outlook.com and Live addresses.',
-    de: 'Die Anmeldung läuft über deinen Browser bei Microsoft — Noctua sieht dein Passwort nie. Funktioniert mit Hotmail-, Outlook.com- und Live-Adressen.'
+    de: 'Du meldest dich in deinem Browser bei Microsoft an – Noctua sieht dein Passwort nie. Funktioniert mit Hotmail-, Outlook.com- und Live-Adressen.'
   },
   addGoogleButton: { en: 'Sign in with Google', de: 'Mit Google anmelden' },
   addGoogleNote: {
     en: 'Sign-in happens in your browser with Google — Noctua never sees your password, no app password needed anymore.',
-    de: 'Die Anmeldung läuft über deinen Browser bei Google — Noctua sieht dein Passwort nie, ein App-Passwort ist nicht mehr nötig.'
+    de: 'Du meldest dich in deinem Browser bei Google an – Noctua sieht dein Passwort nie. Ein App-Passwort brauchst du nicht mehr.'
   },
   addSyncRangeLabel: { en: 'How far back should we sync?', de: 'Wie weit zurück synchronisieren?' },
   addSyncDefault: {
     en: 'Default — last 90 days (search: 6 months)',
-    de: 'Standard — letzte 90 Tage (Suche: 6 Monate)'
+    de: 'Standard – letzte 90 Tage (Suche: 6 Monate)'
   },
   addSync30: { en: 'Last 30 days', de: 'Letzte 30 Tage' },
   addSync90: { en: 'Last 90 days', de: 'Letzte 90 Tage' },
   addSync365: { en: 'Last year', de: 'Letztes Jahr' },
   addSyncAll: { en: 'Everything', de: 'Alles' },
   addLoginFailed: { en: 'Sign-in failed', de: 'Anmeldung fehlgeschlagen' },
-  addWaitingForBrowser: { en: 'Waiting for browser sign-in…', de: 'Warte auf Browser-Anmeldung…' },
+  addWaitingForBrowser: {
+    en: 'Waiting for browser sign-in…',
+    de: 'Warte auf die Anmeldung im Browser…'
+  },
   addBrowserTabNote: {
     en: 'A browser tab has opened. Sign in and approve there — this window waits meanwhile.',
-    de: 'Es hat sich ein Browser-Tab geöffnet. Dort anmelden und zustimmen — dieses Fenster wartet solange.'
+    de: 'Im Browser wurde ein Tab geöffnet. Melde dich dort an und erteile die Freigabe – dieses Fenster wartet so lange.'
   },
   addEmailPh: { en: 'Email address', de: 'E-Mail-Adresse' },
   addPasswordPh: { en: 'Password', de: 'Passwort' },
@@ -481,69 +490,75 @@ const table = {
   addSmtpHostPh: { en: 'SMTP host', de: 'SMTP-Host' },
   addPortPh: { en: 'Port', de: 'Port' },
   addConnectionFailed: { en: 'Connection failed', de: 'Verbindung fehlgeschlagen' },
-  addChecking: { en: 'Checking connection…', de: 'Prüfe Verbindung…' },
+  addChecking: { en: 'Checking connection…', de: 'Verbindung wird geprüft…' },
   addConnect: { en: 'Connect', de: 'Verbinden' },
 
   // ── Masthead ──
-  navCompose: { en: 'NEW MAIL', de: 'NEUE MAIL' },
+  navCompose: { en: 'NEW MAIL', de: 'NEUE E-MAIL' },
   navInbox: { en: 'INBOX', de: 'POSTEINGANG' },
-  navWaiting: { en: 'WAITING', de: 'WARTET' },
+  navWaiting: { en: 'WAITING', de: 'AUSSTEHEND' },
   navTasks: { en: 'TASKS', de: 'AUFGABEN' },
   navSettings: { en: 'SETTINGS', de: 'EINSTELLUNGEN' },
 
   // ── Key-Strip / g-Hint ──
-  keyMove: { en: 'move', de: 'bewegen' },
-  keyFile: { en: 'delete', de: 'löschen' },
+  keyMove: { en: 'move', de: 'navigieren' },
+  keyFile: { en: 'delete', de: 'archivieren' },
   keyDictate: { en: 'dictate', de: 'diktieren' },
-  keyKeys: { en: 'keys', de: 'Tasten' },
+  keyKeys: { en: 'keys', de: 'Kürzel' },
 
   // ── Inbox-Liste ──
-  mailboxFilterLabel: { en: 'MAILBOX', de: 'POSTFACH' },
-  mailboxFilterAll: { en: 'ALL MAILBOXES', de: 'ALLE POSTFÄCHER' },
+  mailboxFilterLabel: { en: 'MAILBOX', de: 'KONTO' },
+  mailboxFilterAll: { en: 'ALL MAILBOXES', de: 'ALLE KONTEN' },
   mailboxFilterLoading: { en: 'LOADING…', de: 'LÄDT…' },
-  mailboxFilterNone: { en: 'NO MAILBOX', de: 'KEIN POSTFACH' },
+  mailboxFilterNone: { en: 'NO MAILBOX', de: 'KEIN KONTO' },
   mailboxFilterCount: { en: '{n} connected', de: '{n} verbunden' },
   mailboxFilterAria: {
     en: 'Filter correspondence by mailbox. Selected: {name}',
-    de: 'Korrespondenz nach Postfach filtern. Ausgewählt: {name}'
+    de: 'E-Mails nach Konto filtern. Ausgewählt: {name}'
   },
-  mailboxTabsAria: { en: 'Mailbox folder', de: 'Postfachordner' },
+  mailboxTabsAria: { en: 'Mailbox folder', de: 'Ordner' },
   chipTask: { en: 'TASK', de: 'AUFGABE' },
   chipDraftReady: { en: 'DRAFT READY', de: 'ENTWURF BEREIT' },
-  prioAria5: { en: 'ranked 5 of 5 — rings', de: 'Rang 5 von 5 — klingelt' },
-  prioAria4: { en: 'ranked 4 of 5 — notifies', de: 'Rang 4 von 5 — benachrichtigt' },
-  helpPrio5: { en: 'urgent — the owl ranked it 5, it rings', de: 'dringend — Rang 5, klingelt' },
-  helpPrio4: { en: 'high — ranked 4, it notifies', de: 'wichtig — Rang 4, benachrichtigt' },
-  triageHead: { en: 'TRIAGE', de: 'TRIAGE' },
+  prioAria5: { en: 'ranked 5 of 5 — rings', de: 'Priorität 5 von 5 – mit Signalton' },
+  prioAria4: { en: 'ranked 4 of 5 — notifies', de: 'Priorität 4 von 5 – mit Benachrichtigung' },
+  helpPrio5: {
+    en: 'urgent — the owl ranked it 5, it rings',
+    de: 'dringend – Priorität 5, mit Signalton'
+  },
+  helpPrio4: {
+    en: 'high — ranked 4, it notifies',
+    de: 'wichtig – Priorität 4, mit Benachrichtigung'
+  },
+  triageHead: { en: 'TRIAGE', de: 'EINSCHÄTZUNG' },
   triagePriority: { en: 'PRIORITY {n} OF 5', de: 'PRIORITÄT {n} VON 5' },
-  triageNeedsReply: { en: 'NEEDS A REPLY', de: 'ERWARTET ANTWORT' },
+  triageNeedsReply: { en: 'NEEDS A REPLY', de: 'ANTWORT NÖTIG' },
   prioNote: {
     en: 'ranked 4+ raises a desktop notification · 5 rings — set in Settings → Intelligence',
-    de: 'Rang 4+ löst eine Desktop-Benachrichtigung aus · 5 klingelt — einstellbar unter Einstellungen → Intelligenz'
+    de: 'Ab Priorität 4 gibt es eine Desktop-Benachrichtigung, bei 5 zusätzlich einen Signalton – einstellbar unter Einstellungen → KI'
   },
   needsYou: { en: 'NEEDS YOU', de: 'BRAUCHT DICH' },
   needsYouAll: { en: 'ALL', de: 'ALLE' },
   filterClearAll: { en: 'reset', de: 'zurücksetzen' },
   filterChipRemove: { en: 'remove filter: {name}', de: 'Filter entfernen: {name}' },
   filterSectPriority: { en: 'PRIORITY', de: 'PRIORITÄT' },
-  filterShowAll: { en: 'Show everything', de: 'Alles zeigen' },
+  filterShowAll: { en: 'Show everything', de: 'Alle anzeigen' },
   filterZero: { en: 'Nothing matches your filters.', de: 'Nichts passt zu deinen Filtern.' },
-  filterZeroSub: { en: 'LOOSEN ONE, SEE MORE', de: 'EINEN LOCKERN, MEHR SEHEN' },
-  needsYouRankNote: { en: '— ranked 4+', de: '— Rang 4+' },
+  filterZeroSub: { en: 'LOOSEN ONE, SEE MORE', de: 'FILTER LOCKERN, MEHR SEHEN' },
+  needsYouRankNote: { en: '— ranked 4+', de: '– Priorität 4+' },
   needsYouFilterLabel: { en: 'FILTER', de: 'FILTER' },
   keyNeedsYou: { en: 'needs you', de: 'braucht dich' },
-  needsYouZero: { en: 'Nothing needs you first.', de: 'Nichts braucht dich zuerst.' },
+  needsYouZero: { en: 'Nothing needs you first.', de: 'Nichts braucht dich gerade.' },
   needsYouZeroSub: { en: 'RARE. ENJOY IT.', de: 'SELTEN. GENIESS ES.' },
   inboxZero: { en: 'Inbox zero.', de: 'Posteingang leer.' },
   inboxZeroSub: {
     en: 'THE OWL APPROVES · Z TO UNDO',
-    de: 'DIE EULE IST ZUFRIEDEN · Z FÜR RÜCKGÄNGIG'
+    de: 'DIE EULE IST ZUFRIEDEN · Z MACHT RÜCKGÄNGIG'
   },
 
   // ── Waiting ──
   waitingHead: { en: 'WAITING ON A REPLY', de: 'WARTET AUF ANTWORT' },
   waitingSub: { en: 'THE OWL COUNTS THE DAYS', de: 'DIE EULE ZÄHLT DIE TAGE' },
-  daysSilent: { en: '{d}d silent', de: '{d} T. still' },
+  daysSilent: { en: '{d}d silent', de: 'seit {d} T.' },
   today: { en: 'today', de: 'heute' },
   nudgedToday: { en: 'NUDGED TODAY ✓', de: '✓ HEUTE GESTUPST' },
   waitingEmpty: { en: 'Nobody owes you a reply.', de: 'Niemand schuldet dir eine Antwort.' },
@@ -551,17 +566,17 @@ const table = {
   youArrow: { en: 'YOU →', de: 'DU →' },
   sentDaysAgo: { en: 'SENT {d} DAYS AGO', de: 'GESENDET VOR {d} TAGEN' },
   sentToday: { en: 'SENT TODAY', de: 'HEUTE GESENDET' },
-  silence: { en: 'SILENCE', de: 'STILLE' },
+  silence: { en: 'SILENCE', de: 'FUNKSTILLE' },
   silenceLine: {
     en: '{d} days without an answer. The owl suggests a gentle nudge.',
     de: '{d} Tage ohne Antwort. Die Eule schlägt einen freundlichen Stups vor.'
   },
   silenceToday: {
     en: 'Sent today — the owl starts counting tonight.',
-    de: 'Heute gesendet — die Eule zählt ab heute Nacht.'
+    de: 'Heute gesendet – die Eule beginnt heute Nacht zu zählen.'
   },
-  nudgeLabel: { en: 'NUDGE, DRAFTED IN YOUR VOICE', de: 'STUPS, IN DEINER STIMME ENTWORFEN' },
-  nudgeSub: { en: '— polite, no pressure', de: '— höflich, ohne Druck' },
+  nudgeLabel: { en: 'NUDGE, DRAFTED IN YOUR VOICE', de: 'STUPS – IN DEINEM STIL ENTWORFEN' },
+  nudgeSub: { en: '— polite, no pressure', de: '– höflich, ohne Druck' },
   sendNudge: { en: 'SEND NUDGE', de: 'STUPS SENDEN' },
   stopWaiting: { en: 'STOP WAITING', de: 'NICHT MEHR WARTEN' },
   nudgedNote: {
@@ -570,27 +585,30 @@ const table = {
   },
   composerNudgePlaceholder: {
     en: 'The owl drafts your nudge — edit, dictate, or rewrite it…',
-    de: 'Die Eule entwirft deinen Stups — bearbeite, diktiere oder formuliere ihn um…'
+    de: 'Die Eule entwirft deinen Stups – du kannst ihn bearbeiten, diktieren oder umformulieren…'
   },
-  originalSentMail: { en: 'YOUR ORIGINAL SENT MAIL', de: 'DEINE URSPRÜNGLICH GESENDETE MAIL' },
-  originalMailLoading: { en: 'Loading the original mail…', de: 'Ursprüngliche Mail wird geladen…' },
+  originalSentMail: { en: 'YOUR ORIGINAL SENT MAIL', de: 'DEINE URSPRÜNGLICHE E-MAIL' },
+  originalMailLoading: {
+    en: 'Loading the original mail…',
+    de: 'Ursprüngliche E-Mail wird geladen…'
+  },
   originalMailUnavailable: {
     en: 'The original mail is no longer available locally.',
-    de: 'Die ursprüngliche Mail ist lokal nicht mehr verfügbar.'
+    de: 'Die ursprüngliche E-Mail ist lokal nicht mehr verfügbar.'
   },
 
   // ── Tasks ──
-  tasksHead: { en: 'TASKS — EXTRACTED FROM MAIL', de: 'AUFGABEN — AUS MAILS GEZOGEN' },
-  tasksSub: { en: 'SPACE TO TICK', de: 'LEERTASTE HAKT AB' },
+  tasksHead: { en: 'TASKS — EXTRACTED FROM MAIL', de: 'AUFGABEN – AUS E-MAILS ERKANNT' },
+  tasksSub: { en: 'SPACE TO TICK', de: 'LEERTASTE ZUM ABHAKEN' },
   tasksFilterStatus: { en: 'STATUS', de: 'STATUS' },
   tasksFilterOpen: { en: 'OPEN', de: 'OFFEN' },
   tasksFilterCompleted: { en: 'COMPLETED', de: 'ERLEDIGT' },
   tasksFilterAll: { en: 'ALL', de: 'ALLE' },
   tasksFilterNone: { en: 'NONE', de: 'KEINE' },
-  tasksFilterNothing: { en: 'Nothing shown.', de: 'Nichts eingeblendet.' },
+  tasksFilterNothing: { en: 'Nothing shown.', de: 'Nichts angezeigt.' },
   tasksFilterNothingSub: {
     en: 'THE STATUS FILTER IS FULLY OFF',
-    de: 'DER STATUS-FILTER IST KOMPLETT AUS'
+    de: 'ALLE STATUS-FILTER SIND AUS'
   },
   tasksFilterAria: {
     en: 'Filter tasks by status. Current view: {state}',
@@ -598,14 +616,14 @@ const table = {
   },
   taskFrom: { en: 'from {src}', de: 'aus {src}' },
   task: { en: 'TASK', de: 'AUFGABE' },
-  extractedAuto: { en: 'extracted automatically', de: 'automatisch gezogen' },
+  extractedAuto: { en: 'extracted automatically', de: 'automatisch erkannt' },
   source: { en: 'SOURCE', de: 'QUELLE' },
   spaceDone: { en: 'DONE', de: 'ERLEDIGT' },
-  spaceReopen: { en: 'REOPEN', de: 'WIEDER AUF' },
+  spaceReopen: { en: 'REOPEN', de: 'WIEDER ÖFFNEN' },
   spaceKey: { en: 'SPACE', de: 'LEERTASTE' },
-  openThread: { en: 'O OPEN THREAD', de: 'O THREAD ÖFFNEN' },
-  threadFiled: { en: 'That thread is deleted', de: 'Dieser Thread ist gelöscht' },
-  tasksEmpty: { en: 'Nothing extracted yet.', de: 'Noch nichts gezogen.' },
+  openThread: { en: 'O OPEN THREAD', de: 'O E-MAIL ÖFFNEN' },
+  threadFiled: { en: 'That thread is deleted', de: 'Diese Unterhaltung gibt es nicht mehr' },
+  tasksEmpty: { en: 'Nothing extracted yet.', de: 'Noch nichts erkannt.' },
   tasksEmptySub: { en: 'THE OWL READS ALONG', de: 'DIE EULE LIEST MIT' },
   tasksAllDone: { en: 'Everything is done.', de: 'Alles erledigt.' },
   tasksAllDoneSub: {
@@ -620,7 +638,7 @@ const table = {
   mailDetailsShow: { en: 'DETAILS', de: 'DETAILS' },
   mailDetailsHide: { en: 'CLOSE', de: 'SCHLIESSEN' },
   mailDetailsFrom: { en: 'FROM', de: 'VON' },
-  mailDetailsSender: { en: 'SENDER', de: 'VERSENDER' },
+  mailDetailsSender: { en: 'SENDER', de: 'SENDER-HEADER' },
   mailDetailsTo: { en: 'TO', de: 'AN' },
   mailDetailsCc: { en: 'CC', de: 'CC' },
   mailDetailsBcc: { en: 'BCC', de: 'BCC' },
@@ -633,11 +651,11 @@ const table = {
   mailDetailsSecurity: { en: 'DELIVERY & AUTHENTICATION', de: 'ZUSTELLUNG & AUTHENTIFIZIERUNG' },
   mailDetailsSecurityNote: {
     en: 'Reported mail-server signals — useful evidence, not a guarantee that the message is trustworthy.',
-    de: 'Gemeldete Mailserver-Signale — hilfreiche Indizien, aber keine Garantie für die Vertrauenswürdigkeit der Mail.'
+    de: 'Gemeldete Signale des Mailservers – hilfreiche Hinweise, aber keine Garantie, dass die E-Mail vertrauenswürdig ist.'
   },
   mailDetailsReplyMismatch: {
     en: 'The reply address uses a different domain than the visible sender.',
-    de: 'Die Antwortadresse verwendet eine andere Domain als der sichtbare Absender.'
+    de: 'Die Antwortadresse hat eine andere Domain als der angezeigte Absender.'
   },
   mailDetailsReturnPath: { en: 'RETURN PATH', de: 'RETURN-PATH' },
   mailDetailsDeliveredTo: { en: 'DELIVERED TO', de: 'ZUGESTELLT AN' },
@@ -650,85 +668,82 @@ const table = {
   mailDetailsAuthFail: { en: 'failed', de: 'fehlgeschlagen' },
   mailDetailsAuthSoftfail: { en: 'soft fail', de: 'Softfail' },
   mailDetailsAuthNeutral: { en: 'neutral', de: 'neutral' },
-  mailDetailsAuthTemperror: { en: 'temporary error', de: 'temporärer Fehler' },
+  mailDetailsAuthTemperror: { en: 'temporary error', de: 'vorübergehender Fehler' },
   mailDetailsAuthPermerror: { en: 'configuration error', de: 'Konfigurationsfehler' },
   mailDetailsAuthNone: { en: 'not provided', de: 'nicht angegeben' },
   mailDetailsAuthUnknown: { en: 'unknown', de: 'unbekannt' },
   mailDetailsLoading: {
     en: 'Fetching technical headers from the mailbox…',
-    de: 'Technische Header werden vom Postfach abgerufen…'
+    de: 'Technische Header werden vom Server abgerufen…'
   },
   mailDetailsLoaded: {
     en: 'Technical mail headers loaded.',
-    de: 'Technische Mail-Header geladen.'
+    de: 'Technische E-Mail-Header geladen.'
   },
   mailDetailsUnavailable: {
     en: 'Technical headers are not available right now. The basic sender and recipient data cached locally remains visible above.',
     de: 'Die technischen Header sind gerade nicht verfügbar. Die lokal gespeicherten Basisdaten zu Absender und Empfängern bleiben oben sichtbar.'
   },
-  mailDetailsRaw: { en: 'RAW MESSAGE HEADERS', de: 'ROHE MAIL-HEADER' },
+  mailDetailsRaw: { en: 'RAW MESSAGE HEADERS', de: 'ROH-HEADER' },
   mailDetailsRawTruncated: {
     en: 'Header display was capped at 512 KB.',
-    de: 'Die Header-Anzeige wurde bei 512 KB begrenzt.'
+    de: 'Die Anzeige der Header ist auf 512 KB begrenzt.'
   },
 
   // ── Masthead search ──
   mastheadSearch: { en: 'SEARCH', de: 'SUCHEN' },
 
   // ── Composer ──
-  listening: { en: 'LISTENING', de: 'HÖRE ZU' },
+  listening: { en: 'LISTENING', de: 'HÖRT ZU' },
   voiceNothingHeard: {
     en: 'Could not hear anything — please dictate again',
-    de: 'Nichts zu hören — bitte nochmal einsprechen'
+    de: 'Nichts zu hören – bitte diktiere noch einmal'
   },
-  voiceQueryStart: {
-    en: 'Dictate your question (⌘D)',
-    de: 'Frage einsprechen (⌘D)'
-  },
-  voicePrefix: { en: 'voice:', de: 'stimme:' },
+  voiceQueryStart: { en: 'Dictate your question (⌘D)', de: 'Frage diktieren (⌘D)' },
+  voicePrefix: { en: 'voice:', de: 'diktat:' },
   send: { en: '↵ SEND', de: '↵ SENDEN' },
-  redraft: { en: '⇧R REDRAFT', de: '⇧R NEUER WURF' },
+  redraft: { en: '⇧R REDRAFT', de: '⇧R NEU ENTWERFEN' },
 
   // ── Owl-Rail ──
   theOwl: { en: 'THE OWL', de: 'DIE EULE' },
   owlQuiet: { en: 'working quietly', de: 'arbeitet leise' },
-  owlAsleepNoKey: { en: 'asleep — no key.', de: 'schläft — kein Schlüssel.' },
+  owlAsleepNoKey: { en: 'asleep — no key.', de: 'schläft – kein Schlüssel.' },
   owlAsleepLocalOnly: {
     en: 'asleep — Local only, no local model set.',
-    de: 'schläft — Local only, kein lokales Modell gewählt.'
+    de: 'schläft – „Nur lokal“ ist an, aber kein lokales Modell gewählt.'
   },
   owlListening: { en: 'listening…', de: 'hört zu…' },
   owlDraftingS: { en: 'drafting…', de: 'entwirft…' },
   railDrafts: { en: 'DRAFTS AWAITING YOU', de: 'ENTWÜRFE FÜR DICH' },
   railDraftNone: {
     en: 'None right now. Press {v} on any thread and talk — a draft appears here.',
-    de: 'Gerade keiner. Drück {v} auf einem Thread und sprich — der Entwurf landet hier.'
+    de: 'Gerade keine. Drück {v} bei einer Unterhaltung und sprich – der Entwurf erscheint hier.'
   },
-  railReview: { en: '↵ REVIEW', de: '↵ ANSEHEN' },
+  railReview: { en: '↵ REVIEW', de: '↵ PRÜFEN' },
   railReplyTo: { en: 'Reply to {name}', de: 'Antwort an {name}' },
   railDraftDelete: { en: 'Discard draft', de: 'Entwurf verwerfen' },
   railDraftMore: { en: '+ {n} more', de: '+ {n} weitere' },
   toastDraftDeleted: { en: 'Draft discarded', de: 'Entwurf verworfen' },
-  railTasksHead: { en: 'TASKS FROM MAIL', de: 'AUFGABEN AUS MAILS' },
+  railTasksHead: { en: 'TASKS FROM MAIL', de: 'AUFGABEN AUS E-MAILS' },
   railOpenArrow: { en: '{n} open →', de: '{n} offen →' },
-  railWaitingHead: { en: 'NO REPLY YET', de: 'KEINE ANTWORT BISHER' },
-  railWaitingArrow: { en: '{n} waiting →', de: '{n} warten →' },
+  railWaitingHead: { en: 'NO REPLY YET', de: 'NOCH KEINE ANTWORT' },
+  railWaitingArrow: { en: '{n} waiting →', de: '{n} ausstehend →' },
   nudgeBtn: { en: 'NUDGE', de: 'STUPS' },
   railNudgeNote: {
     en: 'nudges drafted in your voice — you approve every send',
-    de: 'Stupser in deiner Stimme — du gibst jeden Versand frei'
+    de: 'Stups-Entwürfe in deinem Stil – jeder Versand braucht dein OK'
   },
   yourStyle: { en: 'YOUR STYLE', de: 'DEIN STIL' },
   railVoiceNote: {
     en: 'Writing as {addr} — learned from your sent replies.',
-    de: 'Schreibt als {addr} — gelernt aus deinen gesendeten Antworten.'
+    de: 'Schreibt als {addr} – gelernt aus deinen gesendeten Antworten.'
   },
 
   // ── Settings ──
-  settingsHead: { en: 'SETTINGS — LOCAL, YOURS', de: 'EINSTELLUNGEN — LOKAL, DEINS' },
+  settingsHead: { en: 'SETTINGS — LOCAL, YOURS', de: 'EINSTELLUNGEN – LOKAL, GANZ DEINE' },
   setAccounts: { en: 'Accounts', de: 'Konten' },
   setStyle: { en: 'Style', de: 'Stil' },
-  setIntel: { en: 'Intelligence', de: 'Intelligenz' },
+  setIntel: { en: 'Intelligence', de: 'KI' },
   setAccountsSub: {
     en: '{n} connected · Google, Microsoft, IMAP',
     de: '{n} verbunden · Google, Microsoft, IMAP'
@@ -736,26 +751,23 @@ const table = {
   setStyleSub: { en: 'one per address', de: 'einer pro Adresse' },
   setIntelSubNoKey: { en: 'bring your own OpenRouter key', de: 'eigener OpenRouter-Schlüssel' },
   setIntelSub: { en: '{scan} scans · {write} writes', de: '{scan} scannt · {write} schreibt' },
-  setTech: { en: 'Under the hood', de: 'Technik' },
-  setTechSub: {
-    en: 'how the owl thinks — in pictures',
-    de: 'wie die Eule denkt — in Bildern'
-  },
+  setTech: { en: 'Under the hood', de: 'Unter der Haube' },
+  setTechSub: { en: 'how the owl thinks — in pictures', de: 'wie die Eule denkt – in Bildern' },
   connectedAddresses: { en: 'Connected addresses', de: 'Verbundene Adressen' },
-  accountName: { en: 'Mailbox name', de: 'Postfachname' },
+  accountName: { en: 'Mailbox name', de: 'Kontoname' },
   accountNamePh: {
     en: 'Mailbox name, e.g. Personal or Europe',
-    de: 'Postfachname, z. B. Privat oder Europa'
+    de: 'Kontoname, z. B. Privat oder Europa'
   },
   accountNameEditHint: {
     en: 'Edit mailbox name · saves automatically',
-    de: 'Postfachnamen bearbeiten · speichert automatisch'
+    de: 'Kontoname bearbeiten · wird automatisch gespeichert'
   },
   accountNameSaving: { en: 'saving…', de: 'speichert…' },
   accountNameSaved: { en: '✓ saved', de: '✓ gespeichert' },
   toastAccountNameRequired: {
     en: 'Please enter a unique mailbox name',
-    de: 'Bitte einen eindeutigen Postfachnamen eingeben'
+    de: 'Bitte gib einen eindeutigen Kontonamen ein'
   },
   microsoftBrowserNote: {
     en: 'the Microsoft login opens in your browser',
@@ -763,35 +775,35 @@ const table = {
   },
   googleBrowserNote: {
     en: 'the Google login opens in your browser — no app password needed',
-    de: 'die Google-Anmeldung öffnet sich im Browser — kein App-Passwort mehr nötig'
+    de: 'die Google-Anmeldung öffnet sich im Browser – kein App-Passwort nötig'
   },
   accountsSub: {
     en: 'ONE STYLE PER ADDRESS · INDEXED LOCALLY',
     de: 'EIN STIL PRO ADRESSE · LOKAL INDEXIERT'
   },
-  synced: { en: '✓ synced', de: '✓ synchron' },
+  synced: { en: '✓ synced', de: '✓ synchronisiert' },
   indexing: { en: 'indexing…', de: 'indexiert…' },
   errorState: { en: 'error', de: 'Fehler' },
   disconnect: { en: 'DISCONNECT', de: 'TRENNEN' },
   // Zweitklick-Bestätigung beim Trennen (Design 3b)
   disconnectHint: {
     en: 'removes the account + its local index',
-    de: 'entfernt das Konto + seinen lokalen Index'
+    de: 'entfernt das Konto und seinen lokalen Index'
   },
   disconnectYes: { en: 'YES, DISCONNECT', de: 'JA, TRENNEN' },
   disconnectKeep: { en: 'KEEP', de: 'BEHALTEN' },
   // Sync-Fehler inline (Design 3b): gespeicherter Fehlertext + Zeitpunkt
-  syncFailed: { en: 'sync failed', de: 'Sync gescheitert' },
+  syncFailed: { en: 'sync failed', de: 'Sync fehlgeschlagen' },
   syncNeedsReauth: { en: 'sign-in needed', de: 'Anmeldung nötig' },
   syncNeedsReauthHint: {
     en: 'The server rejected the sign-in — update the password or sign in again.',
-    de: 'Der Server hat die Anmeldung abgelehnt — Passwort aktualisieren oder neu anmelden.'
+    de: 'Der Server hat die Anmeldung abgelehnt – aktualisiere das Passwort oder melde dich erneut an.'
   },
   credReenter: { en: 'RE-ENTER PASSWORD', de: 'PASSWORT NEU EINGEBEN' },
   credSignInAgain: { en: 'SIGN IN AGAIN', de: 'ERNEUT ANMELDEN' },
   credNewPassword: { en: 'New password', de: 'Neues Passwort' },
   credSave: { en: 'SAVE', de: 'SPEICHERN' },
-  credChecking: { en: 'checking···', de: 'prüft···' },
+  credChecking: { en: 'checking···', de: 'wird geprüft···' },
   credCancel: { en: 'CANCEL', de: 'ABBRECHEN' },
   toastCredUpdated: { en: 'Password updated', de: 'Passwort aktualisiert' },
   toastReauthorized: { en: 'Signed in again', de: 'Erneut angemeldet' },
@@ -799,19 +811,13 @@ const table = {
   addAddress: { en: 'ADD AN ADDRESS', de: 'ADRESSE HINZUFÜGEN' },
   waitingForBrowser: {
     en: 'waiting for the browser sign-in···',
-    de: 'wartet auf die Browser-Anmeldung···'
+    de: 'wartet auf die Anmeldung im Browser···'
   },
-  waitingForBrowserHint: {
-    en: '— check your browser window',
-    de: '— schau in dein Browserfenster'
-  },
+  waitingForBrowserHint: { en: '— check your browser window', de: '– sieh im Browserfenster nach' },
   cancelCaps: { en: 'CANCEL', de: 'ABBRECHEN' },
-  imapAddrPh: { en: 'address — you@yourdomain.de', de: 'Adresse — du@deinedomain.de' },
-  imapHostPh: { en: 'imap host — mail.yourdomain.de', de: 'IMAP-Host — mail.deinedomain.de' },
-  smtpHostOptionalPh: {
-    en: 'smtp host — empty = same as imap',
-    de: 'SMTP-Host — leer = wie IMAP'
-  },
+  imapAddrPh: { en: 'address — you@yourdomain.de', de: 'Adresse – du@deinedomain.de' },
+  imapHostPh: { en: 'imap host — mail.yourdomain.de', de: 'IMAP-Host – mail.deinedomain.de' },
+  smtpHostOptionalPh: { en: 'smtp host — empty = same as imap', de: 'SMTP-Host – leer = wie IMAP' },
   imapPassPh: { en: 'password', de: 'Passwort' },
   connect: { en: 'CONNECT', de: 'VERBINDEN' },
   imapNote: {
@@ -820,24 +826,21 @@ const table = {
   },
   accountsFootnote: {
     en: "New addresses appear in the filters after first sync. The owl reads that mailbox's sent folder and starts learning its style.",
-    de: 'Neue Adressen tauchen nach dem ersten Sync in den Filtern auf. Die Eule liest den Gesendet-Ordner des Postfachs und lernt seinen Stil.'
+    de: 'Neue Adressen tauchen nach dem ersten Sync in den Filtern auf. Die Eule liest den Ordner „Gesendet“ dieses Kontos und beginnt, seinen Stil zu lernen.'
   },
-  mailCount: { en: '{n} mails', de: '{n} Mails' },
+  mailCount: { en: '{n} mails', de: '{n} E-Mails' },
   customModelToggle: { en: 'custom model…', de: 'eigenes Modell…' },
   customModelNote: {
     en: 'The listed models are tried and tested. Any OpenRouter model works too — cost and fitness are then yours to judge. The test runs a sample mail through the scanner prompt.',
-    de: 'Die gelisteten Modelle sind erprobt. Jedes OpenRouter-Modell geht auch — Kosten und Tauglichkeit kennen wir dann nicht. Der Test schickt eine Beispiel-Mail durch den Scanner-Prompt.'
+    de: 'Die aufgeführten Modelle sind erprobt. Jedes OpenRouter-Modell funktioniert ebenfalls – Kosten und Eignung musst du dann selbst einschätzen. Der Test schickt eine Beispiel-E-Mail durch den Scanner-Prompt.'
   },
   customModelPh: {
     en: 'provider/model — e.g. moonshotai/kimi-k2',
-    de: 'anbieter/modell — z. B. moonshotai/kimi-k2'
+    de: 'anbieter/modell – z. B. moonshotai/kimi-k2'
   },
   customModelTest: { en: 'TEST', de: 'TESTEN' },
   customModelApply: { en: 'USE MODEL', de: 'ÜBERNEHMEN' },
-  customModelOk: {
-    en: '✓ works — {ms} ms · ~{cost}',
-    de: '✓ funktioniert — {ms} ms · ~{cost}'
-  },
+  customModelOk: { en: '✓ works — {ms} ms · ~{cost}', de: '✓ funktioniert – {ms} ms · ca. {cost}' },
   customModelFailed: { en: 'test failed', de: 'Test fehlgeschlagen' },
   zdrHead: { en: 'PRIVACY', de: 'DATENSCHUTZ' },
   zdrLabel: {
@@ -846,38 +849,41 @@ const table = {
   },
   zdrNote: {
     en: 'Requests are routed only to providers that don’t store prompts (ZDR). Turning this off can make more models available — without that guarantee.',
-    de: 'Anfragen gehen nur an Anbieter, die Prompts nicht speichern (Zero Data Retention). Ausgeschaltet stehen ggf. mehr Modelle bereit — ohne diese Garantie.'
+    de: 'Anfragen gehen nur an Anbieter, die Prompts nicht speichern (Zero Data Retention). Wenn du das ausschaltest, stehen eventuell mehr Modelle zur Verfügung – ohne diese Garantie.'
   },
-  obSyncingMails: { en: 'LOADING MAILS · {n}', de: 'LÄDT MAILS · {n}' },
+  obSyncingMails: { en: 'LOADING MAILS · {n}', de: 'E-MAILS WERDEN GELADEN · {n}' },
   obSyncNote: {
     en: 'mails keep loading in the background — you can already continue',
-    de: 'Mails laden im Hintergrund weiter — du kannst schon fortfahren'
+    de: 'E-Mails werden im Hintergrund weiter geladen – du kannst schon fortfahren'
   },
   yourStyleHead: { en: 'Your style', de: 'Dein Stil' },
   styleSub: {
     en: 'ONE PER ADDRESS · LEARNED FROM SENT MAIL · STORED LOCALLY',
-    de: 'EINER PRO ADRESSE · GELERNT AUS GESENDETEM · LOKAL GESPEICHERT'
+    de: 'EINER PRO ADRESSE · AUS GESENDETEN E-MAILS GELERNT · LOKAL GESPEICHERT'
   },
   styleIntro: {
     en: 'Every draft starts from the address you’re answering from. The owl studies each mailbox’s sent replies — tone, greetings, sign-offs, language — and writes accordingly.',
-    de: 'Jeder Entwurf startet bei der Adresse, von der du antwortest. Die Eule studiert die gesendeten Antworten jedes Postfachs — Ton, Anreden, Grußformeln, Sprache — und schreibt entsprechend.'
+    de: 'Jeder Entwurf beginnt bei der Adresse, von der du antwortest. Die Eule liest die gesendeten Antworten jedes Kontos – Ton, Anrede, Grußformel, Sprache – und schreibt entsprechend.'
   },
-  learnFromSends: { en: 'learn from my sends', de: 'aus meinen Mails lernen' },
+  learnFromSends: { en: 'learn from my sends', de: 'aus meinen gesendeten E-Mails lernen' },
   retrain: { en: 'RETRAIN', de: 'NEU LERNEN' },
   voiceRulesLabel: { en: 'YOUR RULES FOR THIS ADDRESS', de: 'DEINE REGELN FÜR DIESE ADRESSE' },
   voiceRulesPh: {
     en: 'e.g. always informal, short sentences, sign off with “Cheers, Tim”',
-    de: 'z. B. immer Du-Form, kurze Sätze, Gruß „Viele Grüße, Tim“'
+    de: 'z. B. immer duzen, kurze Sätze, Gruß „Viele Grüße, Tim“'
   },
-  previewBtn: { en: 'SAMPLE REPLY', de: 'PROBE' },
+  previewBtn: { en: 'SAMPLE REPLY', de: 'BEISPIEL' },
   previewRunning: { en: 'WRITING…', de: 'SCHREIBT…' },
-  previewLabel: { en: 'SAMPLE — REPLY TO A TEST MAIL', de: 'PROBE — ANTWORT AUF EINE TESTMAIL' },
+  previewLabel: {
+    en: 'SAMPLE — REPLY TO A TEST MAIL',
+    de: 'BEISPIEL – ANTWORT AUF EINE TEST-E-MAIL'
+  },
   voiceRulesSaved: { en: '✓ saved', de: '✓ gespeichert' },
   reading: { en: 'READING…', de: 'LIEST…' },
   replies: { en: '{n} replies', de: '{n} Antworten' },
-  updatedToday: { en: 'updated today', de: 'heute gelernt' },
-  updatedYesterday: { en: 'updated yesterday', de: 'gestern gelernt' },
-  updatedDaysAgo: { en: 'updated {n} days ago', de: 'vor {n} Tagen gelernt' },
+  updatedToday: { en: 'updated today', de: 'heute aktualisiert' },
+  updatedYesterday: { en: 'updated yesterday', de: 'gestern aktualisiert' },
+  updatedDaysAgo: { en: 'updated {n} days ago', de: 'vor {n} Tagen aktualisiert' },
   // Ehrlich gescheitertes Nachlernen (Design 3e) — Gründe für ok:false
   voiceNoSent: {
     en: 'no sent replies to learn from yet',
@@ -885,58 +891,57 @@ const table = {
   },
   noProfileYet: {
     en: 'not learned yet — press RETRAIN',
-    de: 'noch nicht gelernt — drück NEU LERNEN'
+    de: 'noch nicht gelernt – drück NEU LERNEN'
   },
-  tryIt: { en: 'TRY IT', de: 'PROBIER ES' },
+  tryIt: { en: 'TRY IT', de: 'PROBIER ES AUS' },
   tryItLine: {
     en: 'Pick any thread in the inbox, press {v} — the reply arrives in that address’s voice.',
-    de: 'Wähl einen Thread im Posteingang, drück {v} — die Antwort kommt in der Stimme dieser Adresse.'
+    de: 'Wähl im Posteingang eine Unterhaltung aus und drück {v} – die Antwort kommt im Stil dieser Adresse.'
   },
   styleFootnote: {
     en: 'Learned locally. Delete a style any time — the owl forgets politely.',
-    de: 'Lokal gelernt. Lösch einen Stil jederzeit — die Eule vergisst höflich.'
+    de: 'Lokal gelernt. Du kannst einen Stil jederzeit löschen – die Eule vergisst höflich.'
   },
-  intelligence: { en: 'Intelligence', de: 'Intelligenz' },
+  intelligence: { en: 'Intelligence', de: 'KI' },
   intelSub: {
     en: 'YOUR KEYS, YOUR SERVERS · CALLS GO STRAIGHT TO THE PROVIDER YOU CHOOSE · NOTHING PASSES THROUGH US',
-    de: 'EIGENE SCHLÜSSEL, EIGENE SERVER · ANFRAGEN GEHEN DIREKT ZUM GEWÄHLTEN ANBIETER · NICHTS LÄUFT ÜBER UNS'
+    de: 'EIGENE SCHLÜSSEL, EIGENE SERVER · ANFRAGEN GEHEN DIREKT AN DEN GEWÄHLTEN ANBIETER · NICHTS LÄUFT ÜBER UNS'
   },
   orKeyHead: { en: 'OPENROUTER KEY', de: 'OPENROUTER-SCHLÜSSEL' },
   save: { en: 'SAVE', de: 'SPEICHERN' },
   orNoKey: {
     en: 'no key yet — scanning & drafting are paused until you add one',
-    de: 'noch kein Schlüssel — Scannen & Entwerfen pausieren, bis du einen hinterlegst'
+    de: 'noch kein Schlüssel – Scannen & Entwerfen pausieren, bis du einen hinterlegst'
   },
   orSaved: {
-    // Design 1b: „it never leaves this machine" — auch im Onboarding-Schritt 3
     en: '✓ saved · sk-or-•••• — in the macOS keychain, it never leaves this machine',
-    de: '✓ gespeichert · sk-or-•••• — im macOS-Schlüsselbund, verlässt diesen Rechner nie'
+    de: '✓ gespeichert · sk-or-•••• – im macOS-Schlüsselbund, verlässt diesen Rechner nie'
   },
-  modelScan: { en: 'MODEL — INBOX SCANNING', de: 'MODELL — POSTEINGANG-SCAN' },
+  modelScan: { en: 'MODEL — INBOX SCANNING', de: 'MODELL – POSTEINGANG SCANNEN' },
   modelScanSub: {
     en: 'gists · tasks · silence-tracking, on every mail — cheap wins',
-    de: 'Zusammenfassungen · Aufgaben · Stille-Zählung, bei jeder Mail — billig gewinnt'
+    de: 'Kurzfassungen · Aufgaben · Nachverfolgung unbeantworteter E-Mails – hier gewinnt günstig'
   },
-  modelWrite: { en: 'MODEL — WRITING', de: 'MODELL — SCHREIBEN' },
+  modelWrite: { en: 'MODEL — WRITING', de: 'MODELL – SCHREIBEN' },
   modelWriteSub: {
     en: 'your drafts, your nudges — quality wins',
-    de: 'deine Entwürfe, deine Stupser — Qualität gewinnt'
+    de: 'deine Entwürfe, deine Stupser – hier gewinnt Qualität'
   },
-  modelStt: { en: 'MODEL — DICTATION', de: 'MODELL — DIKTAT' },
+  modelStt: { en: 'MODEL — DICTATION', de: 'MODELL – DIKTAT' },
   modelSttSub: {
     en: 'turns your voice into the idea — audio-capable models',
-    de: 'macht aus deiner Stimme die Idee — audiofähige Modelle'
+    de: 'macht aus Gesprochenem deinen Entwurf – Modelle mit Audio-Eingabe'
   },
   toastSttModel: {
     en: 'Dictation now transcribed by {model}',
-    de: 'Diktat transkribiert jetzt {model}'
+    de: 'Diktat wird jetzt von {model} transkribiert'
   },
   accountColor: { en: 'COLOR', de: 'FARBE' },
   // Privacy-Default gedreht (Design 3b): blocken, bis der Nutzer erlaubt
   privacyHead: { en: 'PRIVACY', de: 'PRIVATSPHÄRE' },
   imagesBlockToggle: {
     en: 'block remote images until I allow them',
-    de: 'Bilder aus dem Netz blocken, bis ich sie erlaube'
+    de: 'externe Bilder blockieren, bis ich sie erlaube'
   },
   imagesBlockNote: {
     en: 'per-sender allow remembers your choice',
@@ -944,21 +949,21 @@ const table = {
   },
   intelFootnote: {
     en: 'No key? Mail still works — the owl just sleeps: no gists, no drafts, no counting.',
-    de: 'Kein Schlüssel? Mail läuft trotzdem — die Eule schläft nur: keine Gists, keine Entwürfe, kein Zählen.'
+    de: 'Kein Schlüssel? E-Mail funktioniert trotzdem – nur die Eule schläft: keine Kurzfassungen, keine Entwürfe, kein Zählen.'
   },
 
   // ── KI-Anbieter (Profile), Aufgaben-Zuordnung, Local only ──
   profilesHead: { en: 'AI PROVIDERS', de: 'KI-ANBIETER' },
   profilesSub: {
     en: 'OpenRouter or any OpenAI-compatible server — Ollama, LM Studio, vLLM, LiteLLM …',
-    de: 'OpenRouter oder jeder OpenAI-kompatible Server — Ollama, LM Studio, vLLM, LiteLLM …'
+    de: 'OpenRouter oder jeder OpenAI-kompatible Server – Ollama, LM Studio, vLLM, LiteLLM …'
   },
   profileLocal: { en: 'LOCAL', de: 'LOKAL' },
   profileExternal: { en: 'EXTERNAL', de: 'EXTERN' },
   profileManaged: { en: 'ORGANISATION', de: 'ORGANISATION' },
   profileManagedNote: {
     en: 'Provided by your organisation: URL, API style and name are fixed. Only the key can be changed.',
-    de: 'Von deiner Organisation bereitgestellt: URL, API-Stil und Name sind fest. Nur der Schlüssel lässt sich ändern.'
+    de: 'Von deiner Organisation bereitgestellt: URL, API-Stil und Name sind fest vorgegeben. Nur der Schlüssel lässt sich ändern.'
   },
   profileName: { en: 'NAME', de: 'NAME' },
   profileUrl: { en: 'BASE URL', de: 'BASIS-URL' },
@@ -967,62 +972,62 @@ const table = {
   profileStyleResponses: { en: 'OpenAI Responses', de: 'OpenAI Responses' },
   profileKey: { en: 'API KEY', de: 'API-SCHLÜSSEL' },
   profileKeyPh: { en: 'optional', de: 'optional' },
-  profileKeySaved: { en: '✓ saved — type to replace', de: '✓ gespeichert — tippen zum Ersetzen' },
+  profileKeySaved: {
+    en: '✓ saved — type to replace',
+    de: '✓ gespeichert – zum Ersetzen einfach tippen'
+  },
   profileNoKey: { en: 'no key saved', de: 'kein Schlüssel gespeichert' },
   profileKeyRemove: { en: 'remove key', de: 'Schlüssel entfernen' },
-  profileIsLocal: {
-    en: 'Runs locally or on-prem',
-    de: 'Läuft lokal bzw. im eigenen Netz'
-  },
+  profileIsLocal: { en: 'Runs locally or on-prem', de: 'Läuft lokal oder im eigenen Netzwerk' },
   profileIsLocalNote: {
     en: 'Counts as local for “Local only”. Suggested from the address — you decide.',
-    de: 'Zählt bei „Nur lokal“ als lokal. Vorschlag aus der Adresse — du entscheidest.'
+    de: 'Zählt bei „Nur lokal“ als lokal. Vorschlag anhand der Adresse – du entscheidest.'
   },
   profileTest: { en: 'TEST CONNECTION', de: 'VERBINDUNG TESTEN' },
   profileTestOk: {
     en: '✓ connected — {n} models · {ms} ms',
-    de: '✓ verbunden — {n} Modelle · {ms} ms'
+    de: '✓ verbunden – {n} Modelle · {ms} ms'
   },
   profileAdd: { en: '+ add provider', de: '+ Anbieter hinzufügen' },
   profileEdit: { en: 'edit', de: 'bearbeiten' },
   profileClose: { en: 'close', de: 'schließen' },
   profileDelete: { en: 'delete provider', de: 'Anbieter löschen' },
-  profileBlockedLocalOnly: { en: 'blocked — Local only', de: 'gesperrt — Nur lokal' },
+  profileBlockedLocalOnly: { en: 'blocked — Local only', de: 'gesperrt (Nur lokal)' },
   toastProfileSaved: { en: '✓ {name} saved', de: '✓ {name} gespeichert' },
   taskProvider: { en: 'PROVIDER', de: 'ANBIETER' },
   taskBlockedLocalOnly: {
     en: 'External provider — paused while Local only is on. Pick a local one.',
-    de: 'Externer Anbieter — pausiert, solange „Nur lokal“ an ist. Wähle einen lokalen.'
+    de: 'Externer Anbieter – pausiert, solange „Nur lokal“ aktiv ist. Wähle einen lokalen.'
   },
   taskBlockedNoKey: {
     en: 'No key yet — this task is paused until you add one.',
-    de: 'Noch kein Schlüssel — diese Aufgabe pausiert, bis du einen hinterlegst.'
+    de: 'Noch kein Schlüssel – diese Aufgabe ist pausiert, bis du einen hinterlegst.'
   },
   taskBlockedNoModel: {
     en: 'No model chosen yet — pick one below.',
-    de: 'Noch kein Modell gewählt — wähle unten eins.'
+    de: 'Noch kein Modell gewählt – wähle unten eins aus.'
   },
   taskBlockedNoProfile: {
     en: 'This provider no longer exists — pick another.',
-    de: 'Dieser Anbieter existiert nicht mehr — wähle einen anderen.'
+    de: 'Diesen Anbieter gibt es nicht mehr – wähle einen anderen.'
   },
   sttProviderApple: {
     en: 'Apple speech recognition — on this Mac',
-    de: 'Apple-Spracherkennung — auf diesem Mac'
+    de: 'Apple-Spracherkennung – auf diesem Mac'
   },
   taskAppleNote: {
     en: 'Runs on this Mac — no model, no key, no cost.',
-    de: 'Läuft auf diesem Mac — kein Modell, kein Schlüssel, keine Kosten.'
+    de: 'Läuft auf diesem Mac – ohne Modell, ohne Schlüssel, ohne Kosten.'
   },
-  toastTaskProfile: { en: 'Now using {name}', de: 'Nutzt jetzt {name}' },
+  toastTaskProfile: { en: 'Now using {name}', de: 'Verwendet jetzt {name}' },
   modelsFrom: { en: 'models from {name}', de: 'Modelle von {name}' },
   modelListSkipped: {
     en: 'Local only: the model list is not fetched automatically.',
-    de: 'Nur lokal: die Modellliste wird nicht automatisch geholt.'
+    de: 'Nur lokal: Die Modellliste wird nicht automatisch abgerufen.'
   },
   modelListLoad: { en: 'LOAD MODEL LIST', de: 'MODELLLISTE LADEN' },
   modelPick: { en: 'choose a model…', de: 'Modell wählen…' },
-  modelFreeText: { en: 'or type a model id…', de: 'oder Modell-ID eintippen…' },
+  modelFreeText: { en: 'or type a model id…', de: 'oder Modell-ID eingeben…' },
   localOnlyHead: { en: 'LOCAL ONLY', de: 'NUR LOKAL' },
   localOnlyLabel: {
     en: 'KEEP AI AND LOOKUPS ON THIS DEVICE',
@@ -1030,26 +1035,26 @@ const table = {
   },
   localOnlyNote: {
     en: 'AI uses only providers marked local. Nothing is fetched automatically from the internet: no update check, no model catalog, no search-model download, no remote images. Your mail servers and sign-in are not affected.',
-    de: 'Die KI nutzt nur als lokal markierte Anbieter. Es wird nichts automatisch aus dem Internet geholt: kein Update-Check, kein Modellkatalog, kein Suchmodell-Download, keine Remote-Bilder. Mailserver und Anmeldung sind nicht betroffen.'
+    de: 'Die KI nutzt nur Anbieter, die als lokal markiert sind. Aus dem Internet wird nichts automatisch geladen: keine Update-Prüfung, kein Modellkatalog, kein Download des Suchmodells, keine externen Bilder. Deine Mailserver und die Anmeldung sind davon nicht betroffen.'
   },
   localOnlyBadge: { en: 'LOCAL ONLY', de: 'NUR LOKAL' },
   localOnlyBadgeTip: {
     en: 'Local only is on — click for settings',
-    de: '„Nur lokal“ ist an — Klick öffnet die Einstellungen'
+    de: '„Nur lokal“ ist aktiv – ein Klick öffnet die Einstellungen'
   },
   toastLocalOnlyOn: {
     en: 'Local only is on — AI and lookups stay on this device',
-    de: 'Nur lokal ist an — KI und Abrufe bleiben auf diesem Gerät'
+    de: '„Nur lokal“ ist an – KI und Abrufe bleiben auf diesem Gerät'
   },
-  toastLocalOnlyOff: { en: 'Local only is off', de: 'Nur lokal ist aus' },
-  onDemandHead: { en: 'ON DEMAND', de: 'AUF ANFORDERUNG' },
+  toastLocalOnlyOff: { en: 'Local only is off', de: '„Nur lokal“ ist aus' },
+  onDemandHead: { en: 'ON DEMAND', de: 'AUF ANFRAGE' },
   onDemandNote: {
     en: 'These run by themselves in the background. With Local only they wait for your click.',
-    de: 'Das läuft von selbst im Hintergrund. Mit „Nur lokal“ wartet es auf deinen Klick.'
+    de: 'Das läuft sonst von selbst im Hintergrund. Mit „Nur lokal“ wartet es auf deinen Klick.'
   },
   onDemandNoteLocal: {
     en: 'Local only is on — nothing below runs by itself. Use the buttons when you want it.',
-    de: '„Nur lokal“ ist an — nichts davon läuft von selbst. Nutze die Knöpfe, wenn du es willst.'
+    de: '„Nur lokal“ ist an – nichts davon läuft von selbst. Nutze die Schaltflächen, wenn du es brauchst.'
   },
   updatesHead: { en: 'UPDATES', de: 'UPDATES' },
   updateCheckBtn: { en: 'CHECK FOR UPDATES', de: 'AUF UPDATES PRÜFEN' },
@@ -1057,21 +1062,21 @@ const table = {
   embedHead: { en: 'SEARCH MODEL', de: 'SUCHMODELL' },
   embedReady: {
     en: 'ready — semantic search on ({n}/{total} mails indexed)',
-    de: 'bereit — semantische Suche an ({n}/{total} Mails indexiert)'
+    de: 'bereit – semantische Suche aktiv ({n}/{total} E-Mails indexiert)'
   },
   embedMissing: {
     en: 'not downloaded yet — it loads by itself, or start it now',
-    de: 'noch nicht geladen — lädt von selbst, oder jetzt starten'
+    de: 'noch nicht geladen – wird automatisch geladen, oder starte es jetzt'
   },
   embedMissingLocal: {
     en: 'not downloaded — search uses full text only',
-    de: 'nicht geladen — die Suche nutzt nur Volltext'
+    de: 'nicht geladen – die Suche nutzt nur Volltext'
   },
   embedDownload: { en: 'DOWNLOAD SEARCH MODEL (~120 MB)', de: 'SUCHMODELL LADEN (~120 MB)' },
   embedDownloading: { en: 'DOWNLOADING…', de: 'LÄDT…' },
   toastEmbedReady: {
     en: '✓ Search model ready — indexing starts',
-    de: '✓ Suchmodell bereit — Indexierung startet'
+    de: '✓ Suchmodell bereit – Indexierung startet'
   },
 
   // ── Palette (nur Befehle — die Mailsuche wohnt bei der Eule) ──
@@ -1079,13 +1084,10 @@ const table = {
   palAria: { en: 'Command palette', de: 'Befehlspalette' },
   palCommandMode: { en: 'COMMANDS ONLY', de: 'NUR BEFEHLE' },
   palCommandSection: { en: 'COMMANDS', de: 'BEFEHLE' },
-  palFooterOwl: {
-    en: 'MAIL SEARCH: / — WITH THE OWL',
-    de: 'MAILSUCHE: / — BEI DER EULE'
-  },
+  palFooterOwl: { en: 'MAIL SEARCH: / — WITH THE OWL', de: 'E-MAIL-SUCHE: / – BEI DER EULE' },
   palSearchError: {
     en: 'Local search is unavailable right now. Please try again.',
-    de: 'Die lokale Suche ist gerade nicht verfügbar. Versuch es bitte erneut.'
+    de: 'Die lokale Suche ist gerade nicht verfügbar. Bitte versuche es erneut.'
   },
   palNoCommands: { en: 'No matching command.', de: 'Kein passender Befehl.' },
   palNoMail: {
@@ -1094,95 +1096,89 @@ const table = {
   },
   palNoSubject: { en: '(no subject)', de: '(ohne Betreff)' },
   palUnknownSender: { en: 'Unknown sender', de: 'Unbekannter Absender' },
-  palMailboxInbox: { en: 'Inbox', de: 'Eingang' },
+  palMailboxInbox: { en: 'Inbox', de: 'Posteingang' },
   palMailboxSent: { en: 'Sent', de: 'Gesendet' },
   palMailboxArchive: { en: 'Archive', de: 'Archiv' },
   palMailboxOther: { en: 'Other folder', de: 'Anderer Ordner' },
   palHitClear: { en: 'CLEAR MATCH', de: 'KLARER TREFFER' },
   palHitPossible: { en: 'POSSIBLE', de: 'MÖGLICH' },
-  palIndexLocal: { en: 'LOCAL MAIL SEARCH', de: 'LOKALE MAILSUCHE' },
+  palIndexLocal: { en: 'LOCAL MAIL SEARCH', de: 'LOKALE E-MAIL-SUCHE' },
   helpSearch: { en: 'search & ask the owl', de: 'suchen & die Eule fragen' },
   palChoose: { en: '↑↓ CHOOSE', de: '↑↓ WÄHLEN' },
   palRun: { en: '↵ RUN', de: '↵ AUSFÜHREN' },
-  cmdReviewNudge: { en: 'Review nudge for {name}', de: 'Stups für {name} ansehen' },
+  cmdReviewNudge: { en: 'Review nudge for {name}', de: 'Stups an {name} prüfen' },
   cmdDictate: { en: 'Dictate a reply to {name}', de: 'Antwort an {name} diktieren' },
   cmdHeroMove: { en: 'the hero move', de: 'der Königsweg' },
-  cmdSummarize: { en: 'Summarize thread', de: 'Thread zusammenfassen' },
+  cmdSummarize: { en: 'Summarize thread', de: 'Unterhaltung zusammenfassen' },
   cmdOwlsGist: { en: 'the owl’s gist', de: 'die Eule fasst zusammen' },
   cmdAcceptTask: { en: 'Accept found task', de: 'Gefundene Aufgabe übernehmen' },
   cmdGoInbox: { en: 'Go to Inbox', de: 'Zum Posteingang' },
-  cmdGoWaiting: { en: 'Go to Waiting', de: 'Zu Wartet' },
-  cmdGoTasks: { en: 'Go to Tasks', de: 'Zu Aufgaben' },
+  cmdGoWaiting: { en: 'Go to Waiting', de: 'Zu „Ausstehend“' },
+  cmdGoTasks: { en: 'Go to Tasks', de: 'Zu „Aufgaben“' },
   cmdOpen: { en: '{n} open', de: '{n} offen' },
   cmdYourStyle: { en: 'Your style', de: 'Dein Stil' },
   cmdOnePerAddress: { en: 'one per address', de: 'einer pro Adresse' },
-  cmdFilterAll: { en: 'Filter: all mailboxes', de: 'Filter: alle Postfächer' },
+  cmdFilterAll: { en: 'Filter: all mailboxes', de: 'Filter: alle Konten' },
   cmdFilterOnly: { en: 'Filter: {name} only', de: 'Filter: nur {name}' },
   cmdOpenSettings: { en: 'Open Settings', de: 'Einstellungen öffnen' },
   cmdSettingsNote: { en: 'accounts · key · models', de: 'Konten · Schlüssel · Modelle' },
-  cmdRefresh: { en: 'Check for new mail', de: 'Jetzt nach neuen Mails suchen' },
+  cmdRefresh: { en: 'Check for new mail', de: 'Nach neuen E-Mails suchen' },
   cmdRefreshNote: { en: 'all accounts · incl. spam', de: 'alle Konten · inkl. Spam' },
-  refreshTitle: { en: 'Check for new mail now', de: 'Jetzt nach neuen Mails suchen' },
-  toastRefreshing: { en: 'Checking all mailboxes…', de: 'Alle Postfächer werden abgeglichen…' },
+  refreshTitle: { en: 'Check for new mail now', de: 'Jetzt nach neuen E-Mails suchen' },
+  toastRefreshing: { en: 'Checking all mailboxes…', de: 'Alle Konten werden abgeglichen…' },
   cmdAddAddress: { en: 'Add an email address', de: 'E-Mail-Adresse hinzufügen' },
   cmdProviders: { en: 'Google · Microsoft · IMAP', de: 'Google · Microsoft · IMAP' },
   cmdChooseModels: { en: 'Choose models', de: 'Modelle wählen' },
-  cmdShortcuts: { en: 'Show keyboard shortcuts', de: 'Tastaturkürzel zeigen' },
-  cmdReplayOnboarding: { en: 'Replay onboarding', de: 'Onboarding wiederholen' },
+  cmdShortcuts: { en: 'Show keyboard shortcuts', de: 'Tastenkürzel anzeigen' },
+  cmdReplayOnboarding: { en: 'Replay onboarding', de: 'Einführung wiederholen' },
   cmdCompose: { en: 'New email', de: 'Neue E-Mail' },
   cmdOwlSearch: { en: 'Search & ask the owl', de: 'Suchen & die Eule fragen' },
-  cmdOwlSearchNote: {
-    en: 'mail search lives here now',
-    de: 'die Mailsuche wohnt jetzt hier'
-  },
+  cmdOwlSearchNote: { en: 'mail search lives here now', de: 'die E-Mail-Suche ist jetzt hier' },
   cmdLanguage: { en: 'Sprache: Deutsch', de: 'Language: English' },
 
   // ── Hilfe ──
   helpTitle: { en: 'Keyboard', de: 'Tastatur' },
   helpSub: {
     en: 'EVERYTHING WORKS WITHOUT THE MOUSE · ESC TO CLOSE',
-    de: 'ALLES GEHT OHNE MAUS · ESC SCHLIESST'
+    de: 'ALLES GEHT OHNE MAUS · ESC ZUM SCHLIESSEN'
   },
-  helpMove: { en: 'move through the list', de: 'durch die Liste bewegen' },
+  helpMove: { en: 'move through the list', de: 'in der Liste navigieren' },
   helpDictate: {
     en: 'dictate a reply — the hero move (also: v)',
-    de: 'Antwort diktieren — der Königsweg (auch: v)'
+    de: 'Antwort diktieren – der Königsweg (auch: v)'
   },
-  helpFile: { en: 'delete · edits an open draft', de: 'löschen · bearbeitet offenen Entwurf' },
-  helpEnter: {
-    en: 'finish dictation / run command',
-    de: 'Diktat abschließen / Befehl ausführen'
+  helpFile: {
+    en: 'delete · edits an open draft',
+    de: 'archivieren · bearbeitet einen offenen Entwurf'
   },
+  helpEnter: { en: 'finish dictation / run command', de: 'Diktat beenden / Befehl ausführen' },
   helpSend: { en: 'send draft / nudge', de: 'Entwurf bzw. Stups senden' },
-  helpReply: { en: 'reply by typing (list)', de: 'Antwort tippen (Liste)' },
+  helpReply: { en: 'reply by typing (list)', de: 'Antwort schreiben (Liste)' },
   helpReplyAll: { en: 'reply to all (list)', de: 'allen antworten (Liste)' },
   helpReplyScopeToggle: {
     en: 'switch reply scope (in the editor)',
-    de: 'Antwort-Umfang umschalten (im Editor)'
+    de: 'Empfänger der Antwort umschalten (im Editor)'
   },
-  helpRedraft: { en: 'redraft — another take', de: 'neuer Wurf — andere Fassung' },
-  helpIdeaToMail: { en: 'idea → mail (in the composer)', de: 'Idee → Mail (im Composer)' },
-  sigImgReadError: { en: 'Could not read the image', de: 'Bild konnte nicht gelesen werden' },
+  helpRedraft: { en: 'redraft — another take', de: 'neu entwerfen – andere Fassung' },
+  helpIdeaToMail: { en: 'idea → mail (in the composer)', de: 'Idee → E-Mail (beim Schreiben)' },
+  sigImgReadError: { en: 'Could not read the image', de: 'Das Bild konnte nicht gelesen werden' },
   sigGreetingFallback: { en: 'Best regards', de: 'Viele Grüße' },
-  helpTask: { en: 'accept / dismiss a found task', de: 'Aufgabe übernehmen / verwerfen' },
+  helpTask: { en: 'accept / dismiss a found task', de: 'gefundene Aufgabe übernehmen / verwerfen' },
   helpOverride: {
     en: 'set category — overrides the owl',
-    de: 'Kategorie setzen — überstimmt die Eule'
+    de: 'Kategorie festlegen – überstimmt die Eule'
   },
-  helpSummarize: { en: 'summarize thread', de: 'Thread zusammenfassen' },
-  helpUndo: { en: 'undo last file-away', de: 'letztes Ablegen zurück' },
-  helpFilter: {
-    en: 'filter by mailbox · 0 shows all',
-    de: 'nach Postfach filtern · 0 zeigt alle'
-  },
+  helpSummarize: { en: 'summarize thread', de: 'Unterhaltung zusammenfassen' },
+  helpUndo: { en: 'undo last file-away', de: 'letztes Archivieren rückgängig machen' },
+  helpFilter: { en: 'filter by mailbox · 0 shows all', de: 'nach Konto filtern · 0 zeigt alle' },
   helpPalette: { en: 'commands', de: 'Befehle' },
   helpViews: {
     en: 'go straight to inbox · waiting · tasks · calendar',
-    de: 'direkt zu Posteingang · Wartet · Aufgaben · Kalender'
+    de: 'direkt zu Posteingang · Ausstehend · Aufgaben · Kalender'
   },
   helpSettings: {
     en: 'settings — accounts · key · models',
-    de: 'Einstellungen — Konten · Schlüssel · Modelle'
+    de: 'Einstellungen – Konten · Schlüssel · Modelle'
   },
   helpSignoff: {
     en: 'The owl works while you sleep.',
@@ -1190,53 +1186,53 @@ const table = {
   },
 
   // ── Toasts ──
-  toastFiled: { en: 'Filed.', de: 'Abgelegt.' },
+  toastFiled: { en: 'Filed.', de: 'Archiviert.' },
   toastNothingUndo: { en: 'Nothing to undo', de: 'Nichts rückgängig zu machen' },
   toastBackInbox: { en: 'Back in the inbox', de: 'Zurück im Posteingang' },
-  toastTaskAdded: { en: 'Task added — {label}', de: 'Aufgabe übernommen — {label}' },
+  toastTaskAdded: { en: 'Task added — {label}', de: 'Aufgabe übernommen – {label}' },
   toastTaskUpdateFailed: {
     en: 'Task could not be updated',
-    de: 'Aufgabe konnte nicht aktualisiert werden'
+    de: 'Die Aufgabe konnte nicht aktualisiert werden'
   },
   toastTaskDismissed: {
     en: 'Dismissed — the owl won’t mention it again',
-    de: 'Verworfen — die Eule erwähnt es nicht wieder'
+    de: 'Verworfen – die Eule erwähnt es nicht wieder'
   },
   toastNudgeSent: {
     en: 'Nudge sent to {name} — in your voice, gently',
-    de: 'Stups an {name} — in deiner Stimme, sanft'
+    de: 'Stups an {name} gesendet – freundlich und in deinem Stil'
   },
-  toastStopWaiting: { en: 'Stopped waiting on {name}', de: 'Wartet nicht mehr auf {name}' },
+  toastStopWaiting: { en: 'Stopped waiting on {name}', de: 'Du wartest nicht mehr auf {name}' },
   toastOwlGist: { en: 'The owl: {gist}', de: 'Die Eule: {gist}' },
   toastNoQuestion: {
     en: 'Nothing to answer here — the owl found no question for you.',
-    de: 'Hier gibt es nichts zu beantworten — die Eule fand keine Frage an dich.'
+    de: 'Hier gibt es nichts zu beantworten – die Eule hat keine Frage an dich gefunden.'
   },
   toastVoiceRefreshed: {
     en: 'Voice refreshed — the owl reread your sent mail',
-    de: 'Stimme aufgefrischt — die Eule hat deine gesendeten Mails neu gelesen'
+    de: 'Stil aktualisiert – die Eule hat deine gesendeten E-Mails neu gelesen'
   },
   toastKeySaved: {
     en: '✓ Key saved locally — the owl wakes up',
-    de: '✓ Schlüssel lokal gespeichert — die Eule wacht auf'
+    de: '✓ Schlüssel lokal gespeichert – die Eule wacht auf'
   },
   toastKeyInvalid: {
     en: 'That doesn’t look like an OpenRouter key (sk-or-…)',
     de: 'Das sieht nicht nach einem OpenRouter-Schlüssel aus (sk-or-…)'
   },
-  toastScanModel: { en: 'Scanning now runs on {model}', de: 'Scannen läuft jetzt auf {model}' },
+  toastScanModel: { en: 'Scanning now runs on {model}', de: 'Scannen läuft jetzt mit {model}' },
   toastScanApple: {
     en: 'Scanning now runs on-device (Apple Intelligence)',
-    de: 'Scannen läuft jetzt lokal auf dem Gerät (Apple Intelligence)'
+    de: 'Scannen läuft jetzt auf dem Gerät (Apple Intelligence)'
   },
   fmProviderCloud: { en: 'OpenRouter (cloud)', de: 'OpenRouter (Cloud)' },
   fmProviderApple: {
     en: 'Apple Intelligence — on this Mac',
-    de: 'Apple Intelligence — auf diesem Mac'
+    de: 'Apple Intelligence – auf diesem Mac'
   },
   fmProviderAppleSub: {
     en: 'triage runs on-device, mail text never leaves this machine — tasks only for clear personal requests',
-    de: 'Triage läuft auf dem Gerät, Mail-Text verlässt den Rechner nicht — Aufgaben nur bei klarer persönlicher Bitte'
+    de: 'Die Vorsortierung läuft auf dem Gerät, der Text der E-Mails verlässt den Rechner nicht – Aufgaben nur bei klarer persönlicher Bitte'
   },
   fmStateAvailable: { en: 'available', de: 'verfügbar' },
   fmStateOff: {
@@ -1245,88 +1241,85 @@ const table = {
   },
   fmStateNotReady: {
     en: 'model is still downloading — try again later',
-    de: 'Modell lädt noch — später erneut versuchen'
+    de: 'Das Modell wird noch geladen – versuche es später erneut'
   },
   fmStateUnsupported: {
     en: 'needs macOS 26 on Apple Silicon',
-    de: 'braucht macOS 26 auf Apple Silicon'
+    de: 'benötigt macOS 26 auf einem Mac mit Apple Silicon'
   },
   fmStateHelperMissing: {
     en: 'helper not built — run: pnpm run build:fm',
-    de: 'Helper nicht gebaut — pnpm run build:fm ausführen'
+    de: 'Hilfsprogramm nicht gebaut – führe pnpm run build:fm aus'
   },
   fmStateError: { en: 'check failed', de: 'Prüfung fehlgeschlagen' },
   fmCloudDimmed: {
     en: 'cloud model unused while Apple Intelligence handles scanning',
-    de: 'Cloud-Modell ruht, solange Apple Intelligence scannt'
+    de: 'Cloud-Modell pausiert, solange Apple Intelligence scannt'
   },
   toastWriteModel: { en: 'Drafts now written by {model}', de: 'Entwürfe schreibt jetzt {model}' },
   toastConnected: {
     en: '✓ {addr} connected — the owl starts learning that style',
-    de: '✓ {addr} verbunden — die Eule lernt jetzt diesen Stil'
+    de: '✓ {addr} verbunden – die Eule lernt jetzt diesen Stil'
   },
   toastDisconnected: { en: '{addr} disconnected', de: '{addr} getrennt' },
   toastImapFields: {
     en: 'Address, host and app password — then we’re in',
-    de: 'Adresse, Host und App-Passwort — dann klappt’s'
+    de: 'Es fehlen Adresse, Host oder App-Passwort'
   },
   toastConnectOne: { en: 'Connect at least one address', de: 'Verbinde mindestens eine Adresse' },
   toastWelcome: {
     en: 'Welcome. Press ? for the keys — or just start with j and k.',
-    de: 'Willkommen. Drück ? für die Tasten — oder starte einfach mit j und k.'
+    de: 'Willkommen. Drück ? für die Tastenkürzel – oder starte einfach mit j und k.'
   },
   toastLangSwitched: { en: 'Language: English', de: 'Sprache: Deutsch' },
 
   // ── Onboarding ──
   obTagline: {
     en: 'MAIL, WITH AN OWL ON YOUR SHOULDER',
-    de: 'MAIL, MIT EINER EULE AUF DER SCHULTER'
+    de: 'E-MAIL MIT EINER EULE AUF DER SCHULTER'
   },
   obIntro: {
     en: 'It reads with you, drafts in your voice, remembers who owes you a reply, and turns asks into tasks. You keep your hands on the keyboard — or just talk.',
-    de: 'Sie liest mit, entwirft in deiner Stimme, merkt sich, wer dir eine Antwort schuldet, und macht Bitten zu Aufgaben. Deine Hände bleiben auf der Tastatur — oder du sprichst einfach.'
+    de: 'Sie liest mit, entwirft Antworten in deinem Stil, merkt sich, wer dir noch eine Antwort schuldet, und verwandelt Bitten in Aufgaben. Deine Hände bleiben auf der Tastatur – oder du sprichst einfach.'
   },
-  obConnectCta: { en: 'CONNECT YOUR MAIL — ↵', de: 'POST VERBINDEN — ↵' },
-  obSkip: { en: 'skip for now', de: 'erstmal überspringen' },
+  obConnectCta: { en: 'CONNECT YOUR MAIL — ↵', de: 'E-MAIL-KONTO VERBINDEN – ↵' },
+  obSkip: { en: 'skip for now', de: 'vorerst überspringen' },
   obStep2: { en: 'STEP 2 OF 4', de: 'SCHRITT 2 VON 4' },
-  obStep3: {
-    en: 'STEP 3 OF 4 — THE OWL’S EYES',
-    de: 'SCHRITT 3 VON 4 — DIE AUGEN DER EULE'
-  },
-  obStep4: { en: 'STEP 4 OF 4 — YOUR VOICE', de: 'SCHRITT 4 VON 4 — DEINE STIMME' },
-  obConnectHead: { en: 'Connect your addresses', de: 'Verbinde deine Adressen' },
+  obStep3: { en: 'STEP 3 OF 4 — THE OWL’S EYES', de: 'SCHRITT 3 VON 4 – DIE AUGEN DER EULE' },
+  obStep4: { en: 'STEP 4 OF 4 — YOUR VOICE', de: 'SCHRITT 4 VON 4 – DEIN STIL' },
+  obConnectHead: { en: 'Connect your addresses', de: 'Verbinde deine E-Mail-Konten' },
   obConnectSub: {
     en: 'Noctua speaks Gmail, Outlook and IMAP. Everything is indexed locally.',
-    de: 'Noctua spricht Gmail, Outlook und IMAP. Alles wird lokal indexiert.'
+    de: 'Noctua versteht Gmail, Outlook und IMAP. Alles wird lokal indexiert.'
   },
   obConnect: { en: 'CONNECT', de: 'VERBINDEN' },
   obConnected: { en: 'CONNECTED', de: 'VERBUNDEN' },
-  obContinue: { en: 'CONTINUE — ↵', de: 'WEITER — ↵' },
+  obContinue: { en: 'CONTINUE — ↵', de: 'WEITER – ↵' },
   obNothingLeaves: { en: 'nothing leaves your machine', de: 'nichts verlässt deinen Rechner' },
-  obNConnected: { en: '{n} connected — indexed locally', de: '{n} verbunden — lokal indexiert' },
-  obVoiceHead: { en: 'The owl learns your voice', de: 'Die Eule lernt deine Stimme' },
+  obNConnected: { en: '{n} connected — indexed locally', de: '{n} verbunden – lokal indexiert' },
+  obVoiceHead: { en: 'The owl learns your voice', de: 'Die Eule lernt deinen Stil' },
   obVoiceSub: {
     en: 'It studies what you’ve sent — per address — so drafts sound like you, not like a machine.',
-    de: 'Sie studiert, was du gesendet hast — pro Adresse —, damit Entwürfe nach dir klingen, nicht nach Maschine.'
+    de: 'Sie liest, was du bisher gesendet hast – pro Adresse –, damit Entwürfe nach dir klingen und nicht nach Maschine.'
   },
   obReading: { en: 'reading your sent replies…', de: 'liest deine gesendeten Antworten…' },
   obDone: { en: 'DONE', de: 'FERTIG' },
-  obEnterCta: { en: 'ENTER YOUR MAIL — ↵', de: 'REIN IN DIE POST — ↵' },
+  obEnterCta: { en: 'ENTER YOUR MAIL — ↵', de: 'ZUM POSTEINGANG – ↵' },
   obRetrainNote: {
     en: 'you can retrain any time under STYLE',
-    de: 'jederzeit neu lernbar unter STIL'
+    de: 'du kannst den Stil jederzeit unter STIL neu lernen lassen'
   },
 
   // ── Onboarding — Schlüssel-Schritt + pausiertes Training (Design 1b) ──
-  obKeyHead: { en: 'Bring your own key', de: 'Bring deinen eigenen Schlüssel' },
+  obKeyHead: { en: 'Bring your own key', de: 'Dein eigener Schlüssel' },
   obKeySub: {
     en: 'Gists, tasks and drafts run on OpenRouter with your key. Calls go straight there — nothing passes through us.',
-    de: 'Gists, Aufgaben und Entwürfe laufen über OpenRouter mit deinem Schlüssel. Anfragen gehen direkt dorthin — nichts läuft über uns.'
+    de: 'Kurzfassungen, Aufgaben und Entwürfe laufen mit deinem Schlüssel über OpenRouter. Die Anfragen gehen direkt dorthin – nichts läuft über uns.'
   },
   obOrgHead: { en: 'Your organisation’s AI', de: 'Die KI deiner Organisation' },
   obOrgSub: {
     en: 'Gists, tasks and drafts run on the AI profiles your organisation provides. Add your key where one is needed.',
-    de: 'Gists, Aufgaben und Entwürfe laufen über die KI-Profile deiner Organisation. Hinterlege deinen Schlüssel, wo einer nötig ist.'
+    de: 'Kurzfassungen, Aufgaben und Entwürfe laufen über die KI-Profile deiner Organisation. Hinterlege deinen Schlüssel, wo einer nötig ist.'
   },
   obOrgProfilesLabel: {
     en: 'AI PROFILES FROM YOUR ORGANISATION',
@@ -1334,37 +1327,37 @@ const table = {
   },
   obOrgNoProfiles: {
     en: 'No AI profiles provided — the owl stays paused. You can add one in Settings → Intelligence.',
-    de: 'Keine KI-Profile bereitgestellt — die Eule bleibt pausiert. Du kannst unter Einstellungen → Intelligenz eines anlegen.'
+    de: 'Keine KI-Profile bereitgestellt – die Eule bleibt pausiert. Du kannst unter Einstellungen → KI eines anlegen.'
   },
   obOrgKeySaved: { en: '✓ key saved', de: '✓ Schlüssel gespeichert' },
-  obOrgNoKeyNeeded: { en: 'local — no key needed', de: 'lokal — kein Schlüssel nötig' },
+  obOrgNoKeyNeeded: { en: 'local — no key needed', de: 'lokal – kein Schlüssel nötig' },
   obKeyLabel: { en: 'OPENROUTER API KEY', de: 'OPENROUTER-API-SCHLÜSSEL' },
-  obKeySave: { en: 'SAVE — ↵', de: 'SPEICHERN — ↵' },
+  obKeySave: { en: 'SAVE — ↵', de: 'SPEICHERN – ↵' },
   obKeyFootnotePre: { en: 'no account yet? ', de: 'noch kein Konto? ' },
   obKeyFootnotePost: {
     en: ' — a few cents cover a busy week',
-    de: ' — ein paar Cent reichen für eine volle Woche'
+    de: ' – ein paar Cent reichen für eine ganze Woche'
   },
   obKeyModelsNote: {
     en: 'MODELS COME WITH SENSIBLE DEFAULTS — CHANGE THEM ANYTIME IN SETTINGS → INTELLIGENCE',
-    de: 'MODELLE KOMMEN MIT SINNVOLLEN VORGABEN — JEDERZEIT ÄNDERBAR UNTER EINSTELLUNGEN → INTELLIGENZ'
+    de: 'MODELLE HABEN SINNVOLLE VORGABEN – JEDERZEIT ÄNDERBAR UNTER EINSTELLUNGEN → KI'
   },
-  obTrainCta: { en: 'TRAIN MY VOICE — ↵', de: 'STIMME TRAINIEREN — ↵' },
+  obTrainCta: { en: 'TRAIN MY VOICE — ↵', de: 'STIL LERNEN – ↵' },
   obKeySkip: {
     en: 'skip — the owl sleeps until then',
-    de: 'überspringen — die Eule schläft bis dahin'
+    de: 'überspringen – bis dahin schläft die Eule'
   },
-  obPausedNoKey: { en: 'PAUSED — NO KEY', de: 'PAUSIERT — KEIN SCHLÜSSEL' },
-  obFailed: { en: 'FAILED —', de: 'FEHLGESCHLAGEN —' },
-  obRetry: { en: 'RETRY', de: 'NEU VERSUCHEN' },
+  obPausedNoKey: { en: 'PAUSED — NO KEY', de: 'PAUSIERT – KEIN SCHLÜSSEL' },
+  obFailed: { en: 'FAILED —', de: 'FEHLGESCHLAGEN –' },
+  obRetry: { en: 'RETRY', de: 'ERNEUT VERSUCHEN' },
   obPausedCallout: {
     en: 'The owl can’t read without its eyes. Add the key and training runs on its own.',
-    de: 'Ohne ihre Augen kann die Eule nicht lesen. Hinterleg den Schlüssel, und das Training läuft von allein.'
+    de: 'Ohne ihre Augen kann die Eule nicht lesen. Hinterlege den Schlüssel, dann läuft das Training von allein.'
   },
   obAddKey: { en: 'ADD KEY', de: 'SCHLÜSSEL HINTERLEGEN' },
   obPausedFootnote: {
     en: 'mail works without a key — the owl just sleeps',
-    de: 'Mail läuft auch ohne Schlüssel — die Eule schläft nur'
+    de: 'E-Mail funktioniert auch ohne Schlüssel – nur die Eule schläft'
   },
 
   // ── Compose-Overlay (Feature-Erhalt, nicht im Prototyp) ──
@@ -1377,44 +1370,44 @@ const table = {
   composeFrom: { en: 'FROM', de: 'VON' },
   composeFromAria: {
     en: 'Sending from {name} — choose account',
-    de: 'Gesendet wird von {name} — Konto wählen'
+    de: 'Absender: {name} – Konto auswählen'
   },
   composeAutoSwitched: {
     en: '↳ switched to {name} — last used for {addr}',
-    de: '↳ zu {name} gewechselt — zuletzt für {addr} verwendet'
+    de: '↳ zu {name} gewechselt – zuletzt für {addr} verwendet'
   },
   composeDoubtfulAddr: {
     en: 'Doubtful address — the domain has no dot. Sends anyway if you insist.',
-    de: 'Zweifelhafte Adresse — der Domain fehlt ein Punkt. Geht raus, wenn du darauf bestehst.'
+    de: 'Die Adresse sieht ungewöhnlich aus – der Domain fehlt ein Punkt. Du kannst trotzdem senden.'
   },
   composeNoSubject: { en: 'NO SUBJECT', de: 'OHNE BETREFF' },
   composeDraftFiled: {
     en: 'Draft filed — NEW MAIL brings it back',
-    de: 'Entwurf abgelegt — NEUE MAIL holt ihn zurück'
+    de: 'Entwurf gespeichert – „Neue E-Mail“ holt ihn zurück'
   },
   composeChipRemove: { en: 'Remove {addr}', de: '{addr} entfernen' },
 
-  mboxInbox: { en: 'INBOX', de: 'EINGANG' },
+  mboxInbox: { en: 'INBOX', de: 'POSTEINGANG' },
   mboxSent: { en: 'SENT', de: 'GESENDET' },
   mboxSpam: { en: 'SPAM', de: 'SPAM' },
   mboxSentNote: {
     en: 'Sent by you. If it awaits a reply, you’ll find it under WAITING.',
-    de: 'Von dir geschickt. Wartet sie auf Antwort, findest du sie unter WARTET.'
+    de: 'Von dir gesendet. Wenn sie auf eine Antwort wartet, findest du sie unter AUSSTEHEND.'
   },
   mboxSpamNote: {
     en: 'Sorted out by the owl — links here are disarmed.',
-    de: 'Von der Eule aussortiert — Links hier sind stumpf geschaltet.'
+    de: 'Von der Eule aussortiert – Links sind hier deaktiviert.'
   },
   echoSending: { en: 'SENDING', de: 'WIRD GESENDET' },
   echoSendFailed: { en: 'SEND FAILED', de: 'NICHT GESENDET' },
-  echoSendUnknown: { en: 'MAY HAVE BEEN SENT', de: 'EVTL. GESENDET' },
+  echoSendUnknown: { en: 'MAY HAVE BEEN SENT', de: 'VIELLEICHT GESENDET' },
   echoSendUnknownHint: {
     en: 'May have been sent — check Sent folder',
-    de: 'Evtl. gesendet — Gesendet-Ordner prüfen'
+    de: 'Möglicherweise gesendet – sieh im Ordner „Gesendet“ nach'
   },
   composeDraftRestored: { en: 'Draft restored', de: 'Entwurf wiederhergestellt' },
   // ── Terminvorschläge aus Mails (AI) ──
-  eventSuggestHead: { en: 'ADD TO CALENDAR?', de: 'IN DEN KALENDER?' },
+  eventSuggestHead: { en: 'ADD TO CALENDAR?', de: 'IN DEN KALENDER EINTRAGEN?' },
   eventSuggestProposed: { en: 'PROPOSED', de: 'VORSCHLAG' },
   eventSuggestConfirmed: { en: 'CONFIRMED', de: 'BESTÄTIGT' },
   eventSuggestWhen: { en: 'When', de: 'Wann' },
@@ -1424,11 +1417,11 @@ const table = {
   eventSuggestDismiss: { en: 'Dismiss', de: 'Verwerfen' },
   eventSuggestAdded: { en: 'Added to your calendar', de: 'Zum Kalender hinzugefügt' },
   eventSuggestOpen: { en: 'Open in calendar', de: 'Im Kalender öffnen' },
-  eventSuggestNoCalendar: { en: 'No writable calendar', de: 'Kein beschreibbarer Kalender' },
-  toastEventAdded: { en: 'Event added — {title}', de: 'Termin hinzugefügt — {title}' },
+  eventSuggestNoCalendar: { en: 'No writable calendar', de: 'Kein Kalender mit Schreibzugriff' },
+  toastEventAdded: { en: 'Event added — {title}', de: 'Termin hinzugefügt – {title}' },
   toastEventAddFailed: {
     en: 'Event could not be added',
-    de: 'Termin konnte nicht hinzugefügt werden'
+    de: 'Der Termin konnte nicht hinzugefügt werden'
   },
   draftCalendarHead: { en: 'AVAILABILITY IN DRAFTS', de: 'VERFÜGBARKEIT IN ENTWÜRFEN' },
   draftCalendarSub: {
@@ -1441,7 +1434,7 @@ const table = {
   },
   draftCalendarNoteOn: {
     en: 'Only free time slots (no titles, places or attendees) go into the prompt — and to the AI provider you chose.',
-    de: 'Nur freie Zeitfenster (keine Titel, Orte oder Teilnehmer) gehen in den Prompt — und damit an den gewählten KI-Anbieter.'
+    de: 'Nur freie Zeitfenster (keine Titel, Orte oder Teilnehmende) gehen in den Prompt – und damit an den gewählten KI-Anbieter.'
   },
   draftCalendarNoteOff: {
     en: 'Drafts never see your calendar.',
@@ -1449,13 +1442,13 @@ const table = {
   },
   draftCalendarNoAccount: {
     en: 'Takes effect once a calendar account is connected.',
-    de: 'Wirkt, sobald ein Kalender-Konto verbunden ist.'
+    de: 'Wirkt, sobald ein Kalender verbunden ist.'
   },
 
-  tasksAutoHead: { en: 'TASKS FROM MAIL', de: 'AUFGABEN AUS MAILS' },
+  tasksAutoHead: { en: 'TASKS FROM MAIL', de: 'AUFGABEN AUS E-MAILS' },
   tasksAutoSub: {
     en: 'The owl spots to-dos while reading',
-    de: 'Die Eule erkennt To-dos beim Mitlesen'
+    de: 'Die Eule erkennt To-dos beim Lesen'
   },
   tasksAutoToggle: { en: 'Create tasks automatically', de: 'Aufgaben automatisch anlegen' },
   tasksAutoNoteOn: {
@@ -1464,23 +1457,23 @@ const table = {
   },
   tasksAutoNoteOff: {
     en: 'Suggestion in the mail only — accept with T.',
-    de: 'Nur Vorschlag in der Mail — übernehmen mit T.'
+    de: 'Nur als Vorschlag in der E-Mail – übernehmen mit T.'
   },
 
   // ── Regeln (Design 3c — Letterpress) ──
   rulesHead: { en: 'Rules', de: 'Regeln' },
   rulesSub: {
     en: 'describe it — the owl builds it deterministically',
-    de: 'beschreib sie — die Eule baut sie deterministisch'
+    de: 'beschreibe sie in einem Satz – die Eule baut die Regel'
   },
   rulesPlaceholder: {
     en: 'e.g. “always archive Hetzner invoices and make a task”',
-    de: 'z. B. „Hetzner-Rechnungen immer archivieren und als Aufgabe“'
+    de: 'z. B. „Hetzner-Rechnungen immer archivieren und als Aufgabe anlegen“'
   },
-  rulesDraftBtn: { en: 'DRAFT — ↵', de: 'VORSCHLAG — ↵' },
-  rulesDrafting: { en: 'THINKING…', de: 'DENKE…' },
-  rulesShowJson: { en: 'SHOW RULE JSON ▸', de: 'REGEL-JSON ZEIGEN ▸' },
-  rulesHideJson: { en: 'HIDE RULE JSON ▾', de: 'REGEL-JSON VERBERGEN ▾' },
+  rulesDraftBtn: { en: 'DRAFT — ↵', de: 'VORSCHLAG – ↵' },
+  rulesDrafting: { en: 'THINKING…', de: 'DENKT NACH…' },
+  rulesShowJson: { en: 'SHOW RULE JSON ▸', de: 'REGEL-JSON ANZEIGEN ▸' },
+  rulesHideJson: { en: 'HIDE RULE JSON ▾', de: 'REGEL-JSON AUSBLENDEN ▾' },
   rulesActivate: { en: 'ACTIVATE RULE', de: 'REGEL AKTIVIEREN' },
   rulesDiscard: { en: 'DISCARD', de: 'VERWERFEN' },
   rulesActive: { en: 'Active', de: 'Aktiv' },
@@ -1489,12 +1482,12 @@ const table = {
   rulesDelete: { en: 'Delete rule', de: 'Regel löschen' },
   rulesEmpty: {
     en: 'No rules yet. Describe one above — the owl builds it deterministically.',
-    de: 'Noch keine Regeln. Beschreibe oben eine — die AI baut sie deterministisch.'
+    de: 'Noch keine Regeln. Beschreibe oben eine – die Eule baut daraus eine feste Regel.'
   },
   syncRangeLabel: { en: 'SYNC RANGE', de: 'SYNC-ZEITRAUM' },
   syncRangeStd: {
     en: 'Default — 90 days (search: 6 months)',
-    de: 'Standard — 90 Tage (Suche: 6 Monate)'
+    de: 'Standard – 90 Tage (Suche: 6 Monate)'
   },
   syncRange30: { en: 'Last 30 days', de: 'Letzte 30 Tage' },
   syncRange90: { en: 'Last 90 days', de: 'Letzte 90 Tage' },
@@ -1503,10 +1496,10 @@ const table = {
   syncRangeDays: { en: '{n} days', de: '{n} Tage' },
   toastSyncRange: {
     en: 'Sync range saved — adjusting in the background',
-    de: 'Sync-Zeitraum gespeichert — wird im Hintergrund angepasst'
+    de: 'Zeitraum gespeichert – wird im Hintergrund angepasst'
   },
-  notSpamBtn: { en: 'NOT SPAM → INBOX', de: 'KEIN SPAM → EINGANG' },
-  cmdFolderInbox: { en: 'Folder: Inbox', de: 'Ordner: Eingang' },
+  notSpamBtn: { en: 'NOT SPAM → INBOX', de: 'KEIN SPAM → POSTEINGANG' },
+  cmdFolderInbox: { en: 'Folder: Inbox', de: 'Ordner: Posteingang' },
   cmdFolderSent: { en: 'Folder: Sent', de: 'Ordner: Gesendet' },
   cmdSig: { en: 'Edit signature', de: 'Signatur bearbeiten' },
   cmdSigNote: { en: 'builder \u00b7 image', de: 'Baukasten \u00b7 Bild' },
@@ -1518,7 +1511,7 @@ const table = {
     de: 'EINE SIGNATUR PRO ADRESSE \u00b7 DIE EULE H\u00c4NGT SIE BEIM SENDEN AN'
   },
   sigBlocks: { en: 'BLOCKS', de: 'BAUSTEINE' },
-  sigBlocksHint: { en: 'click to add or remove', de: 'klicken zum Hinzuf\u00fcgen oder Entfernen' },
+  sigBlocksHint: { en: 'click to add or remove', de: 'zum Hinzufügen oder Entfernen anklicken' },
   sigShape: { en: 'SHAPE', de: 'FORM' },
   sigShapeCircle: { en: 'CIRCLE', de: 'KREIS' },
   sigShapeRounded: { en: 'ROUNDED', de: 'ABGERUNDET' },
@@ -1534,15 +1527,15 @@ const table = {
   sigPreview: { en: 'PREVIEW', de: 'VORSCHAU' },
   sigPreviewSub: {
     en: 'as recipients of {addr} will see it',
-    de: 'so sehen es Empf\u00e4nger von {addr}'
+    de: 'so sehen es die Empfänger von {addr}'
   },
   sigPreviewBody: {
-    en: '\u2026 I will get back to you on Thursday with the details.',
-    de: '\u2026 ich melde mich Donnerstag mit den Details.'
+    en: '… I will get back to you on Thursday with the details.',
+    de: '… ich melde mich am Donnerstag mit den Details.'
   },
-  sigImgHint: { en: 'click or drop an image', de: 'klicken oder Bild hineinziehen' },
+  sigImgHint: { en: 'click or drop an image', de: 'Bild anklicken oder hineinziehen' },
   sigImgBorder: { en: 'BORDER', de: 'RAHMEN' },
-  sigImgPadding: { en: 'PADDING', de: 'INNEN' },
+  sigImgPadding: { en: 'PADDING', de: 'ABSTAND' },
   sigImgBackground: { en: 'BACKGROUND', de: 'HINTERGRUND' },
   sigImgBackgroundTransparent: { en: 'Transparent', de: 'Transparent' },
   // Kuratierte Swatches statt OS-Farbwähler (Design 3f)
@@ -1551,27 +1544,27 @@ const table = {
   sigSwatchInk: { en: 'Ink', de: 'Tinte' },
   sigSwatchCustom: { en: 'Saved color {hex}', de: 'Gespeicherte Farbe {hex}' },
   sigImgFootnote: {
-    en: 'WITH IMAGE THE MAIL IS SENT AS HTML \u00b7 WITHOUT IMAGE AS PLAIN TEXT',
-    de: 'MIT BILD GEHT DIE MAIL ALS HTML RAUS \u00b7 OHNE BILD ALS REINER TEXT'
+    en: 'WITH IMAGE THE MAIL IS SENT AS HTML · WITHOUT IMAGE AS PLAIN TEXT',
+    de: 'MIT BILD WIRD DIE E-MAIL ALS HTML GESENDET · OHNE BILD ALS REINER TEXT'
   },
   sigGreetingFootnote: {
     en: 'The closing line comes from your learned style, not from the signature.',
-    de: 'Die Gru\u00dfformel kommt aus deinem gelernten Stil, nicht aus der Signatur.'
+    de: 'Die Grußformel stammt aus deinem gelernten Stil, nicht aus der Signatur.'
   },
   sigBlock_name: { en: 'NAME', de: 'NAME' },
-  sigBlock_title: { en: 'TITLE', de: 'TITEL' },
+  sigBlock_title: { en: 'TITLE', de: 'POSITION' },
   sigBlock_studio: { en: 'COMPANY', de: 'FIRMA' },
   sigBlock_phone: { en: 'PHONE', de: 'TELEFON' },
-  sigBlock_website: { en: 'WEBSITE', de: 'WEBSITE' },
+  sigBlock_website: { en: 'WEBSITE', de: 'WEBSEITE' },
   sigBlock_address: { en: 'ADDRESS', de: 'ANSCHRIFT' },
-  sigBlock_claim: { en: 'CLAIM', de: 'CLAIM' },
+  sigBlock_claim: { en: 'CLAIM', de: 'SLOGAN' },
   sigBlock_rule: { en: 'DIVIDER', de: 'TRENNLINIE' },
   sigBlock_img: { en: 'IMAGE', de: 'BILD' },
   cmdFolderSpam: { en: 'Folder: Spam', de: 'Ordner: Spam' },
   cmdFolderSpamNote: { en: 'the owl pre-sorts', de: 'die Eule sortiert vor' },
   toName: { en: 'To: {name}', de: 'An: {name}' },
-  quoteShow: { en: 'show earlier history', de: 'früheren Verlauf anzeigen' },
-  quoteHide: { en: 'hide earlier history', de: 'früheren Verlauf ausblenden' },
+  quoteShow: { en: 'show earlier history', de: 'frühere Nachrichten anzeigen' },
+  quoteHide: { en: 'hide earlier history', de: 'frühere Nachrichten ausblenden' },
   mailAttachmentOne: { en: '1 ATTACHMENT', de: '1 ANHANG' },
   mailAttachmentMany: { en: '{count} ATTACHMENTS', de: '{count} ANHÄNGE' },
   mailAttachmentsLoading: { en: 'LOADING ATTACHMENTS', de: 'ANHÄNGE WERDEN GELADEN' },
@@ -1580,7 +1573,7 @@ const table = {
   mailAttachmentSave: { en: 'SAVE', de: 'SPEICHERN' },
   mailAttachmentSaving: { en: 'SAVING', de: 'WIRD GESPEICHERT' },
   mailAttachmentSaved: { en: 'SAVED', de: 'GESPEICHERT' },
-  mailAttachmentRetry: { en: 'TRY AGAIN', de: 'ERNEUT' },
+  mailAttachmentRetry: { en: 'TRY AGAIN', de: 'NOCHMAL' },
   mailAttachmentSaveAria: { en: 'Save attachment {filename}', de: 'Anhang {filename} speichern' },
   mailAttachmentSavedToast: { en: 'Saved: {filename}', de: 'Gespeichert: {filename}' },
   mailAttachmentSaveFailed: {
@@ -1598,10 +1591,10 @@ const table = {
   mailAttachmentTypeVideo: { en: 'VIDEO', de: 'VIDEO' },
   mailAttachmentTypeText: { en: 'TEXT FILE', de: 'TEXTDATEI' },
   mailAttachmentTypeFile: { en: 'FILE', de: 'DATEI' },
-  composeHead: { en: 'New message', de: 'Neue Nachricht' },
+  composeHead: { en: 'New message', de: 'Neue E-Mail' },
   composeSub: {
     en: 'THE OWL WRITES IN THIS ADDRESS’S VOICE',
-    de: 'DIE EULE SCHREIBT IN DER STIMME DIESER ADRESSE'
+    de: 'DIE EULE SCHREIBT IM STIL DIESER ADRESSE'
   },
   composeToPh: { en: 'name or address…', de: 'Name oder Adresse…' },
   composeSubjectPh: { en: 'what is it about?', de: 'worum geht’s?' },
@@ -1648,27 +1641,27 @@ const table = {
   },
   replyRestoreRecipients: {
     en: 'Restore the removed recipients',
-    de: 'Entfernte Empfänger zurückholen'
+    de: 'Entfernte Empfänger wiederherstellen'
   },
   replyNoRecipient: {
     en: 'nobody — add a recipient with +',
-    de: 'niemand — Empfänger über + hinzufügen'
+    de: 'niemand – füge über + einen Empfänger hinzu'
   },
   replyAllToggleAria: {
     en: 'reply to all — {n} more recipients',
-    de: 'allen antworten — {n} weitere Empfänger'
+    de: 'allen antworten – {n} weitere Empfänger'
   },
-  sendToN: { en: 'SEND TO {n}', de: 'SENDEN AN {n}' },
+  sendToN: { en: 'SEND TO {n}', de: 'AN {n} SENDEN' },
   toastReplyAllAlone: {
     en: 'No other recipients — the reply goes to the sender.',
-    de: 'Keine weiteren Empfänger — die Antwort geht an den Absender.'
+    de: 'Keine weiteren Empfänger – die Antwort geht an den Absender.'
   },
   composerTranscribing: { en: 'PROCESSING DICTATION', de: 'DIKTAT WIRD VERARBEITET' },
   composerKeepsText: { en: 'YOUR TEXT STAYS IN PLACE', de: 'DEIN TEXT BLEIBT ERHALTEN' },
   composerGenerating: { en: 'THE OWL IS WRITING', de: 'DIE EULE FORMULIERT' },
   composerNoRecording: {
     en: 'No usable recording was found. You can keep typing.',
-    de: 'Keine brauchbare Aufnahme erkannt. Du kannst direkt weiterschreiben.'
+    de: 'Es wurde keine brauchbare Aufnahme erkannt. Du kannst einfach weiterschreiben.'
   },
   composerGenerationError: {
     en: 'The owl did not return a draft. Your original text is still here.',
@@ -1683,81 +1676,81 @@ const table = {
   composerDismiss: { en: 'DISMISS', de: 'SCHLIESSEN' },
   composerRestoreOriginal: { en: 'RESTORE ORIGINAL', de: 'ORIGINAL WIEDERHERSTELLEN' },
   composerSendReply: { en: 'SEND REPLY', de: 'ANTWORT SENDEN' },
-  composerSendMessage: { en: 'SEND MESSAGE', de: 'NACHRICHT SENDEN' },
+  composerSendMessage: { en: 'SEND MESSAGE', de: 'E-MAIL SENDEN' },
   composerSending: { en: 'SENDING…', de: 'WIRD GESENDET…' },
-  composerGenerate: { en: 'FORMULATE WITH OWL', de: 'MIT EULE FORMULIEREN' },
+  composerGenerate: { en: 'FORMULATE WITH OWL', de: 'MIT DER EULE FORMULIEREN' },
   composerDictate: { en: 'DICTATE', de: 'DIKTIEREN' },
   composerFormat: { en: 'FORMAT', de: 'FORMAT' },
   composerDiscard: { en: 'DISCARD DRAFT', de: 'ENTWURF VERWERFEN' },
   toastInvalidLink: {
     en: 'Please enter a valid web or email address',
-    de: 'Bitte eine gültige Web- oder E-Mail-Adresse eingeben'
+    de: 'Bitte gib eine gültige Web- oder E-Mail-Adresse ein'
   },
-  toastNoRecipient: { en: 'At least one recipient', de: 'Mindestens ein Empfänger nötig' },
+  toastNoRecipient: { en: 'At least one recipient', de: 'Gib mindestens einen Empfänger an' },
   toastNoIdea: {
     en: 'Type or dictate the idea first — ⌘J turns it into the mail.',
-    de: 'Erst die Idee tippen oder diktieren — ⌘J macht daraus die Mail.'
+    de: 'Gib zuerst die Idee ein oder diktiere sie – ⌘J macht daraus die E-Mail.'
   },
   toggleListLabel: { en: 'show/hide list', de: 'Liste ein-/ausblenden' },
   toggleRailLabel: { en: 'show/hide the owl', de: 'Eule ein-/ausblenden' },
   loading: { en: 'loading…', de: 'lädt…' },
 
   // ── Rechtschreibprüfung ──
-  followupRadarHead: { en: 'FOLLOW-UP RADAR', de: 'FOLLOW-UP-RADAR' },
+  followupRadarHead: { en: 'FOLLOW-UP RADAR', de: 'NACHFASS-RADAR' },
   followupRadarSub: {
     en: 'when unanswered sent mail appears under WAITING',
-    de: 'wann unbeantwortete gesendete Mails unter WARTET auftauchen'
+    de: 'ab wann unbeantwortete gesendete E-Mails unter AUSSTEHEND erscheinen'
   },
-  followupDays: { en: '{n} days silent', de: '{n} Tage still' },
+  followupDays: { en: '{n} days silent', de: '{n} Tage ohne Antwort' },
   followupFewer: { en: 'Fewer days', de: 'Weniger Tage' },
   followupMore: { en: 'More days', de: 'Mehr Tage' },
   followupWindowNote: {
     en: 'window 3–21 days · applies at the next scan',
-    de: 'Fenster 3–21 Tage · greift beim nächsten Scan'
+    de: 'Spanne 3–21 Tage · gilt ab dem nächsten Scan'
   },
   spellIgnore: { en: 'IGNORE', de: 'IGNORIEREN' },
   spellNoSuggestions: { en: 'no suggestions', de: 'keine Vorschläge' },
 
   // ── Technik-Seite: „Wie die Eule denkt" (Pipelines in Bildern) ──
   cmdTech: { en: 'How the owl thinks', de: 'Wie die Eule denkt' },
-  cmdTechNote: { en: 'every pipeline, one picture', de: 'jede Pipeline ein Bild' },
+  cmdTechNote: { en: 'every pipeline, one picture', de: 'jeder Ablauf als Bild' },
   techHead: { en: 'How the owl thinks', de: 'Wie die Eule denkt' },
   techSub: {
     en: 'TEN PIPELINES, TEN PICTURES, ONE LIVE NETWORK LIST · NO MAGIC, JUST PLUMBING',
-    de: 'ZEHN PIPELINES, ZEHN BILDER, EINE LIVE-NETZWERKLISTE · KEINE MAGIE, NUR HANDWERK'
+    de: 'ZEHN ABLÄUFE, ZEHN BILDER, EINE LIVE-NETZWERKLISTE · KEINE MAGIE, NUR HANDWERK'
   },
-  techLegendSolid: { en: 'SOLID — ON YOUR DEVICE', de: 'DURCHGEZOGEN — AUF DEINEM GERÄT' },
+  techLegendSolid: { en: 'SOLID — ON YOUR DEVICE', de: 'DURCHGEZOGEN – AUF DEINEM GERÄT' },
   techLegendDashed: {
     en: 'DASHED — API CALL TO AN AI PROFILE',
-    de: 'GESTRICHELT — API-CALL AN EIN KI-PROFIL'
+    de: 'GESTRICHELT – API-AUFRUF AN EIN KI-PROFIL'
   },
-  techLegendModel: { en: '✦ — A LANGUAGE MODEL', de: '✦ — EIN SPRACHMODELL' },
+  techLegendModel: { en: '✦ — A LANGUAGE MODEL', de: '✦ – EIN SPRACHMODELL' },
   techLegendNote: {
     en: 'Dashed lines only exist once an AI profile is set up (by default OpenRouter, with your key) — without one, the owl stays fully on paper. Which servers are actually contacted is listed at the bottom.',
-    de: 'Gestrichelte Linien gibt es erst mit einem eingerichteten KI-Profil (standardmäßig OpenRouter mit deinem Schlüssel) — ohne bleibt die Eule ganz auf dem Papier. Welche Server tatsächlich kontaktiert werden, steht ganz unten.'
+    de: 'Gestrichelte Linien gibt es erst, wenn ein KI-Profil eingerichtet ist (standardmäßig OpenRouter mit deinem Schlüssel) – ohne Profil bleibt die Eule ganz auf dem Papier. Welche Server tatsächlich kontaktiert werden, steht ganz unten.'
   },
 
   // 01 · Triage
-  techTriageTitle: { en: 'Triage — every new mail', de: 'Triage — jede neue Mail' },
-  techTriageIn: { en: 'NEW MAIL', de: 'NEUE MAIL' },
+  techTriageTitle: { en: 'Triage — every new mail', de: 'Vorsortierung – jede neue E-Mail' },
+  techTriageIn: { en: 'NEW MAIL', de: 'NEUE E-MAIL' },
   techTriageQueue: { en: 'QUEUE', de: 'WARTESCHLANGE' },
   techTriageBudget: { en: 'BUDGET GUARD', de: 'BUDGET-WÄCHTER' },
   techTriageBudgetNote1: { en: 'DAY & MONTH', de: 'TAG & MONAT' },
   techTriageBudgetNote2: { en: 'CAPPED', de: 'GEDECKELT' },
   techTriageModel: { en: 'SCAN MODEL', de: 'SCAN-MODELL' },
   techTriageModelNote: { en: 'DEEPSEEK · YOUR PICK', de: 'DEEPSEEK · WÄHLBAR' },
-  techTriageCard: { en: 'ANNOTATION', de: 'ANNOTATION' },
-  techTriageRow1: { en: 'CATEGORY — WORK', de: 'KATEGORIE — ARBEIT' },
+  techTriageCard: { en: 'ANNOTATION', de: 'ANMERKUNG' },
+  techTriageRow1: { en: 'CATEGORY — WORK', de: 'KATEGORIE – ARBEIT' },
   techTriagePrio: { en: 'PRIORITY', de: 'PRIORITÄT' },
   techTriageGist: { en: '“The gist in one line.”', de: '„Der Kern in einer Zeile.“' },
   techTriageRow4: { en: 'REPLY? · TASKS · FOR ME?', de: 'ANTWORT? · AUFGABEN · AN MICH?' },
   techTriageSpam: {
     en: 'ONLY THE INBOX — SPAM IS NEVER READ',
-    de: 'NUR DER POSTEINGANG — SPAM WIRD NIE GELESEN'
+    de: 'NUR DER POSTEINGANG – SPAM WIRD NIE GELESEN'
   },
   techTriageCap: {
     en: 'Every new inbox mail gets one cheap read: category, priority, the one-liner — and whether it needs you. A budget guard caps the daily and monthly spend; when the budget is spent, the queue simply waits.',
-    de: 'Jede neue Mail im Posteingang bekommt genau eine günstige Lektüre: Kategorie, Priorität, der Ein-Zeiler — und ob sie dich braucht. Ein Budget-Wächter deckelt Tages- und Monatskosten; ist das Budget leer, wartet die Warteschlange einfach.'
+    de: 'Jede neue E-Mail im Posteingang wird einmal günstig gelesen: Kategorie, Priorität, Zusammenfassung in einer Zeile – und ob sie dich braucht. Ein Budget-Wächter begrenzt die Kosten pro Tag und Monat; ist das Budget aufgebraucht, wartet die Warteschlange einfach.'
   },
 
   // 02 · Adressat-Erkennung
@@ -1770,7 +1763,7 @@ const table = {
   techAddrS2: { en: '2 · ENVELOPE', de: '2 · UMSCHLAG' },
   techAddrS2Sample: { en: 'TO · CC · NOT LISTED', de: 'AN · CC · NICHT ADRESSIERT' },
   techAddrCc: { en: 'CC / LIST ONLY', de: 'NUR CC / VERTEILER' },
-  techAddrTo: { en: 'I AM IN “TO”', de: 'ICH STEHE IM AN' },
+  techAddrTo: { en: 'I AM IN “TO”', de: 'ICH STEHE IM „AN“' },
   techAddrS3: { en: '3 · MODEL VERDICT', de: '3 · MODELL-URTEIL' },
   techAddrS3Sample: { en: 'ADDRESSED_TO_ME', de: 'ADDRESSED_TO_ME' },
   techAddrYes: { en: 'YES', de: 'JA' },
@@ -1780,37 +1773,37 @@ const table = {
   techAddrSuggest: { en: 'SUGGEST ONLY', de: 'NUR VORSCHLAG' },
   techAddrCap: {
     en: 'A task only appears when you are truly meant: a salutation naming you beats the envelope, the envelope beats the model. And when the model doubts, the owl merely suggests — it never creates in silence.',
-    de: 'Eine Aufgabe entsteht nur, wenn wirklich du gemeint bist: Die Anrede mit deinem Namen schlägt den Umschlag, der Umschlag schlägt das Modell. Und zweifelt das Modell, schlägt die Eule nur vor — angelegt wird nie im Stillen.'
+    de: 'Eine Aufgabe entsteht nur, wenn wirklich du gemeint bist: Eine Anrede mit deinem Namen schlägt den Umschlag, der Umschlag schlägt das Modell. Und wenn das Modell zweifelt, schlägt die Eule nur vor – nie legt sie etwas stillschweigend an.'
   },
 
   // 03 · Aufgaben-Sieb
   techSieveTitle: { en: 'The task sieve', de: 'Das Aufgaben-Sieb' },
-  techSieveIn: { en: 'ACTION ITEMS FROM TRIAGE', de: 'ACTION-ITEMS AUS DER TRIAGE' },
-  techSieve1: { en: 'AUTO-CREATE IS OFF', de: 'AUTO-ANLEGEN IST AUS' },
+  techSieveIn: { en: 'ACTION ITEMS FROM TRIAGE', de: 'KANDIDATEN AUS DER VORSORTIERUNG' },
+  techSieve1: { en: 'AUTO-CREATE IS OFF', de: 'AUTOMATISCHES ANLEGEN IST AUS' },
   techSieve2: { en: 'CATEGORY WITHOUT TASKS', de: 'KATEGORIE OHNE AUFGABEN' },
   techSieve2b: { en: 'NEWSLETTER · PROMO · ALERTS', de: 'NEWSLETTER · WERBUNG · INFOS' },
-  techSieve3: { en: 'SECURITY MAIL', de: 'SICHERHEITS-MAIL' },
+  techSieve3: { en: 'SECURITY MAIL', de: 'SICHERHEITS-E-MAIL' },
   techSieve3b: { en: 'LOGIN · 2FA · PASSWORD', de: 'LOGIN · 2FA · PASSWORT' },
   techSieve4: { en: 'NOT ADDRESSED TO ME', de: 'NICHT AN MICH GERICHTET' },
   techSieve4b: { en: 'CC · LIST · FOREIGN NAME', de: 'CC · VERTEILER · FREMDE ANREDE' },
-  techSieve5: { en: 'WRITTEN BY MYSELF', de: 'SELBST GESCHRIEBEN' },
-  techSieve6: { en: 'FORWARD WITHOUT A REQUEST', de: 'WEITERLEITUNG OHNE AUFTRAG' },
+  techSieve5: { en: 'WRITTEN BY MYSELF', de: 'VON MIR SELBST' },
+  techSieve6: { en: 'FORWARD WITHOUT A REQUEST', de: 'WEITERLEITUNG OHNE BITTE' },
   techSieveSuggest: { en: 'IN DOUBT: SUGGEST ONLY', de: 'IM ZWEIFEL: NUR VORSCHLAG' },
-  techSieveSuggestB: { en: 'SHOWN INSIDE THE MAIL', de: 'ERSCHEINT IN DER MAIL' },
+  techSieveSuggestB: { en: 'SHOWN INSIDE THE MAIL', de: 'ERSCHEINT IN DER E-MAIL' },
   techSieveTask: { en: 'TASK', de: 'AUFGABE' },
   techSieveTaskNote: { en: 'MAX 5 + “REPLY” TASK', de: 'MAX. 5 + „ANTWORTEN“' },
   techSieveCap: {
     en: 'Six sieves, in exactly this order — whatever gets caught is dropped, and in doubt the owl only suggests. Only what falls through all six becomes a task on its own.',
-    de: 'Sechs Siebe, genau in dieser Reihenfolge — was hängen bleibt, wird verworfen, und im Zweifel wird nur vorgeschlagen. Nur was durch alle sechs fällt, wird von selbst zur Aufgabe.'
+    de: 'Sechs Siebe in genau dieser Reihenfolge – was hängen bleibt, wird verworfen, und im Zweifel gibt es nur einen Vorschlag. Nur was durch alle sechs fällt, wird von selbst zur Aufgabe.'
   },
 
   // 04 · Semantische Suche
-  techSearchTitle: { en: 'Search — text and meaning', de: 'Suche — Text und Bedeutung' },
+  techSearchTitle: { en: 'Search — text and meaning', de: 'Suche – Text und Bedeutung' },
   techSearchIn: { en: 'YOUR QUERY', de: 'DEINE SUCHE' },
   techSearchSample: { en: '“lease agreement”', de: '„mietvertrag“' },
-  techSearchFts: { en: 'FULL TEXT — FTS5', de: 'VOLLTEXT — FTS5' },
+  techSearchFts: { en: 'FULL TEXT — FTS5', de: 'VOLLTEXT – FTS5' },
   techSearchFtsNote: { en: 'BM25 RANKING', de: 'BM25-RANKING' },
-  techSearchVec: { en: 'MEANING — VECTORS', de: 'BEDEUTUNG — VEKTOREN' },
+  techSearchVec: { en: 'MEANING — VECTORS', de: 'BEDEUTUNG – VEKTOREN' },
   techSearchVecNote: { en: 'E5-SMALL · ON DEVICE', de: 'E5-SMALL · AUF DEM GERÄT' },
   techSearchFuse: { en: 'FUSION', de: 'FUSION' },
   techSearchFuseNote: { en: 'RRF', de: 'RRF' },
@@ -1818,7 +1811,7 @@ const table = {
   techSearchChip: { en: 'LOCAL · 0 TOKENS', de: 'LOKAL · 0 TOKENS' },
   techSearchCap: {
     en: 'Full text and meaning search in parallel; a rank fusion blends both lists. All of it runs on your device — the embedding model lives locally, costs no tokens, and its coverage shows in the owl’s footer.',
-    de: 'Volltext und Bedeutung suchen parallel, eine Rang-Fusion mischt beide Listen. Alles läuft auf deinem Gerät — das Embedding-Modell wohnt lokal, kostet keine Tokens, und die Abdeckung steht unten in der Eulen-Ansicht.'
+    de: 'Volltext- und Bedeutungssuche laufen parallel, eine Rang-Fusion mischt beide Listen. Alles läuft auf deinem Gerät – das Embedding-Modell liegt lokal, kostet keine Tokens, und die Abdeckung steht unten in der Eulen-Ansicht.'
   },
 
   // 05 · Die Eule fragen
@@ -1829,23 +1822,23 @@ const table = {
   techAskLocalNote: { en: 'VECTOR + FULL TEXT', de: 'VEKTOR + VOLLTEXT' },
   techAskSources: { en: 'SOURCES', de: 'QUELLEN' },
   techAskModel: { en: 'WRITING MODEL', de: 'SCHREIB-MODELL' },
-  techAskModelNote: { en: 'DEFAULT CLAUDE · YOUR PICK', de: 'DEFAULT CLAUDE · WÄHLBAR' },
-  techAskAnswer: { en: 'STREAMED ANSWER', de: 'GESTREAMTE ANTWORT' },
+  techAskModelNote: { en: 'DEFAULT CLAUDE · YOUR PICK', de: 'STANDARD: CLAUDE · WÄHLBAR' },
+  techAskAnswer: { en: 'STREAMED ANSWER', de: 'ANTWORT IM STREAM' },
   techAskStore: { en: 'STAYS IN SQLITE', de: 'BLEIBT IN SQLITE' },
   techAskStoreNote: { en: 'YOUR LOCAL DATABASE', de: 'DEINE LOKALE DATENBANK' },
   techAskCap: {
     en: 'A question first searches your mail locally; only the question and the found excerpts travel to the model. The answer streams in with [n] citations — the conversation itself stays in your local database.',
-    de: 'Eine Frage sucht zuerst lokal in deiner Post; nur die Frage und die Fundstellen reisen zum Modell. Die Antwort kommt gestreamt mit [n]-Zitaten — das Gespräch selbst bleibt in deiner lokalen Datenbank.'
+    de: 'Eine Frage durchsucht zuerst lokal deine E-Mails; nur die Frage und die gefundenen Ausschnitte gehen an das Modell. Die Antwort kommt als Stream mit [n]-Zitaten – das Gespräch selbst bleibt in deiner lokalen Datenbank.'
   },
 
   // 06 · Entwürfe & Stimme
-  techVoiceTitle: { en: 'Drafts & your voice', de: 'Entwürfe & deine Stimme' },
+  techVoiceTitle: { en: 'Drafts & your voice', de: 'Entwürfe & dein Stil' },
   techVoiceSent1: { en: 'SENT', de: 'GESENDETE' },
-  techVoiceSent2: { en: 'MAILS', de: 'MAILS' },
+  techVoiceSent2: { en: 'MAILS', de: 'E-MAILS' },
   techVoiceProfile: { en: 'STYLE PROFILE', de: 'STILPROFIL' },
   techVoiceProfileNote: { en: 'ONE PER ADDRESS', de: 'EINES PRO ADRESSE' },
   techVoiceThread1: { en: 'THREAD WITH', de: 'VERLAUF MIT' },
-  techVoiceThread2: { en: 'THIS PERSON', de: 'DER PERSON' },
+  techVoiceThread2: { en: 'THIS PERSON', de: 'DIESER PERSON' },
   techVoiceFormal: { en: 'DU / SIE', de: 'DU / SIE' },
   techVoiceFormalNote1: { en: 'DETERMINISTIC', de: 'DETERMINISTISCH' },
   techVoiceFormalNote2: { en: 'BEATS THE PROFILE', de: 'SCHLÄGT DAS PROFIL' },
@@ -1853,35 +1846,35 @@ const table = {
   techVoiceStt: { en: 'TRANSCRIPTION', de: 'TRANSKRIPTION' },
   techVoiceModel: { en: 'DRAFT MODEL', de: 'ENTWURFS-MODELL' },
   techVoiceDraft: { en: 'DRAFT', de: 'ENTWURF' },
-  techVoiceDraftNote: { en: 'IN YOUR VOICE', de: 'IN DEINER STIMME' },
+  techVoiceDraftNote: { en: 'IN YOUR VOICE', de: 'IN DEINEM STIL' },
   techVoiceSend: { en: 'YOU PRESS SEND', de: 'DU DRÜCKST SENDEN' },
   techVoiceSendNote: { en: 'ALWAYS BY HAND', de: 'IMMER VON HAND' },
   techVoiceCap: {
     en: 'The owl learns your voice per address from mails you sent; Du or Sie follows the actual thread with that person — deterministically, overriding the profile. And nothing ever sends itself: the last click is always yours.',
-    de: 'Deine Stimme lernt die Eule pro Adresse aus deinen gesendeten Mails; Du oder Sie folgt dem echten Verlauf mit der Person — deterministisch, vor dem Profil. Und gesendet wird nie von allein: Der letzte Klick gehört dir.'
+    de: 'Die Eule lernt deinen Stil pro Adresse aus deinen gesendeten E-Mails. Ob du duzt oder siezt, richtet sich nach dem tatsächlichen Verlauf mit der Person – deterministisch und vor dem Profil. Und es wird nie etwas von allein gesendet: Der letzte Klick gehört immer dir.'
   },
 
   // 07 · Rechtschreibprüfung
-  techSpellTitle: { en: 'Spelling — offline, honest', de: 'Rechtschreibung — offline, ehrlich' },
+  techSpellTitle: { en: 'Spelling — offline, honest', de: 'Rechtschreibung – offline und ehrlich' },
   techSpellSample: { en: 'definately', de: 'Rechtschreibpürfung' },
   techSpellEngine: { en: 'HUNSPELL · WASM', de: 'HUNSPELL · WASM' },
-  techSpellDictNote: { en: 'BUNDLED LOCALLY', de: 'LOKAL GEBÜNDELT' },
+  techSpellDictNote: { en: 'BUNDLED LOCALLY', de: 'LOKAL MITGELIEFERT' },
   techSpellSuggest: { en: 'SUGGESTIONS', de: 'VORSCHLÄGE' },
   techSpellFix: { en: 'definitely', de: 'Rechtschreibprüfung' },
-  techSpellIgnoreNote: { en: 'IGNORE — THIS SESSION ONLY', de: 'IGNORIEREN — NUR DIESE SITZUNG' },
+  techSpellIgnoreNote: { en: 'IGNORE — THIS SESSION ONLY', de: 'IGNORIEREN – NUR DIESE SITZUNG' },
   techSpellChip: { en: 'NO CLOUD', de: 'KEINE CLOUD' },
   techSpellChipNote: { en: 'REPLACES THE MACOS CHECKER', de: 'ERSETZT DIE MACOS-PRÜFUNG' },
   techSpellCap: {
     en: 'A real Hunspell runs as WebAssembly inside the app; German and English dictionaries ship in the box. No word ever leaves your machine — the built-in macOS checker is deliberately switched off.',
-    de: 'Ein echtes Hunspell läuft als WebAssembly in der App, deutsche und englische Wörterbücher liegen gleich mit im Paket. Kein Wort verlässt je deinen Rechner — die macOS-Prüfung ist bewusst abgeschaltet.'
+    de: 'Ein echtes Hunspell läuft als WebAssembly direkt in der App, deutsche und englische Wörterbücher sind gleich mit dabei. Kein Wort verlässt deinen Rechner – die Rechtschreibprüfung von macOS ist bewusst abgeschaltet.'
   },
 
   // 08 · Regeln
   techRulesTitle: {
     en: 'Rules — drafted once, applied forever',
-    de: 'Regeln — einmal entworfen, immer angewandt'
+    de: 'Regeln – einmal entworfen, immer angewendet'
   },
-  techRulesQuote1: { en: '“Archive Hetzner invoices,', de: '„Hetzner-Rechnungen ablegen,' },
+  techRulesQuote1: { en: '“Archive Hetzner invoices,', de: '„Hetzner-Rechnungen archivieren,' },
   techRulesQuote2: { en: 'make a task.”', de: 'Aufgabe anlegen.“' },
   techRulesDraft: { en: 'DRAFTS THE RULE', de: 'ENTWIRFT DIE REGEL' },
   techRulesJson: { en: 'RULE JSON', de: 'REGEL-JSON' },
@@ -1891,86 +1884,89 @@ const table = {
   },
   techRulesJsonThen: {
     en: 'THEN: ARCHIVE · TASK · FLAG',
-    de: 'DANN: ABLEGEN · AUFGABE · MARKIEREN'
+    de: 'DANN: ARCHIVIEREN · AUFGABE · MARKIEREN'
   },
-  techRulesLaneA: { en: 'ONCE — WHEN YOU DESCRIBE IT', de: 'EINMAL — WENN DU SIE BESCHREIBST' },
+  techRulesLaneA: { en: 'ONCE — WHEN YOU DESCRIBE IT', de: 'EINMAL – WENN DU SIE BESCHREIBST' },
   techRulesLaneB: {
     en: 'EVERY MAIL — DETERMINISTIC · 0 AI CALLS',
-    de: 'JEDE MAIL — DETERMINISTISCH · 0 KI-CALLS'
+    de: 'BEI JEDER E-MAIL – DETERMINISTISCH · 0 KI-AUFRUFE'
   },
-  techRulesMatch: { en: 'DOES IT MATCH?', de: 'PASST DIE REGEL?' },
+  techRulesMatch: { en: 'DOES IT MATCH?', de: 'TRIFFT DIE REGEL ZU?' },
   techRulesMatchNote: { en: 'PLAIN COMPARISONS', de: 'REINE VERGLEICHE' },
-  techRulesAct1: { en: 'ARCHIVE', de: 'ABLEGEN' },
+  techRulesAct1: { en: 'ARCHIVE', de: 'ARCHIVIEREN' },
   techRulesAct2: { en: 'TASK', de: 'AUFGABE' },
   techRulesAct3: { en: 'CATEGORY', de: 'KATEGORIE' },
   techRulesCap: {
     en: 'The model only drafts the rule JSON from your description — one single time. Applying it happens deterministically on every mail, without any further AI calls.',
-    de: 'Das Modell entwirft nur das Regel-JSON aus deiner Beschreibung — ein einziges Mal. Angewendet wird die Regel deterministisch bei jeder Mail, ganz ohne weitere KI-Calls.'
+    de: 'Das Modell entwirft das Regel-JSON nur einmal, aus deiner Beschreibung. Angewendet wird die Regel danach bei jeder E-Mail deterministisch – ganz ohne weitere KI-Aufrufe.'
   },
 
   // 09 · Follow-up-Radar
-  techRadarTitle: { en: 'The follow-up radar', de: 'Das Follow-up-Radar' },
-  techRadarSent1: { en: 'YOUR SENT', de: 'GESENDETE' },
-  techRadarSent2: { en: 'MAIL', de: 'MAIL' },
-  techRadarDays: { en: '3 DAYS OF SILENCE', de: '3 TAGE STILL' },
+  techRadarTitle: { en: 'The follow-up radar', de: 'Das Nachfass-Radar' },
+  techRadarSent1: { en: 'YOUR SENT', de: 'DEINE GESENDETE' },
+  techRadarSent2: { en: 'MAIL', de: 'E-MAIL' },
+  techRadarDays: { en: '3 DAYS OF SILENCE', de: '3 TAGE OHNE ANTWORT' },
   techRadarDaysNote1: { en: 'THRESHOLD ADJUSTABLE', de: 'SCHWELLE EINSTELLBAR' },
-  techRadarDaysNote2: { en: 'WINDOW 3–21 DAYS', de: 'FENSTER 3–21 TAGE' },
-  techRadarCheck: { en: 'EXPECTS A REPLY?', de: 'ERWARTET ANTWORT?' },
+  techRadarDaysNote2: { en: 'WINDOW 3–21 DAYS', de: 'SPANNE 3–21 TAGE' },
+  techRadarCheck: { en: 'EXPECTS A REPLY?', de: 'ANTWORT ERWARTET?' },
   techRadarCheckNote: { en: 'THE CHEAP SCAN MODEL', de: 'DAS GÜNSTIGE SCAN-MODELL' },
-  techRadarList: { en: 'SHOWS UP IN “WAITING”', de: 'ERSCHEINT UNTER „WARTET“' },
-  techRadarOpen: { en: 'WHEN YOU OPEN IT:', de: 'ÖFFNEST DU DEN EINTRAG:' },
-  techRadarNudge: { en: 'NUDGE DRAFT', de: 'STUPSER-ENTWURF' },
-  techRadarVoice: { en: 'IN YOUR VOICE', de: 'IN DEINER STIMME' },
+  techRadarList: { en: 'SHOWS UP IN “WAITING”', de: 'ERSCHEINT UNTER „AUSSTEHEND“' },
+  techRadarOpen: { en: 'WHEN YOU OPEN IT:', de: 'WENN DU ES ÖFFNEST:' },
+  techRadarNudge: { en: 'NUDGE DRAFT', de: 'STUPS-ENTWURF' },
+  techRadarVoice: { en: 'IN YOUR VOICE', de: 'IN DEINEM STIL' },
   techRadarVoiceNote: { en: 'PROFILE + DU/SIE', de: 'PROFIL + DU/SIE' },
   techRadarSend: { en: 'YOU SEND IT', de: 'DU SENDEST' },
   techRadarCap: {
     en: 'The radar finds your sent mails that stayed unanswered, counts the days, and asks a cheap model whether a reply is even expected. The nudge is only a draft in your voice — sending it stays your move.',
-    de: 'Das Radar findet deine gesendeten Mails, die unbeantwortet blieben, zählt die Tage und fragt ein günstiges Modell, ob überhaupt eine Antwort aussteht. Der Stupser ist nur ein Entwurf in deiner Stimme — abgeschickt wird er von dir.'
+    de: 'Das Radar findet deine gesendeten E-Mails, die unbeantwortet geblieben sind, zählt die Tage und fragt ein günstiges Modell, ob überhaupt eine Antwort erwartet wird. Der Stups ist nur ein Entwurf in deinem Stil – abgeschickt wird er von dir.'
   },
 
   // 10 · Datenhaltung
-  techDataTitle: { en: 'Where your data lives', de: 'Wo deine Daten wohnen' },
+  techDataTitle: { en: 'Where your data lives', de: 'Wo deine Daten liegen' },
   techDataMac: { en: 'YOUR MAC', de: 'DEIN MAC' },
   techDataDb: { en: 'NOCTUA.SQLITE', de: 'NOCTUA.SQLITE' },
-  techDataDbRow1: { en: 'MAILS · TASKS · CHATS', de: 'MAILS · AUFGABEN · GESPRÄCHE' },
-  techDataDbRow2: { en: 'SEARCH INDEX · RULES', de: 'SUCH-INDEX · REGELN' },
-  techDataVault: { en: 'VAULT', de: 'VAULT' },
+  techDataDbRow1: { en: 'MAILS · TASKS · CHATS', de: 'E-MAILS · AUFGABEN · GESPRÄCHE' },
+  techDataDbRow2: { en: 'SEARCH INDEX · RULES', de: 'SUCHINDEX · REGELN' },
+  techDataVault: { en: 'VAULT', de: 'TRESOR' },
   techDataVaultRow1: { en: 'SAFESTORAGE · KEYCHAIN', de: 'SAFESTORAGE · SCHLÜSSELBUND' },
-  techDataVaultRow2: { en: 'PASSWORDS · TOKENS · API KEY', de: 'PASSWÖRTER · TOKEN · API-KEY' },
-  techDataOnboard: { en: 'ON BOARD:', de: 'AN BORD:' },
+  techDataVaultRow2: {
+    en: 'PASSWORDS · TOKENS · API KEY',
+    de: 'PASSWÖRTER · TOKEN · API-SCHLÜSSEL'
+  },
+  techDataOnboard: { en: 'ON BOARD:', de: 'MITGELIEFERT:' },
   techDataChip1: { en: 'E5 EMBEDDINGS', de: 'E5-EMBEDDINGS' },
   techDataChip2: { en: 'HUNSPELL DE+EN', de: 'HUNSPELL DE+EN' },
   techDataChip3: { en: 'SQLITE-VEC', de: 'SQLITE-VEC' },
   techDataNet: { en: 'NETWORK', de: 'NETZWERK' },
   techDataNetNote: { en: 'LIVE LIST BELOW', de: 'LIVE-LISTE UNTEN' },
   techDataPixels: { en: 'TRACKING PIXELS', de: 'TRACKING-PIXEL' },
-  techDataBlocked: { en: 'BLOCKED BY DEFAULT', de: 'STANDARDMÄSSIG BLOCKIERT' },
+  techDataBlocked: { en: 'BLOCKED BY DEFAULT', de: 'STANDARDMÄSSIG GEBLOCKT' },
   techDataCap: {
     en: 'Everything lives in one local SQLite file; credentials sit safeStorage-encrypted in a Keychain-backed vault. What actually talks to the outside is listed live below — it depends on your accounts, AI profiles and settings.',
-    de: 'Alles wohnt in einer lokalen SQLite-Datei; Zugangsdaten liegen safeStorage-verschlüsselt im Schlüsselbund-gestützten Vault. Was tatsächlich nach draußen redet, steht live in der Liste darunter — es hängt von deinen Konten, KI-Profilen und Einstellungen ab.'
+    de: 'Alles liegt in einer lokalen SQLite-Datei. Zugangsdaten sind mit safeStorage verschlüsselt und liegen in einem Tresor, der auf dem Schlüsselbund beruht. Was tatsächlich nach außen kommuniziert, steht live in der Liste darunter – es hängt von deinen Konten, KI-Profilen und Einstellungen ab.'
   },
   techNetTitle: { en: 'Network connections', de: 'Netzwerkverbindungen' },
   techNetCap: {
     en: 'Computed from your accounts, AI profiles, update source and the Local only switch. Tracking pixels and remote images stay blocked unless you allow them.',
-    de: 'Berechnet aus deinen Konten, KI-Profilen, Update-Quelle und dem Local-only-Schalter. Tracking-Pixel und Remote-Bilder bleiben blockiert, solange du sie nicht erlaubst.'
+    de: 'Berechnet aus deinen Konten, KI-Profilen, der Update-Quelle und dem Schalter „Nur lokal“. Tracking-Pixel und externe Bilder bleiben blockiert, solange du sie nicht erlaubst.'
   },
-  techNetLocalOnlyOn: { en: 'LOCAL ONLY: ON', de: 'LOCAL ONLY: AN' },
-  techNetLocalOnlyOff: { en: 'LOCAL ONLY: OFF', de: 'LOCAL ONLY: AUS' },
-  techNetKindMail: { en: 'MAIL SERVER', de: 'MAILSERVER' },
+  techNetLocalOnlyOn: { en: 'LOCAL ONLY: ON', de: 'NUR LOKAL: AN' },
+  techNetLocalOnlyOff: { en: 'LOCAL ONLY: OFF', de: 'NUR LOKAL: AUS' },
+  techNetKindMail: { en: 'MAIL SERVER', de: 'E-MAIL-SERVER' },
   techNetKindCalendar: { en: 'CALENDAR SERVER', de: 'KALENDERSERVER' },
   techNetKindOauth: { en: 'SIGN-IN (OAUTH)', de: 'ANMELDUNG (OAUTH)' },
   techNetKindAi: { en: 'AI PROFILE', de: 'KI-PROFIL' },
-  techNetKindUpdates: { en: 'UPDATE CHECK', de: 'UPDATE-CHECK' },
+  techNetKindUpdates: { en: 'UPDATE CHECK', de: 'UPDATE-PRÜFUNG' },
   techNetKindEmbeddings: { en: 'SEARCH MODEL', de: 'SUCHMODELL' },
   techNetActive: { en: 'ACTIVE', de: 'AKTIV' },
-  techNetBlocked: { en: 'BLOCKED (LOCAL ONLY)', de: 'GESPERRT (LOCAL ONLY)' },
+  techNetBlocked: { en: 'BLOCKED (LOCAL ONLY)', de: 'GESPERRT (NUR LOKAL)' },
   techNetManual: { en: 'ONLY ON REQUEST', de: 'NUR AUF ANFRAGE' },
   techNetOnDemand: { en: 'DOWNLOAD ON DEMAND', de: 'DOWNLOAD BEI BEDARF' },
   techNetCached: { en: 'CACHED · NO NETWORK', de: 'IM CACHE · KEIN NETZ' },
   techNetOff: { en: 'OFF', de: 'AUS' },
   techNetLocal: { en: 'LOCAL', de: 'LOKAL' },
   techNetExternal: { en: 'EXTERNAL', de: 'EXTERN' },
-  techNetTaskTriage: { en: 'triage', de: 'Sortierung' },
+  techNetTaskTriage: { en: 'triage', de: 'Vorsortierung' },
   techNetTaskDraft: { en: 'drafts', de: 'Entwürfe' },
   techNetTaskStt: { en: 'dictation', de: 'Diktat' }
 } as const

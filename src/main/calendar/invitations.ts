@@ -469,7 +469,7 @@ export function respondToInvitation(
     { account_id: number } | undefined
   if (!msg) throw new Error('Nachricht nicht gefunden')
   const obj = findObjectByUid(db, row.uid)
-  if (isOutdated(db, row, obj)) throw new Error('Diese Einladung ist veraltet')
+  if (isOutdated(db, row, obj)) throw new Error('Diese Einladung ist nicht mehr aktuell')
   const partstat: RsvpPartstat = input.partstat
   const comment = input.comment?.trim() || undefined
 
@@ -492,9 +492,9 @@ export function respondToInvitation(
 
   // iMIP-Weg
   const myAddress = (row.my_address ?? '').toLowerCase()
-  if (!myAddress) throw new Error('Eigene Adresse in der Einladung nicht erkennbar')
+  if (!myAddress) throw new Error('Deine Adresse wurde in der Einladung nicht gefunden')
   const organizer = row.organizer
-  if (!organizer) throw new Error('Die Einladung enthält keinen Organisator')
+  if (!organizer) throw new Error('Die Einladung nennt keinen Organisator')
   const mineWithMe = new Set([...mine, myAddress])
 
   let objectId: number | null = obj?.id ?? null
@@ -516,7 +516,7 @@ export function respondToInvitation(
       applyIcsToObject(obj.id, mergeInvitation(obj.ics, stored), db)
     } else {
       const calendarId = input.calendarId ?? suggestCalendarId(db, msg.account_id, myAddress)
-      if (calendarId === null) throw new Error('Kein beschreibbarer Kalender vorhanden')
+      if (calendarId === null) throw new Error('Kein Kalender mit Schreibzugriff vorhanden')
       objectId = createObjectFromIcs(calendarId, row.uid, stored, db)
     }
   }
@@ -575,7 +575,7 @@ export function removeCancelledEvent(
   if (!storedOrganizer || !row.organizer || storedOrganizer !== row.organizer.toLowerCase()) {
     throw new Error('Der Absender der Absage ist nicht der Organisator des Termins')
   }
-  if (isOutdated(db, row, obj)) throw new Error('Diese Absage ist veraltet')
+  if (isOutdated(db, row, obj)) throw new Error('Diese Absage ist nicht mehr aktuell')
   const recurring = row.recurrence_id !== null && /RRULE|RDATE/i.test(obj.ics)
   deleteEvent(obj.id, recurring ? 'this' : 'all', recurring ? row.recurrence_id : null, db, ctx, {
     notifyAttendees: false

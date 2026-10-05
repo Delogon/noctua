@@ -12,10 +12,10 @@ export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | nu
   app.setAboutPanelOptions({
     applicationName: name,
     applicationVersion: app.getVersion(),
-    copyright: 'AI-first Mail-Client · Tim Sigl',
+    copyright: 'E-Mail-Client mit KI · Tim Sigl',
     credits: getOrgConfig()
-      ? 'Triage, Drafts und Postfach-Chat laufen über die konfigurierten KI-Profile;\nEmbeddings lokal auf diesem Mac.'
-      : 'Triage, Drafts und Postfach-Chat laufen über OpenRouter;\nEmbeddings lokal auf diesem Mac.'
+      ? 'Vorsortierung, Entwürfe und E-Mail-Chat laufen über die eingerichteten KI-Anbieter;\nSuchmodell lokal auf diesem Mac.'
+      : 'Vorsortierung, Entwürfe und E-Mail-Chat laufen über OpenRouter;\nSuchmodell lokal auf diesem Mac.'
   })
 
   const send = (action: PushPayload<'app:menuAction'>['action']): void => {
@@ -86,7 +86,7 @@ export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | nu
       label: 'Darstellung',
       submenu: [
         { label: 'Posteingang', accelerator: 'Cmd+1', click: () => send('inbox') },
-        { label: 'Wartet auf Antwort', accelerator: 'Cmd+2', click: () => send('waiting') },
+        { label: 'Ausstehend', accelerator: 'Cmd+2', click: () => send('waiting') },
         { label: 'Aufgaben', accelerator: 'Cmd+3', click: () => send('tasks') },
         { label: 'Kalender', accelerator: 'Cmd+4', click: () => send('calendar') },
         { type: 'separator' },

@@ -174,7 +174,7 @@ describe('SEQUENCE / veraltet', () => {
     expect(view(cur).outdated).toBe(true) // SEQUENCE 4 der Absage > 3
     expect(() =>
       respondToInvitation(db, { invitationId: view(old).id, partstat: 'ACCEPTED' })
-    ).toThrow(/veraltet/)
+    ).toThrow(/nicht mehr aktuell/)
   })
 
   it('Termin im Kalender mit höherer SEQUENCE macht die Einladung veraltet', async () => {

@@ -46,13 +46,13 @@ export function evaluateTestReply(raw: string): { ok: boolean; detail: string | 
 
 export async function runModelTest(profileId: string, model: string): Promise<ModelTestResult> {
   const profile = getProfile(profileId)
-  if (!profile) return { ok: false, latencyMs: 0, costUsd: null, detail: 'Profil nicht gefunden' }
+  if (!profile) return { ok: false, latencyMs: 0, costUsd: null, detail: 'Anbieter nicht gefunden' }
   if (isLocalOnly() && !profile.isLocal) {
     return {
       ok: false,
       latencyMs: 0,
       costUsd: null,
-      detail: 'Local only ist aktiv — externe Profile werden nicht angesprochen'
+      detail: '„Nur lokal“ ist aktiv – externe Anbieter werden nicht angefragt'
     }
   }
   if (profile.preset === 'openrouter' && !profile.hasKey) {
@@ -103,7 +103,7 @@ export interface ConnectionTestResult {
  */
 export async function testProfileConnection(profileId: string): Promise<ConnectionTestResult> {
   const profile = getProfile(profileId)
-  if (!profile) return { ok: false, latencyMs: 0, modelCount: 0, detail: 'Profil nicht gefunden' }
+  if (!profile) return { ok: false, latencyMs: 0, modelCount: 0, detail: 'Anbieter nicht gefunden' }
   const started = Date.now()
   try {
     const models = await getClient(profile).listModels()

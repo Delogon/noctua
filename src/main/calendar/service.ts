@@ -321,8 +321,8 @@ export function getEvent(
   db: Database.Database = getDb()
 ): CalendarEventDetail {
   const obj = getObject(db, objectId)
-  if (!obj || obj.pending_op === 'delete') throw new Error('Ereignis nicht gefunden')
-  if (obj.component !== 'VEVENT') throw new Error('Kein Termin')
+  if (!obj || obj.pending_op === 'delete') throw new Error('Termin nicht gefunden')
+  if (obj.component !== 'VEVENT') throw new Error('Das ist kein Termin')
   const cal = requireCalendar(db, obj.calendar_id)
   const root = parseCalendar(obj.ics)
   const vtz = vtimezonesOf(root)
@@ -342,7 +342,7 @@ export function getEvent(
     occ ??= expandResource(root, { windowStart: 0, windowEnd: 0, all: true }).find(
       (o) => o.recurrenceId === recurrenceId
     )
-    if (!occ) throw new Error('Vorkommen nicht gefunden')
+    if (!occ) throw new Error('Termin der Serie nicht gefunden')
   } else {
     const all = expandResource(root, { windowStart: 0, windowEnd: 0, all: true })
     occ = all[0]
@@ -354,7 +354,7 @@ export function getEvent(
       })[0]
       occ = first
     }
-    if (!occ) throw new Error('Ereignis ohne Vorkommen')
+    if (!occ) throw new Error('Termin ohne passendes Vorkommen')
     if (recurring && !occ.isOverride) occ = { ...occ, recurrenceId: null }
   }
 
@@ -397,7 +397,7 @@ function writableCalendar(db: Database.Database, id: number): CalendarRow {
   const cal = requireCalendar(db, id)
   if (cal.read_only) throw new Error('Dieser Kalender ist schreibgeschützt')
   if (!cal.components.split(',').includes('VEVENT'))
-    throw new Error('Kalender nimmt keine Termine auf')
+    throw new Error('Dieser Kalender unterstützt keine Termine')
   return cal
 }
 
@@ -446,7 +446,7 @@ export function updateEvent(
   scheduling: SchedulingOptions = {}
 ): { objectId: number; createdObjectId: number | null } {
   const obj = getObject(db, objectId)
-  if (!obj || obj.pending_op === 'delete') throw new Error('Ereignis nicht gefunden')
+  if (!obj || obj.pending_op === 'delete') throw new Error('Termin nicht gefunden')
   const cal = writableCalendar(db, obj.calendar_id)
   const account = getCalAccount(db, cal.account_id)
   const result = updateIcs(
@@ -484,7 +484,7 @@ export function deleteEvent(
   scheduling: SchedulingOptions = {}
 ): void {
   const obj = getObject(db, objectId)
-  if (!obj || obj.pending_op === 'delete') throw new Error('Ereignis nicht gefunden')
+  if (!obj || obj.pending_op === 'delete') throw new Error('Termin nicht gefunden')
   const cal = writableCalendar(db, obj.calendar_id)
   const account = getCalAccount(db, cal.account_id)
   const result = deleteFromIcs(obj.ics, { scope, recurrenceId }, ctx)
@@ -529,7 +529,7 @@ export function applyIcsToObject(
   db: Database.Database = getDb()
 ): void {
   const obj = getObject(db, objectId)
-  if (!obj || obj.pending_op === 'delete') throw new Error('Ereignis nicht gefunden')
+  if (!obj || obj.pending_op === 'delete') throw new Error('Termin nicht gefunden')
   const cal = writableCalendar(db, obj.calendar_id)
   db.transaction(() => enqueueUpdate(db, obj, cal, ics))()
   afterWrite(cal)

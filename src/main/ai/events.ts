@@ -400,5 +400,5 @@ export async function runEventExtraction(
     }
     return 'done'
   }
-  throw new Error(`Termin-Output ungültig nach Retry: ${lastError}`)
+  throw new Error(`Ungültige Antwort des Modells (Termine) nach erneutem Versuch: ${lastError}`)
 }

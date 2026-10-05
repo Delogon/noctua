@@ -149,7 +149,7 @@ describe('resolveTask', () => {
   it('OpenRouter ohne Key: null (no-key) wie bisher; mit Key: Defaults', () => {
     expect(resolveTask('triage')).toBeNull()
     expect(taskBlockReason('triage')).toBe('no-key')
-    expect(() => requireTask('draft')).toThrow(/Kein OpenRouter-Key/)
+    expect(() => requireTask('draft')).toThrow(/Kein OpenRouter-Schlüssel/)
 
     setProfileKey('openrouter', 'k')
     expect(resolveTask('triage')!.model).toBe('deepseek/deepseek-v4-flash')
@@ -191,7 +191,7 @@ describe('resolveTask', () => {
     expect(resolveTask('draft')).toBeNull()
     expect(resolveTask('stt')).toBeNull() // OpenRouter, extern
     expect(taskBlockReason('draft')).toBe('local-only')
-    expect(() => requireTask('draft')).toThrow(/Local only/)
+    expect(() => requireTask('draft')).toThrow(/Nur lokal/)
 
     setLocalOnly(false)
     expect(resolveTask('draft')!.profile.id).toBe(cloud.id)
