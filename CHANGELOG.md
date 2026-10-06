@@ -8,7 +8,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Security
 
-- Fixes from the strix audit: Proton Bridge connections now require STARTTLS and pin the Bridge certificate on first use. If the certificate changes, sync stops and asks for the password again. Deeply nested MIME structures and oversized `References` headers can no longer block mail sync. Owl chat treats mail content as untrusted data (SEC-15). The encrypted database keeps temp files in memory. A new privacy switch hides sender, subject and summary in notifications. `nanoid` 2.x (via the spellchecker) is replaced by a crypto-backed drop-in. Removing a Microsoft account also removes its refresh token, and changing an AI provider's base URL discards its stored key.
+- Fixes from the strix audit: Proton Bridge connections now require STARTTLS and pin the Bridge certificate on first use. If the certificate changes, sync stops and asks for the password again. Deeply nested MIME structures and oversized `References` headers can no longer block mail sync. Owl chat treats mail content as untrusted data (SEC-15). The encrypted database keeps temp files in memory. Notifications no longer show sender, subject or summary by default; a new privacy switch turns the details back on. `nanoid` 2.x (via the spellchecker) is replaced by a crypto-backed drop-in. Removing a Microsoft account also removes its refresh token, and changing an AI provider's base URL discards its stored key.
 
 ### Added
 

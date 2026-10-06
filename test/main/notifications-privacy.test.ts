@@ -58,7 +58,8 @@ beforeEach(() => {
 afterEach(() => closeTestDb(db))
 
 describe('Benachrichtigungen auf dem Sperrbildschirm (vuln-0015)', () => {
-  it('zeigt standardmäßig Absender, Betreff und Kurzfassung', () => {
+  it('zeigt Absender, Betreff und Kurzfassung nur nach explizitem Opt-in', () => {
+    setSetting('notifications.hideContent', '0')
     maybeNotify(seedImportantMail())
     expect(shown).toHaveLength(1)
     expect(shown[0]).toMatchObject({
@@ -68,8 +69,7 @@ describe('Benachrichtigungen auf dem Sperrbildschirm (vuln-0015)', () => {
     })
   })
 
-  it('blendet mit notifications.hideContent alle Mailinhalte aus', () => {
-    setSetting('notifications.hideContent', '1')
+  it('blendet standardmäßig alle Mailinhalte aus', () => {
     maybeNotify(seedImportantMail())
     expect(shown).toHaveLength(1)
     expect(shown[0]).toMatchObject({ title: 'Noctua', body: 'Neue E-Mail' })

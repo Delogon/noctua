@@ -973,13 +973,13 @@ function RemoteImagesPrivacy(): React.JSX.Element {
   const t = useT()
   const queryClient = useQueryClient()
   const [blocked, setBlocked] = useState(true)
-  const [hideNotify, setHideNotify] = useState(false)
+  const [hideNotify, setHideNotify] = useState(true)
   useEffect(() => {
     void invoke('settings:get', { key: 'mail.remoteImagesDefault' }).then((r) =>
       setBlocked(r.value !== '1')
     )
     void invoke('settings:get', { key: 'notifications.hideContent' }).then((r) =>
-      setHideNotify(r.value === '1')
+      setHideNotify(r.value !== '0')
     )
   }, [])
   const toggle = (): void => {

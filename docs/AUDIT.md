@@ -18,8 +18,8 @@ mandatory STARTTLS on loopback + trust-on-first-use certificate pinning in
 `accounts.tls_fingerprint256`, see `main/auth/loopback-tls.ts`; re-entering the password trusts a
 new Bridge certificate), vuln-0011 (huge `References` header exceeded SQLite's bind limit; capped),
 vuln-0012 (profile key dropped when the base URL changes), vuln-0013 (SEC-15 for Owl chat and the
-follow-up fallback), vuln-0014 (`temp_store = MEMORY` on the encrypted DB), vuln-0015 (setting to
-hide sender/subject/summary in notifications), vuln-0003…0007 (`nanoid` 2.x replaced by
+follow-up fallback), vuln-0014 (`temp_store = MEMORY` on the encrypted DB), vuln-0015 (notifications
+hide sender/subject/summary by default; switch under Privacy), vuln-0003…0007 (`nanoid` 2.x replaced by
 `vendor/nanoid-compat` via a pnpm override) — all fixed.
 
 **Remaining:** PRV-2 (`ai_enabled` default — now configurable via org config

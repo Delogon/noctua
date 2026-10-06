@@ -20,9 +20,12 @@ function enabled(): boolean {
   return (getSetting('notifications.enabled') ?? '1') === '1'
 }
 
-/** Sperrbildschirm-Schutz: nur „Neue E-Mail“ statt Absender, Betreff, Kurzfassung (vuln-0015). */
+/**
+ * Sperrbildschirm-Schutz: nur „Neue E-Mail“ statt Absender, Betreff,
+ * Kurzfassung (vuln-0015). Privacy by default — nur ein explizites '0' zeigt Inhalte.
+ */
 function hideContent(): boolean {
-  return getSetting('notifications.hideContent') === '1'
+  return getSetting('notifications.hideContent') !== '0'
 }
 
 function minPriority(): number {
