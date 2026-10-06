@@ -111,6 +111,10 @@ export function openEncrypted(file: string, keyHex: string): Database.Database {
       }`
     )
   }
+  // Temp-Dateien (große Sorts, temporäre Indizes) verschlüsselt der Codec
+  // nicht — im RAM halten, sonst landen Mailinhalte im Klartext in $TMPDIR
+  // (SEC, vuln-0014).
+  db.pragma('temp_store = MEMORY')
   return db
 }
 

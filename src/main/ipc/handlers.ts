@@ -17,9 +17,10 @@ import {
   saveOwlConversation
 } from '../db/repos/owl'
 import { deleteSecret, hasSecret, setSecret } from '../auth/secrets'
+import { clearTlsPins } from '../auth/loopback-tls'
 import {
   accountSecretKey,
-  buildImapOptions,
+  imapConnectOptions,
   PROVIDER_DEFAULTS,
   type AccountRow
 } from '../auth/providers'
@@ -120,9 +121,9 @@ async function testImapLogin(
   host: string,
   port: number
 ): Promise<void> {
-  // buildImapOptions kennt die Sonderfälle (STARTTLS-Ports, Loopback-Bridge)
+  // imapConnectOptions kennt die Sonderfälle (STARTTLS-Ports, Loopback-Bridge)
   const client = new ImapFlow(
-    buildImapOptions(
+    await imapConnectOptions(
       { email, provider: 'imap', imap_host: host, imap_port: port },
       { user: email, pass: password }
     )
@@ -409,6 +410,9 @@ export const handlers: IpcHandlers = {
     const password = rawPassword.replace(/\s+/g, '')
     // Erst prüfen, dann speichern: ein falsches Passwort überschreibt nichts
     await testImapLogin(row.email, password, row.imap_host, row.imap_port)
+    // Neu eingegebene Zugangsdaten = Zustimmung zum aktuellen Bridge-Zertifikat
+    // (z. B. nach Neuinstallation); der Syncer pinnt es beim nächsten Verbinden.
+    clearTlsPins(accountId)
     const key = accountSecretKey(accountId)
     setSecret(key, password)
     await restartSyncer(row, key)

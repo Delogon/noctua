@@ -6,6 +6,10 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Security
+
+- Fixes from the strix audit: Proton Bridge connections now require STARTTLS and pin the Bridge certificate on first use. If the certificate changes, sync stops and asks for the password again. Deeply nested MIME structures and oversized `References` headers can no longer block mail sync. Owl chat treats mail content as untrusted data (SEC-15). The encrypted database keeps temp files in memory. Notifications no longer show sender, subject or summary by default; a new privacy switch turns the details back on. `nanoid` 2.x (via the spellchecker) is replaced by a crypto-backed drop-in. Removing a Microsoft account also removes its refresh token, and changing an AI provider's base URL discards its stored key.
+
 ### Added
 
 - **Calendar view** (Phase 2.2): a new top-level view next to Inbox / Waiting / Tasks (⌘4, also in the ⌘K palette and the View menu). Week view by default (Monday start, 24 h, working hours 08–18 shaded, scrolled to 07:00, current-time line), switchable to day and month. All-day and multi-day events sit in a row above the grid and are placed by their calendar days; overlapping events share columns; the month grid shows as many entries as fit plus “+k more”.

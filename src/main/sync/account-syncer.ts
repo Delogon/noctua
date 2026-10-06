@@ -1,6 +1,7 @@
 import { ImapFlow, type FetchMessageObject, type MessageAddressObject } from 'imapflow'
 import type Database from 'better-sqlite3-multiple-ciphers'
-import { buildImapOptions, type AccountRow, type MailCredentials } from '../auth/providers'
+import { isTlsPinMismatch } from '../auth/loopback-tls'
+import { imapConnectOptions, type AccountRow, type MailCredentials } from '../auth/providers'
 import { parseMail } from '../mail/parser'
 import {
   applyFlagUpdate,
@@ -42,7 +43,9 @@ export function isAuthFailure(error: unknown): boolean {
     e?.authenticationFailed === true ||
     e?.serverResponseCode === 'AUTHENTICATIONFAILED' ||
     // OAuth-Refresh gescheitert (invalid_grant / interaction_required)
-    isReauthError(error)
+    isReauthError(error) ||
+    // Bridge-Zertifikat geändert: kein Retry-Loop, Nutzer bestätigt per Passwort
+    isTlsPinMismatch(error)
   )
 }
 
@@ -98,11 +101,22 @@ export function backfillCutoff(
   return now - days * 24 * 3600 * 1000
 }
 
-function structureHasAttachments(node: unknown): boolean {
-  if (!node || typeof node !== 'object') return false
-  const n = node as { disposition?: string; childNodes?: unknown[] }
-  if (n.disposition?.toLowerCase() === 'attachment') return true
-  return (n.childNodes ?? []).some(structureHasAttachments)
+/**
+ * Iterativ statt rekursiv: BODYSTRUCTURE kommt vom Server — eine tief
+ * verschachtelte Struktur darf keinen Stack-Overflow auslösen, der die
+ * Ingest-Transaktion bei jedem Sync erneut abbricht (SEC, vuln-0008).
+ */
+export function structureHasAttachments(root: unknown): boolean {
+  const stack: unknown[] = [root]
+  while (stack.length > 0) {
+    const node = stack.pop()
+    if (!node || typeof node !== 'object') continue
+    const n = node as { disposition?: string; childNodes?: unknown[] }
+    if (typeof n.disposition === 'string' && n.disposition.toLowerCase() === 'attachment')
+      return true
+    if (Array.isArray(n.childNodes)) stack.push(...n.childNodes)
+  }
+  return false
 }
 
 function extractHeader(headers: Buffer | undefined, name: string): string | null {
@@ -111,8 +125,12 @@ function extractHeader(headers: Buffer | undefined, name: string): string | null
   return headers.toString('binary').match(pattern)?.[1] ?? null
 }
 
+/** Obergrenze für References — die jüngsten (letzten) Einträge reichen fürs Threading. */
+const MAX_REFERENCES = 100
+
 function extractReferences(headers: Buffer | undefined): string[] {
-  return extractHeader(headers, 'references')?.match(/<[^<>]+>/g) ?? []
+  const refs = extractHeader(headers, 'references')?.match(/<[^<>]+>/g) ?? []
+  return refs.length > MAX_REFERENCES ? refs.slice(-MAX_REFERENCES) : refs
 }
 
 function mapHeaderAddresses(list?: MessageAddressObject[]): FetchedMessageHeaderData['to'] {
@@ -281,7 +299,7 @@ export class AccountSyncer {
   }
 
   private async connectAndSync(): Promise<void> {
-    const options = buildImapOptions(this.account, await this.getCredentials())
+    const options = await imapConnectOptions(this.account, await this.getCredentials())
     this.cmd = new ImapFlow(options)
     this.cmd.on('error', (err) => console.warn(`[sync:${this.account.email}] cmd:`, err.message))
     await this.cmd.connect()
@@ -754,7 +772,7 @@ export class AccountSyncer {
   }
 
   private async startIdle(inbox: FolderRow): Promise<void> {
-    const options = buildImapOptions(this.account, await this.getCredentials())
+    const options = await imapConnectOptions(this.account, await this.getCredentials())
     this.idleConn = new ImapFlow(options)
     this.idleConn.on('error', (err) => console.warn(`[idle:${this.account.email}]`, err.message))
     await this.idleConn.connect()

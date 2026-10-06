@@ -20,6 +20,14 @@ function enabled(): boolean {
   return (getSetting('notifications.enabled') ?? '1') === '1'
 }
 
+/**
+ * Sperrbildschirm-Schutz: nur „Neue E-Mail“ statt Absender, Betreff,
+ * Kurzfassung (vuln-0015). Privacy by default — nur ein explizites '0' zeigt Inhalte.
+ */
+function hideContent(): boolean {
+  return getSetting('notifications.hideContent') !== '0'
+}
+
 function minPriority(): number {
   const n = Number(getSetting('notifications.minPriority') ?? '4')
   return Number.isFinite(n) ? Math.min(Math.max(n, 1), 5) : 4
@@ -58,10 +66,12 @@ export function maybeNotify(messageId: number): void {
   if (row.priority < minPriority()) return
   if (!row.date || Date.now() - row.date > FRESH_WINDOW_MS) return
 
+  const hidden = hideContent()
+  const newMail = getSetting('ui.language') === 'en' ? 'New email' : 'Neue E-Mail'
   const notification = new Notification({
-    title: row.from_name ?? row.from_addr ?? 'Neue E-Mail',
-    subtitle: row.subject ?? undefined,
-    body: row.summary ?? row.subject ?? '',
+    title: hidden ? 'Noctua' : (row.from_name ?? row.from_addr ?? newMail),
+    subtitle: hidden ? undefined : (row.subject ?? undefined),
+    body: hidden ? newMail : (row.summary ?? row.subject ?? ''),
     silent: row.priority < 5,
     // macOS nutzt das Icon der Noctua.app; Windows/Linux brauchen es explizit.
     ...(process.platform === 'darwin' ? {} : { icon })

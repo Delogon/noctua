@@ -4,6 +4,7 @@ import { getSecret } from '../auth/secrets'
 import { getSetting } from '../db'
 import { accountSecretKey, isLoopbackHost, type AccountRow } from '../auth/providers'
 import { detectImplicitTls, forgetTlsMode } from './tls-mode'
+import { pinnedLoopbackTls, type PinnedTlsOptions } from '../auth/loopback-tls'
 import { msAccessToken } from '../auth/msal'
 import { googleAccessToken } from '../auth/google'
 import {
@@ -130,18 +131,35 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
   const implicitTls = loopback
     ? await detectImplicitTls(account.smtp_host, account.smtp_port)
     : account.smtp_port === 465
+  // Loopback (Proton Bridge): selbstsigniertes Zertifikat nur mit passendem Pin
+  let loopbackTls: PinnedTlsOptions | undefined
+  if (loopback) {
+    try {
+      loopbackTls = await pinnedLoopbackTls(
+        account.id,
+        account.smtp_host,
+        account.smtp_port,
+        'smtp',
+        implicitTls
+      )
+    } catch (error) {
+      // Evtl. falsch erkannte Betriebsart — beim nächsten Versuch neu erkennen
+      forgetTlsMode(account.smtp_host, account.smtp_port)
+      throw error
+    }
+  }
   const transport = nodemailer.createTransport({
     host: account.smtp_host,
     port: account.smtp_port,
     secure: implicitTls,
-    // Nicht-Loopback ohne implizites TLS: STARTTLS erzwingen (kein Klartext-Fallback)
-    requireTLS: !loopback && !implicitTls,
+    // Ohne implizites TLS: STARTTLS erzwingen (kein Klartext-Fallback) — auch
+    // auf Loopback, damit ein fremder Prozess am Port kein AUTH im Klartext sieht
+    requireTLS: !implicitTls,
     connectionTimeout: 30_000,
     greetingTimeout: 20_000,
     socketTimeout: 60_000,
     auth,
-    // Loopback (Proton Bridge): selbstsigniertes Zertifikat akzeptieren
-    ...(loopback ? { tls: { rejectUnauthorized: false } } : {})
+    ...(loopbackTls ? { tls: loopbackTls } : {})
   })
 
   try {

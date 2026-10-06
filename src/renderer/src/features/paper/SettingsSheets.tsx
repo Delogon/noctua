@@ -963,18 +963,23 @@ function ColorRow({ account }: { account: AccountSummary }): React.JSX.Element {
 }
 
 /**
- * Privacy-Einstellung (Design 3b): Remote-Bilder sind standardmäßig BLOCKIERT,
+ * Privacy-Einstellungen (Design 3b): Remote-Bilder sind standardmäßig BLOCKIERT,
  * bis der Nutzer sie erlaubt — als Schutz formuliert, Default entspricht dem
  * Privacy-Versprechen. Nur ein explizites '1' lädt automatisch; gespeicherte
- * Entscheidungen von Bestandsnutzern bleiben unangetastet.
+ * Entscheidungen von Bestandsnutzern bleiben unangetastet. Dazu der
+ * Sperrbildschirm-Schutz für Benachrichtigungen (vuln-0015).
  */
 function RemoteImagesPrivacy(): React.JSX.Element {
   const t = useT()
   const queryClient = useQueryClient()
   const [blocked, setBlocked] = useState(true)
+  const [hideNotify, setHideNotify] = useState(true)
   useEffect(() => {
     void invoke('settings:get', { key: 'mail.remoteImagesDefault' }).then((r) =>
       setBlocked(r.value !== '1')
+    )
+    void invoke('settings:get', { key: 'notifications.hideContent' }).then((r) =>
+      setHideNotify(r.value !== '0')
     )
   }, [])
   const toggle = (): void => {
@@ -986,38 +991,63 @@ function RemoteImagesPrivacy(): React.JSX.Element {
       }
     )
   }
+  const toggleNotify = (): void => {
+    const next = !hideNotify
+    setHideNotify(next)
+    void invoke('settings:set', { key: 'notifications.hideContent', value: next ? '1' : '0' })
+  }
   return (
     <div style={{ marginTop: 16 }}>
       <div className="mlabel" style={{ color: 'var(--muted)' }}>
         {t('privacyHead')}
       </div>
-      <div className="flex items-center gap-3" style={{ marginTop: 8 }}>
-        <button
-          type="button"
-          onClick={toggle}
-          aria-pressed={blocked}
-          className="btn-bare flex items-center gap-1.5"
-        >
+      <PrivacyToggle
+        on={blocked}
+        onToggle={toggle}
+        label={t('imagesBlockToggle')}
+        note={t('imagesBlockNote')}
+      />
+      <PrivacyToggle
+        on={hideNotify}
+        onToggle={toggleNotify}
+        label={t('notifyHideToggle')}
+        note={t('notifyHideNote')}
+      />
+    </div>
+  )
+}
+
+function PrivacyToggle({
+  on,
+  onToggle,
+  label,
+  note
+}: {
+  on: boolean
+  onToggle: () => void
+  label: string
+  note: string
+}): React.JSX.Element {
+  return (
+    <div className="flex items-center gap-3" style={{ marginTop: 8 }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={on}
+        className="btn-bare flex items-center gap-1.5"
+      >
+        <span className="toggle-track" style={{ background: on ? 'var(--ink)' : 'transparent' }}>
           <span
-            className="toggle-track"
-            style={{ background: blocked ? 'var(--ink)' : 'transparent' }}
-          >
-            <span
-              className="toggle-dot"
-              style={{
-                background: blocked ? '#F4F1EA' : 'var(--ink)',
-                marginLeft: blocked ? 12 : 0
-              }}
-            />
-          </span>
-          <span style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}>
-            {t('imagesBlockToggle')}
-          </span>
-        </button>
-        <span style={{ font: '400 9px var(--mono)', color: 'var(--faint)' }}>
-          {t('imagesBlockNote')}
+            className="toggle-dot"
+            style={{
+              background: on ? '#F4F1EA' : 'var(--ink)',
+              marginLeft: on ? 12 : 0
+            }}
+          />
         </span>
-      </div>
+        <span style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}>{label}</span>
+      </button>
+      <span style={{ font: '400 9px var(--mono)', color: 'var(--faint)' }}>{note}</span>
     </div>
   )
 }
