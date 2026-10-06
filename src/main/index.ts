@@ -1,8 +1,10 @@
-import { app, BrowserWindow, dialog, powerMonitor } from 'electron'
+import { app, BrowserWindow, dialog, powerMonitor, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { openDb, closeDb } from './db'
+import { DatabaseTooNewError } from './db/migrate'
+import { DbKeyError } from './db/encryption'
 import { registerIpcHandlers, pushToWindow } from './ipc/register'
 import { handlers, setHandlerPush } from './ipc/handlers'
 import { seedFromEnv } from './auth/seed'
@@ -11,29 +13,49 @@ import { aiQueue } from './ai/queue'
 import { followupRadar } from './ai/followups'
 import { embeddingIndexer } from './ai/embeddings'
 import { outboxWorker } from './smtp/outbox'
-import { initNotifications, updateBadge } from './notifications'
+import { initNotifications, notifyCalendarReminder, updateBadge } from './notifications'
+import { initCalendar, stopCalendar } from './calendar'
+import { setItipMailer } from './calendar/mailer'
+import { calendarSync } from './calendar/sync'
 import { setRuleActionExecutor } from './ai/rules'
 import { startUpdateChecks, stopUpdateChecks } from './updates'
+import { appId, packagedAppName, productName } from './org-config'
+import { applyOrgConfig } from './org-defaults'
 import { stopAppleFm } from './ai/apple-fm'
 import { openExternalSafe } from './util/links'
 import { installAppMenu } from './menu'
 import { cleanupForwardTasksWithoutRequest } from './db/repos/tasks'
 import { reindexHtmlOnlyMessages } from './mail/ingest'
+import { isDev } from './dev-mode'
+import {
+  APP_CSP,
+  isPermissionAllowed,
+  isTrustedAppUrl,
+  safeDevRendererUrl,
+  type TrustedAppPages
+} from './security'
 
 // Bewusst KEIN app.setName('Noctua'): das würde den bestehenden userData-/
 // Safe-Storage-Namen verändern. Im Dev liefert scripts/prepare-dev-app.mjs die
 // Noctua-Identität für macOS, ohne den internen Paketnamen umzubiegen.
 
-// Dev-Erkennung: Der gebrandete Dev-Wrapper benennt die Electron-Binary um,
-// wodurch app.isPackaged fälschlich true meldet — scripts/dev.mjs setzt darum
-// NOCTUA_DEV=1 als explizites Signal. `is.dev` (= !isPackaged) reicht nicht.
-const isDev = !app.isPackaged || process.env.NOCTUA_DEV === '1'
+// Dev-Erkennung (isDev) liegt in dev-mode.ts; ELECTRON_RENDERER_URL zählt nur
+// im Dev-Modus und nur für Loopback-Hosts — ein Produktions-Build lädt nie
+// einen entfernten Renderer.
+const devRendererUrl = isDev ? safeDevRendererUrl(process.env['ELECTRON_RENDERER_URL']) : null
+
+/** Vertrauenswürdige App-Seiten: gebaute index.html bzw. der Dev-Server. */
+const trustedPages = (): TrustedAppPages => ({
+  indexPath: join(__dirname, '../renderer/index.html'),
+  devUrl: devRendererUrl
+})
 
 // Die verpackte App bekommt ein EIGENES Datenverzeichnis (+ eigenen Safe-
 // Storage-Schlüssel): Dev belegt bereits „noctua", und da macOS-Dateisysteme
 // Groß-/Kleinschreibung ignorieren, würde auch „Noctua" dieselbe DB treffen —
 // zwei Instanzen auf einer DB heißt Lock-Konflikte und doppelter IMAP-Sync.
-if (!isDev) app.setName('noctua-prod')
+// Eine Company Edition (Org-Konfiguration) bekommt wiederum einen eigenen Namen.
+if (!isDev) app.setName(packagedAppName())
 
 let mainWindow: BrowserWindow | null = null
 
@@ -45,7 +67,7 @@ function createWindow(): BrowserWindow {
     minWidth: 1180,
     minHeight: 760,
     show: false,
-    title: 'Noctua',
+    title: productName(),
     backgroundColor: '#F4F1EA',
     titleBarStyle: 'hiddenInset',
     // Traffic lights vertically centered on the masthead wordmark: its box
@@ -58,7 +80,9 @@ function createWindow(): BrowserWindow {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: true
+      webSecurity: true,
+      // <webview> wäre eine zweite, schwer abzusichernde Renderer-Ebene
+      webviewTag: false
     }
   })
 
@@ -81,19 +105,73 @@ function createWindow(): BrowserWindow {
     openExternalSafe(details.url)
     return { action: 'deny' }
   })
-  win.webContents.on('will-navigate', (event, url) => {
-    const devUrl = process.env['ELECTRON_RENDERER_URL']
-    if (isDev && devUrl && url.startsWith(devUrl)) return
-    event.preventDefault()
-  })
+  // Navigation und Redirects nur innerhalb der eigenen App-Seite (Reload, HMR)
+  const guardNavigation = (event: { preventDefault: () => void }, url: string): void => {
+    if (!isTrustedAppUrl(url, trustedPages())) event.preventDefault()
+  }
+  win.webContents.on('will-navigate', guardNavigation)
+  win.webContents.on('will-redirect', guardNavigation)
+  win.webContents.on('will-attach-webview', (event) => event.preventDefault())
 
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  if (devRendererUrl) {
+    win.loadURL(devRendererUrl)
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
   return win
+}
+
+/**
+ * Session-Härtung: Berechtigungen standardmäßig verboten (nur Mikrofon für das
+ * Diktat, nur für die eigene App-Seite) und CSP zusätzlich als Response-Header
+ * für die App-Seiten — die Meta-CSP in index.html bleibt als zweite Schicht.
+ */
+function installSessionSecurity(): void {
+  const ses = session.defaultSession
+  const fromMain = (wc: Electron.WebContents | null): boolean =>
+    !!wc && !!mainWindow && !mainWindow.isDestroyed() && wc === mainWindow.webContents
+
+  ses.setPermissionRequestHandler((wc, permission, callback, details) => {
+    const mediaTypes = (details as { mediaTypes?: string[] }).mediaTypes
+    callback(
+      isPermissionAllowed({
+        permission,
+        mediaTypes,
+        fromMainWindow: fromMain(wc),
+        requestingUrl: details.requestingUrl,
+        pages: trustedPages()
+      })
+    )
+  })
+  ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
+    // Check-Requests tragen mediaType statt mediaTypes
+    const mediaType = (details as { mediaType?: string }).mediaType
+    return isPermissionAllowed({
+      permission,
+      mediaTypes: mediaType ? [mediaType] : undefined,
+      fromMainWindow: fromMain(wc),
+      requestingUrl: details.requestingUrl || requestingOrigin,
+      pages: trustedPages()
+    })
+  })
+
+  ses.webRequest.onHeadersReceived((details, callback) => {
+    // Nur für die gebaute App (file://). Der Vite-Dev-Server injiziert ein Inline-Skript
+    // (React-Refresh-Preamble) vor dem <meta>-CSP — ein Header-CSP würde es blockieren;
+    // im Dev-Modus gilt daher wie bisher nur die <meta>-CSP aus index.html.
+    if (
+      details.resourceType === 'mainFrame' &&
+      details.url.startsWith('file:') &&
+      isTrustedAppUrl(details.url, trustedPages())
+    ) {
+      callback({
+        responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [APP_CSP] }
+      })
+      return
+    }
+    callback({})
+  })
 }
 
 // Zweite Instanz der installierten App: erste fokussieren, neue beendet sich.
@@ -120,14 +198,20 @@ if (!isDev) {
 
 app
   .whenReady()
-  .then(() => {
-    electronApp.setAppUserModelId('de.timsigl.noctua')
+  .then(async () => {
+    electronApp.setAppUserModelId(appId())
 
     const db = openDb()
+    // Org-Defaults + bereitgestellte AI-Profile (No-op ohne Org-Konfiguration)
+    applyOrgConfig(db, app.getLocale())
     cleanupForwardTasksWithoutRequest(db)
     reindexHtmlOnlyMessages(db)
     if (isDev) seedFromEnv(db)
-    registerIpcHandlers(handlers)
+    // Dev-only Demo-Daten (NOCTUA_DEMO_SEED=1): kein IMAP-/CalDAV-Sync für Demo-Konten
+    const demo = isDev && process.env.NOCTUA_DEMO_SEED === '1'
+    if (demo) await (await import('./dev/demo-seed')).seedDemoData(db)
+    installSessionSecurity()
+    registerIpcHandlers(handlers, () => mainWindow, trustedPages)
 
     const push: Parameters<typeof syncEngine.init>[1] = (channel, payload) => {
       if (mainWindow && !mainWindow.isDestroyed()) pushToWindow(mainWindow, channel, payload)
@@ -141,10 +225,10 @@ app
         updateBadge()
       }
     })
-    syncEngine.startAll()
+    if (!demo) syncEngine.startAll()
 
     aiQueue.init(db, push)
-    aiQueue.start()
+    if (!demo) aiQueue.start()
     setHandlerPush(push)
     installAppMenu(push, () => mainWindow)
     if (isDev && process.platform === 'darwin') {
@@ -156,19 +240,37 @@ app
     followupRadar.start()
 
     embeddingIndexer.init(db)
-    embeddingIndexer.start()
+    if (!demo) embeddingIndexer.start()
 
     outboxWorker.init(db, push)
     outboxWorker.start()
     initNotifications(db, push)
+    initCalendar(db, push, notifyCalendarReminder, { startSync: !demo })
+    // iMIP (Einladungen/Antworten) läuft über die Outbox, ohne Undo-Fenster
+    setItipMailer((accountId, mail) => {
+      outboxWorker.enqueue(
+        accountId,
+        {
+          to: mail.to,
+          cc: [],
+          subject: mail.subject,
+          textBody: mail.text,
+          icalEvent: { method: mail.method, content: mail.ics }
+        },
+        { immediate: true }
+      )
+    })
     setRuleActionExecutor((ids, action) => syncEngine.applyAction(ids, action))
-    startUpdateChecks(push)
+    if (!demo) startUpdateChecks(push)
 
     if (isDev && process.env.NOCTUA_TEST_SELF_SEND === '1') {
       void import('./dev/self-test').then(({ runSelfSendTest }) => runSelfSendTest(db))
     }
     if (isDev && process.env.NOCTUA_TEST_DRAFT === '1') {
       void import('./dev/self-test').then(({ runDraftTest }) => runDraftTest(db))
+    }
+    if (isDev && process.env.NOCTUA_TEST_SHOTS === 'demo') {
+      void import('./dev/demo-tour').then(({ runDemoTour }) => runDemoTour(() => mainWindow, push))
     }
     if (isDev && process.env.NOCTUA_TEST_SHOTS === '1') {
       void import('./dev/screenshot-tour').then(({ runScreenshotTour }) =>
@@ -256,7 +358,10 @@ app
       void import('./dev/self-test').then(({ runM10Test }) => runM10Test(db))
     }
 
-    powerMonitor.on('resume', () => syncEngine.wakeAll())
+    powerMonitor.on('resume', () => {
+      syncEngine.wakeAll()
+      calendarSync.wakeAll()
+    })
 
     app.on('browser-window-created', (_, window) => {
       optimizer.watchWindowShortcuts(window)
@@ -273,7 +378,11 @@ app
     // hängen (unhandled rejection) — so bekommt der Fehler ein Gesicht.
     dialog.showErrorBox(
       'Noctua kann nicht starten',
-      error instanceof Error ? (error.stack ?? error.message) : String(error)
+      error instanceof DatabaseTooNewError || error instanceof DbKeyError
+        ? error.message
+        : error instanceof Error
+          ? (error.stack ?? error.message)
+          : String(error)
     )
     app.exit(1)
   })
@@ -292,5 +401,6 @@ app.on('quit', () => {
   stopUpdateChecks()
   stopAppleFm()
   void syncEngine.stopAll()
+  stopCalendar()
   closeDb()
 })

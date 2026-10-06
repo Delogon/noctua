@@ -1,21 +1,23 @@
 import { ImapFlow, type FetchMessageObject, type MessageAddressObject } from 'imapflow'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { buildImapOptions, type AccountRow, type MailCredentials } from '../auth/providers'
 import { parseMail } from '../mail/parser'
 import {
   applyFlagUpdate,
-  cleanupSearchOrphans,
   deleteByUids,
   storeBody,
   upsertEnvelope,
   type EnvelopeData
 } from '../mail/ingest'
+import { isReauthError } from '../auth/reauth'
 import { rebuildContactStats } from '../db/repos/contacts'
 import { applyRules } from '../ai/rules'
 import {
   storeMessageHeaderDetails,
   type FetchedMessageHeaderData
 } from '../db/repos/message-headers'
+import { OpDeadError } from './op-queue'
+import { resetFolderForUidValidity } from './uidvalidity'
 
 const DEFAULT_ENVELOPE_BACKFILL_DAYS = 90
 export const SEARCH_BACKFILL_DAYS = 183
@@ -25,8 +27,24 @@ const BODY_PASS_LIMIT = 50
 const FLAG_RESYNC_WINDOW = 500
 const BACKOFF_BASE_MS = 5_000
 const BACKOFF_MAX_MS = 5 * 60_000
+// Falls IDLE still stirbt: INBOX zusätzlich regelmäßig abfragen
+const INBOX_WATCHDOG_MS = 5 * 60_000
 
-export type SyncState = 'idle' | 'connecting' | 'syncing' | 'error' | 'off'
+export type SyncState = 'idle' | 'connecting' | 'syncing' | 'error' | 'needs-reauth' | 'off'
+
+/**
+ * Login vom Server abgelehnt (imapflow setzt `authenticationFailed`)? Dann
+ * hilft kein Reconnect-Loop — der Nutzer muss neue Zugangsdaten liefern.
+ */
+export function isAuthFailure(error: unknown): boolean {
+  const e = error as { authenticationFailed?: unknown; serverResponseCode?: unknown } | null
+  return (
+    e?.authenticationFailed === true ||
+    e?.serverResponseCode === 'AUTHENTICATIONFAILED' ||
+    // OAuth-Refresh gescheitert (invalid_grant / interaction_required)
+    isReauthError(error)
+  )
+}
 
 export interface SyncEvents {
   onState: (state: SyncState, detail: string | null) => void
@@ -42,6 +60,8 @@ export interface QueuedOp {
     add?: string[]
     remove?: string[]
     targetSpecialUse?: string
+    /** UIDVALIDITY des Ordners beim Einreihen — bei Abweichung sind die UIDs ungültig. */
+    uidValidity?: number
   }
 }
 
@@ -157,6 +177,10 @@ export class AccountSyncer {
   private idleDebounce: NodeJS.Timeout | null = null
   private wakeReconnect: (() => void) | null = null
   private pollTimer: NodeJS.Timeout | null = null
+  private watchdogTimer: NodeJS.Timeout | null = null
+  private needsReauth = false
+  // Noch nicht gestartete Ordner-Syncs — gleiche Anforderungen teilen sich einen Lauf
+  private pendingFolderSyncs = new Map<number, Promise<void>>()
   private folders: FolderRow[] = []
 
   constructor(
@@ -175,15 +199,31 @@ export class AccountSyncer {
     this.wakeReconnect?.()
     if (this.idleDebounce) clearTimeout(this.idleDebounce)
     if (this.pollTimer) clearInterval(this.pollTimer)
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer)
     await Promise.allSettled([this.cmd?.logout(), this.idleConn?.logout()])
     this.cmd = null
     this.idleConn = null
     this.events.onState('off', null)
   }
 
-  /** Bricht einen laufenden Backoff-Wait ab (z. B. nach System-Wakeup). */
+  /**
+   * Bricht einen laufenden Backoff-Wait ab (z. B. nach System-Wakeup). Im
+   * needs-reauth-Zustand bewusst wirkungslos: Wiederholte falsche Logins
+   * können das Konto beim Anbieter sperren.
+   */
   wake(): void {
+    if (this.needsReauth) return
     this.wakeReconnect?.()
+  }
+
+  /** Nutzer-Aktion (RETRY, neue Zugangsdaten): beendet auch needs-reauth. */
+  retryNow(): void {
+    this.needsReauth = false
+    this.wakeReconnect?.()
+  }
+
+  isConnected(): boolean {
+    return !!this.cmd?.usable
   }
 
   /** Serialisiert Arbeit auf der Kommando-Verbindung. */
@@ -205,13 +245,28 @@ export class AccountSyncer {
         if (this.stopped) break
         const message = error instanceof Error ? error.message : String(error)
         console.warn(`[sync:${this.account.email}] error: ${message}`)
-        this.events.onState('error', message)
+        if (isAuthFailure(error)) {
+          // Kein Backoff-Loop gegen falsche Zugangsdaten: warten, bis der Nutzer
+          // RETRY drückt oder die Zugangsdaten ändert (retryNow / Neustart).
+          this.needsReauth = true
+          this.backoffAttempt = 0
+          this.events.onState('needs-reauth', message)
+        } else {
+          this.events.onState('error', message)
+        }
       }
       await Promise.allSettled([this.cmd?.logout(), this.idleConn?.logout()])
       this.cmd = null
       this.idleConn = null
       if (this.stopped) break
 
+      if (this.needsReauth) {
+        await new Promise<void>((resolve) => {
+          this.wakeReconnect = resolve
+        })
+        this.needsReauth = false
+        continue
+      }
       const delay = Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** this.backoffAttempt)
       const jittered = delay * (0.7 + Math.random() * 0.6)
       this.backoffAttempt += 1
@@ -254,15 +309,23 @@ export class AccountSyncer {
     this.pollTimer = setInterval(() => {
       for (const folder of this.folders) {
         if (folder.sync_mode === 'full' && folder.special_use !== '\\Inbox') {
-          void this.enqueue(async () => {
-            await this.syncFolder(folder)
-            if (isSearchableFolder(folder)) await this.backfillBodies(folder)
-          }).catch((error) =>
+          void this.enqueueFolderSync(folder).catch((error) =>
             console.warn(`[sync:${this.account.email}] Poll ${folder.path}:`, error)
           )
         }
       }
     }, 10 * 60_000)
+    // Watchdog: IDLE kann ohne close-Event sterben — dann würde die INBOX nie
+    // wieder syncen. Scheitert der Poll, greift der normale Reconnect.
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer)
+    this.watchdogTimer = null
+    if (inbox) {
+      this.watchdogTimer = setInterval(() => {
+        void this.enqueueFolderSync(inbox).catch((error) =>
+          console.warn(`[sync:${this.account.email}] INBOX-Watchdog:`, error)
+        )
+      }, INBOX_WATCHDOG_MS)
+    }
   }
 
   /**
@@ -272,14 +335,11 @@ export class AccountSyncer {
    */
   refreshNow(): void {
     // Getrennt/Backoff: aufwecken reicht — der Reconnect synct ohnehin alles.
-    this.wake()
+    this.retryNow()
     if (!this.cmd) return
     for (const folder of this.folders) {
       if (folder.sync_mode !== 'full') continue
-      void this.enqueue(async () => {
-        await this.syncFolder(folder)
-        if (isSearchableFolder(folder)) await this.backfillBodies(folder)
-      }).catch((error) =>
+      void this.enqueueFolderSync(folder).catch((error) =>
         console.warn(`[sync:${this.account.email}] Refresh ${folder.path}:`, error)
       )
     }
@@ -289,11 +349,46 @@ export class AccountSyncer {
   resyncSpecialUse(specialUse: string): Promise<void> {
     const folder = this.folders.find((f) => f.special_use === specialUse)
     if (!folder || !this.cmd) return Promise.resolve()
-    return this.enqueue(async () => {
-      await this.syncFolder(folder)
-      if (isSearchableFolder(folder)) await this.backfillBodies(folder)
+    return this.enqueueFolderSync(folder).then(() => {
       if (specialUse === '\\Sent') rebuildContactStats(this.db, this.account.id)
     })
+  }
+
+  /**
+   * Reiht einen Ordner-Sync (+ Body-Backfill) ein. Ist für den Ordner schon
+   * einer eingereiht, der noch nicht läuft, teilen sich beide Anforderungen
+   * diesen Lauf — IDLE-Bursts, Poll und Refresh stauen sich nicht mehr auf.
+   */
+  private enqueueFolderSync(folder: FolderRow): Promise<void> {
+    const pending = this.pendingFolderSyncs.get(folder.id)
+    if (pending) return pending
+    const run = this.enqueue(async () => {
+      this.pendingFolderSyncs.delete(folder.id) // ab jetzt zählt eine neue Anforderung wieder
+      await this.syncFolder(folder)
+      if (isSearchableFolder(folder)) await this.backfillBodies(folder)
+    })
+    this.pendingFolderSyncs.set(folder.id, run)
+    // Scheitert der Lauf, bevor er startete, darf der Eintrag nicht hängen bleiben
+    void run.catch(() => {
+      if (this.pendingFolderSyncs.get(folder.id) === run) this.pendingFolderSyncs.delete(folder.id)
+    })
+    return run
+  }
+
+  /** Ordner nach verworfener Op neu abgleichen lassen (voller Backfill dedupliziert). */
+  invalidateFolder(folderId: number): void {
+    const folder = this.folders.find((f) => f.id === folderId)
+    this.db
+      .prepare('UPDATE folders SET uidnext = NULL, envelope_backfill_since = NULL WHERE id = ?')
+      .run(folderId)
+    if (!folder) return
+    folder.uidnext = null
+    folder.envelope_backfill_since = null
+    if (this.cmd && folder.sync_mode === 'full') {
+      void this.enqueueFolderSync(folder).catch((error) =>
+        console.warn(`[sync:${this.account.email}] Resync ${folder.path}:`, error)
+      )
+    }
   }
 
   private async waitForDisconnect(): Promise<void> {
@@ -347,15 +442,9 @@ export class AccountSyncer {
 
       if (folder.uidvalidity !== null && folder.uidvalidity !== uidValidity) {
         console.warn(`[sync:${this.account.email}] UIDVALIDITY changed for ${folder.path} — reset`)
-        this.db.prepare('DELETE FROM messages WHERE folder_id = ?').run(folder.id)
-        cleanupSearchOrphans(this.db)
-        this.db
-          .prepare(
-            `UPDATE folders
-             SET envelope_backfill_since = NULL, body_backfill_since = NULL
-             WHERE id = ?`
-          )
-          .run(folder.id)
+        // Atomar (REL-3): löschen + neue UIDVALIDITY + Cursor-Reset in einer Transaktion
+        resetFolderForUidValidity(this.db, folder.id, uidValidity)
+        folder.uidvalidity = uidValidity
         folder.uidnext = null
         folder.envelope_backfill_since = null
         folder.body_backfill_since = null
@@ -674,8 +763,8 @@ export class AccountSyncer {
     const trigger = (): void => {
       if (this.idleDebounce) clearTimeout(this.idleDebounce)
       this.idleDebounce = setTimeout(() => {
-        void this.enqueue(() => this.syncFolder(inbox)).then(() =>
-          this.enqueue(() => this.backfillBodies(inbox))
+        void this.enqueueFolderSync(inbox).catch((error) =>
+          console.warn(`[idle:${this.account.email}] Sync:`, error)
         )
       }, 500)
     }
@@ -692,28 +781,51 @@ export class AccountSyncer {
       const folder = this.db
         .prepare('SELECT id, path FROM folders WHERE id = ?')
         .get(payload.folderId) as { id: number; path: string } | undefined
-      if (!folder) return
+      if (!folder) throw new OpDeadError('folder-gone', 'Ordner existiert nicht mehr')
       const range = payload.uids.join(',')
+
+      // Zielordner VOR dem Lock auflösen: fehlt er, ist die Op dauerhaft
+      // unausführbar — nie still als Erfolg werten (Mail wäre lokal weg, serverseitig nicht).
+      let moveTarget: string | null = null
+      if (op.kind === 'move') {
+        moveTarget = this.resolveSpecialUse(payload.targetSpecialUse)
+        if (!moveTarget) {
+          throw new OpDeadError(
+            payload.targetSpecialUse === '\\Trash' ? 'no-trash' : 'no-target-folder',
+            `Zielordner ${payload.targetSpecialUse ?? '?'} nicht gefunden`
+          )
+        }
+      }
+      let deleteTrash: string | null = null
+      if (op.kind === 'delete' && this.account.provider !== 'gmail') {
+        // Ohne Papierkorb NICHT hart löschen — Datenverlust wäre unumkehrbar
+        deleteTrash = this.resolveSpecialUse('\\Trash')
+        if (!deleteTrash) throw new OpDeadError('no-trash', 'Kein Papierkorb-Ordner vorhanden')
+      }
 
       const lock = await this.cmd!.getMailboxLock(folder.path)
       try {
+        if (payload.uidValidity !== undefined) {
+          const mailbox = this.cmd!.mailbox
+          const live = mailbox && typeof mailbox !== 'boolean' ? Number(mailbox.uidValidity) : null
+          if (live !== null && live !== payload.uidValidity) {
+            throw new OpDeadError('uidvalidity', `UIDVALIDITY ${payload.uidValidity} → ${live}`)
+          }
+        }
         if (op.kind === 'setFlags') {
           if (payload.add?.length)
             await this.cmd!.messageFlagsAdd(range, payload.add, { uid: true })
           if (payload.remove?.length)
             await this.cmd!.messageFlagsRemove(range, payload.remove, { uid: true })
         } else if (op.kind === 'move') {
-          const target = this.resolveSpecialUse(payload.targetSpecialUse)
-          if (target) await this.cmd!.messageMove(range, target, { uid: true })
+          await this.cmd!.messageMove(range, moveTarget!, { uid: true })
         } else if (op.kind === 'delete') {
           if (this.account.provider === 'gmail') {
             // Gmail: \Deleted + Expunge in INBOX = Archivieren (Label weg);
             // echtes Löschen läuft als move nach \Trash.
             await this.cmd!.messageDelete(range, { uid: true })
           } else {
-            const trash = this.resolveSpecialUse('\\Trash')
-            if (trash) await this.cmd!.messageMove(range, trash, { uid: true })
-            else await this.cmd!.messageDelete(range, { uid: true })
+            await this.cmd!.messageMove(range, deleteTrash!, { uid: true })
           }
         }
       } finally {

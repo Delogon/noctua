@@ -1,21 +1,45 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
 import { htmlToText } from '../mail/parser'
+import { getTriageProvider } from './openrouter'
 import {
-  extractUsage,
-  getOpenRouter,
-  getTriageModel,
-  getTriageProvider,
-  providerBody
-} from './openrouter'
+  budgetBlocks,
+  resolveDecision,
+  resolveTask,
+  type ResolvedDecision
+} from './providers/registry'
+import type { ResolvedTask } from './providers/types'
+import { decide, isDecisionConfigError } from './providers/systemone'
+import {
+  DECISION_STATE_NOTE,
+  TRIAGE_QUESTIONS,
+  buildHybridWritePrompt,
+  hybridWriteSchema,
+  interpretTriageAnswers,
+  writeGates,
+  type HybridWrite
+} from './decision-triage'
+import { computePhishingSignals } from './phishing-signals'
+import { extractiveSummary } from './extractive-summary'
+import { NEEDS_REPLY_THRESHOLD, ADDRESSED_TO_ME_THRESHOLD } from '@shared/decision-thresholds'
 import { AppleGuardrailError, appleFmStatus, appleGate, appleTriage } from './apple-fm'
 import { logUsage } from './budget'
 import { createTasksFromTriage, isUserAuthoredMail } from '../db/repos/tasks'
 import { isForwardWithoutRequest, textBeforeForwardedMessage } from '../mail/forwarded'
 import { recipientPlacement, salutationTarget } from './addressee'
 import { localStamp } from './prompt-date'
+import {
+  UNTRUSTED_SYSTEM_NOTE,
+  sanitizeUntrusted,
+  sanitizeUntrustedLine,
+  wrapUntrusted
+} from './untrusted'
 
-export const PROMPT_VERSION = 5
+// v6: Mail-Inhalt in Delimitern + „Daten, keine Anweisung" (SEC-15). Das Ausgabeformat
+// ist unverändert; bestehende Annotationen bleiben gültig. Die Erhöhung setzt beim Start
+// nur permanent gescheiterte Jobs zurück (requeueOnPromptChange) — erledigte Jobs bleiben
+// über UNIQUE(message_id, kind) gesperrt, es gibt KEINE Neu-Triage des 30-Tage-Fensters.
+export const PROMPT_VERSION = 6
 
 export const AI_CATEGORIES = [
   'personal',
@@ -72,6 +96,7 @@ eine andere Person nennt, reinen Infos ohne Bitte.
 Im Zweifel: NEIN.`
 
 const SYSTEM_PROMPT = `Du bist der Triage-Klassifikator eines persönlichen E-Mail-Clients.
+${UNTRUSTED_SYSTEM_NOTE}
 Analysiere die E-Mail und antworte AUSSCHLIESSLICH mit einem JSON-Objekt, exakt in dieser Form:
 {
   "category": "personal" | "work" | "newsletter" | "promotions" | "notifications" | "transactional" | "other",
@@ -125,6 +150,7 @@ interface TriageRow {
   from_addr: string | null
   to_json: string | null
   cc_json: string | null
+  reply_to: string | null
   account_email: string | null
   account_display_name: string | null
   account_name: string | null
@@ -137,9 +163,13 @@ interface TriageRow {
   folder_special_use: string | null
 }
 
-function buildUserPrompt(db: Database.Database, row: TriageRow): string {
+function buildUserPrompt(
+  db: Database.Database,
+  row: TriageRow,
+  extraSignals: string[] = []
+): string {
   const fullBodyText = row.text_plain?.trim() || htmlToText(row.html_raw ?? '')
-  const bodyText = textBeforeForwardedMessage(row.subject, fullBodyText).slice(0, 6000)
+  const bodyText = sanitizeUntrusted(textBeforeForwardedMessage(row.subject, fullBodyText), 6000)
   const stats = db
     .prepare('SELECT sent_count FROM contact_stats WHERE account_id = ? AND addr = ?')
     .get(row.account_id, row.from_addr ?? '') as { sent_count: number } | undefined
@@ -156,7 +186,8 @@ function buildUserPrompt(db: Database.Database, row: TriageRow): string {
     stats && stats.sent_count > 0
       ? `Der Empfänger hat diesem Absender schon ${stats.sent_count}× geschrieben (bekannter Kontakt)`
       : null,
-    previous ? `Frühere Mails dieses Absenders wurden als "${previous.cat}" eingeordnet` : null
+    previous ? `Frühere Mails dieses Absenders wurden als "${previous.cat}" eingeordnet` : null,
+    ...extraSignals
   ].filter(Boolean)
 
   // EMPFÄNGER-Block: Wer ist der Kontoinhaber, wo steht er im Envelope,
@@ -177,14 +208,14 @@ function buildUserPrompt(db: Database.Database, row: TriageRow): string {
         : 'keine erkennbare Anrede'
 
   return [
-    `Von: ${row.from_name ?? ''} <${row.from_addr ?? 'unbekannt'}>`,
-    `Betreff: ${row.subject ?? '(kein Betreff)'}`,
+    `Von: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unbekannt', 200)}>`,
+    `Betreff: ${sanitizeUntrustedLine(row.subject, 300) || '(kein Betreff)'}`,
     `Datum: ${row.date ? localStamp(row.date) : 'unbekannt'}`,
     `EMPFÄNGER (Kontoinhaber): ${ownerName ? `${ownerName} ` : ''}<${row.account_email ?? 'unbekannt'}>; ${placementLabel}; Anrede der Mail: ${salutationLabel}`,
     signals.length > 0 ? `Signale: ${signals.join('; ')}` : null,
     '',
     'Inhalt:',
-    bodyText || '(kein Textinhalt)'
+    wrapUntrusted('MAIL', bodyText || '(kein Textinhalt)')
   ]
     .filter((line) => line !== null)
     .join('\n')
@@ -246,13 +277,18 @@ function neutralVerdict(subject: string | null): TriageVerdict {
 /** Klassifiziert eine Nachricht und schreibt die Annotation. Wirft bei API-Fehlern. */
 export async function runTriage(db: Database.Database, messageId: number): Promise<TriageOutcome> {
   const provider = getTriageProvider()
-  const client = getOpenRouter()
-  if (provider === 'openrouter' && !client) return 'skipped-no-client'
+  // Aufgabe → Profil: bei Local only oder ohne Key/Modell pausiert die Triage
+  // wie bei „kein Key" (Job bleibt liegen, kein verbrannter Versuch)
+  const resolved = provider === 'openrouter' ? resolveTask('triage') : null
+  // Entscheidungsmodell (System One): entscheidet zuerst, das Textmodell schreibt nur bei Bedarf.
+  // Läuft auch ohne nutzbares Textmodell (dann extraktive Zusammenfassung, keine Aufgabentitel).
+  const decisionCfg = provider === 'openrouter' ? resolveDecision() : null
+  if (provider === 'openrouter' && !resolved && !decisionCfg) return 'skipped-no-client'
 
   const row = db
     .prepare(
       `SELECT m.id, m.account_id, m.subject, m.from_name, m.from_addr, m.to_json, m.cc_json,
-              m.date, m.internal_date, m.list_unsubscribe, b.text_plain, b.html_raw,
+              m.reply_to, m.date, m.internal_date, m.list_unsubscribe, b.text_plain, b.html_raw,
               a.email account_email, a.display_name account_display_name, a.account_name,
               a.created_at account_created_at,
               f.special_use folder_special_use
@@ -263,6 +299,12 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
     )
     .get(messageId) as TriageRow | undefined
   if (!row) return 'skipped-missing'
+
+  if (decisionCfg) {
+    const outcome = await runHybridTriage(db, row, messageId, decisionCfg, resolved)
+    if (outcome) return outcome
+    // Konfigurationsfehler des Entscheidungsmodells: klassische Triage übernimmt
+  }
 
   const userPrompt = buildUserPrompt(db, row)
 
@@ -292,13 +334,12 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
     })
   }
 
-  if (!client) return 'skipped-no-client'
-  const model = getTriageModel()
+  if (!resolved) return 'skipped-no-client'
+  const { client, model } = resolved
 
   let lastError = ''
   for (let attempt = 0; attempt < 2; attempt++) {
-    const response = await client.chat.completions.create({
-      ...providerBody(),
+    const result = await client.complete({
       model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -310,21 +351,18 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
               : `${userPrompt}\n\nDeine letzte Antwort war ungültig (${lastError}). Antworte exakt nach Schema.`
         }
       ],
-      response_format: { type: 'json_object' },
+      json: true,
       temperature: 0.1,
       // Reasoning-Modelle (z. B. DeepSeek v4 Flash) verbrauchen max_tokens
       // auch für Denk-Tokens — 500 schnitt Antworten ab (finish=length)
       // und verbrannte Retries. Der Output selbst bleibt ~150 Tokens.
-      max_tokens: 1200,
-      // OpenRouter-Erweiterung: Kosten in der Response mitliefern
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...({ usage: { include: true } } as any)
+      maxTokens: 1200
     })
 
-    const { inputTokens, outputTokens, costUsd } = extractUsage(response.usage)
+    const { inputTokens, outputTokens, costUsd } = result.usage
     logUsage(db, model, inputTokens, outputTokens, costUsd)
 
-    const raw = response.choices[0]?.message?.content ?? ''
+    const raw = result.text
     let parsed: z.infer<typeof triageResultSchema> | null = null
     try {
       parsed = triageResultSchema.parse(JSON.parse(raw))
@@ -340,7 +378,155 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
     })
   }
 
-  throw new Error(`Triage-Output ungültig nach Retry: ${lastError}`)
+  throw new Error(
+    `Ungültige Antwort des Modells (Vorsortierung) nach erneutem Versuch: ${lastError}`
+  )
+}
+
+/** Erste {...}-Struktur eines Textmodell-Outputs (Codezäune/Umgebungstext tolerieren). */
+function parseHybridWrite(raw: string): HybridWrite {
+  const match = raw.match(/\{[\s\S]*\}/)
+  return hybridWriteSchema.parse(JSON.parse(match?.[0] ?? raw))
+}
+
+/**
+ * Hybrid-Triage: EIN System-One-Aufruf (Kategorie, Priorität, needs_reply,
+ * addressed_to_me, has_request, proposes_meeting, phishing); das Textmodell
+ * schreibt nur Aufgabentitel (has_request) und den Einzeiler (Priorität ≥ 3
+ * oder needs_reply). Alles andere bekommt eine extraktive Zusammenfassung.
+ * Gibt null zurück, wenn das Entscheidungsmodell falsch konfiguriert ist
+ * (404/kein Entscheidungsmodell) – dann läuft die klassische Triage.
+ */
+async function runHybridTriage(
+  db: Database.Database,
+  row: TriageRow,
+  messageId: number,
+  cfg: ResolvedDecision,
+  generative: ResolvedTask | null
+): Promise<TriageOutcome | null> {
+  const fullBodyText = row.text_plain?.trim() || htmlToText(row.html_raw ?? '')
+  const bodyText = textBeforeForwardedMessage(row.subject, fullBodyText)
+  const signals = computePhishingSignals({
+    fromName: row.from_name,
+    fromAddr: row.from_addr,
+    replyToJson: row.reply_to,
+    html: row.html_raw
+  })
+  const userPrompt = buildUserPrompt(db, row)
+  const state = [
+    DECISION_STATE_NOTE,
+    '',
+    userPrompt,
+    signals.lines.length > 0
+      ? `\nPhishing-Prüfung (lokal, vor der Analyse berechnet):\n${signals.lines.map((l) => `- ${sanitizeUntrustedLine(l, 220)}`).join('\n')}`
+      : ''
+  ].join('\n')
+
+  let result: Awaited<ReturnType<typeof decide>>
+  try {
+    result = await decide({
+      baseUrl: cfg.profile.baseUrl,
+      apiKey: cfg.apiKey,
+      model: cfg.model,
+      state,
+      questions: TRIAGE_QUESTIONS
+    })
+  } catch (error) {
+    if (isDecisionConfigError(error)) {
+      console.warn('[ai] Entscheidungsmodell unbrauchbar, klassische Triage:', error)
+      return null
+    }
+    throw error
+  }
+  logUsage(db, cfg.model, result.usage.inputTokens, result.usage.outputTokens, 0)
+  const decision = interpretTriageAnswers(result.answers)
+
+  const userAuthored = isUserAuthoredMail(db, row.from_addr, row.folder_special_use)
+  const suppressRequests = userAuthored || isForwardWithoutRequest(row.subject, fullBodyText)
+  const gates = writeGates(decision, suppressRequests)
+
+  let written: HybridWrite | null = null
+  let genUsage = { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+  const canWrite = generative !== null && !budgetBlocks(db, generative)
+  if (canWrite && (gates.tasks || gates.summary)) {
+    let lastError = ''
+    for (let attempt = 0; attempt < 2 && !written; attempt++) {
+      const reply = await generative.client.complete({
+        model: generative.model,
+        messages: [
+          { role: 'system', content: buildHybridWritePrompt(gates, decision) },
+          {
+            role: 'user',
+            content:
+              attempt === 0
+                ? userPrompt
+                : `${userPrompt}\n\nDeine letzte Antwort war ungültig (${lastError}). Antworte exakt nach Schema.`
+          }
+        ],
+        json: true,
+        temperature: 0.1,
+        maxTokens: 1200
+      })
+      genUsage = {
+        inputTokens: genUsage.inputTokens + reply.usage.inputTokens,
+        outputTokens: genUsage.outputTokens + reply.usage.outputTokens,
+        costUsd: genUsage.costUsd + reply.usage.costUsd
+      }
+      logUsage(
+        db,
+        generative.model,
+        reply.usage.inputTokens,
+        reply.usage.outputTokens,
+        reply.usage.costUsd
+      )
+      try {
+        written = parseHybridWrite(reply.text)
+      } catch (error) {
+        lastError = error instanceof Error ? error.message.slice(0, 300) : 'parse error'
+      }
+    }
+    // Zweimal ungültig: nicht scheitern – Entscheidung steht, Text wird extraktiv
+  }
+
+  const summary =
+    gates.summary && written?.summary?.trim()
+      ? written.summary.trim()
+      : extractiveSummary(row.subject, bodyText)
+  const verdict: TriageVerdict = {
+    category: decision.category,
+    priority: decision.priority,
+    summary,
+    action_items: gates.tasks && written ? written.action_items : [],
+    needs_reply: decision.needsReply >= NEEDS_REPLY_THRESHOLD,
+    addressed_to_me: decision.addressedToMe >= ADDRESSED_TO_ME_THRESHOLD,
+    confidence: decision.confidence
+  }
+  const model = written && generative ? `${cfg.model}+${generative.model}` : cfg.model
+  persistVerdict(db, row, messageId, verdict, model, {
+    inputTokens: result.usage.inputTokens + genUsage.inputTokens,
+    outputTokens: result.usage.outputTokens + genUsage.outputTokens,
+    costUsd: genUsage.costUsd
+  })
+  db.prepare(
+    `INSERT OR REPLACE INTO ai_decisions (message_id, model, category, category_confidence,
+       priority_score, needs_reply, addressed_to_me, has_request, proposes_meeting, phishing,
+       phishing_signals_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    messageId,
+    cfg.model,
+    decision.category,
+    decision.confidence,
+    decision.priorityScore,
+    decision.needsReply,
+    decision.addressedToMe,
+    decision.hasRequest,
+    decision.proposesMeeting,
+    decision.phishing,
+    JSON.stringify(signals.codes),
+    Date.now()
+  )
+  return 'done'
 }
 
 /** Deterministische Nachverarbeitung + Persistenz — für beide Provider gleich:

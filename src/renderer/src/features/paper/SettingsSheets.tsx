@@ -1,8 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { DraftCalendarToggle } from '@renderer/features/settings/DraftCalendarToggle'
 import { useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import { useAccounts } from '@renderer/queries/accounts'
-import { useAppleFm, useModelCatalog, useModels, useOrKeyStatus } from '@renderer/queries/intel'
+import { CalendarAccountsSection } from '@renderer/features/settings/CalendarAccountsSection'
+import { TasksSyncSection } from '@renderer/features/settings/TasksSyncSection'
+import {
+  useOrKeyStatus,
+  useProfileModels,
+  useProfiles,
+  useTaskAssignments,
+  type AiTaskName
+} from '@renderer/queries/intel'
+import {
+  LocalOnlyCard,
+  OnDemandCard,
+  ProfileModelPicker,
+  ProvidersCard,
+  TaskProviderPicker,
+  DecisionCard
+} from '@renderer/features/settings/AiProvidersSection'
 import { usePaper } from '@renderer/stores/paper'
 import { rowTime, useI18n, useT } from '@renderer/lib/i18n'
 import { useStyleMeta, useStyleProfile } from '@renderer/features/paper/useVoiceTag'
@@ -374,6 +391,9 @@ export function AccountsSheet(): React.JSX.Element {
         {t('accountsFootnote')}
       </div>
       <div className="double-rule" style={{ marginTop: 18 }} />
+      <CalendarAccountsSection />
+      <TasksSyncSection />
+      <div className="double-rule" style={{ marginTop: 18 }} />
       <RemoteImagesPrivacy />
     </SheetShell>
   )
@@ -393,12 +413,12 @@ function AccountCard({
 }): React.JSX.Element {
   const t = useT()
   const lang = useI18n((s) => s.lang)
-  const failed = a.syncState === 'error'
+  const failed = a.syncState === 'error' || a.syncState === 'needs-reauth'
   const errLine = failed
     ? (syncErrorLine(
         a.lastError,
         a.errorSince ? t('sinceTime', { time: rowTime(lang, a.errorSince) }) : null
-      ) ?? t('errorState'))
+      ) ?? t(a.syncState === 'needs-reauth' ? 'syncNeedsReauthHint' : 'errorState'))
     : null
   return (
     <div className="tint-card" style={{ padding: '11px 13px' }}>
@@ -439,6 +459,154 @@ function AccountCard({
       </div>
       <ColorRow account={a} />
       <SyncRangeRow account={a} />
+      <CredentialsRow account={a} failed={failed} />
+    </div>
+  )
+}
+
+/**
+ * Zugangsdaten erneuern: bei Passwort-/Bridge-Konten ein Inline-Feld (der
+ * Server-Login wird vor dem Speichern geprüft), bei Google/Microsoft der
+ * Browser-Login erneut. Im Fehlerzustand hervorgehoben, sonst dezent.
+ */
+function CredentialsRow({
+  account,
+  failed
+}: {
+  account: AccountSummary
+  failed: boolean
+}): React.JSX.Element {
+  const t = useT()
+  const queryClient = useQueryClient()
+  const { toastNow } = usePaper()
+  const oauth = account.credentialType === 'oauth-google' || account.credentialType === 'oauth-ms'
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const done = (toast: string): void => {
+    setBusy(false)
+    setOpen(false)
+    setPassword('')
+    toastNow(toast)
+    void queryClient.invalidateQueries({ queryKey: ['accounts'] })
+  }
+  const fail = (err: unknown): void => {
+    setBusy(false)
+    setError(err instanceof Error ? err.message : String(err))
+  }
+
+  const savePassword = (): void => {
+    if (!password || busy) return
+    setBusy(true)
+    setError(null)
+    invoke('accounts:updatePassword', { accountId: account.id, password })
+      .then(() => done(t('toastCredUpdated')))
+      .catch(fail)
+  }
+  const signInAgain = (): void => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    invoke('accounts:reauthorize', { accountId: account.id })
+      .then(() => done(t('toastReauthorized')))
+      .catch(fail)
+  }
+
+  const buttonStyle: React.CSSProperties = {
+    font: '500 9px var(--mono)',
+    letterSpacing: '.5px',
+    border: failed ? '1px solid var(--ink)' : '1px solid var(--rule, var(--faint))',
+    color: failed ? 'var(--ink)' : 'var(--muted)',
+    padding: '4px 10px'
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {oauth ? (
+        <div className="flex items-baseline gap-2">
+          <button
+            type="button"
+            className="btn-bare"
+            style={buttonStyle}
+            disabled={busy}
+            onClick={signInAgain}
+          >
+            {busy ? t('waitingForBrowser') : t('credSignInAgain')}
+          </button>
+          {busy && (
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => {
+                void invoke('accounts:cancelOAuth', {
+                  provider: account.credentialType === 'oauth-ms' ? 'microsoft' : 'gmail'
+                }).catch(() => {})
+              }}
+            >
+              {t('credCancel')}
+            </button>
+          )}
+        </div>
+      ) : open ? (
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            savePassword()
+          }}
+        >
+          <input
+            type="password"
+            autoFocus
+            autoComplete="off"
+            maxLength={1000}
+            value={password}
+            placeholder={t('credNewPassword')}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation()
+                setOpen(false)
+                setPassword('')
+                setError(null)
+              }
+            }}
+            className="paper-input"
+            style={{ flex: 1, padding: '3px 8px', font: '500 10px var(--mono)' }}
+          />
+          <button
+            type="submit"
+            className="btn-bare"
+            style={buttonStyle}
+            disabled={busy || !password}
+          >
+            {busy ? t('credChecking') : t('credSave')}
+          </button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="btn-bare"
+          style={buttonStyle}
+          onClick={() => setOpen(true)}
+        >
+          {t('credReenter')}
+        </button>
+      )}
+      {error && (
+        <div
+          style={{
+            font: '400 12px var(--serif)',
+            fontStyle: 'italic',
+            color: 'var(--ac)',
+            marginTop: 4
+          }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   )
 }
@@ -538,7 +706,9 @@ function AccountRowActions({
     <div className="flex flex-none items-center gap-3">
       {failed ? (
         <>
-          <span style={{ font: '500 9px var(--mono)', color: 'var(--ac)' }}>{t('syncFailed')}</span>
+          <span style={{ font: '500 9px var(--mono)', color: 'var(--ac)' }}>
+            {t(account.syncState === 'needs-reauth' ? 'syncNeedsReauth' : 'syncFailed')}
+          </span>
           <button
             type="button"
             onClick={retry}
@@ -1216,7 +1386,7 @@ function CustomModelRow({ onPick }: { onPick: (id: string) => void }): React.JSX
     if (!valid || testing) return
     setTesting(true)
     setResult(null)
-    void invoke('ai:testModel', { model: id.trim() })
+    void invoke('ai:testModel', { profileId: 'openrouter', model: id.trim() })
       .then(setResult)
       .catch((err) =>
         setResult({
@@ -1331,14 +1501,17 @@ function ModelList({
   current: string
   onPick: (id: string) => void
 }): React.JSX.Element {
-  const catalog = useModelCatalog()
+  const t = useT()
+  const queryClient = useQueryClient()
+  const catalog = useProfileModels('openrouter')
+  const catalogModels = catalog.data?.models
   const rows = useMemo(() => {
     // Nischen-Varianten raus (Bild/Video/Realtime, Spezial-SKUs)
     const NICHE = /(image|video|realtime|tts|transcribe|search|-fast|computer-use)/
     const models =
       kind === 'stt'
-        ? (catalog.data ?? []).filter((m) => m.audioIn && !/(image|video|realtime)/.test(m.id))
-        : (catalog.data ?? []).filter(
+        ? (catalogModels ?? []).filter((m) => m.audioIn && !/(image|video|realtime)/.test(m.id))
+        : (catalogModels ?? []).filter(
             (m) =>
               !m.audioIn &&
               !/audio/.test(m.id) &&
@@ -1388,7 +1561,7 @@ function ModelList({
       ].slice(0, 5)
     }
     return pick
-  }, [catalog.data, kind, current])
+  }, [catalogModels, kind, current])
 
   return (
     <div className="flex flex-col gap-1.5" style={{ marginTop: 10 }}>
@@ -1441,6 +1614,30 @@ function ModelList({
       {catalog.isLoading && (
         <span style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}>…</span>
       )}
+      {/* Local only: der Katalog kommt nie automatisch — nur auf Klick */}
+      {catalog.data?.skipped && (
+        <div className="flex items-center gap-2">
+          <span style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}>
+            {t('modelListSkipped')}
+          </span>
+          <button
+            type="button"
+            className="text-btn"
+            style={{ borderBottom: '1px solid var(--hairline)' }}
+            onClick={() =>
+              void invoke('ai:profileModels', {
+                profileId: 'openrouter',
+                manual: true,
+                kind: 'chat'
+              }).then((data) =>
+                queryClient.setQueryData(['ai', 'profileModels', 'openrouter'], data)
+              )
+            }
+          >
+            {t('modelListLoad')}
+          </button>
+        </div>
+      )}
       {kind !== 'stt' && <CustomModelRow onPick={onPick} />}
     </div>
   )
@@ -1488,7 +1685,6 @@ export function IntelSheet(): React.JSX.Element {
   const queryClient = useQueryClient()
   const { toastNow } = usePaper()
   const orStatus = useOrKeyStatus()
-  const models = useModels()
   const accounts = useAccounts()
   const [key, setKey] = useState('')
 
@@ -1522,10 +1718,16 @@ export function IntelSheet(): React.JSX.Element {
     })
   }
 
-  const KEYS = { scan: 'ai.triageModel', write: 'ai.draftModel', stt: 'ai.sttModel' } as const
+  const profiles = useProfiles()
+  const assignments = useTaskAssignments()
+
+  // Modell einer Aufgabe wählen: Profil bleibt, nur das Modell wechselt
+  const TASK_OF = { scan: 'triage', write: 'draft', stt: 'stt' } as const
   const pick = (kind: 'scan' | 'write' | 'stt') => (id: string) => {
-    void invoke('settings:set', { key: KEYS[kind], value: id }).then(() => {
-      const model = id.split('/')[1]
+    const task = TASK_OF[kind]
+    const profileId = assignments.data?.[task].profileId ?? 'openrouter'
+    void invoke('ai:tasks:set', { task, profileId, model: id }).then(() => {
+      const model = id.split('/')[1] ?? id
       toastNow(
         kind === 'scan'
           ? t('toastScanModel', { model })
@@ -1536,41 +1738,28 @@ export function IntelSheet(): React.JSX.Element {
       void queryClient.invalidateQueries({ queryKey: ['ai'] })
     })
   }
-  const [sttModel, setSttModel] = useState('openai/gpt-audio-mini')
-  useEffect(() => {
-    void invoke('settings:get', { key: 'ai.sttModel' }).then((r) => {
-      if (r.value) setSttModel(r.value)
-    })
-  }, [])
 
-  // Triage-Rechner: OpenRouter (Cloud) oder Apple Intelligence (On-Device).
-  const appleFm = useAppleFm()
-  const [scanProvider, setScanProvider] = useState<'openrouter' | 'apple'>('openrouter')
-  useEffect(() => {
-    void invoke('settings:get', { key: 'ai.triageProvider' }).then((r) => {
-      if (r.value === 'apple') setScanProvider('apple')
-    })
-  }, [])
-  const pickProvider = (provider: 'openrouter' | 'apple'): void => {
-    setScanProvider(provider)
-    void invoke('settings:set', { key: 'ai.triageProvider', value: provider }).then(() => {
-      toastNow(
-        provider === 'apple'
-          ? t('toastScanApple')
-          : t('toastScanModel', { model: (models.data?.scanModel ?? '').split('/')[1] ?? '' })
+  /** Modellwahl je nach Profil: OpenRouter kuratiert, eigene Profile aus /models. */
+  const renderModels = (kind: 'scan' | 'write' | 'stt'): React.JSX.Element | null => {
+    const task: AiTaskName = TASK_OF[kind]
+    const a = assignments.data?.[task]
+    if (!a) return null
+    if (a.profileId === 'apple') {
+      return (
+        <div className="mmeta" style={{ marginTop: 8 }}>
+          {kind === 'stt' ? t('taskAppleNote') : t('fmCloudDimmed')}
+        </div>
       )
-      void queryClient.invalidateQueries({ queryKey: ['ai'] })
-    })
+    }
+    const profile = profiles.data?.find((p) => p.id === a.profileId)
+    if (!profile) return null
+    if (profile.preset === 'openrouter') {
+      return <ModelList kind={kind} current={a.model} onPick={pick(kind)} />
+    }
+    return (
+      <ProfileModelPicker task={task} profile={profile} current={a.model} onPick={pick(kind)} />
+    )
   }
-  const fmStateLabel = {
-    available: t('fmStateAvailable'),
-    'apple-intelligence-off': t('fmStateOff'),
-    'model-not-ready': t('fmStateNotReady'),
-    'device-unsupported': t('fmStateUnsupported'),
-    'helper-missing': t('fmStateHelperMissing'),
-    error: t('fmStateError')
-  }[appleFm.data?.state ?? 'error']
-  const fmAvailable = appleFm.data?.state === 'available'
 
   return (
     <SheetShell title={t('intelligence')} sub={t('intelSub')}>
@@ -1622,6 +1811,14 @@ export function IntelSheet(): React.JSX.Element {
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <LocalOnlyCard />
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <ProvidersCard />
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
         <div className="flex flex-wrap items-baseline gap-2">
           <span className="mlabel" style={{ color: 'var(--ac)' }}>
             {t('modelScan')}
@@ -1630,58 +1827,8 @@ export function IntelSheet(): React.JSX.Element {
             {t('modelScanSub')}
           </span>
         </div>
-
-        {/* On-Device-Option: erscheint nur, wo der Helper überhaupt existiert */}
-        {appleFm.data && appleFm.data.state !== 'device-unsupported' && (
-          <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
-            <label
-              className="flex items-start gap-2 cursor-pointer"
-              style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}
-            >
-              <input
-                type="radio"
-                name="scan-provider"
-                checked={scanProvider === 'apple'}
-                disabled={!fmAvailable}
-                onChange={() => pickProvider('apple')}
-                style={{ marginTop: 2 }}
-              />
-              <span style={{ display: 'grid', gap: 2 }}>
-                <strong style={{ font: '500 10px var(--mono)' }}>{t('fmProviderApple')}</strong>
-                <span style={{ color: 'var(--faint)', font: '400 9px var(--mono)' }}>
-                  {t('fmProviderAppleSub')} ·{' '}
-                  <span style={{ color: fmAvailable ? 'var(--ink)' : 'var(--ac)' }}>
-                    {fmStateLabel}
-                  </span>
-                </span>
-              </span>
-            </label>
-            <label
-              className="flex items-start gap-2 cursor-pointer"
-              style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}
-            >
-              <input
-                type="radio"
-                name="scan-provider"
-                checked={scanProvider === 'openrouter'}
-                onChange={() => pickProvider('openrouter')}
-                style={{ marginTop: 2 }}
-              />
-              <strong style={{ font: '500 10px var(--mono)' }}>{t('fmProviderCloud')}</strong>
-            </label>
-          </div>
-        )}
-
-        <div
-          style={scanProvider === 'apple' ? { opacity: 0.45, pointerEvents: 'none' } : undefined}
-        >
-          {scanProvider === 'apple' && (
-            <div className="mmeta" style={{ marginTop: 8 }}>
-              {t('fmCloudDimmed')}
-            </div>
-          )}
-          <ModelList kind="scan" current={models.data?.scanModel ?? ''} onPick={pick('scan')} />
-        </div>
+        <TaskProviderPicker task="triage" />
+        {renderModels('scan')}
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
@@ -1693,7 +1840,8 @@ export function IntelSheet(): React.JSX.Element {
             {t('modelWriteSub')}
           </span>
         </div>
-        <ModelList kind="write" current={models.data?.writeModel ?? ''} onPick={pick('write')} />
+        <TaskProviderPicker task="draft" />
+        {renderModels('write')}
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
@@ -1705,18 +1853,24 @@ export function IntelSheet(): React.JSX.Element {
             {t('modelSttSub')}
           </span>
         </div>
-        <ModelList
-          kind="stt"
-          current={sttModel}
-          onPick={(id) => {
-            setSttModel(id)
-            pick('stt')(id)
-          }}
-        />
+        <TaskProviderPicker task="stt" />
+        {renderModels('stt')}
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <DecisionCard />
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <OnDemandCard />
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
         <TasksAutoCard />
+      </div>
+
+      <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>
+        <DraftCalendarToggle />
       </div>
 
       <div className="ink-card" style={{ padding: 14, marginTop: 12 }}>

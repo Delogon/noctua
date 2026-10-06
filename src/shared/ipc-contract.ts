@@ -6,6 +6,7 @@ import {
   messageActionSchema,
   messageDetailSchema,
   messageHeaderDetailsSchema,
+  networkConnectionsSchema,
   owlConversationListItemSchema,
   owlConversationSchema,
   owlMessageSchema,
@@ -14,6 +15,35 @@ import {
   taskItemSchema,
   threadListItemSchema
 } from './types'
+import {
+  calendarAccountStateSchema,
+  calendarAccountSummarySchema,
+  calendarEditScopeSchema,
+  calendarEventDetailSchema,
+  calendarEventInputSchema,
+  calendarEventPatchSchema,
+  calendarInstanceSchema,
+  calendarSummarySchema,
+  discoveredCalendarSchema
+} from './calendar-types'
+import { davContactsStatusSchema } from './contacts-types'
+import {
+  freeBusyInputSchema,
+  freeBusyResultSchema,
+  freeBusySelfInputSchema,
+  schedulingInfoInputSchema,
+  schedulingInfoSchema,
+  busyIntervalSchema,
+  invitationRespondInputSchema,
+  invitationRespondOutputSchema,
+  invitationViewSchema
+} from './invitation-types'
+import { eventSuggestionViewSchema } from './event-suggestion-types'
+import {
+  isRendererSecretKey,
+  isRendererSettingReadable,
+  isRendererSettingWritable
+} from './settings-keys'
 
 /**
  * Der zentrale IPC-Vertrag zwischen Main und Renderer.
@@ -28,6 +58,69 @@ import {
  * und Renderer-Typen leiten sich automatisch ab.
  */
 
+// Schlüssel-Allowlists (settings-keys.ts) greifen schon im Schema; die Handler
+// prüfen zusätzlich selbst (Defense in Depth).
+const readableSettingKey = z
+  .string()
+  .max(200)
+  .refine(isRendererSettingReadable, 'Schlüssel nicht erlaubt')
+const writableSettingKey = z
+  .string()
+  .max(200)
+  .refine(isRendererSettingWritable, 'Schlüssel nicht erlaubt')
+const secretKey = z.string().max(200).refine(isRendererSecretKey, 'Schlüssel nicht erlaubt')
+
+// --- AI-Provider-Profile (Phase 1.1) -----------------------------------------
+const profileIdSchema = z.string().regex(/^[a-z0-9_-]{1,40}$/)
+
+export const aiProfileSchema = z.object({
+  id: profileIdSchema,
+  name: z.string().max(60),
+  baseUrl: z.string().max(500),
+  apiStyle: z.enum(['chat', 'responses']),
+  isLocal: z.boolean(),
+  preset: z.enum(['openrouter', 'custom']),
+  managed: z.boolean(),
+  hasKey: z.boolean()
+})
+
+const profileFieldsSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  baseUrl: z.string().trim().min(1).max(500),
+  apiStyle: z.enum(['chat', 'responses']),
+  isLocal: z.boolean()
+})
+
+export const aiTaskSchema = z.enum(['triage', 'draft', 'stt', 'decision'])
+
+const modelInfoSchema = z.object({
+  id: z.string(),
+  promptPerM: z.number(),
+  completionPerM: z.number(),
+  context: z.number(),
+  audioIn: z.boolean().default(false)
+})
+
+const taskAssignmentSchema = z.object({
+  /** Profil-ID oder 'apple' (On-Device, nur Triage) */
+  profileId: z.string().max(40),
+  /** gewähltes Modell; leer = Default (nur OpenRouter) */
+  model: z.string().max(200),
+  /** Warum die Aufgabe gerade nicht läuft — null, wenn sie läuft */
+  blocked: z.enum(['local-only', 'no-key', 'no-profile', 'no-model']).nullable()
+})
+
+// --- Kalender (Phase 2.1) ------------------------------------------------------------
+const calendarCredentialsSchema = z.object({
+  /** Server-URL, Domain oder Mail-Adresse (Discovery nach RFC 6764) */
+  serverInput: z.string().trim().min(1).max(500),
+  username: z.string().trim().min(1).max(320),
+  /** Leer erlaubt, wenn das Passwort des Mail-Kontos übernommen wird */
+  password: z.string().max(1000).optional(),
+  mailAccountId: z.number().int().optional(),
+  reuseMailPassword: z.boolean().optional()
+})
+
 /** Sync-Zeitraum in Tagen: 0 = alles, null = Standard (90 Tage Liste / 183 Suche). */
 const syncDaysSchema = z.union([z.literal(0), z.number().int().min(7).max(3650)]).nullable()
 
@@ -37,21 +130,21 @@ export const invokeContract = {
     output: z.object({ app: z.string(), electron: z.string(), node: z.string() })
   },
   'settings:get': {
-    input: z.object({ key: z.string().max(200) }),
+    input: z.object({ key: readableSettingKey }),
     output: z.object({ value: z.string().nullable() })
   },
   'settings:set': {
-    input: z.object({ key: z.string().max(200), value: z.string().max(100_000) }),
+    input: z.object({ key: writableSettingKey, value: z.string().max(100_000) }),
     output: z.object({ ok: z.literal(true) })
   },
   // Secrets sind write-only für den Renderer: setzen und prüfen — nie lesen.
   // Entschlüsselte Werte bleiben ausschließlich im Main-Prozess.
   'secrets:set': {
-    input: z.object({ key: z.string().max(200), value: z.string().max(100_000) }),
+    input: z.object({ key: secretKey, value: z.string().max(100_000) }),
     output: z.object({ ok: z.literal(true) })
   },
   'secrets:exists': {
-    input: z.object({ key: z.string().max(200) }),
+    input: z.object({ key: secretKey }),
     output: z.object({ exists: z.boolean() })
   },
   'app:openExternal': {
@@ -62,7 +155,7 @@ export const invokeContract = {
     input: z.object({
       provider: z.enum(['gmail', 'imap']),
       accountName: z.string().trim().min(1).max(40),
-      email: z.string().email(),
+      email: z.string().email().max(320),
       displayName: z.string().max(200).optional(),
       password: z.string().min(1).max(1000),
       imapHost: z.string().max(500).optional(),
@@ -104,6 +197,17 @@ export const invokeContract = {
     }),
     output: z.object({ ok: z.literal(true), accountName: z.string().optional() })
   },
+  // Neues Passwort für ein Passwort-/Bridge-Konto (needs-reauth): Login wird
+  // geprüft, bevor das Vault-Geheimnis überschrieben und der Syncer neu gestartet wird.
+  'accounts:updatePassword': {
+    input: z.object({ accountId: z.number().int(), password: z.string().min(1).max(1000) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Erneute Browser-Anmeldung für Google-/Microsoft-Konten (gleiche Adresse Pflicht).
+  'accounts:reauthorize': {
+    input: z.object({ accountId: z.number().int() }),
+    output: z.object({ ok: z.literal(true), email: z.string() })
+  },
   'accounts:remove': {
     input: z.object({ accountId: z.number() }),
     output: z.object({ ok: z.literal(true) })
@@ -113,6 +217,169 @@ export const invokeContract = {
   'accounts:cancelOAuth': {
     input: z.object({ provider: z.enum(['gmail', 'microsoft']) }),
     output: z.object({ canceled: z.boolean() })
+  },
+  // --- Kalender (CalDAV, Phase 2.1) -----------------------------------------------
+  'calendar:accounts:list': {
+    input: z.void(),
+    output: z.object({ accounts: z.array(calendarAccountSummarySchema) })
+  },
+  // Vorbelegung aus einem Mail-Konto (Benutzername = Adresse, Server aus der Domain)
+  'calendar:accounts:suggest': {
+    input: z.object({ mailAccountId: z.number().int() }),
+    output: z.object({
+      username: z.string(),
+      serverInput: z.string(),
+      canReusePassword: z.boolean()
+    })
+  },
+  // Verbindung prüfen und Kalender auflisten, ohne etwas zu speichern
+  'calendar:accounts:discover': {
+    input: calendarCredentialsSchema,
+    output: z.object({
+      serverUrl: z.string(),
+      autoSchedule: z.boolean(),
+      calendars: z.array(discoveredCalendarSchema)
+    })
+  },
+  'calendar:accounts:add': {
+    input: calendarCredentialsSchema.extend({ name: z.string().trim().max(60) }),
+    output: z.object({
+      accountId: z.number(),
+      calendarCount: z.number(),
+      autoSchedule: z.boolean()
+    })
+  },
+  'calendar:accounts:update': {
+    input: z.object({ accountId: z.number().int(), name: z.string().trim().min(1).max(60) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Neues Passwort für ein Kalender-Konto (needs-reauth): erst prüfen, dann speichern
+  'calendar:accounts:updatePassword': {
+    input: z.object({ accountId: z.number().int(), password: z.string().min(1).max(1000) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'calendar:accounts:remove': {
+    input: z.object({ accountId: z.number().int() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'calendar:accounts:test': {
+    input: z.object({ accountId: z.number().int() }),
+    output: z.object({ calendarCount: z.number(), autoSchedule: z.boolean() })
+  },
+  'calendar:list': {
+    input: z.object({ accountId: z.number().int().optional() }),
+    output: z.object({ calendars: z.array(calendarSummarySchema) })
+  },
+  'calendar:setVisible': {
+    input: z.object({ calendarId: z.number().int(), visible: z.boolean() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'calendar:setColor': {
+    input: z.object({
+      calendarId: z.number().int(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable()
+    }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'calendar:events:list': {
+    input: z.object({
+      rangeStart: z.number(),
+      rangeEnd: z.number(),
+      calendarIds: z.array(z.number().int()).max(200).optional(),
+      /** IANA-Zone für ganztägige Einträge (Default: Systemzone) */
+      tz: z.string().max(100).optional()
+    }),
+    output: z.object({ events: z.array(calendarInstanceSchema) })
+  },
+  'calendar:events:get': {
+    input: z.object({
+      objectId: z.number().int(),
+      recurrenceId: z.string().max(40).nullable().default(null)
+    }),
+    output: z.object({ event: calendarEventDetailSchema })
+  },
+  'calendar:events:create': {
+    input: z.object({
+      event: calendarEventInputSchema,
+      /** Teilnehmer benachrichtigen (Standard: ja, wenn Teilnehmer vorhanden und der Nutzer Organisator ist) */
+      notifyAttendees: z.boolean().optional()
+    }),
+    output: z.object({ objectId: z.number() })
+  },
+  'calendar:events:update': {
+    input: z.object({
+      objectId: z.number().int(),
+      scope: calendarEditScopeSchema,
+      recurrenceId: z.string().max(40).nullable(),
+      patch: calendarEventPatchSchema,
+      notifyAttendees: z.boolean().optional()
+    }),
+    output: z.object({ objectId: z.number(), createdObjectId: z.number().nullable() })
+  },
+  'calendar:events:delete': {
+    input: z.object({
+      objectId: z.number().int(),
+      scope: calendarEditScopeSchema,
+      recurrenceId: z.string().max(40).nullable(),
+      notifyAttendees: z.boolean().optional()
+    }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Einladungskarten (iMIP) einer Mail
+  'calendar:invitations:get': {
+    input: z.object({ messageId: z.number().int() }),
+    output: z.object({ invitations: z.array(invitationViewSchema) })
+  },
+  // Terminvorschläge aus Mails (AI, 2.4): nie automatisch angelegt
+  'calendar:eventSuggestions:get': {
+    input: z.object({ messageId: z.number().int() }),
+    output: z.object({ suggestions: z.array(eventSuggestionViewSchema) })
+  },
+  'calendar:eventSuggestions:accept': {
+    input: z.object({ id: z.number().int() }),
+    output: z.object({ objectId: z.number().int() })
+  },
+  'calendar:eventSuggestions:dismiss': {
+    input: z.object({ id: z.number().int() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Editor übernimmt den Vorschlag (Bearbeiten…): gilt als erledigt
+  'calendar:eventSuggestions:edit': {
+    input: z.object({ id: z.number().int() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // RSVP: Server-Scheduling (nur PARTSTAT-PUT) oder iMIP-REPLY per Outbox
+  'calendar:invitations:respond': {
+    input: invitationRespondInputSchema,
+    output: invitationRespondOutputSchema
+  },
+  // Absage übernehmen: Termin aus dem Kalender entfernen
+  'calendar:invitations:removeCancelled': {
+    input: z.object({ invitationId: z.number().int() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Free/Busy anderer Teilnehmer (Scheduling-Outbox), „ich" aus den eigenen Kalendern
+  'calendar:freebusy': {
+    input: freeBusyInputSchema,
+    output: z.object({ results: z.array(freeBusyResultSchema) })
+  },
+  // Eigene Belegung aus der lokalen DB (z. B. für KI-Entwürfe)
+  'calendar:freebusy:self': {
+    input: freeBusySelfInputSchema,
+    output: z.object({ busy: z.array(busyIntervalSchema) })
+  },
+  // Scheduling-Kontext für den Editor (Organisator?, eigene Adressen, Einladung zum Termin)
+  'calendar:scheduling:info': {
+    input: schedulingInfoInputSchema,
+    output: schedulingInfoSchema
+  },
+  // Sofortiger Abgleich (ein Konto oder alle); hebt needs-reauth-Wartezeiten auf
+  'calendar:refresh': {
+    input: z.object({ accountId: z.number().int().optional() }),
+    output: z.object({ ok: z.literal(true) })
   },
   'threads:list': {
     input: z.object({
@@ -127,7 +394,7 @@ export const invokeContract = {
     output: z.object({ inbox: z.number(), sent: z.number(), spam: z.number() })
   },
   'threads:get': {
-    input: z.object({ threadKey: z.string().max(500) }),
+    input: z.object({ threadKey: z.string().max(512) }),
     output: z.object({ messages: z.array(messageDetailSchema) })
   },
   'messages:details': {
@@ -159,18 +426,14 @@ export const invokeContract = {
     output: z.object({ ok: z.literal(true) })
   },
   'ai:overrideCategory': {
-    input: z.object({ threadKey: z.string().max(500), category: aiCategorySchema.nullable() }),
+    input: z.object({ threadKey: z.string().max(512), category: aiCategorySchema.nullable() }),
     output: z.object({ ok: z.literal(true) })
   },
   'ai:testModel': {
     input: z.object({
-      /** OpenRouter-Modell-ID, z. B. moonshotai/kimi-k2 */
-      model: z
-        .string()
-        .trim()
-        .min(3)
-        .max(200)
-        .regex(/^[\w.:-]+\/[\w.:-]+$/)
+      profileId: profileIdSchema,
+      /** Modell-ID des Profils, z. B. moonshotai/kimi-k2 oder llama3.2:latest */
+      model: z.string().trim().min(1).max(200)
     }),
     output: z.object({
       ok: z.boolean(),
@@ -179,19 +442,162 @@ export const invokeContract = {
       detail: z.string().nullable()
     })
   },
-  'ai:models': {
+  // Modellliste eines Profils (OpenRouter: Live-Katalog, sonst GET /models).
+  // Bei Local only holt ein externes Profil sie nur auf ausdrückliche Anfrage
+  // (`manual`) — sonst `skipped: true` und keine Netzverbindung.
+  'ai:profileModels': {
+    // kind: 'chat' (Standard) schließt reine Entscheidungsmodelle aus (sie antworten im Chat mit
+    // Fehlern); 'decision' liefert nur Modelle mit Fähigkeit `decision` (Ollama /api/tags, /api/show)
+    input: z.object({
+      profileId: profileIdSchema,
+      manual: z.boolean().default(false),
+      kind: z.enum(['chat', 'decision']).default('chat')
+    }),
+    output: z.object({ models: z.array(modelInfoSchema), skipped: z.boolean() })
+  },
+  // Funktions-Test eines Entscheidungsmodells: zwei Mini-Fragen, Antworten + Latenz
+  'ai:decisions:test': {
+    input: z.object({ profileId: profileIdSchema, model: z.string().trim().min(1).max(200) }),
+    output: z.object({
+      ok: z.boolean(),
+      latencyMs: z.number(),
+      detail: z.string().nullable(),
+      answers: z.array(z.object({ name: z.string(), text: z.string() })).max(8)
+    })
+  },
+  // Phishing-Einschätzung einer Mail (nur mit Entscheidungsmodell berechnet)
+  'ai:decisions:get': {
+    input: z.object({ messageId: z.number().int() }),
+    output: z.object({
+      phishing: z
+        .object({
+          /** 0 (unauffällig) … 2 (wahrscheinlich Phishing) */
+          score: z.number(),
+          high: z.boolean(),
+          /** lokale Signale, z. B. "reply_to_differs", "link_mismatch:2" */
+          signals: z.array(z.string().max(60)).max(10)
+        })
+        .nullable()
+    })
+  },
+  // Lokale KI-Server erkennen (Onboarding): Main sondiert nur fest verdrahtete
+  // Loopback-Adressen (Ollama, LM Studio, llama.cpp, LocalAI/vLLM) — erlaubt auch
+  // unter Local only, da nie ein Nicht-Loopback-Host angefragt wird.
+  'ai:detectLocal': {
     input: z.void(),
     output: z.object({
-      models: z.array(
-        z.object({
-          id: z.string(),
-          promptPerM: z.number(),
-          completionPerM: z.number(),
-          context: z.number(),
-          audioIn: z.boolean().default(false)
-        })
-      )
+      found: z
+        .array(
+          z.object({
+            kind: z.enum(['ollama', 'lmstudio', 'llamacpp', 'localai']),
+            baseUrl: z.string().max(200),
+            models: z.array(z.string().max(200)).max(200),
+            /** nur Ollama: Modelle mit Fähigkeit `decision` (nicht in `models` enthalten) */
+            decisionModels: z.array(z.string().max(200)).max(50).default([])
+          })
+        )
+        .max(8)
     })
+  },
+  'ai:profiles:list': {
+    input: z.void(),
+    output: z.object({ profiles: z.array(aiProfileSchema) })
+  },
+  'ai:profiles:create': {
+    input: profileFieldsSchema,
+    output: z.object({ profile: aiProfileSchema })
+  },
+  'ai:profiles:update': {
+    input: profileFieldsSchema.partial().extend({ id: profileIdSchema }),
+    output: z.object({ profile: aiProfileSchema })
+  },
+  'ai:profiles:delete': {
+    input: z.object({ id: profileIdSchema }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Profil-Keys: write-only über einen eigenen Kanal (nicht über secrets:set)
+  'ai:profiles:setKey': {
+    input: z.object({ id: profileIdSchema, key: z.string().trim().min(1).max(500) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'ai:profiles:clearKey': {
+    input: z.object({ id: profileIdSchema }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'ai:profiles:test': {
+    input: z.object({ id: profileIdSchema }),
+    output: z.object({
+      ok: z.boolean(),
+      latencyMs: z.number(),
+      modelCount: z.number(),
+      detail: z.string().nullable()
+    })
+  },
+  'ai:tasks:get': {
+    input: z.void(),
+    output: z.object({
+      triage: taskAssignmentSchema,
+      draft: taskAssignmentSchema,
+      stt: taskAssignmentSchema,
+      decision: taskAssignmentSchema
+    })
+  },
+  'ai:tasks:set': {
+    input: z.object({
+      task: aiTaskSchema,
+      profileId: z.string().max(40),
+      model: z.string().trim().max(200)
+    }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  // Local only (privacy.localOnly): weicher Schalter, siehe src/main/privacy.ts
+  'privacy:getLocalOnly': {
+    input: z.void(),
+    output: z.object({ localOnly: z.boolean() })
+  },
+  'privacy:setLocalOnly': {
+    input: z.object({ localOnly: z.boolean() }),
+    output: z.object({ localOnly: z.boolean() })
+  },
+  // Alle Netzwerkverbindungen der App (Technik-Seite), live aus Konten/Profilen/Konfiguration
+  'privacy:networkConnections': {
+    input: z.void(),
+    output: networkConnectionsSchema
+  },
+  // Branding/Onboarding-Hinweise aus der Org-Konfiguration (Upstream: Defaults)
+  'org:info': {
+    input: z.void(),
+    output: z.object({
+      productName: z.string().max(60),
+      /** true: Onboarding bietet statt OpenRouter die Profile der Organisation an */
+      hideOpenRouterOnboarding: z.boolean(),
+      edition: z.enum(['upstream', 'organisation'])
+    })
+  },
+  // Update-Check auf Anforderung (bei Local only der einzige Weg)
+  'updates:checkNow': {
+    input: z.void(),
+    output: z.object({
+      updateAvailable: z.boolean(),
+      latest: z.string().nullable(),
+      url: z.string(),
+      note: z.string().nullable()
+    })
+  },
+  // Lokales Suchmodell (Embeddings): Status + ausdrücklicher Download
+  'embeddings:status': {
+    input: z.void(),
+    output: z.object({
+      state: z.enum(['not_loaded', 'loading', 'ready', 'error']),
+      cached: z.boolean(),
+      error: z.string().nullable(),
+      eligible: z.number(),
+      indexed: z.number()
+    })
+  },
+  'embeddings:downloadModel': {
+    input: z.void(),
+    output: z.object({ ok: z.literal(true) })
   },
   // Verfügbarkeit des On-Device-Modells (Apple Intelligence) für die Triage
   'ai:appleFm': {
@@ -226,6 +632,8 @@ export const invokeContract = {
     input: z.void(),
     output: z.object({
       hasApiKey: z.boolean(),
+      draftBlock: z.enum(['local-only', 'no-key', 'no-profile', 'no-model']).nullable(),
+      openrouterKey: z.boolean(),
       triageModel: z.string(),
       draftModel: z.string()
     })
@@ -233,9 +641,9 @@ export const invokeContract = {
   'compose:send': {
     input: z.object({
       accountId: z.number(),
-      to: z.array(z.string().email()).min(1).max(50),
-      cc: z.array(z.string().email()).max(50).default([]),
-      bcc: z.array(z.string().email()).max(50).default([]),
+      to: z.array(z.string().email().max(320)).min(1).max(50),
+      cc: z.array(z.string().email().max(320)).max(50).default([]),
+      bcc: z.array(z.string().email().max(320)).max(50).default([]),
       subject: z.string().max(500),
       textBody: z.string().max(500_000),
       htmlBody: z.string().max(1_000_000).optional(),
@@ -249,14 +657,14 @@ export const invokeContract = {
   },
   'drafts:save': {
     input: z.object({
-      threadKey: z.string().min(1),
+      threadKey: z.string().min(1).max(512),
       text: z.string().min(1).max(500_000),
       html: z.string().max(1_000_000).default('')
     }),
     output: z.object({ ok: z.literal(true) })
   },
   'drafts:delete': {
-    input: z.object({ threadKey: z.string().min(1) }),
+    input: z.object({ threadKey: z.string().min(1).max(512) }),
     output: z.object({ ok: z.boolean() })
   },
   'outbox:cancel': {
@@ -299,7 +707,9 @@ export const invokeContract = {
           name: z.string(),
           description: z.string().nullable(),
           enabled: z.boolean(),
-          hits: z.number()
+          hits: z.number(),
+          /** KI-Bedingung der Regel (Entscheidungsmodell), sonst null */
+          aiCondition: z.string().nullable()
         })
       )
     })
@@ -321,13 +731,27 @@ export const invokeContract = {
       contacts: z.array(z.object({ addr: z.string(), name: z.string().nullable() }))
     })
   },
+  // CardDAV-Kontakte (Phase 3.1, nur lesend) je Kalender-Konto
+  'contacts:dav:status': {
+    input: z.object({ accountId: z.number().int() }),
+    output: davContactsStatusSchema
+  },
+  // „Kontakte synchronisieren" ein/aus; ein = Discovery gegen den Server des Kontos
+  'contacts:dav:setSync': {
+    input: z.object({ accountId: z.number().int(), enabled: z.boolean() }),
+    output: z.object({ addressBookCount: z.number() })
+  },
+  'contacts:dav:setAddressBook': {
+    input: z.object({ addressBookId: z.number().int(), enabled: z.boolean() }),
+    output: z.object({ ok: z.literal(true) })
+  },
   'contacts:preferredAccount': {
-    input: z.object({ addr: z.string().email() }),
+    input: z.object({ addr: z.string().email().max(320) }),
     output: z.object({ accountId: z.number().int().nullable() })
   },
   'ai:draftReply': {
     input: z.object({
-      threadKey: z.string().max(500),
+      threadKey: z.string().max(512),
       instruction: z.string().max(2000).optional(),
       idea: z.string().max(20_000).optional(),
       reviseText: z.string().max(20_000).optional()
@@ -337,7 +761,7 @@ export const invokeContract = {
   'ai:draftNew': {
     input: z.object({
       accountId: z.number().int(),
-      to: z.array(z.string()).default([]),
+      to: z.array(z.string().max(320)).max(50).default([]),
       subject: z.string().max(500).default(''),
       idea: z.string().min(1).max(20_000),
       instruction: z.string().max(2000).optional()
@@ -361,11 +785,29 @@ export const invokeContract = {
     output: z.object({ tasks: z.array(taskItemSchema), openCount: z.number() })
   },
   'tasks:decideSuggestion': {
-    input: z.object({ threadKey: z.string(), accept: z.boolean() }),
+    input: z.object({ threadKey: z.string().max(512), accept: z.boolean() }),
     output: z.object({ ok: z.literal(true) })
   },
   'tasks:update': {
     input: z.object({ id: z.number(), status: z.enum(['open', 'done', 'dismissed']) }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'tasks:sync:get': {
+    input: z.void(),
+    output: z.object({
+      calendarId: z.number().nullable(),
+      lists: z.array(
+        z.object({
+          calendarId: z.number(),
+          accountId: z.number(),
+          accountName: z.string(),
+          name: z.string()
+        })
+      )
+    })
+  },
+  'tasks:sync:set': {
+    input: z.object({ calendarId: z.number().int().positive().nullable() }),
     output: z.object({ ok: z.literal(true) })
   },
   'followups:list': {
@@ -470,8 +912,38 @@ export const pushContract = {
   }),
   'sync:state': z.object({
     accountId: z.number(),
-    state: z.enum(['idle', 'connecting', 'syncing', 'error', 'off']),
+    state: z.enum(['idle', 'connecting', 'syncing', 'error', 'needs-reauth', 'off']),
     detail: z.string().nullable()
+  }),
+  // Op-Queue: IMAP-Aktionen, die endgültig nicht ausgeführt werden konnten
+  // (Dead-Letter) — der Renderer zeigt eine Toast statt stillem Verlust.
+  'sync:opsDead': z.object({
+    accountId: z.number(),
+    count: z.number(),
+    reason: z.enum(['attempts', 'uidvalidity', 'no-target-folder', 'no-trash', 'folder-gone'])
+  }),
+  // Kalender: Daten haben sich geändert (calendarIds leer = Kalenderliste/Sichtbarkeit)
+  'calendar:changed': z.object({ accountId: z.number(), calendarIds: z.array(z.number()) }),
+  'calendar:accountState': z.object({
+    accountId: z.number(),
+    state: calendarAccountStateSchema,
+    detail: z.string().nullable()
+  }),
+  // Lokale Änderung wurde nicht übernommen (Konflikt: Server-Version gewinnt, nie stilles Überschreiben)
+  'calendar:conflict': z.object({
+    accountId: z.number(),
+    calendarId: z.number(),
+    uid: z.string(),
+    summary: z.string().nullable(),
+    kind: z.enum(['create', 'update', 'delete']),
+    reason: z.enum(['conflict', 'deleted-on-server', 'forbidden', 'attempts'])
+  }),
+  // CardDAV-Kontakte (Phase 3.1): Adressbücher/Karten eines Kontos wurden abgeglichen
+  'contacts:changed': z.object({ accountId: z.number() }),
+  // Klick auf eine Erinnerung
+  'calendar:openEvent': z.object({
+    objectId: z.number(),
+    recurrenceId: z.string().nullable()
   }),
   'app:openThread': z.object({ threadKey: z.string() }),
   'updates:available': z.object({ latest: z.string(), url: z.string() }),
@@ -485,6 +957,7 @@ export const pushContract = {
       'chat',
       'inbox',
       'tasks',
+      'calendar',
       'waiting'
     ])
   }),
@@ -492,7 +965,7 @@ export const pushContract = {
   'tasks:changed': z.object({}),
   'outbox:changed': z.object({
     outboxId: z.number(),
-    state: z.enum(['pending', 'sending', 'sent', 'canceled', 'error'])
+    state: z.enum(['pending', 'sending', 'sent', 'canceled', 'error', 'unknown'])
   }),
   'ai:chatChunk': z.object({
     chatId: z.string(),

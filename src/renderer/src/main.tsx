@@ -14,7 +14,6 @@ import { createRoot } from 'react-dom/client'
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 
-
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error, query) => console.error('[query]', query.queryKey, error)

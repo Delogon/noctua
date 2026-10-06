@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { isSecurityNotification, isUserAuthoredMail } from './tasks'
 import { taskAddresseeVerdict } from '../../ai/addressee'
 import type { AiCategory, MessageDetail, Recipient, ThreadListItem } from '@shared/types'
@@ -221,9 +221,10 @@ export function listThreads(
   accountId?: number,
   mbox: 'inbox' | 'sent' | 'spam' = 'inbox'
 ): ThreadListItem[] {
-  const where = `JOIN folders f ON m.folder_id = f.id WHERE f.special_use = '${MBOX_SPECIAL[mbox]}'`
+  const where = `JOIN folders f ON m.folder_id = f.id WHERE f.special_use = ?`
   const accountFilter = accountId != null ? ' AND m.account_id = ?' : ''
-  const params: unknown[] = accountId != null ? [accountId, limit] : [limit]
+  const params: unknown[] =
+    accountId != null ? [MBOX_SPECIAL[mbox], accountId, limit] : [MBOX_SPECIAL[mbox], limit]
   const rows = db
     .prepare(
       `${THREAD_AGG_SELECT} ${where}${accountFilter} GROUP BY m.thread_key ORDER BY max_date DESC LIMIT ?`
@@ -255,6 +256,10 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
      ORDER BY CAST(part_id AS INTEGER), id`
   )
   const allowStmt = db.prepare('SELECT value FROM settings WHERE key = ?')
+  // Local only: keine automatischen Remote-Bilder — weder Absender-Freigabe noch
+  // globaler Default greifen; „Bilder anzeigen" pro Nachricht bleibt möglich.
+  const localOnly =
+    (allowStmt.get('privacy.localOnly') as { value: string } | undefined)?.value === '1'
   return rows.map((r) => {
     const bodyState = (r.body_state as 'none' | 'full') ?? 'none'
     const html = (r.html_raw as string) ?? null
@@ -263,6 +268,7 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
         isVisibleMailAttachment(
           {
             mimeType: (attachment.mime_type as string) ?? null,
+            filename: (attachment.filename as string) ?? null,
             contentId: (attachment.content_id as string) ?? null
           },
           html
@@ -278,16 +284,17 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
     return {
       listUnsubscribe: r.list_unsubscribe === 1,
       remoteImagesAllowed:
+        !localOnly &&
         // Default BLOCKIERT (Design 3b, Privacy-Versprechen): Remote-Bilder
         // laden nur, wenn der Nutzer es global erlaubt hat ('1') ODER der
         // Absender auf der Freigabeliste steht. Explizit gespeicherte Werte
         // ('1'/'0') behalten ihre Bedeutung — nur der ungesetzte Default dreht.
-        (allowStmt.get('mail.remoteImagesDefault') as { value: string } | undefined)?.value ===
+        ((allowStmt.get('mail.remoteImagesDefault') as { value: string } | undefined)?.value ===
           '1' ||
-        (
-          allowStmt.get(imagesAllowKey((r.from_addr as string) ?? '')) as
-            { value: string } | undefined
-        )?.value === '1',
+          (
+            allowStmt.get(imagesAllowKey((r.from_addr as string) ?? '')) as
+              { value: string } | undefined
+          )?.value === '1'),
       id: r.id as number,
       accountId: r.account_id as number,
       folderId: r.folder_id as number,

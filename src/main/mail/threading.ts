@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 
 function sha1(input: string): string {
   return createHash('sha1').update(input).digest('hex').slice(0, 20)

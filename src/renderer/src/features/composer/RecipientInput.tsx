@@ -55,10 +55,15 @@ export function RecipientInput({
     return list.filter((s) => !taken.has(s.addr.toLowerCase()))
   }, [suggestQuery.data, chips])
 
-  useEffect(() => {
+  // Auswahl und Popup bei neuer Anfrage bzw. neuer Trefferzahl zurücksetzen
+  // (Render-Anpassung statt Effect, damit kein Zusatz-Render nötig ist)
+  const suggestSignature = `${query}\u0000${suggestions.length}`
+  const [prevSuggestSignature, setPrevSuggestSignature] = useState(suggestSignature)
+  if (prevSuggestSignature !== suggestSignature) {
+    setPrevSuggestSignature(suggestSignature)
     setActive(0)
     setOpen(query.length >= 1 && suggestions.length > 0)
-  }, [query, suggestions.length])
+  }
 
   const setTextBoth = (value: string): void => {
     setText(value)

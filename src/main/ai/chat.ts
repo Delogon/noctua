@@ -2,13 +2,15 @@ import { foldSharpS } from '../search/fold'
 import { fuzzySenderThreadKeys } from '../search/fuzzy-sender'
 import { queryTerms } from '../search/semantic'
 import { randomUUID } from 'node:crypto'
+import { isDev } from '../dev-mode'
 import { currentDateLine, localStamp } from './prompt-date'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import { htmlToText } from '../mail/parser'
-import { extractUsage, getDraftModel, getOpenRouter, providerBody } from './openrouter'
-import { isBudgetExceeded, logUsage } from './budget'
+import { requireTaskWithBudget } from './providers/registry'
+import type { ResolvedTask } from './providers/types'
+import { logUsage } from './budget'
 import { embedQuery } from './embeddings'
 import { blendThreadKeys, isTemporalQuestion } from './chat-recency'
 
@@ -86,16 +88,18 @@ export function senderInventory(db: Database.Database, limit = 60): string {
   return labels.join(', ')
 }
 
-async function expandQuery(db: Database.Database, question: string): Promise<string[]> {
-  const client = getOpenRouter()!
+async function expandQuery(
+  db: Database.Database,
+  question: string,
+  resolved: ResolvedTask
+): Promise<string[]> {
   // Draft-Modell: die Assoziation "Beschreibung -> Produktname" (z. B.
   // "künstliche Stimmen" -> ElevenLabs) schafft das kleine Modell nicht
   // zuverlässig; ein Call pro Chat-Frage ist es wert.
-  const model = getDraftModel()
-  // Kein response_format: Anthropic-Modelle unterstützen json_object über
+  const { client, model } = resolved
+  // Kein json-Modus: Anthropic-Modelle unterstützen json_object über
   // OpenRouter nicht — JSON kommt per Instruktion und wird robust extrahiert.
-  const response = await client.chat.completions.create({
-    ...providerBody(),
+  const response = await client.complete({
     model,
     messages: [
       {
@@ -109,24 +113,23 @@ Antworte NUR mit JSON: {"keywords": ["…"]}`
       { role: 'user', content: question }
     ],
     temperature: 0.2,
-    max_tokens: 300,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...({ usage: { include: true } } as any)
+    maxTokens: 300
   })
-  const { inputTokens, outputTokens, costUsd } = extractUsage(response.usage)
+  const { inputTokens, outputTokens, costUsd } = response.usage
   logUsage(db, model, inputTokens, outputTokens, costUsd)
-  const raw = response.choices[0]?.message?.content ?? ''
+  const raw = response.text
   try {
     const jsonText = raw.match(/\{[\s\S]*\}|\[[\s\S]*\]/)?.[0] ?? raw
     const keywords = keywordSchema.parse(JSON.parse(jsonText))
-    console.log(`[chat] keywords: ${keywords.join(', ')}`)
+    // Suchbegriffe stammen aus der Nutzerfrage — nur in Dev loggen
+    if (isDev) console.log(`[chat] keywords: ${keywords.join(', ')}`)
     return keywords
   } catch (error) {
     console.warn(
       '[chat] Query-Expansion unlesbar, Wort-Fallback:',
       (error as Error).message.slice(0, 120),
-      '| raw:',
-      raw.slice(0, 200)
+      // Modellantwort kann Mail-Inhalt enthalten: im Release nur die Länge
+      !isDev ? `| raw: ${raw.length} Zeichen` : `| raw: ${raw.slice(0, 200)}`
     )
     return question.split(/\s+/).filter((w) => w.length > 3)
   }
@@ -256,13 +259,12 @@ async function runChat(
   chatId: string,
   input: ChatInput
 ): Promise<void> {
-  const client = getOpenRouter()
-  if (!client) throw new Error('Kein OpenRouter-Key hinterlegt (⌘, Einstellungen)')
-  if (isBudgetExceeded(db)) throw new Error('AI-Budget erschöpft')
+  // Local only / kein Key / Budget: klare Fehlermeldung statt stiller Leere
+  const resolved = requireTaskWithBudget(db, 'draft')
 
   const retrievalText = buildRetrievalText(input.question, input.history)
 
-  const keywords = await expandQuery(db, retrievalText)
+  const keywords = await expandQuery(db, retrievalText, resolved)
   // Typo-tolerant sender channel first: "letzte Mail von jens buetfisch"
   // must surface that sender's threads even when full text misses (M92).
   // "alle Mails von …" widens the channel so the answer can enumerate.
@@ -307,14 +309,14 @@ async function runChat(
           .join('\n\n')
       : '(keine passenden Mails gefunden)'
 
-  const model = getDraftModel()
-  const stream = await client.chat.completions.create({
-    ...providerBody(),
-    model,
-    messages: [
-      {
-        role: 'system',
-        content: `${currentDateLine()}
+  const { client, model } = resolved
+  const streamed = await client.stream(
+    {
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: `${currentDateLine()}
 Du beantwortest Fragen über das E-Mail-Postfach des Nutzers.
 Zeitbezüge wie „diesen Monat" oder „gestern" beziehen sich auf das heutige Datum.
 Der Kontext enthält thematisch passende UND die zuletzt eingetroffenen Mails
@@ -323,36 +325,27 @@ diesen Zeitangaben.
 Nutze AUSSCHLIESSLICH den bereitgestellten Mail-Kontext. Verweise auf Quellen mit [n].
 Wenn die Antwort nicht im Kontext steht, sage das ehrlich statt zu raten.
 Antworte knapp und konkret auf Deutsch (Beträge, Daten, Namen nennen).`
-      },
-      ...input.history.slice(-6),
-      {
-        role: 'user' as const,
-        content: `Mail-Kontext:\n\n${contextBlock}\n\nFrage: ${input.question}`
-      }
-    ],
-    temperature: 0.2,
-    max_tokens: 900,
-    stream: true,
-    stream_options: { include_usage: true }
-  })
-
-  let usageLogged = false
-  let charCount = 0
-  for await (const part of stream) {
-    const delta = part.choices[0]?.delta?.content ?? ''
-    if (delta) {
-      charCount += delta.length
+        },
+        ...input.history.slice(-6),
+        {
+          role: 'user' as const,
+          content: `Mail-Kontext:\n\n${contextBlock}\n\nFrage: ${input.question}`
+        }
+      ],
+      temperature: 0.2,
+      maxTokens: 900
+    },
+    (delta) => {
       push('ai:chatChunk', { chatId, chunk: delta, done: false, error: null, sources: null })
     }
-    if (part.usage) {
-      const { inputTokens, outputTokens, costUsd } = extractUsage(part.usage)
-      logUsage(db, model, inputTokens, outputTokens, costUsd)
-      usageLogged = true
-    }
-  }
-  if (!usageLogged) {
-    logUsage(db, model, 0, Math.ceil(charCount / 4), (Math.ceil(charCount / 4) * 25) / 1_000_000)
-  }
+  )
+  logUsage(
+    db,
+    model,
+    streamed.usage.inputTokens,
+    streamed.usage.outputTokens,
+    streamed.usage.costUsd
+  )
   push('ai:chatChunk', {
     chatId,
     chunk: '',

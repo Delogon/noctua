@@ -2,7 +2,10 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import { useAccounts } from '@renderer/queries/accounts'
-import { useOrKeyStatus } from '@renderer/queries/intel'
+import { useOrgInfo, useProfiles } from '@renderer/queries/intel'
+import { OnboardingOrgProfiles } from '@renderer/features/paper/OnboardingOrgProfiles'
+import { OnboardingAiStep } from '@renderer/features/paper/OnboardingAi'
+import { useOnboardingAi } from '@renderer/features/paper/useOnboardingAi'
 import { usePaper } from '@renderer/stores/paper'
 import { useT } from '@renderer/lib/i18n'
 import { OwlGlyph } from '@renderer/components/paper/OwlGlyph'
@@ -10,16 +13,15 @@ import {
   enterAction,
   finishCtaEnabled,
   rowState,
-  trainCtaEnabled,
   type ObStep,
   type TrainRowState
 } from '@renderer/features/paper/onboarding-steps'
 
-// 4-Schritte-Onboarding nach Design 1b (welcome → connect → key → training)
+// 4-Schritte-Onboarding nach Design 1b (welcome → connect → ai → training)
 // — mit ECHTEN Flows: Google und Microsoft öffnen den Browser-OAuth (M46),
-// IMAP nimmt Host + App-Passwort inline, Schritt 3 speichert den OpenRouter-Schlüssel
-// über denselben Kanal wie das Intelligenz-Sheet (secrets:set), und das
-// Stil-Training in Schritt 4 zeigt ehrlich, ob es läuft, pausiert oder
+// IMAP nimmt Host + App-Passwort inline, Schritt 3 fragt „Wo soll die KI
+// laufen?" (lokaler Server zuerst — OnboardingAi.tsx, useOnboardingAi.ts), und
+// das Stil-Training in Schritt 4 zeigt ehrlich, ob es läuft, pausiert oder
 // gescheitert ist — nie ein erfundenes 100 %.
 
 interface TrainRow {
@@ -36,7 +38,8 @@ export function Onboarding(): React.JSX.Element {
   const t = useT()
   const queryClient = useQueryClient()
   const accounts = useAccounts()
-  const orStatus = useOrKeyStatus()
+  const orgInfo = useOrgInfo()
+  const profiles = useProfiles()
   const { setOnboarding, toastNow } = usePaper()
   const [step, setStep] = useState<ObStep>(1)
   const [form, setForm] = useState<'gmail' | 'microsoft' | 'imap' | null>(null)
@@ -47,45 +50,26 @@ export function Onboarding(): React.JSX.Element {
   const [pass, setPass] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [train, setTrain] = useState<TrainRow[]>([])
-  // Schritt 4 im Pausen-Modus: Schlüssel übersprungen, Spuren bleiben leer
+  // Schritt 4 im Pausen-Modus: keine Entwurfs-KI, Spuren bleiben leer
   const [paused, setPaused] = useState(false)
-  // Schlüssel-Schritt: Eingabe, Inline-Fehler, lokal bestätigter Save
-  const [key, setKey] = useState('')
-  const [keyErr, setKeyErr] = useState<string | null>(null)
-  const [keyBusy, setKeyBusy] = useState(false)
-  const [keySaved, setKeySaved] = useState(false)
+  const [committing, setCommitting] = useState(false)
   const keyInputRef = useRef<HTMLInputElement | null>(null)
 
   const connected = accounts.data ?? []
-  // Replay-Fall: existiert schon ein Schlüssel (ai:usage), ist der CTA sofort aktiv
-  const keyReady = keySaved || orStatus.data?.hasKey === true
+  // Company Edition mit hideOpenRouterOnboarding: Profile der Organisation statt
+  // KI-Wahl — dieser Pfad hat Vorrang und verhält sich wie bisher.
+  const orgMode = orgInfo.data?.hideOpenRouterOnboarding === true
+  const orgProfiles = (profiles.data ?? []).filter((p) => p.managed)
+  const orgReady = orgProfiles.some((p) => p.isLocal || p.hasKey)
+  const ai = useOnboardingAi(step === 3 && !orgMode)
+  // Schritt-3-CTA: Org-Pfad braucht einen Schlüssel, sonst zählt die gewählte Option
+  const aiReady = orgMode ? orgReady : ai.ready
+  const aiTrains = orgMode ? orgReady : ai.trains
 
   const finish = (): void => {
     void invoke('settings:set', { key: 'noctua.onboarded', value: '1' })
     setOnboarding(false)
     setTimeout(() => toastNow(t('toastWelcome')), 600)
-  }
-
-  const saveKey = (): void => {
-    const k = key.trim()
-    // Gleiche Prüfung wie im Intelligenz-Sheet — Fehler inline, kein Toast (Design 1b)
-    if (!k.startsWith('sk-or-') || k.length <= 14) {
-      setKeyErr(t('toastKeyInvalid'))
-      return
-    }
-    if (keyBusy) return
-    setKeyBusy(true)
-    void invoke('secrets:set', { key: 'openrouter.apiKey', value: k })
-      .then(() => {
-        setKey('')
-        setKeyErr(null)
-        setKeySaved(true)
-        // Fokus raus aus dem Input, damit ↵ jetzt den CTA (Training) auslöst
-        keyInputRef.current?.blur()
-        void queryClient.invalidateQueries({ queryKey: ['ai'] })
-      })
-      .catch((err) => setKeyErr(err instanceof Error ? err.message : String(err)))
-      .finally(() => setKeyBusy(false))
   }
 
   /** Trainiert EIN Konto: Fortschritts-Intervall bis 92 %, dann ehrliches Ende. */
@@ -139,8 +123,8 @@ export function Onboarding(): React.JSX.Element {
       })
   }
 
-  /** Wechsel zu Schritt 4 — mit Schlüssel läuft das Training, ohne pausiert es. */
-  const goTraining = (withKey: boolean): void => {
+  /** Wechsel zu Schritt 4 — mit Entwurfs-KI läuft das Training, ohne pausiert es. */
+  const goTraining = (runs: boolean): void => {
     const rows: TrainRow[] = connected.map((a) => ({
       accountId: a.id,
       accountName: a.accountName,
@@ -150,15 +134,26 @@ export function Onboarding(): React.JSX.Element {
       running: false,
       failed: false
     }))
-    setPaused(!withKey)
+    setPaused(!runs)
     setTrain(rows)
     setStep(4)
-    if (withKey) rows.forEach((row, i) => setTimeout(() => runRow(row.accountId), i * 500))
+    if (runs) rows.forEach((row, i) => setTimeout(() => runRow(row.accountId), i * 500))
   }
 
   const rowStates: TrainRowState[] = train.map((r) => rowState(r, paused))
   const finishEnabled = finishCtaEnabled(rowStates)
-  const trainEnabled = trainCtaEnabled(keyReady)
+
+  /** Schritt-3-CTA: gewählte KI-Option einrichten (nicht im Org-Pfad), dann Schritt 4. */
+  const continueFromAi = async (): Promise<void> => {
+    if (!aiReady || committing) return
+    if (!orgMode) {
+      setCommitting(true)
+      const ok = await ai.commit()
+      setCommitting(false)
+      if (!ok) return
+    }
+    goTraining(aiTrains)
+  }
 
   // Enter steuert die Schritte (Spec) — Gating liegt in onboarding-steps.ts.
   // Buttons sind ausgenommen: dort feuert Enter schon den nativen Klick.
@@ -167,22 +162,30 @@ export function Onboarding(): React.JSX.Element {
       const tag = (e.target as HTMLElement | null)?.tagName ?? ''
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return
       if (e.key !== 'Enter') return
-      const action = enterAction(step, { connectedCount: connected.length, keyReady, rowStates })
+      const action = enterAction(step, {
+        connectedCount: connected.length,
+        aiReady,
+        aiTrains,
+        aiSkip: !orgMode && ai.choice === 'skip',
+        rowStates
+      })
       if (!action) return
       if (action.kind === 'to-connect') setStep(2)
       else if (action.kind === 'toast-connect-one') toastNow(t('toastConnectOne'))
       else if (action.kind === 'to-key') setStep(3)
-      else if (action.kind === 'to-training') goTraining(true)
+      else if (action.kind === 'to-training' || action.kind === 'to-training-paused')
+        void continueFromAi()
       else if (action.kind === 'finish') finish()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  // Schritt 3 ohne Schlüssel: Input fokussieren — auch beim Rücksprung über ADD KEY
+  // Cloud/OpenRouter ohne Schlüssel: Input fokussieren
+  const focusKey = step === 3 && !orgMode && ai.choice === 'cloud' && ai.cloudKind === 'openrouter'
   useEffect(() => {
-    if (step === 3 && !keyReady) keyInputRef.current?.focus()
-  }, [step, keyReady])
+    if (focusKey && !ai.state.openrouterKey) keyInputRef.current?.focus()
+  }, [focusKey, ai.state.openrouterKey])
 
   // Laufenden Flow markieren: Ein Neustart mittendrin setzt das Onboarding
   // dann fort, statt verbundene Konten als „Bestandsinstallation" zu werten
@@ -193,9 +196,7 @@ export function Onboarding(): React.JSX.Element {
 
   // Wiederaufnahme nach Unterbrechung: Sind schon Konten verbunden, ist der
   // Willkommens-Schritt erledigt — direkt bei VERBINDEN weitermachen.
-  useEffect(() => {
-    if (step === 1 && connected.length > 0) setStep(2)
-  }, [step, connected.length])
+  if (step === 1 && connected.length > 0) setStep(2)
 
   // Erst-Sync live verfolgen: Solange ein Konto lädt, die Kontenliste alle
   // 2,5 s neu ziehen — Mail-Zähler und Puls-Punkt bleiben so ehrlich.
@@ -534,7 +535,9 @@ export function Onboarding(): React.JSX.Element {
             <div className="mlabel" style={{ letterSpacing: 2, color: 'var(--ac)' }}>
               {t('obStep3')}
             </div>
-            <div style={{ font: '500 24px var(--serif)', marginTop: 8 }}>{t('obKeyHead')}</div>
+            <div style={{ font: '500 24px var(--serif)', marginTop: 8 }}>
+              {orgMode ? t('obOrgHead') : t('obAiHead')}
+            </div>
             <div
               style={{
                 font: '400 13.5px/1.6 var(--serif)',
@@ -543,106 +546,54 @@ export function Onboarding(): React.JSX.Element {
                 marginTop: 4
               }}
             >
-              {t('obKeySub')}
+              {orgMode ? t('obOrgSub') : t('obAiSub')}
             </div>
 
-            <div className="tint-card" style={{ padding: 14, marginTop: 22 }}>
-              <div className="mlabel" style={{ color: 'var(--muted)' }}>
-                {t('obKeyLabel')}
-              </div>
-              <div className="flex gap-2" style={{ marginTop: 8 }}>
-                <input
-                  ref={keyInputRef}
-                  value={key}
-                  onChange={(e) => {
-                    setKey(e.target.value)
-                    setKeyErr(null)
-                  }}
-                  onKeyDown={(e) => {
-                    // Enter im Input = speichern, nie Schritt-Weiter (Design 1b)
-                    if (e.key === 'Enter') saveKey()
-                    e.stopPropagation()
-                  }}
-                  type="password"
-                  placeholder="sk-or-v1-…"
-                  className="paper-input flex-1"
-                  aria-label={t('obKeyLabel')}
-                />
-                <button
-                  type="button"
-                  onClick={saveKey}
-                  className="btn-bare flex-none"
-                  style={{
-                    font: '500 10px var(--mono)',
-                    letterSpacing: 1,
-                    color: 'var(--paper)',
-                    background: 'var(--ink)',
-                    padding: '8px 14px'
-                  }}
-                >
-                  {keyBusy ? '···' : t('obKeySave')}
-                </button>
-              </div>
-              {keyErr ? (
+            {orgMode ? (
+              <>
+                <OnboardingOrgProfiles profiles={orgProfiles} />
                 <div
-                  role="alert"
-                  style={{ font: '400 9px var(--mono)', color: 'var(--ac)', marginTop: 8 }}
+                  style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)', marginTop: 12 }}
                 >
-                  {keyErr}
+                  {t('obKeyModelsNote')}
                 </div>
-              ) : (
-                <div
-                  style={{
-                    font: '400 9px var(--mono)',
-                    color: keyReady ? 'var(--ink)' : 'var(--muted)',
-                    marginTop: 8
-                  }}
-                >
-                  {keyReady ? t('orSaved') : t('orNoKey')}
-                </div>
-              )}
-              <div style={{ font: '400 9px var(--mono)', color: 'var(--faint)', marginTop: 4 }}>
-                {t('obKeyFootnotePre')}
-                <button
-                  type="button"
-                  onClick={() =>
-                    void invoke('app:openExternal', { url: 'https://openrouter.ai/keys' })
-                  }
-                  className="btn-bare"
-                  style={{ color: 'var(--faint)', borderBottom: '1px solid var(--hairline)' }}
-                >
-                  openrouter.ai/keys
-                </button>
-                {t('obKeyFootnotePost')}
-              </div>
-            </div>
-
-            <div style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)', marginTop: 12 }}>
-              {t('obKeyModelsNote')}
-            </div>
+              </>
+            ) : (
+              <OnboardingAiStep ai={ai} keyInputRef={keyInputRef} />
+            )}
 
             <div className="flex items-center gap-4" style={{ marginTop: 26 }}>
               <button
                 type="button"
-                onClick={() => (trainEnabled ? goTraining(true) : keyInputRef.current?.focus())}
+                onClick={() => (aiReady ? void continueFromAi() : keyInputRef.current?.focus())}
                 className="btn-bare"
-                style={ctaStyle(trainEnabled)}
-                aria-disabled={!trainEnabled}
+                style={ctaStyle(aiReady)}
+                aria-disabled={!aiReady}
               >
-                {t('obTrainCta')}
+                {committing
+                  ? '···'
+                  : orgMode
+                    ? t('obTrainCta')
+                    : ai.choice === 'skip'
+                      ? t('obAiContinueSkip')
+                      : aiTrains
+                        ? t('obTrainCta')
+                        : t('obContinue')}
               </button>
-              <button
-                type="button"
-                onClick={() => goTraining(false)}
-                className="btn-bare"
-                style={{
-                  font: '400 10px var(--mono)',
-                  color: 'var(--faint)',
-                  borderBottom: '1px solid var(--hairline)'
-                }}
-              >
-                {t('obKeySkip')}
-              </button>
+              {orgMode && (
+                <button
+                  type="button"
+                  onClick={() => goTraining(false)}
+                  className="btn-bare"
+                  style={{
+                    font: '400 10px var(--mono)',
+                    color: 'var(--faint)',
+                    borderBottom: '1px solid var(--hairline)'
+                  }}
+                >
+                  {t('obKeySkip')}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -680,7 +631,11 @@ export function Onboarding(): React.JSX.Element {
                         style={{ font: '500 9px var(--mono)', color: 'var(--ac)' }}
                       >
                         {state === 'paused' ? (
-                          t('obPausedNoKey')
+                          orgMode ? (
+                            t('obPausedNoKey')
+                          ) : (
+                            t('obAiPausedNoAi')
+                          )
                         ) : state === 'failed' ? (
                           <>
                             {t('obFailed')}{' '}
@@ -744,7 +699,11 @@ export function Onboarding(): React.JSX.Element {
                     color: 'var(--secondary)'
                   }}
                 >
-                  {t('obPausedCallout')}
+                  {orgMode
+                    ? t('obPausedCallout')
+                    : ai.choice === 'apple'
+                      ? t('obAiPausedCalloutApple')
+                      : t('obAiPausedCallout')}
                 </span>
                 <button
                   type="button"
@@ -758,7 +717,7 @@ export function Onboarding(): React.JSX.Element {
                     padding: '5px 12px'
                   }}
                 >
-                  {t('obAddKey')}
+                  {orgMode ? t('obAddKey') : t('obAiSetUp')}
                 </button>
               </div>
             )}
@@ -773,7 +732,11 @@ export function Onboarding(): React.JSX.Element {
                 {t('obEnterCta')}
               </button>
               <span style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}>
-                {paused ? t('obPausedFootnote') : t('obRetrainNote')}
+                {paused
+                  ? orgMode
+                    ? t('obPausedFootnote')
+                    : t('obAiPausedFootnote')
+                  : t('obRetrainNote')}
               </span>
             </div>
           </div>
