@@ -30,7 +30,9 @@ const WRITABLE_EXACT = new Set([
   'tasks.autoCreate',
   // Entwürfe dürfen freie Zeitfenster (ohne Termindetails) nutzen; '0' = aus
   'ai.draftUseCalendar',
-  'compose.draft'
+  'compose.draft',
+  // Benachrichtigungen ohne Absender/Betreff/Kurzfassung; Schwellen bleiben intern
+  'notifications.hideContent'
 ])
 
 const WRITABLE_PATTERNS = [

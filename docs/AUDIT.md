@@ -12,11 +12,20 @@ except where noted under _Remaining_. Phase 0 fixed SEC-1…14, PRV-3/4/6/8, REL
 PRV-1 (provider profiles, Local only), PRV-5 (SQLCipher), PRV-7 (org-config OAuth IDs); Phase 2.4
 fixed SEC-15 for triage, reply drafts and event extraction.
 
+**Strix audit (2026-10-06):** vuln-0008 (deep BODYSTRUCTURE → stack overflow; now iterative),
+vuln-0009 (MSAL refresh token kept after account removal), vuln-0010 = PRV-9 (Proton Bridge:
+mandatory STARTTLS on loopback + trust-on-first-use certificate pinning in
+`accounts.tls_fingerprint256`, see `main/auth/loopback-tls.ts`; re-entering the password trusts a
+new Bridge certificate), vuln-0011 (huge `References` header exceeded SQLite's bind limit; capped),
+vuln-0012 (profile key dropped when the base URL changes), vuln-0013 (SEC-15 for Owl chat and the
+follow-up fallback), vuln-0014 (`temp_store = MEMORY` on the encrypted DB), vuln-0015 (setting to
+hide sender/subject/summary in notifications), vuln-0003…0007 (`nanoid` 2.x replaced by
+`vendor/nanoid-compat` via a pnpm override) — all fixed.
+
 **Remaining:** PRV-2 (`ai_enabled` default — now configurable via org config
-`defaults.aiEnabledForNewAccounts`, upstream default unchanged), PRV-9 (Proton Bridge cert
-pinning), SEC-9 partially (allowlist still keyed on From; tracking pixels stripped), 4 `nanoid`
-advisories via `hunspell-asm` (no patched release — replace the spellchecker), SEC-15 for
-chat/Owl and nudge drafts, AI annotations lost on UIDVALIDITY reset. Everything macOS-specific
+`defaults.aiEnabledForNewAccounts`, upstream default unchanged), SEC-9 partially (allowlist still
+keyed on From; tracking pixels stripped), SEC-15 for nudge drafts and Sent-mail style examples
+(user's own text), AI annotations lost on UIDVALIDITY reset. Everything macOS-specific
 is unverified until run on a Mac — see [VERIFICATION.md](VERIFICATION.md).
 
 ## Summary

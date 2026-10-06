@@ -944,6 +944,14 @@ const table = {
     en: 'per-sender allow remembers your choice',
     de: 'Freigaben pro Absender merkt sich die Eule'
   },
+  notifyHideToggle: {
+    en: 'hide sender and subject in notifications',
+    de: 'Absender und Betreff in Benachrichtigungen ausblenden'
+  },
+  notifyHideNote: {
+    en: 'keeps email content off the lock screen',
+    de: 'hält E-Mail-Inhalte vom Sperrbildschirm fern'
+  },
   intelFootnote: {
     en: 'No key? Email still works — the owl just sleeps: no gists, no drafts, no counting.',
     de: 'Kein Schlüssel? E-Mail funktioniert trotzdem – nur die Eule schläft: keine Kurzfassungen, keine Entwürfe, kein Zählen.'

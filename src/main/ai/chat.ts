@@ -13,6 +13,12 @@ import type { ResolvedTask } from './providers/types'
 import { logUsage } from './budget'
 import { embedQuery } from './embeddings'
 import { blendThreadKeys, isTemporalQuestion } from './chat-recency'
+import {
+  sanitizeUntrusted,
+  sanitizeUntrustedLine,
+  UNTRUSTED_SYSTEM_NOTE,
+  wrapUntrusted
+} from './untrusted'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
@@ -135,7 +141,7 @@ Antworte NUR mit JSON: {"keywords": ["…"]}`
   }
 }
 
-interface RetrievedThread {
+export interface RetrievedThread {
   threadKey: string
   subject: string | null
   context: string
@@ -208,7 +214,7 @@ function newestThreadKeys(db: Database.Database, limit: number): string[] {
   ).map((r) => r.thread_key)
 }
 
-function loadThreadContexts(db: Database.Database, threadKeys: string[]): RetrievedThread[] {
+export function loadThreadContexts(db: Database.Database, threadKeys: string[]): RetrievedThread[] {
   return threadKeys.map((thread_key) => {
     const messages = db
       .prepare(
@@ -226,15 +232,36 @@ function loadThreadContexts(db: Database.Database, threadKeys: string[]): Retrie
     }>
     const context = messages
       .map((m) => {
-        const body = (m.text_plain?.trim() || htmlToText(m.html_raw ?? '')).slice(0, 700)
+        // SEC-15: Mailtext fremder Absender ist Daten, keine Anweisung
+        const body = sanitizeUntrusted(m.text_plain?.trim() || htmlToText(m.html_raw ?? ''), 700)
         // Mit Uhrzeit in Lokalzeit: „Welche Mails kamen heute an?" braucht
         // mehr als das Datum, und UTC würde abends das Datum verschieben.
         const when = m.date ? localStamp(m.date) : '?'
-        return `Von ${m.from_name ?? m.from_addr ?? '?'} am ${when}:\n${body}`
+        const from = sanitizeUntrustedLine(m.from_name ?? m.from_addr ?? '?')
+        return `Von ${from} am ${when}:\n${body}`
       })
       .join('\n---\n')
     return { threadKey: thread_key, subject: messages[0]?.subject ?? null, context }
   })
+}
+
+/**
+ * Kontextblock für den Chat-Prompt. Jeder Thread steht in eigenen
+ * UNTRUSTED-Delimitern (SEC-15, vuln-0013): Mails fremder Absender dürfen die
+ * Antwort nicht per eingebetteter Anweisung steuern.
+ */
+export function formatContextBlock(threads: RetrievedThread[]): string {
+  if (threads.length === 0) return '(keine passenden Mails gefunden)'
+  return threads
+    .map(
+      (t, i) =>
+        `[${i + 1}]\n` +
+        wrapUntrusted(
+          'THREAD',
+          `Betreff: ${sanitizeUntrustedLine(t.subject) || '(ohne Betreff)'}\n${t.context}`
+        )
+    )
+    .join('\n\n')
 }
 
 /**
@@ -302,12 +329,7 @@ async function runChat(
   )
   const threads = loadThreadContexts(db, merged)
 
-  const contextBlock =
-    threads.length > 0
-      ? threads
-          .map((t, i) => `[${i + 1}] Betreff: ${t.subject ?? '(ohne Betreff)'}\n${t.context}`)
-          .join('\n\n')
-      : '(keine passenden Mails gefunden)'
+  const contextBlock = formatContextBlock(threads)
 
   const { client, model } = resolved
   const streamed = await client.stream(
@@ -324,7 +346,9 @@ Der Kontext enthält thematisch passende UND die zuletzt eingetroffenen Mails
 diesen Zeitangaben.
 Nutze AUSSCHLIESSLICH den bereitgestellten Mail-Kontext. Verweise auf Quellen mit [n].
 Wenn die Antwort nicht im Kontext steht, sage das ehrlich statt zu raten.
-Antworte knapp und konkret auf Deutsch (Beträge, Daten, Namen nennen).`
+Antworte knapp und konkret auf Deutsch (Beträge, Daten, Namen nennen).
+
+${UNTRUSTED_SYSTEM_NOTE}`
         },
         ...input.history.slice(-6),
         {

@@ -26,12 +26,18 @@ describe('buildImapOptions', () => {
     expect(opts.secure).toBe(false)
   })
 
-  it('akzeptiert selbstsignierte Zertifikate NUR auf Loopback (Proton Bridge)', () => {
+  it('Loopback (Proton Bridge) nur mit gepinntem Zertifikat, sonst strikte CA-Prüfung', () => {
+    const pinned = {
+      rejectUnauthorized: true as const,
+      ca: ['pem'],
+      checkServerIdentity: () => undefined
+    }
     const bridge = buildImapOptions(
       { ...base, imap_host: '127.0.0.1', imap_port: 1143 },
-      { user: 'x', pass: 'p' }
+      { user: 'x', pass: 'p' },
+      pinned
     )
-    expect(bridge.tls).toEqual({ rejectUnauthorized: false })
+    expect(bridge.tls).toBe(pinned)
     // Für echte Hosts bleibt die Zertifikatsprüfung strikt an
     const remote = buildImapOptions(base, { user: 'x', pass: 'p' })
     expect(remote.tls).toBeUndefined()
@@ -53,10 +59,19 @@ describe('buildImapOptions — Transportsicherheit (SEC-3)', () => {
     expect(opts.doSTARTTLS).toBe(true)
   })
 
-  it('Loopback (Bridge) bleibt opportunistisch', () => {
-    const opts = buildImapOptions({ ...base, imap_host: '127.0.0.1', imap_port: 1143 }, creds)
+  it('Loopback (Bridge): STARTTLS ist ebenfalls Pflicht (vuln-0010)', () => {
+    const pinned = {
+      rejectUnauthorized: true as const,
+      ca: ['pem'],
+      checkServerIdentity: () => undefined
+    }
+    const opts = buildImapOptions(
+      { ...base, imap_host: '127.0.0.1', imap_port: 1143 },
+      creds,
+      pinned
+    )
     expect(opts.secure).toBe(false)
-    expect(opts.doSTARTTLS).toBeUndefined()
+    expect(opts.doSTARTTLS).toBe(true)
   })
 
   it('setzt Timeouts; socketTimeout bleibt IDLE-tauglich (>= 5 min)', () => {

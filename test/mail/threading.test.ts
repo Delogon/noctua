@@ -133,4 +133,24 @@ describe('computeThreadKey', () => {
     })
     expect(key.startsWith(`${accountId}:msg:`)).toBe(true)
   })
+
+  it('übersteht References mit Zehntausenden IDs (SQLite-Bind-Limit, vuln-0011)', () => {
+    setup()
+    const folderId = seedFolder(db, accountId, '\\Sent')
+    db.prepare(
+      `INSERT INTO messages (account_id, folder_id, uid, message_id, thread_key, date)
+       VALUES (?, ?, 1, '<parent@x>', 'thread-parent', 1000)`
+    ).run(accountId, folderId)
+    const junk = Array.from({ length: 40_000 }, (_, i) => `<junk${i}@evil>`)
+
+    const key = computeThreadKey(db, accountId, {
+      gmThrid: null,
+      messageId: '<reply@x>',
+      inReplyTo: '<parent@x>',
+      references: junk,
+      subject: 'Re: Thema'
+    })
+    // In-Reply-To steht hinten und bleibt erhalten → richtiger Thread
+    expect(key).toBe('thread-parent')
+  })
 })

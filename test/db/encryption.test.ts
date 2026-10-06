@@ -98,6 +98,8 @@ describe('verschlüsselte DB', () => {
     const ok = openEncrypted(dbPath, KEY)
     sqliteVec.load(ok)
     expect(ok.prepare('SELECT count(*) AS c FROM v').get()).toEqual({ c: 0 })
+    // Temp-Dateien im RAM: der Codec verschlüsselt sie nicht (vuln-0014)
+    expect(ok.pragma('temp_store', { simple: true })).toBe(2)
     ok.close()
 
     expect(() => openEncrypted(dbPath, 'cd'.repeat(32))).toThrow(/entschlüsselt/)

@@ -43,7 +43,7 @@ export default {
     '!.claude/**',
     '!.codex-work/**',
     '!{coverage,output,outputs,tmp}/**',
-    '!{test,scripts}/**',
+    '!{test,scripts,vendor}/**',
     '!vitest.config.ts',
     // Die Org-Konfiguration steckt im Main-Bundle; die Datei selbst gehört nicht ins Paket.
     '!build/org-config*.json'

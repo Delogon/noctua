@@ -256,9 +256,14 @@ export class FollowupRadar {
           {
             role: 'system',
             content:
-              'Der Nutzer hat diese E-Mail GESENDET. Beurteile, ob er darauf realistisch eine Antwort erwartet (Frage gestellt, Bitte geäußert, Angebot gemacht). Antworte NUR mit JSON: {"expects_reply": true|false}'
+              'Der Nutzer hat diese E-Mail GESENDET. Beurteile, ob er darauf realistisch eine Antwort erwartet (Frage gestellt, Bitte geäußert, Angebot gemacht). Antworte NUR mit JSON: {"expects_reply": true|false}\n\n' +
+              UNTRUSTED_SYSTEM_NOTE
           },
-          { role: 'user', content: `Betreff: ${candidate.subject ?? ''}\n\n${text}` }
+          {
+            role: 'user',
+            // Gesendete Mails zitieren oft fremden Text — gleiche Härtung wie oben (SEC-15)
+            content: `Betreff: ${sanitizeUntrustedLine(candidate.subject, 300)}\n\n${wrapUntrusted('MAIL', sanitizeUntrusted(text, 2500))}`
+          }
         ],
         json: true,
         temperature: 0,
