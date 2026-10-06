@@ -76,7 +76,10 @@ function getPca(): PublicClientApplication {
 async function findAccount(email: string): Promise<AccountInfo | null> {
   const accounts = await getPca().getTokenCache().getAllAccounts()
   const lower = email.toLowerCase()
-  return accounts.find((a) => a.username.toLowerCase() === lower) ?? accounts[0] ?? null
+  // Kein Fallback auf accounts[0]: ein Token für ein ANDERES Konto wäre am
+  // IMAP/SMTP-Server (user ≠ Token-Konto) ohnehin ungültig — sauber
+  // weiterreichen, damit der Syncer in needs-reauth läuft statt in Fehlversuchen.
+  return accounts.find((a) => a.username.toLowerCase() === lower) ?? null
 }
 
 /** Der gerade wartende Loopback-Client — Ziel des CANCEL-Knopfs (Design 3b). */

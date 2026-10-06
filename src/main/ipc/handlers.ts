@@ -450,6 +450,10 @@ export const handlers: IpcHandlers = {
     // Google-Refresh-Token hängt an der Adresse, nicht an der Konto-ID
     if (row?.credential_type === 'oauth-google') {
       deleteSecret(`google:refresh:${row.email.toLowerCase()}`)
+    } else if (row?.credential_type === 'oauth-ms') {
+      // MSAL serialisiert alle Konten in einen Cache-Blob (ms.tokenCache) —
+      // das Refresh-Token überlebt sonst die Kontolöschung im Vault.
+      await msForgetAccount(row.email).catch(() => {})
     }
     return { ok: true }
   },

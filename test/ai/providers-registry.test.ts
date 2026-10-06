@@ -118,6 +118,22 @@ describe('Profil-CRUD', () => {
     })
   })
 
+  it('verwirft den Key, wenn die Basis-URL eines Profils geändert wird', () => {
+    const p = createProfile({ ...local, baseUrl: 'https://api.example.com/v1' })
+    setProfileKey(p.id, 'geheim')
+    // Basis-URL-Änderung (auch nur Pfad/Port) verwirft den Key: der Vault-Key
+    // darf nie an einen anderen Endpunkt gesendet werden als den, für den er
+    // eingegeben wurde (Schutz vor renderer-gesteuerter Umleitung).
+    const changed = updateProfile(p.id, { baseUrl: 'http://evil.example/v1' })
+    expect(changed.baseUrl).toBe('http://evil.example/v1')
+    expect(changed.hasKey).toBe(false)
+    expect(hasSecret(`ai.profile.${p.id}.apiKey`)).toBe(false)
+    // Gleiche URL (andere Felder) hält den Key
+    setProfileKey(p.id, 'geheim2')
+    const renamed = updateProfile(p.id, { name: 'Weiter so' })
+    expect(renamed.hasKey).toBe(true)
+  })
+
   it('löscht Profil samt Key; Aufgaben fallen auf OpenRouter zurück', () => {
     const p = createProfile(local)
     setProfileKey(p.id, 'k')

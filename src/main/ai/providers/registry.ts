@@ -133,6 +133,15 @@ export function updateProfile(
     apiStyle: !builtin && patch.apiStyle !== undefined ? patch.apiStyle : current.apiStyle,
     isLocal: !builtin && patch.isLocal !== undefined ? patch.isLocal : current.isLocal
   }
+  // SEC: Der Vault-Key gilt für die Basis-URL, für die er eingegeben wurde. Bei
+  // einer Änderung der Basis-URL wird er verworfen — der Key verlässt den
+  // Main-Prozess nie Richtung anderem Endpunkt (Schutz vor renderer-gesteuerter
+  // Umleitung eines profilierten Endpunkts auf einen Angreifer-Host).
+  const nextUrl = next.baseUrl !== current.baseUrl
+  if (nextUrl && current.hasKey) {
+    deleteSecret(profileSecretKey(current))
+    clientCache.delete(id)
+  }
   db.prepare(
     'UPDATE ai_profiles SET name = ?, base_url = ?, api_style = ?, is_local = ? WHERE id = ?'
   ).run(next.name, next.baseUrl, next.apiStyle, next.isLocal ? 1 : 0, id)
