@@ -1,4 +1,5 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
+import { davNamesForEmails, searchDavContacts } from '../../contacts/repo'
 
 /**
  * Baut contact_stats für ein Konto neu auf: sent_count aus den Empfängern des
@@ -61,7 +62,9 @@ export function recordSentContacts(
   recipients: string[],
   sentAt = Date.now()
 ): void {
-  const addresses = [...new Set(recipients.map(normalizeAddress).filter((addr): addr is string => !!addr))]
+  const addresses = [
+    ...new Set(recipients.map(normalizeAddress).filter((addr): addr is string => !!addr))
+  ]
   if (addresses.length === 0) return
   const upsert = db.prepare(
     `INSERT INTO contact_stats (account_id, addr, sent_count, received_count, last_interaction)
@@ -76,10 +79,7 @@ export function recordSentContacts(
 }
 
 /** Zuletzt genutztes Absenderkonto fuer einen bereits angeschriebenen Kontakt. */
-export function preferredAccountForContact(
-  db: Database.Database,
-  address: string
-): number | null {
+export function preferredAccountForContact(db: Database.Database, address: string): number | null {
   const normalized = normalizeAddress(address)
   if (!normalized) return null
   const row = db
@@ -96,11 +96,50 @@ export function preferredAccountForContact(
 }
 
 /**
- * Empfänger-Vorschläge aus der Kontakt-Historie (angeschrieben zählt dreifach,
- * empfangen einfach). Namen kommen aus dem häufigsten from_name der Adresse;
- * eigene Konto-Adressen werden ausgefiltert.
+ * Empfänger-Vorschläge: zuerst die lokale Kontakt-Historie (bestehendes
+ * Ranking), dann CardDAV-Kontakte. Dedupe nach Adresse; fehlt einem
+ * Historien-Treffer der Name, kommt er aus dem Adressbuch. Eigene
+ * Konto-Adressen erscheinen nie.
  */
 export function suggestContacts(
+  db: Database.Database,
+  query: string,
+  limit: number
+): ContactSuggestion[] {
+  const local = suggestFromHistory(db, query, limit)
+  let davRows: ReturnType<typeof searchDavContacts> = []
+  try {
+    davRows = searchDavContacts(db, query, limit * 2 + local.length)
+  } catch {
+    // Kontakt-Tabellen fehlen/sind gesperrt: Vorschläge bleiben ohne Adressbuch nutzbar
+  }
+  if (davRows.length === 0) return local
+
+  const davNames = new Map(davRows.map((r) => [r.addr, r.name]))
+  const missing = local.filter((c) => !c.name).map((c) => c.addr)
+  const looked = missing.length > 0 ? davNamesForEmails(db, missing) : new Map<string, string>()
+  const out: ContactSuggestion[] = local.map((c) => ({
+    addr: c.addr,
+    name: c.name ?? davNames.get(c.addr) ?? looked.get(c.addr) ?? null
+  }))
+  if (out.length >= limit) return out
+  const seen = new Set(out.map((c) => c.addr.toLowerCase()))
+  const own = new Set(
+    (
+      db.prepare('SELECT lower(email) AS email FROM accounts').all() as Array<{ email: string }>
+    ).map((r) => r.email)
+  )
+  for (const row of davRows) {
+    if (out.length >= limit) break
+    const key = row.addr.toLowerCase()
+    if (seen.has(key) || own.has(key)) continue
+    seen.add(key)
+    out.push({ addr: row.addr, name: row.name })
+  }
+  return out
+}
+
+function suggestFromHistory(
   db: Database.Database,
   query: string,
   limit: number

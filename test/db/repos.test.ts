@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { upsertEnvelope, storeBody } from '@main/mail/ingest'
 import { listThreads, getThreadMessages } from '@main/db/repos/threads'
 import {

@@ -1,10 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { matches, ruleJsonSchema, ruleNeedsAi, applyRules } from '@main/ai/rules'
 import { setRuleActionExecutor } from '@main/ai/rules'
 import { createTestDb, closeTestDb, seedAccount, seedFolder } from '../helpers/db'
 
-const facts = (over: Partial<Parameters<typeof matches>[1]> = {}): Parameters<typeof matches>[1] => ({
+const facts = (
+  over: Partial<Parameters<typeof matches>[1]> = {}
+): Parameters<typeof matches>[1] => ({
   id: 1,
   from_addr: 'news@shop.de',
   from_name: 'Shop',
@@ -17,39 +19,73 @@ const facts = (over: Partial<Parameters<typeof matches>[1]> = {}): Parameters<ty
 
 describe('matches', () => {
   it('fromContains prüft Adresse und Name (case-insensitive)', () => {
-    expect(matches({ match: { fromContains: ['shop'] }, actions: { archive: true } }, facts())).toBe(true)
-    expect(matches({ match: { fromContains: ['bank'] }, actions: { archive: true } }, facts())).toBe(false)
+    expect(
+      matches({ match: { fromContains: ['shop'] }, actions: { archive: true } }, facts())
+    ).toBe(true)
+    expect(
+      matches({ match: { fromContains: ['bank'] }, actions: { archive: true } }, facts())
+    ).toBe(false)
   })
 
   it('fromDomain matcht exakt und auf Subdomains', () => {
     expect(
-      matches({ match: { fromDomain: ['shop.de'] }, actions: { archive: true } }, facts({ from_addr: 'a@shop.de' }))
+      matches(
+        { match: { fromDomain: ['shop.de'] }, actions: { archive: true } },
+        facts({ from_addr: 'a@shop.de' })
+      )
     ).toBe(true)
     expect(
-      matches({ match: { fromDomain: ['shop.de'] }, actions: { archive: true } }, facts({ from_addr: 'a@mail.shop.de' }))
+      matches(
+        { match: { fromDomain: ['shop.de'] }, actions: { archive: true } },
+        facts({ from_addr: 'a@mail.shop.de' })
+      )
     ).toBe(true)
     expect(
-      matches({ match: { fromDomain: ['shop.de'] }, actions: { archive: true } }, facts({ from_addr: 'a@shop.de.evil.com' }))
+      matches(
+        { match: { fromDomain: ['shop.de'] }, actions: { archive: true } },
+        facts({ from_addr: 'a@shop.de.evil.com' })
+      )
     ).toBe(false)
   })
 
   it('subjectContains ist case-insensitive', () => {
-    expect(matches({ match: { subjectContains: ['ANGEBOT'] }, actions: { archive: true } }, facts())).toBe(true)
+    expect(
+      matches({ match: { subjectContains: ['ANGEBOT'] }, actions: { archive: true } }, facts())
+    ).toBe(true)
   })
 
   it('listUnsubscribe vergleicht boolesch', () => {
-    expect(matches({ match: { listUnsubscribe: true }, actions: { archive: true } }, facts({ list_unsubscribe: 1 }))).toBe(true)
-    expect(matches({ match: { listUnsubscribe: true }, actions: { archive: true } }, facts({ list_unsubscribe: 0 }))).toBe(false)
+    expect(
+      matches(
+        { match: { listUnsubscribe: true }, actions: { archive: true } },
+        facts({ list_unsubscribe: 1 })
+      )
+    ).toBe(true)
+    expect(
+      matches(
+        { match: { listUnsubscribe: true }, actions: { archive: true } },
+        facts({ list_unsubscribe: 0 })
+      )
+    ).toBe(false)
   })
 
   it('category und Prioritätsgrenzen', () => {
-    expect(matches({ match: { category: ['promotions'] }, actions: { archive: true } }, facts())).toBe(true)
-    expect(matches({ match: { minPriority: 4 }, actions: { archive: true } }, facts({ priority: 2 }))).toBe(false)
-    expect(matches({ match: { maxPriority: 2 }, actions: { archive: true } }, facts({ priority: 2 }))).toBe(true)
+    expect(
+      matches({ match: { category: ['promotions'] }, actions: { archive: true } }, facts())
+    ).toBe(true)
+    expect(
+      matches({ match: { minPriority: 4 }, actions: { archive: true } }, facts({ priority: 2 }))
+    ).toBe(false)
+    expect(
+      matches({ match: { maxPriority: 2 }, actions: { archive: true } }, facts({ priority: 2 }))
+    ).toBe(true)
   })
 
   it('kombiniert Kriterien als UND', () => {
-    const rule = { match: { fromDomain: ['shop.de'], subjectContains: ['angebot'] }, actions: { archive: true } }
+    const rule = {
+      match: { fromDomain: ['shop.de'], subjectContains: ['angebot'] },
+      actions: { archive: true }
+    }
     expect(matches(rule, facts())).toBe(true)
     expect(matches(rule, facts({ subject: 'Rechnung' }))).toBe(false)
   })
@@ -69,7 +105,9 @@ describe('ruleJsonSchema', () => {
 
 describe('ruleNeedsAi', () => {
   it('ist true bei Kategorie/Priorität, false bei Absender/Betreff', () => {
-    expect(ruleNeedsAi({ match: { category: ['newsletter'] }, actions: { archive: true } })).toBe(true)
+    expect(ruleNeedsAi({ match: { category: ['newsletter'] }, actions: { archive: true } })).toBe(
+      true
+    )
     expect(ruleNeedsAi({ match: { minPriority: 4 }, actions: { flag: true } })).toBe(true)
     expect(ruleNeedsAi({ match: { fromDomain: ['x.de'] }, actions: { archive: true } })).toBe(false)
   })
@@ -98,12 +136,14 @@ describe('applyRules (Integration)', () => {
     db.prepare(
       `INSERT INTO rules (name, description, source_text, rule_json, needs_ai, enabled, created_at)
        VALUES ('r', '', 'src', ?, 0, 1, 1000)`
-    ).run(JSON.stringify({ match: { fromDomain: ['shop.de'] }, actions: { setCategory: 'promotions' } }))
+    ).run(
+      JSON.stringify({ match: { fromDomain: ['shop.de'] }, actions: { setCategory: 'promotions' } })
+    )
 
     applyRules(db, msgId, 'ingest')
-    const ann = db.prepare('SELECT user_override_category FROM ai_annotations WHERE message_id = ?').get(msgId) as
-      | { user_override_category: string }
-      | undefined
+    const ann = db
+      .prepare('SELECT user_override_category FROM ai_annotations WHERE message_id = ?')
+      .get(msgId) as { user_override_category: string } | undefined
     expect(ann?.user_override_category).toBe('promotions')
   })
 
@@ -129,10 +169,9 @@ describe('applyRules (Integration)', () => {
       called = true
     })
     const msgId = insertMessage('a@b.de', 'irgendwas')
-    db.prepare('INSERT INTO ai_annotations (message_id, category, priority, prompt_version, needs_reply, created_at) VALUES (?, ?, 5, 3, 0, 1000)').run(
-      msgId,
-      'work'
-    )
+    db.prepare(
+      'INSERT INTO ai_annotations (message_id, category, priority, prompt_version, needs_reply, created_at) VALUES (?, ?, 5, 3, 0, 1000)'
+    ).run(msgId, 'work')
     db.prepare(
       `INSERT INTO rules (name, description, source_text, rule_json, needs_ai, enabled, created_at)
        VALUES ('r', '', 'src', ?, 1, 1, 1000)`

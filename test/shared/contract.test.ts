@@ -189,6 +189,17 @@ describe('ipc-contract', () => {
     expect(spec.output.parse({ canceled: false })).toEqual({ canceled: false })
   })
 
+  it('validiert accounts:updatePassword / reauthorize (Längenlimit, keine Extras)', () => {
+    const pw = invokeContract['accounts:updatePassword']
+    expect(pw.input.parse({ accountId: 1, password: 'x' })).toEqual({ accountId: 1, password: 'x' })
+    expect(() => pw.input.parse({ accountId: 1, password: '' })).toThrow()
+    expect(() => pw.input.parse({ accountId: 1, password: 'x'.repeat(1001) })).toThrow()
+    expect(() => pw.input.parse({ password: 'x' })).toThrow()
+    const re = invokeContract['accounts:reauthorize']
+    expect(re.input.parse({ accountId: 2 })).toEqual({ accountId: 2 })
+    expect(() => re.input.parse({ accountId: 'a' })).toThrow()
+  })
+
   it('sync:trigger nimmt optional ein einzelnes Konto (RETRY, Design 3b)', () => {
     const spec = invokeContract['sync:trigger']
     // Bestandsaufrufer ohne Eingabe bleiben gültig
@@ -220,13 +231,18 @@ describe('ipc-contract', () => {
     ).toBe(1_752_576_600_000)
   })
 
-  it('ai:testModel verlangt eine OpenRouter-ID in anbieter/modell-Form (M86)', () => {
+  it('ai:testModel verlangt Profil und Modell-ID (beliebiges Format, z. B. llama3.2:latest)', () => {
     const spec = invokeContract['ai:testModel']
-    expect(spec.input.parse({ model: ' moonshotai/kimi-k2 ' })).toEqual({
+    expect(spec.input.parse({ profileId: 'openrouter', model: ' moonshotai/kimi-k2 ' })).toEqual({
+      profileId: 'openrouter',
       model: 'moonshotai/kimi-k2'
     })
-    expect(() => spec.input.parse({ model: 'ohne-slash' })).toThrow()
-    expect(() => spec.input.parse({ model: 'a/b c' })).toThrow()
+    expect(spec.input.parse({ profileId: 'p_ab12', model: 'llama3.2:latest' }).model).toBe(
+      'llama3.2:latest'
+    )
+    expect(() => spec.input.parse({ model: 'moonshotai/kimi-k2' })).toThrow()
+    expect(() => spec.input.parse({ profileId: 'Ungültig!', model: 'x' })).toThrow()
+    expect(() => spec.input.parse({ profileId: 'openrouter', model: '' })).toThrow()
     expect(spec.output.parse({ ok: true, latencyMs: 812, costUsd: 0.0004, detail: null }).ok).toBe(
       true
     )
@@ -329,6 +345,72 @@ describe('ipc-contract', () => {
     expect(() => spec.input.parse({ words: ['Haus', "geht's"] })).not.toThrow()
     expect(() => spec.input.parse({ words: [''] })).toThrow()
     expect(() => spec.input.parse({ words: 'Haus' })).toThrow()
+  })
+
+  it('settings:get/set akzeptieren nur Allowlist-Schlüssel', () => {
+    const get = invokeContract['settings:get'].input
+    const set = invokeContract['settings:set'].input
+    for (const key of ['ui.language', 'sig.12', 'ai.styleProfile.3', 'ai.styleInstructions.7']) {
+      expect(() => get.parse({ key }), key).not.toThrow()
+    }
+    // Stilprofile sind lesbar, aber nicht vom Renderer schreibbar
+    expect(() => set.parse({ key: 'ai.styleProfile.3', value: '{}' })).toThrow()
+    expect(() => set.parse({ key: 'sig.12', value: 'x' })).not.toThrow()
+    for (const key of [
+      'google.clientId',
+      'google.clientSecret',
+      'ms.clientId',
+      'ai.dailyBudgetUsd',
+      'images.allow.a@b.de',
+      'sig.',
+      'sig.0',
+      'sig.01',
+      'sig.1.2',
+      'sig.12/../x',
+      ''
+    ]) {
+      expect(() => get.parse({ key }), key).toThrow()
+      expect(() => set.parse({ key, value: 'x' }), key).toThrow()
+    }
+  })
+
+  it('secrets:set/exists akzeptieren nur openrouter.apiKey', () => {
+    const set = invokeContract['secrets:set'].input
+    const exists = invokeContract['secrets:exists'].input
+    expect(() => set.parse({ key: 'openrouter.apiKey', value: 'k' })).not.toThrow()
+    expect(() => exists.parse({ key: 'openrouter.apiKey' })).not.toThrow()
+    for (const key of ['account:1:password', 'ms.tokenCache', 'google.refresh.a@b.de']) {
+      expect(() => set.parse({ key, value: 'k' })).toThrow()
+      expect(() => exists.parse({ key })).toThrow()
+    }
+  })
+
+  it('begrenzt IDs und Thread-Keys', () => {
+    const long = 'x'.repeat(513)
+    expect(() => invokeContract['drafts:delete'].input.parse({ threadKey: long })).toThrow()
+    expect(() =>
+      invokeContract['drafts:save'].input.parse({ threadKey: long, text: 'a' })
+    ).toThrow()
+    expect(() =>
+      invokeContract['tasks:decideSuggestion'].input.parse({ threadKey: long, accept: true })
+    ).toThrow()
+    expect(() =>
+      invokeContract['threads:get'].input.parse({ threadKey: 'x'.repeat(512) })
+    ).not.toThrow()
+  })
+
+  it('validiert die Erkennung lokaler KI-Server (ai:detectLocal) mit Längengrenzen', () => {
+    const spec = invokeContract['ai:detectLocal']
+    expect(() => spec.input.parse(undefined)).not.toThrow()
+    const ok = { kind: 'ollama', baseUrl: 'http://127.0.0.1:11434/v1', models: ['llama3.2:3b'] }
+    expect(() => spec.output.parse({ found: [ok] })).not.toThrow()
+    expect(() => spec.output.parse({ found: [] })).not.toThrow()
+    expect(() => spec.output.parse({ found: [{ ...ok, kind: 'cloud' }] })).toThrow()
+    expect(() => spec.output.parse({ found: [{ ...ok, models: ['m'.repeat(201)] }] })).toThrow()
+    expect(() =>
+      spec.output.parse({ found: [{ ...ok, models: Array.from({ length: 201 }, () => 'm') }] })
+    ).toThrow()
+    expect(() => spec.output.parse({ found: Array.from({ length: 9 }, () => ok) })).toThrow()
   })
 
   it('Kanal-Listen und Contract-Keys stimmen überein', () => {

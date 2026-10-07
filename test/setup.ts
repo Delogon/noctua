@@ -18,7 +18,9 @@ vi.mock('electron', () => {
     on(): this {
       return this
     }
-    show(): void {}
+    show(): void {
+      // Test-Double: Benachrichtigungen werden nur mitgeschrieben, nicht angezeigt
+    }
     constructor() {
       notificationInstances.push(this)
     }
@@ -29,6 +31,8 @@ vi.mock('electron', () => {
       getVersion: () => '0.0.0-test',
       setBadgeCount: vi.fn(),
       getName: () => 'noctua-test',
+      isPackaged: false,
+      getAppPath: () => process.cwd(),
       on: vi.fn()
     },
     safeStorage: {

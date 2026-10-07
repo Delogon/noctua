@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import type { DraftItem } from '@shared/types'
 
 interface DraftRow {
@@ -45,9 +45,7 @@ export function saveDraft(
 
 /** Alle gespeicherten Entwürfe, jüngste zuerst. */
 export function listDrafts(db: Database.Database): DraftItem[] {
-  const rows = db
-    .prepare('SELECT * FROM drafts ORDER BY updated_at DESC')
-    .all() as DraftRow[]
+  const rows = db.prepare('SELECT * FROM drafts ORDER BY updated_at DESC').all() as DraftRow[]
   return rows.map((row) => ({
     threadKey: row.thread_key,
     displayName: row.display_name,

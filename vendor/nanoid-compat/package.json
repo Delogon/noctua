@@ -1,0 +1,8 @@
+{
+  "name": "nanoid",
+  "version": "2.1.11-noctua.1",
+  "description": "Drop-in für nanoid 2.x (CJS, nanoid(size)) auf Basis von node:crypto — ersetzt die verwundbare 2.1.11 in hunspell-asm/emscripten-wasm-loader",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { runTriage } from '@main/ai/triage'
 import { upsertEnvelope, storeBody } from '@main/mail/ingest'
 import { countOpenTasks } from '@main/db/repos/tasks'
@@ -19,8 +19,7 @@ vi.mock('@main/ai/openrouter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@main/ai/openrouter')>()
   return {
     ...actual,
-    getTriageProvider: () => 'apple' as const,
-    getOpenRouter: () => null
+    getTriageProvider: () => 'apple' as const
   }
 })
 

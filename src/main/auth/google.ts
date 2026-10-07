@@ -2,7 +2,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { createHash, randomBytes } from 'node:crypto'
 import { shell } from 'electron'
 import { getSetting } from '../db'
+import { getOrgConfig } from '../org-config'
+import type { OrgConfig } from '@shared/org-config'
 import { deleteSecret, getSecret, setSecret } from './secrets'
+import { isGoogleReauthCode, ReauthRequiredError } from './reauth'
 
 /**
  * Google-OAuth für Gmail-Konten (Loopback-Flow mit PKCE, wie beim
@@ -28,12 +31,49 @@ export const GOOGLE_MAIL_SCOPE = 'https://mail.google.com/ openid email'
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000
 const EXPIRY_MARGIN_MS = 60_000
 
+/**
+ * Client-Auflösung: explizite Main-Settings > Org-Konfiguration > Thunderbird-
+ * Default. Ein Org-Client bekommt NIE das Thunderbird-Secret: ohne eigenes
+ * clientSecret bleibt es leer (öffentlicher Client, wird nicht mitgeschickt).
+ */
+export function resolveGoogleClient(
+  settings: { clientId: string | null; clientSecret: string | null },
+  org: OrgConfig | null
+): { clientId: string; clientSecret: string } {
+  const orgGoogle = org?.oauth?.google
+  const settingId = settings.clientId?.trim()
+  const settingSecret = settings.clientSecret?.trim()
+  if (settingId) {
+    return {
+      clientId: settingId,
+      clientSecret: settingSecret || orgGoogle?.clientSecret || THUNDERBIRD_GOOGLE_CLIENT_SECRET
+    }
+  }
+  if (orgGoogle) {
+    return {
+      clientId: orgGoogle.clientId,
+      clientSecret: settingSecret || orgGoogle.clientSecret || ''
+    }
+  }
+  return {
+    clientId: THUNDERBIRD_GOOGLE_CLIENT_ID,
+    clientSecret: settingSecret || THUNDERBIRD_GOOGLE_CLIENT_SECRET
+  }
+}
+
+function googleClient(): { clientId: string; clientSecret: string } {
+  return resolveGoogleClient(
+    { clientId: getSetting('google.clientId'), clientSecret: getSetting('google.clientSecret') },
+    getOrgConfig()
+  )
+}
+
 function clientId(): string {
-  return getSetting('google.clientId')?.trim() || THUNDERBIRD_GOOGLE_CLIENT_ID
+  return googleClient().clientId
 }
 
 function clientSecret(): string {
-  return getSetting('google.clientSecret')?.trim() || THUNDERBIRD_GOOGLE_CLIENT_SECRET
+  return googleClient().clientSecret
 }
 
 function refreshSecretKey(email: string): string {
@@ -106,9 +146,19 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
   const response = await fetch(TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(params).toString()
+    body: new URLSearchParams(
+      Object.entries(params).filter(([key, value]) => key !== 'client_secret' || value !== '')
+    ).toString()
   })
-  return (await response.json()) as TokenResponse
+  const body = (await response.json().catch(() => null)) as TokenResponse | null
+  // Google meldet Fehler (z. B. invalid_grant) als HTTP 400 mit JSON-Body —
+  // den reichen wir durch, die Aufrufer werten error/error_description aus.
+  // Ohne verwertbaren Body (Proxy-Fehlerseite, 5xx) gibt es einen klaren Fehler.
+  if (!response.ok && !body?.error) {
+    throw new Error(`Die Anmeldung bei Google ist fehlgeschlagen (HTTP ${response.status})`)
+  }
+  if (!body) throw new Error('Google hat keine gültige Antwort geliefert')
+  return body
 }
 
 const HTML_HEAD = '<html><body style="font-family:sans-serif;padding:2rem">'
@@ -212,7 +262,8 @@ export async function googleInteractiveLogin(): Promise<{ email: string }> {
     })
 
     const timeout = setTimeout(
-      () => finish(new Error('Google-Anmeldung: Zeitüberschreitung — bitte erneut versuchen')),
+      () =>
+        finish(new Error('Die Google-Anmeldung hat zu lange gedauert – bitte versuche es erneut')),
       LOGIN_TIMEOUT_MS
     )
 
@@ -238,7 +289,8 @@ export async function googleAccessToken(email: string): Promise<string> {
   if (cached && cached.expiresAt - EXPIRY_MARGIN_MS > Date.now()) return cached.token
 
   const refreshToken = getSecret(refreshSecretKey(key))
-  if (!refreshToken) throw new Error('Google-Konto nicht angemeldet — bitte neu verbinden')
+  if (!refreshToken)
+    throw new ReauthRequiredError('Google-Konto nicht angemeldet — bitte erneut anmelden')
 
   const tokens = await tokenRequest({
     client_id: clientId(),
@@ -247,11 +299,11 @@ export async function googleAccessToken(email: string): Promise<string> {
     grant_type: 'refresh_token'
   })
   if (!tokens.access_token) {
-    if (tokens.error === 'invalid_grant') {
+    if (isGoogleReauthCode(tokens.error)) {
       // Zugriff widerrufen oder Token abgelaufen — Rest aufräumen, Re-Login nötig
       deleteSecret(refreshSecretKey(key))
       accessTokens.delete(key)
-      throw new Error('Google-Zugriff widerrufen — bitte Konto neu verbinden')
+      throw new ReauthRequiredError('Google-Zugriff widerrufen — bitte erneut anmelden')
     }
     throw new Error(
       `Google-Token-Refresh fehlgeschlagen: ${tokens.error_description ?? tokens.error ?? 'unbekannt'}`

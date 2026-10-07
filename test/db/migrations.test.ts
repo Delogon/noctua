@@ -1,5 +1,10 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import type Database from 'better-sqlite3'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
+import Database from 'better-sqlite3-multiple-ciphers'
+import * as sqliteVec from 'sqlite-vec'
+import { existsSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { runMigrations, backupBeforeMigration, DatabaseTooNewError } from '@main/db/migrate'
 import { createTestDb, closeTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 import { upsertEnvelope } from '@main/mail/ingest'
 
@@ -12,7 +17,7 @@ describe('migrations', () => {
 
   it('wenden alle Migrationen sauber an und setzen user_version', () => {
     db = createTestDb()
-    expect(db.pragma('user_version', { simple: true })).toBe(23)
+    expect(db.pragma('user_version', { simple: true })).toBe(33)
   })
 
   it('erzwingt eindeutige Postfachnamen unabhängig von Großschreibung', () => {
@@ -220,7 +225,7 @@ describe('migrations', () => {
     db = createTestDb()
     const { runMigrations } = await import('@main/db/migrate')
     const result = runMigrations(db)
-    expect(result).toEqual({ from: 23, to: 23 })
+    expect(result).toEqual({ from: 33, to: 33 })
   })
 
   it('bereinigt Aufgaben aus kontenuebergreifenden Selbst-Sends', async () => {
@@ -257,6 +262,9 @@ describe('migrations', () => {
       ALTER TABLE followups DROP COLUMN nudged_at;
       ALTER TABLE contact_stats DROP COLUMN display_name;
       DROP INDEX IF EXISTS idx_msg_from_addr_lower;
+      DROP INDEX IF EXISTS idx_op_queue_status;
+      ALTER TABLE op_queue DROP COLUMN status;
+      ALTER TABLE op_queue DROP COLUMN last_error;
       DROP TABLE drafts;
       DROP TABLE owl_conversations;
       DROP TABLE message_header_details;
@@ -273,7 +281,7 @@ describe('migrations', () => {
     `)
     db.pragma('user_version = 11')
     const { runMigrations } = await import('@main/db/migrate')
-    expect(runMigrations(db)).toEqual({ from: 11, to: 23 })
+    expect(runMigrations(db)).toEqual({ from: 11, to: 33 })
     expect(db.prepare('SELECT count(*) count FROM tasks').get()).toEqual({ count: 0 })
     expect(
       db
@@ -281,5 +289,82 @@ describe('migrations', () => {
         .get(messageId)
     ).toEqual({ action_items_json: '[]', needs_reply: 0 })
     expect(sender).not.toBe(receiver)
+  })
+
+  describe('Backup und Downgrade-Guard (REL-4)', () => {
+    let dir: string
+
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), 'noctua-mig-'))
+    })
+    afterEach(() => {
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    function openFileDb(path: string): Database.Database {
+      const conn = new Database(path)
+      sqliteVec.load(conn)
+      conn.pragma('foreign_keys = ON')
+      return conn
+    }
+
+    it('wirft bei user_version über der neuesten Migration', () => {
+      const conn = openFileDb(join(dir, 'a.sqlite'))
+      conn.pragma('user_version = 999')
+      expect(() => runMigrations(conn)).toThrow(DatabaseTooNewError)
+      expect(conn.pragma('user_version', { simple: true })).toBe(999)
+      conn.close()
+    })
+
+    it('legt vor ausstehenden Migrationen auf bestehender DB ein Backup an', () => {
+      const path = join(dir, 'b.sqlite')
+      const conn = openFileDb(path)
+      runMigrations(conn)
+      conn.exec(`INSERT INTO settings (key, value) VALUES ('probe', 'x')`)
+      // Zustand von v22 simulieren: Migration 23+ steht wieder aus
+      conn.exec(`ALTER TABLE contact_stats DROP COLUMN display_name`)
+      conn.exec(`DROP INDEX IF EXISTS idx_op_queue_status`)
+      conn.exec(`ALTER TABLE op_queue DROP COLUMN status`)
+      conn.exec(`ALTER TABLE op_queue DROP COLUMN last_error`)
+      conn.pragma('user_version = 22')
+
+      expect(runMigrations(conn)).toEqual({ from: 22, to: 33 })
+      const backup = `${path}.bak-v22`
+      expect(existsSync(backup)).toBe(true)
+      const bak = new Database(backup)
+      expect(bak.pragma('user_version', { simple: true })).toBe(22)
+      expect(bak.prepare(`SELECT value FROM settings WHERE key = 'probe'`).get()).toEqual({
+        value: 'x'
+      })
+      bak.close()
+      conn.close()
+    })
+
+    it('legt bei frischer (leerer) DB kein Backup an', () => {
+      const path = join(dir, 'c.sqlite')
+      const conn = openFileDb(path)
+      runMigrations(conn)
+      expect(readdirSync(dir).filter((n) => n.includes('.bak-'))).toEqual([])
+      conn.close()
+    })
+
+    it('behält nur die neuesten zwei Backups', () => {
+      const path = join(dir, 'd.sqlite')
+      const conn = openFileDb(path)
+      runMigrations(conn)
+      const now = Date.now() / 1000
+      for (const [i, v] of [1, 2, 3].entries()) {
+        const p = `${path}.bak-v${v}`
+        writeFileSync(p, 'x')
+        utimesSync(p, now - 1000 + i, now - 1000 + i)
+      }
+      const created = backupBeforeMigration(conn, 24)
+      expect(created).toBe(`${path}.bak-v24`)
+      const left = readdirSync(dir)
+        .filter((n) => n.includes('.bak-'))
+        .sort()
+      expect(left).toEqual(['d.sqlite.bak-v24', 'd.sqlite.bak-v3'])
+      conn.close()
+    })
   })
 })

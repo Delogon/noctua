@@ -5,11 +5,19 @@ import { detectAddressForm, stripQuoted } from '@main/ai/style'
 
 describe('detectAddressForm (Du/Sie aus dem Verlauf)', () => {
   it('erkennt förmliches Sie', () => {
-    expect(detectAddressForm(['Sehr geehrter Herr Sigl,\n\nkönnen Sie mir die Liste senden? Ich danke Ihnen.'])).toBe('sie')
+    expect(
+      detectAddressForm([
+        'Sehr geehrter Herr Sigl,\n\nkönnen Sie mir die Liste senden? Ich danke Ihnen.'
+      ])
+    ).toBe('sie')
   })
 
   it('erkennt Du in typischer Team-Mail', () => {
-    expect(detectAddressForm(['Hi Tim, kannst du mir kurz deine Nummer schicken? Ich melde mich bei dir.'])).toBe('du')
+    expect(
+      detectAddressForm([
+        'Hi Tim, kannst du mir kurz deine Nummer schicken? Ich melde mich bei dir.'
+      ])
+    ).toBe('du')
   })
 
   it('erkennt großgeschriebenes Du/Dein (Briefform)', () => {
@@ -31,7 +39,8 @@ describe('detectAddressForm (Du/Sie aus dem Verlauf)', () => {
 
 describe('stripQuoted (Zitat-Historie zählt nicht)', () => {
   it('entfernt >-Zeilen und Am-…-schrieb-Blöcke', () => {
-    const mail = 'Können Sie mir das freigeben?\n\nAm 07.07.2026 schrieb Lena Hartmann:\n> Hi, kannst du mir das schicken?\n> Danke dir!'
+    const mail =
+      'Können Sie mir das freigeben?\n\nAm 07.07.2026 schrieb Lena Hartmann:\n> Hi, kannst du mir das schicken?\n> Danke dir!'
     const stripped = stripQuoted(mail)
     expect(stripped).toContain('freigeben')
     expect(stripped).not.toContain('kannst du')

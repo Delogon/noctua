@@ -1,16 +1,21 @@
 import { app, Menu, shell, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
+import { isDev } from './dev-mode'
+import { getOrgConfig, helpLinks, productName } from './org-config'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
 /** Natives App-Menü mit Noctua-Aktionen für Dev- und Release-Bundle. */
 export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | null): void {
+  const name = productName()
+  const links = helpLinks()
   app.setAboutPanelOptions({
-    applicationName: 'Noctua',
+    applicationName: name,
     applicationVersion: app.getVersion(),
-    copyright: 'AI-first Mail-Client · Tim Sigl',
-    credits:
-      'Triage, Drafts und Postfach-Chat laufen über OpenRouter;\nEmbeddings lokal auf diesem Mac.'
+    copyright: 'E-Mail-Client mit KI · Tim Sigl',
+    credits: getOrgConfig()
+      ? 'Vorsortierung, Entwürfe und E-Mail-Chat laufen über die eingerichteten KI-Anbieter;\nSuchmodell lokal auf diesem Mac.'
+      : 'Vorsortierung, Entwürfe und E-Mail-Chat laufen über OpenRouter;\nSuchmodell lokal auf diesem Mac.'
   })
 
   const send = (action: PushPayload<'app:menuAction'>['action']): void => {
@@ -24,9 +29,9 @@ export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | nu
 
   const template: MenuItemConstructorOptions[] = [
     {
-      label: 'Noctua',
+      label: name,
       submenu: [
-        { label: 'Über Noctua', role: 'about' },
+        { label: `Über ${name}`, role: 'about' },
         { type: 'separator' },
         {
           label: 'Einstellungen…',
@@ -36,11 +41,11 @@ export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | nu
         { type: 'separator' },
         { role: 'services', label: 'Dienste' },
         { type: 'separator' },
-        { role: 'hide', label: 'Noctua ausblenden' },
+        { role: 'hide', label: `${name} ausblenden` },
         { role: 'hideOthers', label: 'Andere ausblenden' },
         { role: 'unhide', label: 'Alle einblenden' },
         { type: 'separator' },
-        { role: 'quit', label: 'Noctua beenden' }
+        { role: 'quit', label: `${name} beenden` }
       ]
     },
     {
@@ -81,16 +86,15 @@ export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | nu
       label: 'Darstellung',
       submenu: [
         { label: 'Posteingang', accelerator: 'Cmd+1', click: () => send('inbox') },
-        { label: 'Wartet auf Antwort', accelerator: 'Cmd+2', click: () => send('waiting') },
+        { label: 'Ausstehend', accelerator: 'Cmd+2', click: () => send('waiting') },
         { label: 'Aufgaben', accelerator: 'Cmd+3', click: () => send('tasks') },
+        { label: 'Kalender', accelerator: 'Cmd+4', click: () => send('calendar') },
         { type: 'separator' },
         // Bewusst ohne Accelerator: ⌘5 ist abgeschafft, / und ⌘F führen zur Suche
         { label: 'Suchen & die Eule fragen', click: () => send('chat') },
         { type: 'separator' },
         { role: 'togglefullscreen', label: 'Vollbild ein/aus' },
-        ...(process.env.NODE_ENV === 'development' ||
-        !app.isPackaged ||
-        process.env.NOCTUA_DEV === '1'
+        ...(isDev
           ? ([
               { type: 'separator' },
               { role: 'reload', label: 'Neu laden (Dev)' },
@@ -118,9 +122,17 @@ export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | nu
           click: () => send('shortcuts')
         },
         {
-          label: 'Noctua auf GitHub',
-          click: () => void shell.openExternal('https://github.com/Schereo/noctua')
-        }
+          label: links.homepageIsUpstream ? 'Noctua auf GitHub' : `${name}-Startseite`,
+          click: () => void shell.openExternal(links.homepage)
+        },
+        ...(links.support
+          ? ([
+              {
+                label: 'Support',
+                click: () => void shell.openExternal(links.support!)
+              }
+            ] as MenuItemConstructorOptions[])
+          : [])
       ]
     }
   ]

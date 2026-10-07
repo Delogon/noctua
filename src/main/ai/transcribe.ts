@@ -1,48 +1,35 @@
-import type Database from 'better-sqlite3'
-import { extractUsage, getOpenRouter, getSttModel, providerBody } from './openrouter'
-import { isBudgetExceeded, logUsage } from './budget'
+import type Database from 'better-sqlite3-multiple-ciphers'
+import { logUsage } from './budget'
+import { getSetting } from '../db'
+import { appleSpeechLocale, isAppleSpeechAvailable, transcribeWithApple } from './apple-speech'
+import { getTaskProfileId, requireTaskWithBudget } from './providers/registry'
 
 /**
- * Diktat-Transkription über ein Audio-Input-Chat-Modell auf OpenRouter
- * (input_audio im Chat-Completions-Format). Gibt NUR das Transkript zurück.
+ * Diktat-Transkription über das Profil der Aufgabe „stt": bei OpenRouter ein
+ * Audio-Input-Chat-Modell (input_audio), bei eigenen Profilen ein
+ * Whisper-kompatibler /audio/transcriptions-Endpunkt. Gibt NUR das Transkript zurück.
  */
 export async function transcribeAudio(
   db: Database.Database,
   audioBase64: string,
   format: 'wav' | 'mp3'
 ): Promise<string> {
-  const client = getOpenRouter()
-  if (!client) throw new Error('Kein OpenRouter-Key hinterlegt (⌘, Einstellungen)')
-  if (isBudgetExceeded(db)) throw new Error('AI-Budget erschöpft')
-
-  const model = getSttModel()
-  const completion = await client.chat.completions.create({
-    ...providerBody(),
-    model,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'Transkribiere diese Sprachaufnahme wortgetreu in ihrer Originalsprache. Gib AUSSCHLIESSLICH das Transkript aus — keine Anführungszeichen, keine Kommentare, keine Übersetzung. Ist keine oder nur unverständliche Sprache zu hören, gib exakt [LEER] aus.'
-          },
-          {
-            type: 'input_audio',
-            input_audio: { data: audioBase64, format }
-          }
-        ] as never
-      }
-    ],
-    temperature: 0,
-    max_tokens: 2000
-  })
-  const usage = completion.usage
-  if (usage) {
-    const { inputTokens, outputTokens, costUsd } = extractUsage(usage)
-    logUsage(db, model, inputTokens, outputTokens, costUsd)
+  // Apple-Spracherkennung (Pseudo-Profil 'apple'): on-device, ohne Kosten/Key, zählt als lokal
+  if (getTaskProfileId('stt') === 'apple') {
+    if (format !== 'wav') throw new Error('Apple-Diktat braucht WAV-Audio')
+    const locale = appleSpeechLocale(getSetting('ui.language'))
+    const state = await isAppleSpeechAvailable(locale)
+    if (!state.available) throw new Error(`Apple-Diktat nicht verfügbar: ${state.reason}`)
+    return transcribeWithApple(Buffer.from(audioBase64, 'base64'), 'wav', locale)
   }
-  const text = completion.choices[0]?.message?.content?.trim() ?? ''
+  const { client, model, profile } = requireTaskWithBudget(db, 'stt')
+  if (!client.transcribe) {
+    throw new Error(`Anbieter „${profile.name}“ unterstützt keine Transkription`)
+  }
+  const result = await client.transcribe(audioBase64, format, model)
+  const { inputTokens, outputTokens, costUsd } = result.usage
+  logUsage(db, model, inputTokens, outputTokens, costUsd)
+  const text = result.text.trim()
   // [LEER] = Modell hat nichts Verwertbares gehört → leeres Transkript,
   // der Aufrufer zeigt dann einen verständlichen Hinweis statt Modell-Prosa
   if (text === '[LEER]' || /^\[LEER\]$/i.test(text)) return ''

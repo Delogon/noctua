@@ -1,9 +1,10 @@
 import { foldSharpS } from '../search/fold'
 import { createHash } from 'node:crypto'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { htmlToText, type ParsedMail } from './parser'
 import { computeThreadKey } from './threading'
 import { isVisibleMailAttachment } from './attachment-visibility'
+import { storeInvitations } from '../calendar/invitations'
 
 export interface EnvelopeData {
   uid: number
@@ -359,6 +360,9 @@ export function storeBody(db: Database.Database, messageId: number, parsed: Pars
   // Immer ersetzen: wiederholte Fetches koennen korrigierte Bodies oder
   // Attachment-Metadaten enthalten und muessen dann FTS + Vektor invalidieren.
   refreshMessageSearchIndex(db, messageId)
+
+  // Einladungen (text/calendar): geparste Zusammenfassung ablegen; wirft nie
+  storeInvitations(db, messageId, parsed.calendarParts)
 }
 
 export function applyFlagUpdate(

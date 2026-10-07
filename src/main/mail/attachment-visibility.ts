@@ -1,5 +1,6 @@
 export interface AttachmentVisibilityInput {
   mimeType: string | null
+  filename?: string | null
   contentId: string | null
 }
 
@@ -25,6 +26,9 @@ export function isVisibleMailAttachment(
 ): boolean {
   const mimeType = (attachment.mimeType ?? '').trim().toLowerCase()
   if (TECHNICAL_MIME_PARTS.has(mimeType)) return false
+  // Namenloser text/calendar-Teil = Alternative zum Mailtext, die die Einladungskarte
+  // zeigt; eine benannte .ics-Datei bleibt als Anhang sichtbar.
+  if (mimeType === 'text/calendar' && !(attachment.filename ?? '').trim()) return false
 
   const contentId = normalizedContentId(attachment.contentId)
   if (!mimeType.startsWith('image/') || !contentId || !html) return true

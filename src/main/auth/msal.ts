@@ -6,8 +6,11 @@ import {
   type TokenCacheContext
 } from '@azure/msal-node'
 import { getSetting } from '../db'
+import { getOrgConfig } from '../org-config'
+import type { OrgConfig } from '@shared/org-config'
 import { getSecret, setSecret } from './secrets'
 import { CancelableLoopbackClient } from './loopback'
+import { mapMsalError, ReauthRequiredError } from './reauth'
 
 /**
  * Microsoft-OAuth für persönliche Konten (Hotmail/Outlook.com).
@@ -30,8 +33,13 @@ export const MS_MAIL_SCOPES = [
   'https://outlook.office.com/SMTP.Send'
 ]
 
+/** Client-ID: explizites Main-Setting > Org-Konfiguration > Thunderbird-Default. */
+export function resolveMicrosoftClientId(setting: string | null, org: OrgConfig | null): string {
+  return setting?.trim() || org?.oauth?.microsoft?.clientId || THUNDERBIRD_CLIENT_ID
+}
+
 function clientId(): string {
-  return getSetting('ms.clientId')?.trim() || THUNDERBIRD_CLIENT_ID
+  return resolveMicrosoftClientId(getSetting('ms.clientId'), getOrgConfig())
 }
 
 /** Persistiert den MSAL-Token-Cache verschlüsselt im safeStorage-Vault. */
@@ -68,7 +76,10 @@ function getPca(): PublicClientApplication {
 async function findAccount(email: string): Promise<AccountInfo | null> {
   const accounts = await getPca().getTokenCache().getAllAccounts()
   const lower = email.toLowerCase()
-  return accounts.find((a) => a.username.toLowerCase() === lower) ?? accounts[0] ?? null
+  // Kein Fallback auf accounts[0]: ein Token für ein ANDERES Konto wäre am
+  // IMAP/SMTP-Server (user ≠ Token-Konto) ohnehin ungültig — sauber
+  // weiterreichen, damit der Syncer in needs-reauth läuft statt in Fehlversuchen.
+  return accounts.find((a) => a.username.toLowerCase() === lower) ?? null
 }
 
 /** Der gerade wartende Loopback-Client — Ziel des CANCEL-Knopfs (Design 3b). */
@@ -94,7 +105,7 @@ export async function msInteractiveLogin(): Promise<{ email: string }> {
       errorTemplate:
         '<html><body style="font-family:sans-serif;padding:2rem"><h3>Anmeldung fehlgeschlagen.</h3>Bitte in Noctua erneut versuchen.</body></html>'
     })
-    if (!result?.account?.username) throw new Error('Microsoft-Anmeldung lieferte kein Konto')
+    if (!result?.account?.username) throw new Error('Microsoft hat kein Konto zurückgegeben')
     return { email: result.account.username.toLowerCase() }
   } finally {
     if (activeLoopback === loopback) activeLoopback = null
@@ -109,11 +120,33 @@ export function cancelMsLogin(): boolean {
   return true
 }
 
-/** Frisches Access-Token (silent, mit Refresh); wirft, wenn Re-Login nötig ist. */
+/** Entfernt ein Konto aus dem MSAL-Cache (z. B. nach einer Anmeldung mit falscher Adresse). */
+export async function msForgetAccount(email: string): Promise<void> {
+  const lower = email.toLowerCase()
+  const accounts = await getPca().getTokenCache().getAllAccounts()
+  for (const account of accounts) {
+    if (account.username.toLowerCase() === lower) {
+      await getPca().getTokenCache().removeAccount(account)
+    }
+  }
+}
+
+/**
+ * Frisches Access-Token (silent, mit Refresh). Ist ein Re-Login nötig
+ * (Refresh-Token abgelaufen/widerrufen, kein Konto im Cache), wirft die
+ * Funktion einen ReauthRequiredError → needs-reauth statt Backoff-Loop.
+ */
 export async function msAccessToken(email: string): Promise<string> {
   const account = await findAccount(email)
-  if (!account) throw new Error('Microsoft-Konto nicht angemeldet — bitte neu verbinden')
-  const result = await getPca().acquireTokenSilent({ account, scopes: MS_MAIL_SCOPES })
+  if (!account) {
+    throw new ReauthRequiredError('Microsoft-Konto nicht angemeldet — bitte erneut anmelden')
+  }
+  let result
+  try {
+    result = await getPca().acquireTokenSilent({ account, scopes: MS_MAIL_SCOPES })
+  } catch (error) {
+    throw mapMsalError(error)
+  }
   if (!result?.accessToken) throw new Error('Kein Access-Token erhalten')
   return result.accessToken
 }
