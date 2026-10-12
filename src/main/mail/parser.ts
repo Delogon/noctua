@@ -1,8 +1,5 @@
 import PostalMime from 'postal-mime'
 
-/** workerData flag set by ParsePool; importing parse-worker elsewhere stays inert. */
-export const PARSE_WORKER_MARKER = 'noctuaParseWorker'
-
 export interface ParsedAddress {
   name: string | null
   address: string
