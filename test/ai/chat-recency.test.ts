@@ -19,7 +19,7 @@ describe('isTemporalQuestion', () => {
   it('lässt thematische Fragen unangetastet', () => {
     expect(isTemporalQuestion('Welche Mails betreffen Plakate?')).toBe(false)
     expect(isTemporalQuestion('Was schulde ich Hetzner?')).toBe(false)
-    // „Heute"/Teilwörter zählen nicht
+    // „Heute"/partial words do not count
     expect(isTemporalQuestion('Wer ist Frau Heutemann?')).toBe(false)
   })
 })

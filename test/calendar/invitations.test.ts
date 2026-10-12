@@ -66,7 +66,7 @@ afterEach(() => {
   closeTestDb(db)
 })
 
-/** Legt eine Mail mit text/calendar an und lässt ingest laufen. */
+/** Creates a mail with text/calendar and runs ingest. */
 async function ingest(ics: string, from: string, method = 'REQUEST'): Promise<number> {
   uidSeq += 1
   const raw = rawInviteMail(ics, method).replace(
@@ -171,7 +171,7 @@ describe('SEQUENCE / veraltet', () => {
     const cancel = await ingest(outlookCancel, 'dieter.chef@corp.example.com', 'CANCEL')
     expect(view(cancel).method).toBe('CANCEL')
     expect(view(cancel).outdated).toBe(false)
-    expect(view(cur).outdated).toBe(true) // SEQUENCE 4 der Absage > 3
+    expect(view(cur).outdated).toBe(true) // SEQUENCE 4 of the cancellation > 3
     expect(() =>
       respondToInvitation(db, { invitationId: view(old).id, partstat: 'ACCEPTED' })
     ).toThrow(/nicht mehr aktuell/)
@@ -225,7 +225,7 @@ describe('RSVP-Wegauswahl', () => {
     respondToInvitation(db, { invitationId: v.id, partstat: 'ACCEPTED' })
     expect(sent).toHaveLength(1)
     expect(listPendingOps(db, calAccount)).toHaveLength(1)
-    // Geänderte Antwort darf erneut senden
+    // A changed response may send again
     respondToInvitation(db, { invitationId: v.id, partstat: 'DECLINED' })
     expect(sent).toHaveLength(2)
   })
@@ -258,11 +258,11 @@ describe('RSVP-Wegauswahl', () => {
     const obj = findObjectByUid(db, row.uid)!
     expect(obj.pending_op).toBe('update')
     expect(obj.ics).toMatch(/PARTSTAT=ACCEPTED/)
-    // Update läuft als If-Match-PUT über die Sync-Op auf dem bekannten ETag
+    // Update runs as an If-Match PUT via the sync op on the known ETag
     const ops = listPendingOps(db, calAccount)
     expect(ops).toHaveLength(1)
     expect(ops[0]).toMatchObject({ kind: 'update', base_etag: '"e1"' })
-    // SCHEDULE-AGENT wird NICHT gesetzt (der Server soll hier antworten)
+    // SCHEDULE-AGENT is NOT set (the server should respond here)
     expect(obj.ics).not.toMatch(/SCHEDULE-AGENT/)
   })
 
@@ -301,7 +301,7 @@ describe('CANCEL', () => {
   it('"aus Kalender entfernen" nur wenn der Organisator übereinstimmt', async () => {
     const req = await ingest(outlookRequest, 'dieter.chef@corp.example.com')
     respondToInvitation(db, { invitationId: view(req).id, partstat: 'ACCEPTED' })
-    // gefälschte Absage eines anderen Organisators
+    // forged cancellation from another organizer
     const forged = await ingest(
       outlookCancel.replace(/dieter\.chef@corp\.example\.com/g, 'mallory@evil.example.net'),
       'mallory@evil.example.net',
@@ -311,15 +311,15 @@ describe('CANCEL', () => {
     expect(findObjectByUid(db, view(req).uid)).toBeDefined()
     const cancel = await ingest(outlookCancel, 'dieter.chef@corp.example.com', 'CANCEL')
     removeCancelledEvent(db, view(cancel).id)
-    // Termin war nur lokal (pending create) → verschwindet ersatzlos
+    // Event was local only (pending create) → disappears without a trace
     expect(findObjectByUid(db, view(req).uid)).toBeUndefined()
-    expect(sent).toHaveLength(1) // nur die frühere Antwort, keine Mail beim Entfernen
+    expect(sent).toHaveLength(1) // only the earlier response, no mail on removal
   })
 })
 
 describe('REPLY (Organisator-Seite)', () => {
   async function ownEvent(): Promise<string> {
-    // Ich (bob@mail.example.com) organisiere; ohne Server-Scheduling → Einladung wird eingereiht
+    // I (bob@mail.example.com) organize; without server scheduling → invitation is queued
     createEvent({
       calendarId: calId,
       summary: 'Planung',

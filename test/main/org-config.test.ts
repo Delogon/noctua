@@ -161,7 +161,7 @@ describe('Org-AI-Profile: Seeding', () => {
   it('ist idempotent und weist Aufgaben nicht erneut zu', () => {
     __setOrgConfigForTest({ aiProfiles: [profileCfg] })
     seedOrgProfiles(db)
-    // Nutzer stellt Triage auf OpenRouter zurück
+    // User switches triage back to OpenRouter
     setTaskAssignment('triage', 'openrouter', '')
     seedOrgProfiles(db)
     seedOrgProfiles(db)

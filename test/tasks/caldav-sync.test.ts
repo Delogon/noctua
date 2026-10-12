@@ -102,7 +102,7 @@ describe('VTODO-Abbildung', () => {
       'END:VALARM'
     ])
     const prev = readTodo(src)
-    // nur der Titel ändert sich: DUE (mit Uhrzeit/TZID) bleibt unangetastet
+    // only the title changes: DUE (with time/TZID) stays untouched
     const out = patchTodoIcs(src, { ...prev, title: 'Neu' }, prev, NOW)
     expect(out).toContain('SUMMARY:Neu')
     expect(out).toContain('DUE;TZID=Europe/Berlin:20990131T170000')
@@ -135,7 +135,7 @@ describe('VTODO-Abbildung', () => {
   })
 })
 
-// --- Abgleich mit Fake-Server ---------------------------------------------------------------------
+// --- Reconciliation with fake server --------------------------------------------------------------
 
 let db: Database.Database
 let server: FakeCalDavServer
@@ -178,7 +178,7 @@ function ctx(): SyncContext {
   }
 }
 
-/** Ein voller Zyklus wie im Betrieb: Sync (Push+Pull) mit anschließendem Abgleich, dann Push. */
+/** A full cycle as in production: sync (push+pull) followed by reconciliation, then push. */
 async function cycle(times = 2): Promise<void> {
   for (let i = 0; i < times; i++) {
     await syncAccount(ctx(), account, { force: true })
@@ -192,7 +192,7 @@ function calId(): number {
 }
 
 async function enable(): Promise<void> {
-  await syncAccount(ctx(), account) // Kalenderliste laden
+  await syncAccount(ctx(), account) // load calendar list
   setTasksSyncCalendar(db, calId())
   await cycle()
 }
@@ -243,7 +243,7 @@ describe('Aufgaben <-> CalDAV', () => {
     const open = addTask('Offen', { due: '2099-02-01', notes: 'Aus: Mail' })
     addTask('Verworfen', { status: 'dismissed' })
     addTask('Schon erledigt', { status: 'done' })
-    // KI-Vorschlag: nur Annotation, nie eine Aufgabenzeile
+    // AI suggestion: annotation only, never a task row
     const acc = Number(
       db
         .prepare(
@@ -267,7 +267,7 @@ describe('Aufgaben <-> CalDAV', () => {
 
   it('neue Aufgaben aus der Triage (accept) werden synchronisiert, Vorschlag allein nicht', async () => {
     await enable()
-    // decideSuggestion(dismiss) legt nur einen 'dismissed'-Merker an
+    // decideSuggestion(dismiss) only creates a 'dismissed' marker
     const mid = seedMail()
     db.prepare(
       `INSERT INTO ai_annotations (message_id, category, priority, action_items_json, needs_reply, prompt_version, created_at)
@@ -277,9 +277,9 @@ describe('Aufgaben <-> CalDAV', () => {
     decideSuggestion(db, 'thread-1', false)
     await cycle()
     expect(serverFiles()).toEqual([])
-    decideSuggestion(db, 'thread-1', true) // zweites INSERT OR IGNORE ändert den Merker nicht
+    decideSuggestion(db, 'thread-1', true) // second INSERT OR IGNORE does not change the marker
     expect(serverFiles()).toEqual([])
-    // frischer Thread, akzeptiert
+    // fresh thread, accepted
     const mid2 = seedMail('thread-2', '<m2@x>')
     db.prepare(
       `INSERT INTO ai_annotations (message_id, category, priority, action_items_json, needs_reply, prompt_version, created_at)
@@ -338,7 +338,7 @@ describe('Aufgaben <-> CalDAV', () => {
       notes: 'Notiz',
       syncState: 'synced'
     })
-    // nichts zurückgeschrieben
+    // nothing written back
     expect(server.callsOfKind('put').filter((c) => c.method === 'PUT')).toHaveLength(0)
     expect(tasksChanged).toBeGreaterThan(0)
   })
@@ -360,7 +360,7 @@ describe('Aufgaben <-> CalDAV', () => {
     expect(ics).toContain('PRIORITY:2')
     expect(ics).toContain('X-FOO:bar')
     expect(listTasks(db, 'done')[0].syncState).toBe('synced')
-    // stabil: weitere Zyklen erzeugen keine weiteren PUTs
+    // stable: further cycles create no further PUTs
     server.calls.length = 0
     await cycle()
     expect(server.calls.filter((c) => c.method === 'PUT')).toHaveLength(0)
@@ -419,7 +419,7 @@ describe('Aufgaben <-> CalDAV', () => {
     server.put('tasks', 'nc1.ics', vtodo(['UID:nc1', 'SUMMARY:Original']))
     await enable()
     const id = (db.prepare('SELECT id FROM tasks').get() as { id: number }).id
-    // lokale Änderung (reiht Update ein), anderer Client ändert vor dem Push
+    // local change (enqueues update), another client changes it before the push
     db.prepare(`UPDATE tasks SET title = 'Meine Fassung' WHERE id = ?`).run(id)
     reconcileTasks(db)
     expect(listPendingOps(db, account.id)).toHaveLength(1)
@@ -438,7 +438,7 @@ describe('Aufgaben <-> CalDAV', () => {
     server.put('tasks', 'nc1.ics', vtodo(['UID:nc1', 'SUMMARY:Vom Server']))
     await enable()
     expect(serverFiles().sort()).toEqual(['nc1.ics', `${taskUid(id)}.ics`].sort())
-    // aus, Zuordnungen verloren, wieder an
+    // off, mappings lost, on again
     setTasksSyncCalendar(db, null)
     db.prepare('DELETE FROM task_caldav').run()
     setTasksSyncCalendar(db, calId())

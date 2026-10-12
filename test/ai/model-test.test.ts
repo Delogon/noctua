@@ -5,7 +5,7 @@ import { providerBody, zdrOnly } from '@main/ai/openrouter'
 import { setSetting } from '@main/db'
 import { createTestDb, closeTestDb } from '../helpers/db'
 
-// M86: Funktions-Test für eigene OpenRouter-Modelle + ZDR-Routing.
+// M86: function test for custom OpenRouter models + ZDR routing.
 
 describe('evaluateTestReply', () => {
   it('akzeptiert sauberes Triage-JSON', () => {

@@ -74,7 +74,7 @@ describe('listCalendars', () => {
       'https://cloud.example.com/remote.php/dav/calendars/anna/team%20kalender/'
     )
     expect(team.color).toBe('#ff7f00')
-    expect(team.readOnly).toBe(true) // nur read-Privileg
+    expect(team.readOnly).toBe(true) // read privilege only
     expect(cals[2].readOnly).toBe(true) // subscribed
   })
 
@@ -85,7 +85,7 @@ describe('listCalendars', () => {
     expect(cals[0].color).toBe('#e8710a')
     expect(cals[0].ctag).toBe('"a1b2c3"')
     expect(cals[0].supportsSyncCollection).toBe(false)
-    expect(cals[0].readOnly).toBe(false) // keine Privilegien gemeldet → schreibbar annehmen
+    expect(cals[0].readOnly).toBe(false) // no privileges reported → assume writable
   })
 
   it('iCloud: absolute Hrefs mit Port, Alpha-Farbe, write-content/bind', async () => {

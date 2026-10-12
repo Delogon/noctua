@@ -36,7 +36,7 @@ const scheduler = (): ReminderScheduler => {
   return s
 }
 
-const T0 = Date.parse('2099-06-10T10:00:00Z') // Terminbeginn
+const T0 = Date.parse('2099-06-10T10:00:00Z') // event start
 const MIN = 60_000
 
 function addEvent(
@@ -93,7 +93,7 @@ describe('Erinnerungen', () => {
   it('holt Verpasstes nach (bis 15 min), danach nicht mehr', () => {
     addEvent('late')
     const s = scheduler()
-    // Alarm fällig um T0-15min; App startet 10 min später
+    // Alarm due at T0-15min; app starts 10 min later
     expect(s.tick(T0 - 5 * MIN)).toBe(1)
     addEvent('later', { start: 'DTSTART:20990610T120000Z', end: 'DTEND:20990610T130000Z' })
     const fireAt = Date.parse('2099-06-10T12:00:00Z') - 15 * MIN
@@ -109,7 +109,7 @@ describe('Erinnerungen', () => {
     expect(scheduler().tick(T0 - 10 * MIN)).toBe(0)
     db.prepare('UPDATE calendars SET visible = 1').run()
     const s = scheduler()
-    expect(s.tick(T0 - 10 * MIN)).toBe(1) // nur „h"
+    expect(s.tick(T0 - 10 * MIN)).toBe(1) // only „h"
     expect(notices[0].objectId).toBe(hidden)
   })
 
@@ -128,7 +128,7 @@ describe('Erinnerungen', () => {
   it('Alarm relativ zum Ende, absoluter Alarm, EMAIL wird ignoriert', () => {
     addEvent('end', { alarm: 'TRIGGER;RELATED=END:-PT5M' })
     const s = scheduler()
-    expect(s.tick(Date.parse('2099-06-10T10:56:00Z'))).toBe(1) // Ende 11:00 − 5 min
+    expect(s.tick(Date.parse('2099-06-10T10:56:00Z'))).toBe(1) // end 11:00 − 5 min
     addEvent('abs', { alarm: 'TRIGGER;VALUE=DATE-TIME:20990610T083000Z' })
     expect(s.tick(Date.parse('2099-06-10T08:31:00Z'))).toBe(1)
     const mail = addEvent('mail')

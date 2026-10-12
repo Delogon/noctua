@@ -6,8 +6,8 @@ import {
 } from '@renderer/features/inbox/override-options'
 
 /**
- * Kategorie-Override (Design 3d): Die 1–7/0-Zuordnung und die ↑↓-Auswahl
- * sind pure Logik — hier festgenagelt, damit die Tasten im Overlay stimmen.
+ * Category override (Design 3d): the 1–7/0 mapping and the ↑↓ selection
+ * are pure logic — pinned down here so the keys in the overlay are right.
  */
 describe('override-options — Tastenzuordnung', () => {
   it('bildet 1–7 auf die sieben Kategorien ab', () => {
@@ -43,7 +43,7 @@ describe('override-options — ↑↓-Auswahl', () => {
   it('bewegt sich zeilenweise und bleibt in der Liste', () => {
     expect(moveOverrideSelection(0, 1)).toBe(1)
     expect(moveOverrideSelection(3, -1)).toBe(2)
-    // Anschläge: oben und unten wird geklemmt, kein Umlauf
+    // Bounds: clamped at top and bottom, no wraparound
     expect(moveOverrideSelection(0, -1)).toBe(0)
     expect(moveOverrideSelection(OVERRIDE_OPTIONS.length - 1, 1)).toBe(OVERRIDE_OPTIONS.length - 1)
   })

@@ -23,7 +23,7 @@ describe('xml parser', () => {
     expect(nc.ns).toBe(NS.dav)
     expect(nc.name).toBe('multistatus')
     const radicale = parseXml(RADICALE_HOME_LISTING)
-    expect(radicale.ns).toBe(NS.dav) // Default-Namespace
+    expect(radicale.ns).toBe(NS.dav) // default namespace
     expect(children(radicale, NS.dav, 'response')).toHaveLength(2)
   })
 
@@ -126,7 +126,7 @@ describe('DavClient', () => {
     await expect(client.propfind('http://cloud.example.com/dav/', '<x/>')).rejects.toThrow(
       InsecureUrlError
     )
-    expect(calls).toHaveLength(1) // http-Request wurde nie abgesetzt
+    expect(calls).toHaveLength(1) // http request was never sent
   })
 
   it('401 → DavAuthError, 412 → DavHttpError mit Status', async () => {

@@ -46,7 +46,7 @@ describe('drafts-repo', () => {
     expect(draftA.text).toContain('kommt sofort')
     expect(draftA.html).toBe('<p>x</p>')
 
-    // Upsert: gleicher Thread überschreibt, statt einen zweiten Eintrag anzulegen
+    // Upsert: same thread overwrites instead of creating a second entry
     saveDraft(db, keyA, 'Hallo Alice,\nneuer Stand.', '')
     const after = listDrafts(db)
     expect(after).toHaveLength(2)

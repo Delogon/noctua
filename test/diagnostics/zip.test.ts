@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { inflateRawSync } from 'node:zlib'
 import { createZip, crc32 } from '@main/diagnostics/zip'
 
-/** Minimaler Leser über das zentrale Verzeichnis — prüft, was ein Unzip sähe. */
+/** Minimal reader via the central directory — checks what an unzip would see. */
 function readZip(buf: Buffer): Record<string, string> {
   const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]))
   const count = buf.readUInt16LE(eocd + 10)

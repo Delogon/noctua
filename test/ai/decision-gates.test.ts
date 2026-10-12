@@ -33,7 +33,7 @@ function configureDecision(): void {
   setTaskAssignment('decision', p.id, 'clef-flash')
 }
 
-/** Antwortet auf jede gestellte noul-Frage mit probs[name] (Standard 0.01). */
+/** Answers every noul question asked with probs[name] (default 0.01). */
 function stubNoul(probs: Record<string, number>): void {
   systemOne = vi.fn(async (_url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body)) as { questions: Record<string, unknown> }
@@ -274,9 +274,9 @@ describe('Regeln mit KI-Bedingung', () => {
       type: 'noul',
       instructions: 'Ist das eine Rechnung?'
     })
-    // Mail steht als unvertrauenswürdige Daten im state
+    // Mail is in the state as untrusted data
     expect(body.state).toContain('<<<BEGIN MAIL (UNTRUSTED DATA)>>>')
-    expect(flagged).toEqual([id, id]) // r1 und r3
+    expect(flagged).toEqual([id, id]) // r1 and r3
     expect(archived).toEqual([])
     expect(db.prepare('SELECT hits FROM rules WHERE id = ?').get(r1)).toEqual({ hits: 1 })
     expect(db.prepare('SELECT hits FROM rules WHERE id = ?').get(r2)).toEqual({ hits: 0 })
@@ -298,7 +298,7 @@ describe('Regeln mit KI-Bedingung', () => {
   it('ohne Entscheidungsmodell: Regeln mit KI-Bedingung werden übersprungen, kein Request', async () => {
     const id = seedInbox()
     addRule({ match: { aiCondition: 'Ist das eine Rechnung?' }, actions: { flag: true } })
-    // normale Regel daneben feuert weiter
+    // normal rule alongside still fires
     addRule({ match: { category: ['transactional'] }, actions: { flag: true } })
     db.prepare(
       `INSERT INTO ai_annotations (message_id, category, priority, prompt_version, needs_reply, created_at)
@@ -308,7 +308,7 @@ describe('Regeln mit KI-Bedingung', () => {
     vi.stubGlobal('fetch', f)
     await applyRulesPostTriage(db, id)
     expect(f).not.toHaveBeenCalled()
-    expect(flagged).toEqual([id]) // nur die Kategorie-Regel
+    expect(flagged).toEqual([id]) // only the category rule
   })
 
   it('höchstens 64 Fragen je Aufruf', async () => {

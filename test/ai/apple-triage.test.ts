@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { sanitizeAppleVerdict } from '../../src/main/ai/triage'
 
-// Werte-Klemmung der Apple-Triage (M86): Guided Generation garantiert die
-// Struktur, die Bereiche (Enum, 1–5, Datums-Format) klemmen wir selbst.
+// Value clamping of the Apple triage (M86): Guided Generation guarantees the
+// structure; we clamp the ranges (enum, 1–5, date format) ourselves.
 
 describe('sanitizeAppleVerdict', () => {
   it('lässt ein sauberes Urteil unverändert durch', () => {
@@ -32,7 +32,7 @@ describe('sanitizeAppleVerdict', () => {
     expect(sanitizeAppleVerdict({ category: 'work', priority: 9, summary: 'x' }).priority).toBe(5)
     expect(sanitizeAppleVerdict({ category: 'work', priority: 0, summary: 'x' }).priority).toBe(1)
     expect(sanitizeAppleVerdict({ category: 'work', priority: 3.6, summary: 'x' }).priority).toBe(4)
-    // fehlend/NaN → neutral 3
+    // missing/NaN → neutral 3
     expect(sanitizeAppleVerdict({ category: 'work', summary: 'x' }).priority).toBe(3)
   })
 

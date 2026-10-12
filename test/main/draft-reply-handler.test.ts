@@ -2,15 +2,15 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { createTestDb, closeTestDb } from '../helpers/db'
 
-// Nur der Draft-Start wird gemockt — geprüft wird, dass der Handler den
-// validierten Input vollständig durchreicht (M79: reviseText ging verloren).
+// Only the draft start is mocked — checks that the handler passes the
+// validated input through completely (M79: reviseText was lost).
 vi.mock('@main/ai/drafts', () => ({
   startDraftReply: vi.fn(() => ({ draftId: 'draft-test' })),
   startDraftNew: vi.fn(),
   startDraftNudge: vi.fn(),
   stylePreview: vi.fn()
 }))
-// Zieht sonst die Hunspell-Wörterbücher als ?asset-Importe in den Test
+// Otherwise pulls the Hunspell dictionaries into the test as ?asset imports
 vi.mock('@main/spell', () => ({ getSpellEngine: vi.fn() }))
 
 import { startDraftReply } from '@main/ai/drafts'

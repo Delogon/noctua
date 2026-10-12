@@ -138,7 +138,7 @@ describe('Keymap — Kalenderansicht', () => {
     handler(fakeKey({ key: 'w' }))
     handler(fakeKey({ key: 'n' }))
     expect(calendarEvents()).toEqual([])
-    // d gehört in der Wartet-Ansicht weiter dem Verwerfen
+    // in the waiting view, d still belongs to discard
     usePaper.setState({ view: 'waiting' })
     handler(fakeKey({ key: 'd' }))
     expect(dispatched).toContainEqual({ type: 'paper:waiting', detail: 'drop' })

@@ -13,7 +13,7 @@ import {
 import { alarmsFromChoice } from '@renderer/features/calendar/alarms'
 import { diffFields } from '@renderer/features/calendar/scope'
 
-// Zeitzone vor dem Sammeln der Tests setzen (Modul-Konstanten mit Date)
+// Set the time zone before tests are collected (module constants using Date)
 process.env.TZ = 'Europe/Berlin'
 
 const timedFields: CalendarEventFields = {

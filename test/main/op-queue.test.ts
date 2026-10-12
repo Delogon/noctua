@@ -116,7 +116,7 @@ describe('Op-Queue (REL-5)', () => {
     expect(push).toHaveBeenCalledWith('sync:opsDead', { accountId, count: 1, reason: 'attempts' })
     expect(syncer.invalidateFolder).toHaveBeenCalledWith(folderId)
 
-    // tote Ops werden nicht erneut ausgeführt
+    // dead ops are not executed again
     syncer.executeOp.mockClear()
     await processOpQueue(db, accountId, syncer, push)
     expect(syncer.executeOp).not.toHaveBeenCalled()
@@ -139,7 +139,7 @@ describe('Op-Queue (REL-5)', () => {
 
   it('UIDVALIDITY-Mismatch: Op wird nicht ausgeführt, sondern dead', async () => {
     enqueueOp(db, accountId, 'delete', { folderId, uids: [9] })
-    // Ordner wurde seit dem Einreihen zurückgesetzt
+    // folder was reset since enqueueing
     db.prepare('UPDATE folders SET uidvalidity = 222 WHERE id = ?').run(folderId)
     const syncer = executor(async () => {})
     await processOpQueue(db, accountId, syncer, push)
@@ -150,7 +150,7 @@ describe('Op-Queue (REL-5)', () => {
       count: 1,
       reason: 'uidvalidity'
     })
-    // Server-Resync wäre sinnlos: der Reset hat den Ordner ohnehin neu aufgebaut
+    // A server resync would be pointless: the reset already rebuilt the folder
     expect(syncer.invalidateFolder).not.toHaveBeenCalled()
   })
 

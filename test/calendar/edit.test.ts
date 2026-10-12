@@ -141,7 +141,7 @@ describe('createEventIcs', () => {
 })
 
 describe('updateIcs', () => {
-  const series = (): string => createEventIcs(base({ rrule: 'FREQ=WEEKLY;COUNT=6' }), ctx()).ics // Mo 24.3., 31.3., 7.4., …
+  const series = (): string => createEventIcs(base({ rrule: 'FREQ=WEEKLY;COUNT=6' }), ctx()).ics // Mon 24.3., 31.3., 7.4., …
 
   it('nicht wiederkehrend: Änderung, SEQUENCE steigt, Felder bleiben', () => {
     const { ics } = createEventIcs(base(), ctx())
@@ -185,7 +185,7 @@ describe('updateIcs', () => {
     const occ = win(res.ics)
     expect(occ).toHaveLength(6)
     expect(iso(occ[0].startUtc)).toBe('2025-03-24T10:00:00Z')
-    expect(iso(occ[2].startUtc)).toBe('2025-04-07T09:00:00Z') // Sommerzeit
+    expect(iso(occ[2].startUtc)).toBe('2025-04-07T09:00:00Z') // summer time
   })
 
   it('"alle": Titeländerung behält Ausnahmen', () => {
@@ -231,9 +231,9 @@ describe('updateIcs', () => {
     const ov = occ.find((o) => o.isOverride)!
     expect(iso(ov.startUtc)).toBe('2025-04-07T13:00:00Z')
     expect(iso(ov.endUtc)).toBe('2025-04-07T14:30:00Z')
-    // Override trägt keine Wiederholung
+    // Override carries no recurrence
     expect(ov.comp.hasProperty('rrule')).toBe(false)
-    // erneutes Ändern desselben Vorkommens aktualisiert den vorhandenen Override
+    // changing the same occurrence again updates the existing override
     const again = updateIcs(
       res.ics,
       { scope: 'this', recurrenceId: '2025-04-07T07:00:00Z', patch: { location: 'Anderswo' } },
@@ -272,7 +272,7 @@ describe('updateIcs', () => {
       ctx()
     )
     expect(res.created).not.toBeNull()
-    // Ursprung: 24.3. und 31.3., endet davor
+    // Original: 24.3. and 31.3., ends before
     const orig = win(res.ics, '2025-03-01T00:00:00Z', '2025-08-01T00:00:00Z')
     expect(orig.map((o) => iso(o.startUtc))).toEqual([
       '2025-03-24T08:00:00Z',
@@ -280,7 +280,7 @@ describe('updateIcs', () => {
     ])
     expect(res.ics).toMatch(/UNTIL=20250407T065959Z/)
     expect(res.ics).not.toContain('COUNT=')
-    // Neue Serie: 4 verbleibende Vorkommen ab 7.4., 10:00 lokal
+    // New series: 4 remaining occurrences from 7.4., 10:00 local
     const created = win(res.created!.ics, '2025-03-01T00:00:00Z', '2025-08-01T00:00:00Z')
     expect(created.map((o) => iso(o.startUtc))).toEqual([
       '2025-04-07T08:00:00Z',

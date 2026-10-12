@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { FROM_AUTOPILOT_NOTE_MS, planAutoSwitch } from '@renderer/features/composer/from-autopilot'
 
 /**
- * Design 3a: Die Konto-Automatik folgt dem bevorzugten Konto des Empfängers.
- * Wechselt sie das sichtbare Konto, gibt es eine Notiz; eine manuelle Wahl
- * gewinnt immer und unterdrückt sie.
+ * Design 3a: The account autopilot follows the recipient's preferred account.
+ * If it switches the visible account, a note appears; a manual choice
+ * always wins and suppresses it.
  */
 describe('planAutoSwitch', () => {
   const accountIds = [1, 2, 3]

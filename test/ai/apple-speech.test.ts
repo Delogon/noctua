@@ -2,7 +2,7 @@ import { readdirSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Helper-Prozess und Binär-Suche gemockt; Temp-Dateien laufen echt (Cleanup-Test).
+// Helper process and binary lookup mocked; temp files are real (cleanup test).
 const execFileMock = vi.fn()
 vi.mock('node:child_process', () => ({ execFile: (...args: unknown[]) => execFileMock(...args) }))
 vi.mock('electron', () => ({

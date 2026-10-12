@@ -177,7 +177,7 @@ describe('applyRules (Integration)', () => {
        VALUES ('r', '', 'src', ?, 1, 1, 1000)`
     ).run(JSON.stringify({ match: { minPriority: 4 }, actions: { archive: true } }))
 
-    applyRules(db, msgId, 'ingest') // AI-Regel darf hier NICHT feuern
+    applyRules(db, msgId, 'ingest') // AI rule must NOT fire here
     expect(called).toBe(false)
     applyRules(db, msgId, 'post-triage')
     expect(called).toBe(true)

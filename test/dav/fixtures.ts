@@ -1,6 +1,6 @@
 /**
- * Handgebaute, an echten Servern orientierte Antworten (Nextcloud/sabre,
- * Radicale, iCloud). Namespace-Präfixe unterscheiden sich bewusst je Server.
+ * Hand-built responses modeled on real servers (Nextcloud/sabre,
+ * Radicale, iCloud). Namespace prefixes deliberately differ per server.
  */
 
 export const NEXTCLOUD_HOME_LISTING = `<?xml version="1.0"?>

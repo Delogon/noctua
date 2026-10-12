@@ -44,7 +44,7 @@ describe('google-auth', () => {
     expect(url.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:49152/callback')
     expect(url.searchParams.get('response_type')).toBe('code')
     expect(url.searchParams.get('scope')).toContain('https://mail.google.com/')
-    // Ohne offline+consent gäbe Google kein Refresh-Token heraus
+    // Without offline+consent Google would not hand out a refresh token
     expect(url.searchParams.get('access_type')).toBe('offline')
     expect(url.searchParams.get('prompt')).toBe('consent')
     expect(url.searchParams.get('code_challenge')).toBe('challenge-abc')
@@ -106,7 +106,7 @@ describe('google-auth', () => {
       })
     )
     await expect(googleAccessToken('proxy@gmail.com')).rejects.toThrow(/HTTP 502/)
-    // Refresh-Token bleibt erhalten (kein invalid_grant)
+    // Refresh token is kept (no invalid_grant)
     expect(getSecret('google:refresh:proxy@gmail.com')).toBe('refresh-1')
   })
 

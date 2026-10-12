@@ -106,12 +106,12 @@ describe('AiQueue (REL-2)', () => {
     queue.kick()
     await vi.waitFor(() => expect(runTriage.mock.calls.length).toBeGreaterThanOrEqual(5))
     await new Promise((r) => setTimeout(r, 50))
-    // Parallelität 2: ein bereits gestarteter Job kann die Schwelle überholen
+    // Concurrency 2: an already started job can overshoot the threshold
     const calls = runTriage.mock.calls.length
     expect(calls).toBeLessThanOrEqual(6)
-    // kein Job wurde als error verbraucht
+    // no job was consumed as error
     for (const id of ids) expect(job(id).status).not.toBe('error')
-    // weiteres kick() während der Pause startet nichts
+    // further kick() during the pause starts nothing
     queue.kick()
     await new Promise((r) => setTimeout(r, 30))
     expect(runTriage.mock.calls.length).toBe(calls)

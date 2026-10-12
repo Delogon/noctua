@@ -106,7 +106,7 @@ describe('salutationTarget (Stufe 2 — Anrede)', () => {
     expect(salutationTarget('Hallo,\nkurze Frage:')).toEqual({ kind: 'none' })
     expect(salutationTarget('')).toEqual({ kind: 'none' })
     expect(salutationTarget(null)).toEqual({ kind: 'none' })
-    // Kleingeschriebenes nach dem Gruß ist kein Name — lieber neutral
+    // Lowercase text after the greeting is not a name — prefer neutral
     expect(salutationTarget('Hallo erstmal vielen Dank für alles')).toEqual({ kind: 'none' })
   })
 
@@ -172,7 +172,7 @@ describe('taskAddresseeVerdict (Gesamtpolitik)', () => {
         toJson: list('verteiler@verein.de'),
         ccJson: '[]',
         bodyText: 'Hallo Jannik,\n\nanbei die Infos zu Plakaten und Sponsoren.',
-        addressedToMe: true // selbst wenn das Modell irrt, greift Stufe 1+2
+        addressedToMe: true // even if the model is wrong, stages 1+2 apply
       })
     ).toBe('none')
   })

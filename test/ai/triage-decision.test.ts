@@ -206,7 +206,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
     expect(a.cost_usd).toBe(0)
     expect(a.needs_reply).toBe(0)
     expect(JSON.parse(a.action_items_json)).toEqual([])
-    // PROMPT_VERSION bleibt: kein Neu-Triage-Effekt beim Moduswechsel
+    // PROMPT_VERSION stays: no re-triage effect on mode switch
     expect(a.prompt_version).toBe(6)
   })
 
@@ -238,7 +238,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
     expect(body.questions.priority.criteria).toHaveLength(5)
     expect(body.questions.phishing.criteria).toHaveLength(3)
     expect(body.questions.spam.criteria).toHaveLength(3)
-    // Mail steht als unvertrauenswürdige Daten im state
+    // Mail is in the state as untrusted data
     expect(body.state).toContain('<<<BEGIN MAIL (UNTRUSTED DATA)>>>')
   })
 
@@ -271,7 +271,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
   })
 
   it('Zusammenfassung nur bei Priorität ≥ 3: dann ohne Aufgaben-Feld im Prompt', async () => {
-    stubSystemOne({ category: 'transactional', priority: 2.4, has_request: 0.1 }) // → Priorität 3
+    stubSystemOne({ category: 'transactional', priority: 2.4, has_request: 0.1 }) // → priority 3
     genReply({ summary: 'Rechnung über 120 Euro.' })
     const id = seedMail(db, { body: 'Ihre Rechnung liegt bei.' })
     await runTriage(db, id)
@@ -299,7 +299,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
 
   it('ohne nutzbares Textmodell (Local only, externes Profil) läuft die Entscheidung trotzdem', async () => {
     stubSystemOne({ category: 'work', priority: 3, has_request: 0.9 })
-    setLocalOnly(true) // OpenRouter (triage) blockiert, Ollama (lokal) nicht
+    setLocalOnly(true) // OpenRouter (triage) blocked, Ollama (local) not
     const id = seedMail(db, { body: 'Bitte schick mir die Unterlagen. Danke.' })
     expect(await runTriage(db, id)).toBe('done')
     expect(fakeCreate).not.toHaveBeenCalled()
@@ -406,7 +406,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
     stubSystemOne({ category: 'promotions', priority: 0, spam: 1.9 })
     const id = seedMail(db, { fromAddr: 'deals@spam.top', body: 'Casino Jackpot!' })
     await runTriage(db, id)
-    expect(maybeAutoJunk(db, id)).toBe(false) // Einstellung aus
+    expect(maybeAutoJunk(db, id)).toBe(false) // setting off
     db.prepare(`INSERT INTO settings (key, value) VALUES ('security.autoJunk', '1')`).run()
     expect(maybeAutoJunk(db, id)).toBe(true)
     expect(moved).toEqual([[id]])
@@ -416,7 +416,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
     db.prepare(
       `INSERT INTO contact_stats (account_id, addr, sent_count, last_interaction) VALUES (?, 'deals@spam.top', 1, 1)`
     ).run(acc)
-    expect(maybeAutoJunk(db, id)).toBe(false) // bekannter Kontakt
+    expect(maybeAutoJunk(db, id)).toBe(false) // known contact
     setJunkExecutor(() => {})
   })
 
@@ -608,11 +608,11 @@ describe('Reine Bausteine', () => {
         'reply_to_differs',
         'link_mismatch:1',
         'ip_link:1',
-        // xn--pypal-4ve.com = „pаypal.com" mit kyrillischem а: mehr als nur Punycode
+        // xn--pypal-4ve.com = „pаypal.com" with Cyrillic а: more than just Punycode
         'homoglyph_link:1'
       ])
     )
-    // legitime IDN-Domain: nur der schwache Punycode-Hinweis, keine Homoglyph-Warnung
+    // legitimate IDN domain: only the weak Punycode hint, no homoglyph warning
     const idn = computeMailSignals({
       fromName: 'Stadt',
       fromAddr: 'info@stadt.de',

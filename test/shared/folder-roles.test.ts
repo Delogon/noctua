@@ -14,7 +14,7 @@ describe('roleFromName', () => {
     ['Entwürfe', '/', 'drafts'],
     ['Archiv', '/', 'archive'],
     ['Projects', '/', 'other'],
-    // Tief verschachtelt oder unter eigenem Ordner: kein Systemordner
+    // Deeply nested or under a custom folder: not a system folder
     ['Clients/Spam', '/', 'other'],
     ['INBOX.Kunden.Spam', '.', 'other']
   ])('%s → %s', (path, delimiter, role) => {

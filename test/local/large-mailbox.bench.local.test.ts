@@ -16,13 +16,13 @@ import { runBenchmark } from '@main/diagnostics/benchmark'
 import { collectDatasetStats } from '@main/diagnostics/dataset'
 import { makeEnvelope } from '../helpers/db'
 
-// Benchmark mit synthetischem Großpostfach — reproduziert „wird bei großen
-// Postfächern langsam" ohne echtes Konto. Läuft nur auf Anfrage:
+// Benchmark with a synthetic large mailbox — reproduces „gets slow with large
+// mailboxes" without a real account. Runs only on request:
 //
 //   NOCTUA_PERF_BENCH=1 NOCTUA_PERF_MESSAGES=50000 pnpm test:perf
 //
-// Die DB ist wie in der App SQLCipher-verschlüsselt, WAL, auf der Platte. Ergebnis
-// (JSON) unter NOCTUA_PERF_OUT oder test/local/out/large-mailbox-<n>.json.
+// As in the app, the DB is SQLCipher-encrypted, WAL, on disk. Result
+// (JSON) in NOCTUA_PERF_OUT or test/local/out/large-mailbox-<n>.json.
 
 const enabled = process.env.NOCTUA_PERF_BENCH === '1'
 const localDescribe = enabled ? describe : describe.skip
@@ -45,7 +45,7 @@ function sentence(r: () => number, n: number): string {
   return Array.from({ length: n }, () => WORDS[Math.floor(r() * WORDS.length)]).join(' ')
 }
 
-/** Postfach mit Threads (Ø ~2,5 Mails), 2000 Absendern, HTML-Bodies, Annotationen. */
+/** Mailbox with threads (avg ~2.5 mails), 2000 senders, HTML bodies, annotations. */
 function seed(db: Database.Database, total: number): void {
   const r = rng(42)
   const now = Date.now()
@@ -157,7 +157,7 @@ localDescribe('Großpostfach-Benchmark (synthetisch, lokal)', () => {
 
         const benchmark = await runBenchmark(db, { runs: 3 })
 
-        // Sync-Fenster: 500 Flag-Updates wie incrementalSync, ohne Transaktion
+        // Sync window: 500 flag updates like incrementalSync, without a transaction
         const inboxId = (
           db.prepare(`SELECT id FROM folders WHERE special_use = '\\Inbox'`).get() as { id: number }
         ).id
@@ -172,7 +172,7 @@ localDescribe('Großpostfach-Benchmark (synthetisch, lokal)', () => {
             if (id !== null) db.prepare('SELECT thread_key FROM messages WHERE id = ?').get(id)
           }
         })
-        // Was ein einziges messages:changed im Renderer nach sich zieht
+        // What a single messages:changed triggers in the renderer
         const refreshFanout = timeIt(() => {
           listThreads(db, 300, undefined, 'inbox')
           mboxCounts(db)

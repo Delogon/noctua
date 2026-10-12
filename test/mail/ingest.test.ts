@@ -83,7 +83,7 @@ describe('upsertEnvelope', () => {
     const archive = seedFolder(db, acc, '\\Archive')
     upsertEnvelope(db, acc, inbox, makeEnvelope({ uid: 1, gmMsgid: 'GM1' }))
     const dupe = upsertEnvelope(db, acc, archive, makeEnvelope({ uid: 99, gmMsgid: 'GM1' }))
-    expect(dupe).toBeNull() // als Duplikat verworfen
+    expect(dupe).toBeNull() // discarded as duplicate
     expect((db.prepare('SELECT count(*) c FROM messages').get() as { c: number }).c).toBe(1)
   })
 
@@ -266,7 +266,7 @@ describe('applyFlagUpdate & deleteByUids', () => {
       Buffer.from(new Float32Array(768).buffer)
     )
 
-    // Virtuelle Tabellen besitzen keine FK-Cascade.
+    // Virtual tables have no FK cascade.
     db.prepare('DELETE FROM messages WHERE id = ?').run(message.messageId)
     expect(db.prepare('SELECT count(*) count FROM messages_fts').get()).toEqual({ count: 1 })
     expect(db.prepare('SELECT count(*) count FROM message_vecs').get()).toEqual({ count: 1 })

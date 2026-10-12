@@ -1,6 +1,6 @@
 /**
- * Realistische iMIP-Fixtures im Stil von Nextcloud (sabre), Exchange/Outlook,
- * Google Calendar und Apple Kalender. Handgebaut nach beobachteten Mails.
+ * Realistic iMIP fixtures in the style of Nextcloud (sabre), Exchange/Outlook,
+ * Google Calendar and Apple Calendar. Hand-built from observed mails.
  */
 const crlf = (lines: string[]): string => `${lines.join('\r\n')}\r\n`
 
@@ -24,7 +24,7 @@ const BERLIN_VTIMEZONE = [
   'END:VTIMEZONE'
 ]
 
-/** Nextcloud: REQUEST, Europe/Berlin, 20.10.2026 10:00–11:00 Ortszeit (08:00Z). */
+/** Nextcloud: REQUEST, Europe/Berlin, 20.10.2026 10:00–11:00 local time (08:00Z). */
 export const nextcloudRequest = crlf([
   'BEGIN:VCALENDAR',
   'PRODID:-//Sabre//Sabre VObject 4.5.4//EN',
@@ -49,7 +49,7 @@ export const nextcloudRequest = crlf([
   'END:VCALENDAR'
 ])
 
-/** Exchange/Outlook: Windows-Zonenname als TZID, mit VTIMEZONE. 21.10.2026 14:00–15:30 (12:00Z). */
+/** Exchange/Outlook: Windows zone name as TZID, with VTIMEZONE. 21.10.2026 14:00–15:30 (12:00Z). */
 export const outlookRequest = crlf([
   'BEGIN:VCALENDAR',
   'METHOD:REQUEST',
@@ -93,7 +93,7 @@ export const outlookRequest = crlf([
   'END:VCALENDAR'
 ])
 
-/** Exchange ohne VTIMEZONE, nur der Windows-Name (kommt bei Outlook-Web vor). */
+/** Exchange without VTIMEZONE, only the Windows name (occurs with Outlook Web). */
 export const outlookNoVtimezone = crlf([
   'BEGIN:VCALENDAR',
   'METHOD:REQUEST',
@@ -112,7 +112,7 @@ export const outlookNoVtimezone = crlf([
   'END:VCALENDAR'
 ])
 
-/** Google Calendar: UTC-Zeiten, wiederkehrend (jeden Dienstag), X-Parameter an ATTENDEE. */
+/** Google Calendar: UTC times, recurring (every Tuesday), X parameters on ATTENDEE. */
 export const googleRequest = crlf([
   'BEGIN:VCALENDAR',
   'PRODID:-//Google Inc//Google Calendar 70.9054//EN',
@@ -141,7 +141,7 @@ export const googleRequest = crlf([
   'END:VCALENDAR'
 ])
 
-/** Apple Kalender: ganztägig, EMAIL-Parameter, X-APPLE-Properties. */
+/** Apple Calendar: all-day, EMAIL parameter, X-APPLE properties. */
 export const appleAllDayRequest = crlf([
   'BEGIN:VCALENDAR',
   'VERSION:2.0',
@@ -164,7 +164,7 @@ export const appleAllDayRequest = crlf([
   'END:VCALENDAR'
 ])
 
-/** Einzelnes Vorkommen einer Serie (RECURRENCE-ID), Exchange. */
+/** Single occurrence of a series (RECURRENCE-ID), Exchange. */
 export const outlookOccurrenceRequest = crlf([
   'BEGIN:VCALENDAR',
   'METHOD:REQUEST',
@@ -204,7 +204,7 @@ export const outlookCancel = crlf([
   'END:VCALENDAR'
 ])
 
-/** Nextcloud/Google REPLY von Bob (Zusage) auf unseren Termin. */
+/** Nextcloud/Google REPLY from Bob (accepted) to our event. */
 export const bobAcceptReply = (uid: string, sequence = 0, rid?: string): string =>
   crlf([
     'BEGIN:VCALENDAR',
@@ -223,7 +223,7 @@ export const bobAcceptReply = (uid: string, sequence = 0, rid?: string): string 
     'END:VCALENDAR'
   ])
 
-/** Outlook COUNTER (Gegenvorschlag). */
+/** Outlook COUNTER (counter-proposal). */
 export const outlookCounter = crlf([
   'BEGIN:VCALENDAR',
   'METHOD:COUNTER',
@@ -243,7 +243,7 @@ export const outlookCounter = crlf([
   'END:VCALENDAR'
 ])
 
-/** Kompletter Roh-Mail-Text mit text/calendar-Alternative (Exchange-Stil). */
+/** Complete raw mail text with a text/calendar alternative (Exchange style). */
 export const rawInviteMail = (ics: string, method = 'REQUEST'): string =>
   [
     'From: Dieter Chef <dieter.chef@corp.example.com>',

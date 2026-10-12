@@ -5,9 +5,9 @@ import { upsertEnvelope } from '@main/mail/ingest'
 import { setSetting } from '@main/db'
 import { closeTestDb, createAiTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 
-// Stups-Entwurf (M75): Der Prompt verhält sich zur Signatur wie der
-// Antwort-Prompt — mit eingerichteter Signatur schreibt das Modell keine
-// Grußformel, und eine trotzdem erzeugte wird vor der Anzeige gestrippt.
+// Nudge draft (M75): the prompt treats the signature like the
+// reply prompt — with a signature configured, the model writes no
+// sign-off, and one generated anyway is stripped before display.
 
 const { fakeCreate } = vi.hoisted(() => ({ fakeCreate: vi.fn() }))
 
@@ -15,7 +15,7 @@ vi.mock('@main/ai/providers/openai-factory', () => ({
   createOpenAiClient: () => ({ chat: { completions: { create: fakeCreate } } })
 }))
 
-/** Simulierter Streaming-Response: jedes Element ein Delta-Chunk. */
+/** Simulated streaming response: each element is a delta chunk. */
 function modelStreams(...chunks: string[]): void {
   fakeCreate.mockResolvedValueOnce(
     (async function* () {
@@ -29,7 +29,7 @@ interface DraftResult {
   error: string | null
 }
 
-/** Startet den Stups-Entwurf und sammelt alle Chunks bis done. */
+/** Starts the nudge draft and collects all chunks until done. */
 function collectNudge(
   db: Database.Database,
   input: { messageId: number; idea?: string }
@@ -104,8 +104,8 @@ describe('startDraftNudge — Signatur & Idee', () => {
     const result = await collectNudge(db, { messageId })
 
     expect(result.error).toBeNull()
-    // Grußformel + Namenszeile des Modells fliegen raus — die Signatur hängt
-    // erst der Versand-Pfad (sendMail) genau einmal an.
+    // The model's sign-off + name line are removed — only the send path
+    // (sendMail) appends the signature, exactly once.
     expect(result.text).toBe(
       'Hallo Heike,\n\nwollte kurz nachhaken, ob du meine Mail gesehen hast.'
     )

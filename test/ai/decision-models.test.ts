@@ -23,7 +23,7 @@ vi.mock('@main/ai/providers/openai-factory', () => ({
   createOpenAiClient: () => ({ chat: { completions: { create: vi.fn() } } })
 }))
 
-/** Fake-Ollama: /api/tags, /api/show, /v1/models, /v1/systemone */
+/** Fake Ollama: /api/tags, /api/show, /v1/models, /v1/systemone */
 function fakeOllama(opts: {
   tags: Array<{ name: string; capabilities?: string[] }>
   show?: Record<string, string[]>
@@ -90,7 +90,7 @@ describe('Fähigkeiten (capabilities)', () => {
     const caps = await listOllamaModelCaps('http://127.0.0.1:11434', { showLimit: 5 })
     const shows = f.mock.calls.filter(([u]) => String(u).endsWith('/api/show'))
     expect(shows).toHaveLength(5)
-    // bekannte Entscheidungsmodelle werden zuerst abgefragt und fallen nicht unters Limit
+    // known decision models are queried first and do not count toward the limit
     expect(caps.find((m) => m.name === 'nimble')?.capabilities).toEqual(['decision'])
   })
 

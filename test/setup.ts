@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 /**
- * Electron ist im Test-Runtime nicht vorhanden — alle im Main-Prozess
- * genutzten APIs werden hier gemockt. Reine Logik und die DB-Integrationstests
- * laufen dadurch unter Node/Vitest, ohne den Electron-Kontext zu brauchen.
+ * Electron is not available in the test runtime — all APIs used in the main
+ * process are mocked here. This lets pure logic and the DB integration tests
+ * run under Node/Vitest without needing the Electron context.
  */
 const cipherPrefix = Buffer.from('enc:')
 
@@ -19,7 +19,7 @@ vi.mock('electron', () => {
       return this
     }
     show(): void {
-      // Test-Double: Benachrichtigungen werden nur mitgeschrieben, nicht angezeigt
+      // Test double: notifications are only recorded, not shown
     }
     constructor() {
       notificationInstances.push(this)
@@ -37,7 +37,7 @@ vi.mock('electron', () => {
     },
     safeStorage: {
       isEncryptionAvailable: () => true,
-      // Reversibles „Verschlüsseln" fürs Vault-Verhalten in Tests
+      // Reversible „encryption" for vault behavior in tests
       encryptString: (s: string) => Buffer.concat([cipherPrefix, Buffer.from(s, 'utf8')]),
       decryptString: (b: Buffer) => b.subarray(cipherPrefix.length).toString('utf8')
     },
@@ -49,6 +49,6 @@ vi.mock('electron', () => {
   }
 })
 
-// Deterministischer Modell-Cache-Pfad für evtl. transitive Importe
+// Deterministic model cache path for possible transitive imports
 process.env.NOCTUA_TEST = '1'
 void join

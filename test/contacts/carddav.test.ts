@@ -199,7 +199,7 @@ describe('Kontakt-Sync', () => {
     expect(multiget[0].body).toContain('a.vcf')
     expect(multiget[0].body).toContain('c.vcf')
     expect(multiget[0].body).not.toContain('b.vcf')
-    // Gelöschte Karte verschwindet auch aus dem E-Mail-Index
+    // Deleted card also disappears from the email index
     expect(searchDavContacts(db, 'bernd', 5)).toEqual([])
   })
 
@@ -303,7 +303,7 @@ describe('Empfänger-Vorschläge: Historie + Adressbuch', () => {
       'bob2@brandt.example',
       'bob@brandt.example'
     ])
-    // LIKE-Platzhalter aus der Eingabe sind wirkungslos
+    // LIKE wildcards in the input have no effect
     expect(searchDavContacts(db, '%', 10)).toEqual([])
   })
 
@@ -317,7 +317,7 @@ describe('Empfänger-Vorschläge: Historie + Adressbuch', () => {
 
     const result = suggestContacts(db, 'ali', 8)
     expect(result.map((r) => r.addr)).toEqual(['alice@firma.de', 'alina@web.de', 'carla@x.example'])
-    // Historie ohne Namen übernimmt den Adressbuch-Namen, vorhandener Name bleibt
+    // History without a name takes the address book name; an existing name stays
     expect(result.map((r) => r.name)).toEqual(['Alice Adressbuch', 'Alina Web', 'Carla Alicante'])
     expect(suggestContacts(db, 'tim', 8).map((r) => r.addr)).not.toContain('tim@test.de')
   })
@@ -335,7 +335,7 @@ describe('Empfänger-Vorschläge: Historie + Adressbuch', () => {
     ).toEqual(['ali1@web.de', 'ali2@web.de'])
     await withContacts()
     expect(suggestContacts(db, 'ali', 3)).toHaveLength(3)
-    // Deaktiviertes Adressbuch liefert keine Vorschläge mehr
+    // Disabled address book no longer yields suggestions
     const id = (
       db.prepare('SELECT id FROM addressbooks WHERE display_name = ?').get('Kontakte') as {
         id: number

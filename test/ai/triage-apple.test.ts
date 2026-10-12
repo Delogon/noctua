@@ -5,9 +5,9 @@ import { upsertEnvelope, storeBody } from '@main/mail/ingest'
 import { countOpenTasks } from '@main/db/repos/tasks'
 import { createTestDb, closeTestDb, seedAccount, seedFolder, makeEnvelope } from '../helpers/db'
 
-// Apple-Provider (M88): zweistufige Pipeline — die enge Gate-Frage entscheidet,
-// ob action_items/needs_reply Aufgaben erzeugen dürfen. Eval-getrieben:
-// Precision 64 % → 100 % bei Recall 90 % (scripts/apple-triage-eval).
+// Apple provider (M88): two-stage pipeline — the narrow gate question decides
+// whether action_items/needs_reply may create tasks. Eval-driven:
+// precision 64 % → 100 % at recall 90 % (scripts/apple-triage-eval).
 
 const { fakeAppleTriage, fakeAppleGate, fakeAppleStatus } = vi.hoisted(() => ({
   fakeAppleTriage: vi.fn(),

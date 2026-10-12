@@ -17,7 +17,7 @@ export type MockHandler = (
   req: MockRequest
 ) => MockReply | undefined | Promise<MockReply | undefined>
 
-/** Fetch-Mock für DAV-Tests: protokolliert Requests, Handler antwortet je Anfrage. */
+/** Fetch mock for DAV tests: logs requests, a handler responds per request. */
 export function createMockFetch(handler: MockHandler): { fetch: FetchLike; calls: MockRequest[] } {
   const calls: MockRequest[] = []
   const fetchImpl: FetchLike = async (input, init) => {

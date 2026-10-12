@@ -5,7 +5,7 @@ import { sendMail } from '@main/smtp/sender'
 import { setSetting } from '@main/db'
 import { createTestDb, closeTestDb, seedAccount } from '../helpers/db'
 
-// Für den tick()-Test: echtes SMTP raus, Rest des Moduls unangetastet
+// For the tick() test: real SMTP out, rest of the module untouched
 vi.mock('@main/smtp/sender', async (importOriginal) => {
   const original = await importOriginal<typeof import('@main/smtp/sender')>()
   return { ...original, sendMail: vi.fn().mockResolvedValue(undefined) }
@@ -70,7 +70,7 @@ describe('outbox (Undo Send)', () => {
     await vi.advanceTimersByTimeAsync(1100)
     outboxWorker.stop()
     vi.useRealTimers()
-    // 'sending' gehört dazu — das Gesendet-Echo im Renderer hört darauf
+    // 'sending' is included — the sent echo in the renderer listens for it
     expect(states).toEqual(['pending', 'sending', 'sent'])
   })
 
@@ -224,7 +224,7 @@ describe('outbox (Zuverlässigkeit)', () => {
     expect(classifySendError(e({ responseCode: 550 }))).toBe('permanent')
     expect(classifySendError(e({ code: 'EAUTH', responseCode: 535 }))).toBe('permanent')
     expect(classifySendError(new Error('Kein Passwort'))).toBe('permanent')
-    // Abbruch mitten in der Datenübertragung: evtl. zugestellt → nie blind erneut
+    // Abort mid data transfer: possibly delivered → never blindly retry
     expect(classifySendError(e({ code: 'ECONNRESET', command: 'DATA' }))).toBe('unknown')
   })
 })

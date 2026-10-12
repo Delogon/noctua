@@ -3,8 +3,8 @@ import type { PushPayload } from '@shared/ipc-contract'
 import { enrichSources, historyForAsk, owlPhase, useOwl } from '@renderer/stores/owl'
 import type { SemanticSearchHit } from '@renderer/features/search/useSemanticSearch'
 
-// Der Automat der Owl-View: empty → typing → asking → conversation → follow-up.
-// Die IPC-Aufrufe liegen außerhalb — hier werden die reinen Übergänge geprüft.
+// The Owl view state machine: empty → typing → asking → conversation → follow-up.
+// The IPC calls live outside — only the pure transitions are tested here.
 
 function chunk(over: Partial<PushPayload<'ai:chatChunk'>>): PushPayload<'ai:chatChunk'> {
   return { chatId: 'c1', chunk: '', done: false, error: null, sources: null, ...over }
@@ -43,7 +43,7 @@ describe('owl-store', () => {
     const begun = useOwl.getState().beginAsk('hetzner rechnung')
     expect(begun).toEqual({ history: [] })
     expect(owlPhase(useOwl.getState())).toBe('asking')
-    // Frage-Zeile hat das Feld geleert; Nutzerbeitrag + streamende Antwort stehen
+    // Question line cleared the field; user turn + streaming answer are present
     expect(useOwl.getState().query).toBe('')
     expect(useOwl.getState().messages.map((m) => m.role)).toEqual(['user', 'assistant'])
 
@@ -75,7 +75,7 @@ describe('owl-store', () => {
       { role: 'user', content: 'Welche Rechnungen?' },
       { role: 'assistant', content: 'Drei.' }
     ])
-    // Die streamende Antwort zählt nie zur History — abgeschlossene Beiträge schon
+    // The streaming answer never counts toward history — completed turns do
     expect(historyForAsk(useOwl.getState().messages).map((m) => m.role)).toEqual([
       'user',
       'assistant',
@@ -91,7 +91,7 @@ describe('owl-store', () => {
     const state = useOwl.getState()
     expect(state.messages).toEqual([])
     expect(state.asking).toBe(false)
-    // Frage wandert zurück ins Feld, Fehler steht inline an
+    // Question moves back into the field, error is shown inline
     expect(state.query).toBe('kaputte frage')
     expect(state.askError).toBe('Budget erschöpft')
   })
@@ -149,7 +149,7 @@ describe('owl-store', () => {
       accountName: 'fernweh',
       mailbox: 'inbox'
     })
-    // Ohne passenden Treffer bleibt die Quelle ehrlich schlank
+    // Without a matching hit the source stays honestly minimal
     expect(enriched[1]).toEqual({ index: 2, threadKey: 'unbekannt', subject: 'Ohne Kontext' })
   })
 

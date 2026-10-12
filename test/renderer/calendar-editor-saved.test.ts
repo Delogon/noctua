@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCalendar } from '@renderer/stores/calendar'
 import { formFromSlot } from '@renderer/features/calendar/event-form'
 
-// Terminvorschlag „Bearbeiten…": der Vorschlag gilt erst als erledigt, wenn der Editor
-// erfolgreich gespeichert hat (finishEditor → onSaved); Abbrechen lässt ihn „neu".
+// Event suggestion „Bearbeiten…": the suggestion counts as done only once the editor
+// has saved successfully (finishEditor → onSaved); cancel leaves it „neu".
 
 const form = formFromSlot(
   new Date(2026, 9, 5, 9).getTime(),

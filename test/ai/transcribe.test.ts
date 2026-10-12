@@ -5,7 +5,7 @@ import { setSecret } from '@main/auth/secrets'
 import { setLocalOnly } from '@main/privacy'
 import { closeTestDb, createAiTestDb } from '../helpers/db'
 
-// SDK-Client wird gemockt — geprüft werden [LEER]-Protokoll und Profil-Weg, nicht das Netz
+// SDK client is mocked — tests the [LEER] protocol and profile path, not the network
 const { createMock, transcriptionMock } = vi.hoisted(() => ({
   createMock: vi.fn(),
   transcriptionMock: vi.fn()
@@ -40,7 +40,7 @@ describe('transcribeAudio — [LEER]-Protokoll (OpenRouter, Audio-Input-Chat)', 
       choices: [{ message: { content: 'Welche Rechnungen kamen diese Woche?' } }]
     })
     expect(await transcribeAudio(db, 'QUJD', 'wav')).toBe('Welche Rechnungen kamen diese Woche?')
-    // Audio geht als input_audio im Chat-Format raus
+    // Audio is sent as input_audio in chat format
     const body = createMock.mock.calls[0][0] as {
       messages: Array<{ content: Array<{ type: string }> }>
     }
