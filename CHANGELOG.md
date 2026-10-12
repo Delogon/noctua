@@ -8,6 +8,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Fixed
 
+- **Constant refreshes during sync**: every IDLE event, watchdog tick and folder poll re-applied the flags of the newest 500 messages one write at a time and reported all of them as changed, so the list, counts, AI queue and search index refreshed even when nothing had changed. The flags are now applied in one transaction and only real changes are reported.
 - **Slow sync of large mailboxes**: storing each incoming reply looked up its thread by walking the whole account, so ingest got slower as the mailbox grew (≈66 ms per message at 20,000 messages). A new index (migration 036) makes it a direct lookup (≈3 ms per message, flat).
 - **Freezes with large mailboxes**: rebuilding the contact statistics (after every send and every Sent sync) walked the whole sender index once per contact and blocked the app for seconds to minutes (33 s at 20,000 messages). It now seeks per contact and takes milliseconds. Ties between display names now go to the most recently used name.
 

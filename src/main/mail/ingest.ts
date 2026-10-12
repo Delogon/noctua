@@ -365,23 +365,38 @@ export function storeBody(db: Database.Database, messageId: number, parsed: Pars
   storeInvitations(db, messageId, parsed.calendarParts)
 }
 
-export function applyFlagUpdate(
+/**
+ * Applies the server's flags for a batch of UIDs in one transaction and
+ * returns the thread keys whose messages actually changed. Rows whose
+ * seen/flagged/answered already match are not written and not reported, so
+ * an idle resync of the newest UIDs produces no change events.
+ */
+export function applyFlagUpdates(
   db: Database.Database,
   folderId: number,
-  uid: number,
-  flags: Set<string>
-): number | null {
-  const row = db
-    .prepare('SELECT id FROM messages WHERE folder_id = ? AND uid = ?')
-    .get(folderId, uid) as { id: number } | undefined
-  if (!row) return null
-  db.prepare('UPDATE messages SET seen = ?, flagged = ?, answered = ? WHERE id = ?').run(
-    flagInt(flags, '\\Seen'),
-    flagInt(flags, '\\Flagged'),
-    flagInt(flags, '\\Answered'),
-    row.id
+  updates: Array<{ uid: number; flags: Set<string> }>
+): string[] {
+  if (updates.length === 0) return []
+  const select = db.prepare(
+    'SELECT id, thread_key, seen, flagged, answered FROM messages WHERE folder_id = ? AND uid = ?'
   )
-  return row.id
+  const update = db.prepare('UPDATE messages SET seen = ?, flagged = ?, answered = ? WHERE id = ?')
+  const changed = new Set<string>()
+  db.transaction(() => {
+    for (const { uid, flags } of updates) {
+      const row = select.get(folderId, uid) as
+        | { id: number; thread_key: string; seen: number; flagged: number; answered: number }
+        | undefined
+      if (!row) continue
+      const seen = flagInt(flags, '\\Seen')
+      const flagged = flagInt(flags, '\\Flagged')
+      const answered = flagInt(flags, '\\Answered')
+      if (row.seen === seen && row.flagged === flagged && row.answered === answered) continue
+      update.run(seen, flagged, answered, row.id)
+      changed.add(row.thread_key)
+    }
+  })()
+  return [...changed]
 }
 
 export function deleteByUids(db: Database.Database, folderId: number, uids: number[]): void {

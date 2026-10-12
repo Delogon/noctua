@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { runMigrations } from '@main/db/migrate'
 import { __setTestDb } from '@main/db'
 import { loadVecExtension, openEncrypted } from '@main/db/encryption'
-import { applyFlagUpdate, storeBody, upsertEnvelope } from '@main/mail/ingest'
+import { applyFlagUpdates, storeBody, upsertEnvelope } from '@main/mail/ingest'
 import { listFolders, listThreads, mboxCounts } from '@main/db/repos/threads'
 import { metrics } from '@main/diagnostics/metrics'
 import { instrumentDb } from '@main/diagnostics/db-profiler'
@@ -167,10 +167,11 @@ localDescribe('Großpostfach-Benchmark (synthetisch, lokal)', () => {
             .all(inboxId) as Array<{ uid: number }>
         ).map((u) => u.uid)
         const flagPass = timeIt(() => {
-          for (const uid of uids) {
-            const id = applyFlagUpdate(db, inboxId, uid, new Set(['\\Seen']))
-            if (id !== null) db.prepare('SELECT thread_key FROM messages WHERE id = ?').get(id)
-          }
+          applyFlagUpdates(
+            db,
+            inboxId,
+            uids.map((uid) => ({ uid, flags: new Set(['\\Seen']) }))
+          )
         })
         // What a single messages:changed triggers in the renderer
         const refreshFanout = timeIt(() => {
@@ -184,7 +185,7 @@ localDescribe('Großpostfach-Benchmark (synthetisch, lokal)', () => {
           seedMs,
           cases: benchmark.cases,
           extra: {
-            'sync.flagPass(500 uids, no tx)': flagPass,
+            'sync.flagPass(500 uids)': flagPass,
             'renderer.refreshFanout(list+counts+folders)': refreshFanout
           },
           fullScanQueries: benchmark.plans
