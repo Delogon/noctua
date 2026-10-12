@@ -68,6 +68,32 @@ export const updatesConfigSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('off') }).strict()
 ])
 
+const domainName = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(253)
+  .regex(/^(?!-)[a-z0-9-]{1,63}(?:\.(?!-)[a-z0-9-]{1,63})+$/, 'Domain, z. B. example.com')
+
+/**
+ * Spam/phishing rules (src/main/mail/threat-signals.ts): extra protected
+ * brands (e.g. the company's own name) with their official domains, and
+ * trusted domains whose senders and link targets never count as impersonation
+ * or link deception.
+ */
+export const securityConfigSchema = z
+  .object({
+    brands: z
+      .record(
+        z.string().regex(/^[a-z0-9]{3,30}$/, 'ein Wort aus Kleinbuchstaben/Ziffern, 3–30 Zeichen'),
+        z.array(domainName).min(1).max(20)
+      )
+      .refine((brands) => Object.keys(brands).length <= 50, 'höchstens 50 Marken')
+      .optional(),
+    trustedDomains: z.array(domainName).max(200).optional()
+  })
+  .strict()
+
 export const orgConfigSchema = z
   .object({
     productName: z.string().trim().min(1).max(60).optional(),
@@ -120,13 +146,15 @@ export const orgConfigSchema = z
       })
       .strict()
       .optional(),
-    hideOpenRouterOnboarding: z.boolean().optional()
+    hideOpenRouterOnboarding: z.boolean().optional(),
+    security: securityConfigSchema.optional()
   })
   .strict()
 
 export type OrgConfig = z.infer<typeof orgConfigSchema>
 export type OrgAiProfile = z.infer<typeof orgAiProfileSchema>
 export type UpdatesConfig = z.infer<typeof updatesConfigSchema>
+export type SecurityConfig = z.infer<typeof securityConfigSchema>
 
 /** Errors as readable lines ("updates.repo: Format owner/name"). */
 export function formatOrgConfigIssues(error: z.ZodError): string[] {

@@ -142,7 +142,9 @@ Two layers, combined per mail (`src/main/ai/threat-check.ts`):
    fee, a brand in the display name sent from a domain that is not the brand's, an executive
    title ("CEO", "Geschäftsführer") from a freemail address, a payment to be kept confidential,
    executable / macro / HTML-SVG attachments and double extensions, spam phrases, shouting
-   subjects, image-only mails and hidden text. Mails from
+   subjects, image-only mails and hidden text. The brand, freemail and shortener lists cover
+   major services, regional banks, parcel carriers and tax authorities; company editions add their
+   own brands and trusted domains via the org configuration (`security`, see `docs/ORG-CONFIG.md`). Mails from
    known contacts get a spam discount. Signals are recomputed on demand and never stored, so better
    rules apply to old mail too.
 2. **Decision model** (optional): the hybrid triage asks `phishing` and `spam` (each a score 0..2)

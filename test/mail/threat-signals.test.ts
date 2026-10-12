@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { __setOrgConfigForTest } from '@main/org-config'
 import {
   computeMailSignals,
   isHomoglyphHost,
@@ -227,6 +228,55 @@ describe('request and impersonation signals', () => {
     ]) {
       expect(codes({ text }), text).toEqual([])
     }
+  })
+})
+
+describe('brand, freemail and shortener lists', () => {
+  it('cover regional banks, carriers, tax authorities and services', () => {
+    expect(lookalikeBrand('v0lksbank-login.com')).toBe('volksbank')
+    expect(lookalikeBrand('e1ster.de')).toBe('elster')
+    expect(
+      codes({ fromName: 'DPD Paketservice', fromAddr: 'info@dpd-zustellung.example' })
+    ).toContain('brand_other_domain')
+    expect(
+      codes({ fromName: 'Volksbank', fromAddr: 'service@volksbank-online.example' })
+    ).toContain('brand_other_domain')
+    expect(codes({ fromName: 'ELSTER', fromAddr: 'noreply@elster.de' })).toEqual([])
+    expect(codes({ fromName: 'Hermes', fromAddr: 'info@myhermes.de' })).toEqual([])
+    expect(codes({ fromName: 'Klarna Support', fromAddr: 'klarna.help@posteo.de' })).toContain(
+      'brand_freemail'
+    )
+    expect(codes({ text: 'Details: https://clck.ru/abc' })).toContain('shortener_link:1')
+  })
+})
+
+describe('organisation brands and trusted domains', () => {
+  afterEach(() => __setOrgConfigForTest(undefined))
+
+  it('protects the company name like a built-in brand', () => {
+    __setOrgConfigForTest({ security: { brands: { acme: ['acme.com', 'acme-mail.net'] } } })
+    expect(codes({ fromName: 'ACME IT-Support', fromAddr: 'it@acme-helpdesk.example' })).toContain(
+      'brand_other_domain'
+    )
+    expect(codes({ fromName: 'ACME IT-Support', fromAddr: 'it@acme-mail.net' })).toEqual([])
+    expect(lookalikeBrand('acrne.com')).toBe('acme')
+    // Built-in brands stay
+    expect(lookalikeBrand('paypa1.com')).toBe('paypal')
+  })
+
+  it('never flags trusted senders or link targets', () => {
+    const phishy = {
+      fromName: 'Microsoft 365 Portal',
+      fromAddr: 'noreply@portal.partner-tools.example',
+      replyToJson: JSON.stringify([{ address: 'help@desk.partner-tools.example' }]),
+      html: '<a href="https://go.partner-tools.example/x">https://login.microsoftonline.com</a> <a href="https://bit.ly/x">x</a>'
+    }
+    expect(codes(phishy)).toEqual(
+      expect.arrayContaining(['brand_other_domain', 'link_mismatch:1', 'shortener_link:1'])
+    )
+    __setOrgConfigForTest({ security: { trustedDomains: ['partner-tools.example'] } })
+    // Only the untrusted shortener remains
+    expect(codes(phishy)).toEqual(['shortener_link:1'])
   })
 })
 

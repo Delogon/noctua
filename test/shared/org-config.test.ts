@@ -140,3 +140,29 @@ describe('IPC: Netzwerkverbindungen und Org-Info', () => {
     ).toBe(false)
   })
 })
+
+describe('org config: security', () => {
+  it('accepts brands with domains and trusted domains, lower-cased', () => {
+    const config = orgConfigSchema.parse({
+      security: {
+        brands: { acme: ['Acme.com', 'acme-mail.net'] },
+        trustedDomains: ['Partner-Tools.example']
+      }
+    })
+    expect(config.security).toEqual({
+      brands: { acme: ['acme.com', 'acme-mail.net'] },
+      trustedDomains: ['partner-tools.example']
+    })
+  })
+
+  it.each([
+    ['brand with spaces', { brands: { 'acme corp': ['acme.com'] } }],
+    ['brand too short', { brands: { ac: ['acme.com'] } }],
+    ['brand without domains', { brands: { acme: [] } }],
+    ['domain with scheme', { trustedDomains: ['https://acme.com'] }],
+    ['domain without dot', { trustedDomains: ['localhost'] }],
+    ['unknown field', { allowlist: ['acme.com'] }]
+  ])('rejects %s', (_label, security) => {
+    expect(orgConfigSchema.safeParse({ security }).success).toBe(false)
+  })
+})
