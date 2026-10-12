@@ -3,9 +3,9 @@ import { parseXml, XmlParseError, type XmlNode } from './xml'
 import { parseMultistatus, type Multistatus } from './multistatus'
 
 /**
- * Schlanker WebDAV-Client auf Node-`fetch`. Wiederverwendbar für CalDAV und
- * (später) CardDAV: PROPFIND, REPORT, PUT, DELETE, OPTIONS mit Timeouts,
- * Größenlimit, manueller Redirect-Behandlung und Basic-Auth nur über HTTPS.
+ * Lean WebDAV client on Node `fetch`. Reusable for CalDAV and
+ * (later) CardDAV: PROPFIND, REPORT, PUT, DELETE, OPTIONS with timeouts,
+ * size limit, manual redirect handling and Basic auth over HTTPS only.
  */
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
@@ -17,7 +17,7 @@ export class DavError extends Error {
   }
 }
 
-/** 401: Zugangsdaten falsch/abgelaufen → needs-reauth. */
+/** 401: credentials wrong/expired → needs-reauth. */
 export class DavAuthError extends DavError {
   readonly status = 401
   constructor(message = 'Anmeldung fehlgeschlagen (401)') {
@@ -30,7 +30,7 @@ export class DavHttpError extends DavError {
   constructor(
     readonly status: number,
     message: string,
-    /** Name des DAV:error-Kindelements (z. B. valid-sync-token), falls geliefert */
+    /** Name of the DAV:error child element (e.g. valid-sync-token), if provided */
     readonly davError: string | null = null,
     readonly retryAfterMs: number | null = null
   ) {
@@ -40,9 +40,9 @@ export class DavHttpError extends DavError {
 }
 
 /**
- * 401 nach einer Umleitung auf einen anderen Host: Zugangsdaten werden dorthin
- * nie automatisch geschickt (DNS-SRV/Redirect könnten gefälscht sein). Der
- * Nutzer muss die neue Adresse ausdrücklich bestätigen bzw. eingeben.
+ * 401 after a redirect to another host: credentials are never sent there
+ * automatically (DNS SRV/redirect could be forged). The
+ * user must explicitly confirm or enter the new address.
  */
 export class DavCrossOriginAuthError extends DavAuthError {
   constructor(readonly targetUrl: string) {
@@ -68,9 +68,9 @@ export interface DavClientOptions {
   maxResponseBytes?: number
   maxRedirects?: number
   /**
-   * Redirects auf einen anderen Origin (https) folgen und dabei Zugangsdaten
-   * mitschicken. Nur für die Discovery (.well-known → anderer Host) sinnvoll;
-   * im laufenden Sync führt ein Origin-Wechsel zum Fehler.
+   * Follow redirects to another origin (https) and send credentials along.
+   * Only sensible for discovery (.well-known → other host);
+   * during regular sync a change of origin results in an error.
    */
   followCrossOrigin?: boolean
   userAgent?: string
@@ -86,7 +86,7 @@ export interface DavResponseRaw {
   status: number
   headers: Headers
   text: string
-  /** Finale URL nach Redirects */
+  /** Final URL after redirects */
   url: string
 }
 
@@ -109,7 +109,7 @@ export class DavClient {
     this.authHeader = `Basic ${token}`
   }
 
-  /** Roher Request mit Redirect-Behandlung. Wirft nicht bei HTTP-Fehlerstatus. */
+  /** Raw request with redirect handling. Does not throw on HTTP error status. */
   async raw(method: string, url: string, init: DavRequestInit = {}): Promise<DavResponseRaw> {
     let current = new URL(url)
     const origin = current
@@ -123,7 +123,7 @@ export class DavClient {
         Accept: '*/*',
         ...init.headers
       }
-      // Zugangsdaten nur an den Ursprung, den der Nutzer angegeben hat
+      // Credentials only to the origin the user specified
       if (sameOrigin(current, origin)) headers.Authorization = this.authHeader
       if (init.depth !== undefined) headers.Depth = init.depth
 
@@ -150,14 +150,14 @@ export class DavClient {
           if (!this.config.followCrossOrigin) {
             throw new DavTransportError(`Umleitung auf anderen Host (${next.host}) abgelehnt`)
           }
-          // Gleicher Server-Betreiber nicht garantiert: nur https, nie von https auf http
+          // Same server operator not guaranteed: https only, never from https to http
           if (next.protocol !== 'https:')
             throw new DavTransportError('Umleitung auf http abgelehnt')
         }
         if (current.protocol === 'https:' && next.protocol !== 'https:') {
           throw new DavTransportError('Umleitung von https auf http abgelehnt')
         }
-        // WebDAV: Methode und Body bleiben bei 301/302/307/308 erhalten; 303 → GET
+        // WebDAV: method and body are kept on 301/302/307/308; 303 → GET
         if (response.status === 303) {
           curMethod = 'GET'
           body = undefined
@@ -172,7 +172,7 @@ export class DavClient {
     throw new DavTransportError('Zu viele Umleitungen')
   }
 
-  /** Request mit Fehlerabbildung: 401 → DavAuthError, ≥ 400 → DavHttpError. */
+  /** Request with error mapping: 401 → DavAuthError, ≥ 400 → DavHttpError. */
   async request(method: string, url: string, init: DavRequestInit = {}): Promise<DavResponseRaw> {
     const res = await this.raw(method, url, init)
     if (res.status === 401) {
@@ -193,7 +193,7 @@ export class DavClient {
     return parseMultistatusResponse(res, url)
   }
 
-  /** REPORT → Multistatus. Fehlerstatus bleiben als DavHttpError mit davError erhalten. */
+  /** REPORT → Multistatus. Error statuses are kept as DavHttpError with davError. */
   async report(url: string, body: string, depth: '0' | '1' = '1'): Promise<Multistatus> {
     const res = await this.request('REPORT', url, {
       depth,
@@ -203,7 +203,7 @@ export class DavClient {
     return parseMultistatusResponse(res, url)
   }
 
-  /** OPTIONS → Werte des DAV-Headers als Token-Liste. */
+  /** OPTIONS → values of the DAV header as a token list. */
   async optionsRequest(url: string): Promise<{ dav: string[]; allow: string[] }> {
     const res = await this.request('OPTIONS', url)
     const split = (v: string | null): string[] =>
@@ -215,9 +215,9 @@ export class DavClient {
   }
 
   /**
-   * PUT einer Ressource. `ifMatch` für Updates, `ifNoneMatch: true` für
-   * Neuanlage (kein stilles Überschreiben). Liefert ETag (falls der Server
-   * ihn mitschickt — sonst null und der Aufrufer muss nachladen).
+   * PUT of a resource. `ifMatch` for updates, `ifNoneMatch: true` for
+   * creation (no silent overwriting). Returns the ETag (if the server
+   * sends one — otherwise null and the caller must fetch it).
    */
   async put(
     url: string,
@@ -253,7 +253,7 @@ function httpError(res: DavResponseRaw): DavHttpError {
         davError = root.children[0]?.name ?? null
       }
     } catch {
-      // kein lesbarer Fehlerkörper
+      // no readable error body
     }
   }
   const retryAfter = parseRetryAfter(res.headers.get('retry-after'))

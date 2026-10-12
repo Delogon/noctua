@@ -20,10 +20,10 @@ import { listEvents } from './service'
 import { systemTimeZone, wallToUtcIana } from './tz'
 
 /**
- * Free/Busy: eigene Belegung aus der lokalen DB (`calendar:freebusy:self`) und
- * die anderer Teilnehmer per CalDAV-Scheduling-Outbox (RFC 6638 §5: POST einer
- * VFREEBUSY-Anfrage). Ohne Server-Unterstützung: nur "ich" aus den eigenen
- * Kalendern, alle anderen `unavailable`.
+ * Free/busy: own availability from the local DB (`calendar:freebusy:self`) and
+ * that of other attendees via the CalDAV scheduling outbox (RFC 6638 §5: POST of a
+ * VFREEBUSY request). Without server support: only "me" from my own
+ * calendars, everyone else `unavailable`.
  */
 
 const MAX_RANGE_MS = 62 * 24 * 3600_000
@@ -31,7 +31,7 @@ const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/
 
 let defaultDeps: FreeBusyDeps = {}
 
-/** Nur Dev/Demo: feste Abhängigkeiten für `queryFreeBusy` (z. B. eine Demo-Serverantwort). */
+/** Dev/demo only: fixed dependencies for `queryFreeBusy` (e.g. a demo server response). */
 export function setFreeBusyDeps(deps: FreeBusyDeps): void {
   defaultDeps = deps
 }
@@ -43,20 +43,20 @@ export interface FreeBusyDeps {
   newUid?: () => string
 }
 
-// --- Eigene Belegung --------------------------------------------------------------------------------------
+// --- Own availability -------------------------------------------------------------------------------------
 
 export interface SelfBusyInput {
   rangeStart: number
   rangeEnd: number
   calendarIds?: number[]
-  /** Dieser Termin zählt nicht als belegt (Editor: der Termin selbst) */
+  /** This event does not count as busy (editor: the event itself) */
   excludeObjectId?: number
 }
 
 /**
- * Belegte Zeiten aus allen (oder den angegebenen) Kalendern: ohne abgesagte
- * Termine, ohne TRANSPARENT (frei) und ohne von mir abgelehnte; TENTATIVE
- * (Status oder PARTSTAT) zählt als BUSY-TENTATIVE.
+ * Busy times from all (or the given) calendars: excluding cancelled
+ * events, TRANSPARENT (free) ones and those I declined; TENTATIVE
+ * (status or PARTSTAT) counts as BUSY-TENTATIVE.
  */
 export function selfBusy(input: SelfBusyInput, db: Database.Database = getDb()): BusyInterval[] {
   if (!(input.rangeEnd > input.rangeStart)) return []
@@ -91,7 +91,7 @@ export function selfBusy(input: SelfBusyInput, db: Database.Database = getDb()):
     let start = e.startUtc
     let end = e.endUtc
     if (e.allDay && e.startDay && e.endDay) {
-      // Ganztägig: lokale Mitternacht statt UTC-Mitternacht
+      // All-day: local midnight instead of UTC midnight
       const [sy, sm, sd] = e.startDay.split('-').map(Number)
       const [ey, em, ed] = e.endDay.split('-').map(Number)
       start = wallToUtcIana({ y: sy, m: sm, d: sd, h: 0, mi: 0, s: 0 }, zone)
@@ -132,7 +132,7 @@ function occurrenceFlags(
   }
 }
 
-// --- Scheduling-Outbox ----------------------------------------------------------------------------------------
+// --- Scheduling outbox ----------------------------------------------------------------------------------------
 
 export interface ScheduleRecipientResult {
   email: string
@@ -141,7 +141,7 @@ export interface ScheduleRecipientResult {
   busy: BusyInterval[]
 }
 
-/** Antwort des Scheduling-Outbox (schedule-response, RFC 6638 §10.1) lesen. */
+/** Read the scheduling outbox response (schedule-response, RFC 6638 §10.1). */
 export function parseScheduleResponse(xml: string): ScheduleRecipientResult[] {
   const out: ScheduleRecipientResult[] = []
   let root
@@ -161,7 +161,7 @@ export function parseScheduleResponse(xml: string): ScheduleRecipientResult[] {
     if (!email) continue
     const status = textOf(child(resp, NS.caldav, 'request-status'))
     const data = textOf(child(resp, NS.caldav, 'calendar-data'))
-    // "2.0;Success" (auch 2.x) = Erfolg; 3.x/5.x = Fehler (z. B. 3.7 Invalid calendar user)
+    // "2.0;Success" (also 2.x) = success; 3.x/5.x = error (e.g. 3.7 Invalid calendar user)
     const ok = status !== null && /^2\./.test(status)
     out.push({ email, ok, status, busy: ok && data ? parseFreeBusy(data) : [] })
   }
@@ -176,9 +176,9 @@ export interface FreeBusyQuery {
 }
 
 /**
- * Busy-Intervalle je Adresse. „Ich" kommt immer aus der lokalen DB (aktuell,
- * auch mit wartenden Änderungen); alle anderen per Scheduling-Outbox, falls
- * das Konto es kann, sonst `unavailable`.
+ * Busy intervals per address. "Me" always comes from the local DB (current,
+ * including pending changes); everyone else via the scheduling outbox if
+ * the account supports it, otherwise `unavailable`.
  */
 export async function queryFreeBusy(
   query: FreeBusyQuery,
@@ -235,7 +235,7 @@ async function serverFreeBusy(
     for (const e of emails) out.set(e, { email: e, source: 'unavailable', busy: [], error })
     return out
   }
-  // schedule-outbox-URL wird nur von Servern mit Scheduling (RFC 6638) angeboten
+  // The schedule-outbox URL is only offered by servers with scheduling (RFC 6638)
   if (!account.schedule_outbox_url) return unavailable(null)
   const organizer = ownAddressOf(db, account) ?? calendarAccountAddresses(account)[0]
   if (!organizer) return unavailable('Eigene Adresse unbekannt')

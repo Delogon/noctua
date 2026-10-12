@@ -1,21 +1,21 @@
 /**
- * Minimaler, namespace-bewusster XML-Parser für WebDAV-Antworten (Multistatus,
- * Propfind, CalDAV-Reports). Bewusst selbst geschrieben statt einer
- * XML-Bibliothek: WebDAV-XML ist ein kleiner Ausschnitt (Elemente, Attribute,
- * Text, CDATA), und so gibt es keine Angriffsfläche durch DTDs oder externe
- * Entities (XXE / Billion Laughs): `<!DOCTYPE` wird abgelehnt, `<!ENTITY` gibt
- * es damit nicht, und es werden nur die fünf vordefinierten sowie numerische
- * Zeichenreferenzen aufgelöst. Tiefe und Knotenzahl sind begrenzt.
+ * Minimal, namespace-aware XML parser for WebDAV responses (multistatus,
+ * propfind, CalDAV reports). Deliberately hand-written instead of an
+ * XML library: WebDAV XML is a small subset (elements, attributes,
+ * text, CDATA), and this leaves no attack surface via DTDs or external
+ * entities (XXE / billion laughs): `<!DOCTYPE` is rejected, so `<!ENTITY`
+ * cannot occur, and only the five predefined and numeric
+ * character references are resolved. Depth and node count are limited.
  */
 
 export interface XmlNode {
-  /** Namespace-URI ('' = keiner) */
+  /** Namespace URI ('' = none) */
   ns: string
-  /** Lokaler Name ohne Präfix */
+  /** Local name without prefix */
   name: string
   attrs: Record<string, string>
   children: XmlNode[]
-  /** Zusammengeführter direkter Textinhalt (inkl. CDATA) */
+  /** Merged direct text content (incl. CDATA) */
   text: string
 }
 
@@ -51,14 +51,14 @@ interface OpenElement {
   prefix: string
   local: string
   node: XmlNode
-  /** Namespace-Bindungen dieses Elements (Präfix → URI) */
+  /** Namespace bindings of this element (prefix → URI) */
   scope: Map<string, string>
 }
 
 const NAME_CHAR = /[^\s/>=]/
 const SPACE = /\s/
 
-/** Parst ein XML-Dokument und liefert das Wurzelelement. */
+/** Parses an XML document and returns the root element. */
 export function parseXml(input: string): XmlNode {
   const src = input.charCodeAt(0) === 0xfeff ? input.slice(1) : input
   let pos = 0
@@ -106,7 +106,7 @@ export function parseXml(input: string): XmlNode {
       continue
     }
     if (src.startsWith('<!', pos)) {
-      // DOCTYPE/ENTITY: nie verarbeiten (XXE, Entity-Expansion)
+      // DOCTYPE/ENTITY: never process (XXE, entity expansion)
       throw new XmlParseError('DTD/DOCTYPE nicht erlaubt')
     }
 
@@ -121,7 +121,7 @@ export function parseXml(input: string): XmlNode {
       pos = end + 1
       if (stack.length === 0) {
         root = open.node
-        // Nur noch Whitespace/Kommentare dürfen folgen
+        // Only whitespace/comments may follow
         if (
           src
             .slice(pos)
@@ -135,7 +135,7 @@ export function parseXml(input: string): XmlNode {
       continue
     }
 
-    // Start-Tag
+    // Start tag
     let i = pos + 1
     while (i < src.length && NAME_CHAR.test(src[i])) i++
     const qname = src.slice(pos + 1, i)
@@ -222,7 +222,7 @@ export function parseXml(input: string): XmlNode {
   return root
 }
 
-// --- Navigations-Helfer --------------------------------------------------------
+// --- Navigation helpers --------------------------------------------------------
 
 export const NS = {
   dav: 'DAV:',
@@ -248,9 +248,9 @@ export function textOf(node: XmlNode | undefined): string | null {
   return t === '' ? null : t
 }
 
-// --- Serialisierung (Request-Bodies) -------------------------------------------
+// --- Serialization (request bodies) --------------------------------------------
 
-/** Escaped Text für XML-Inhalte und Attributwerte. */
+/** Escapes text for XML content and attribute values. */
 export function escapeXml(value: string): string {
   return value.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`)
 }

@@ -7,9 +7,9 @@ import { getCalAccount, calSecretKey } from './repo'
 import { calendarSync } from './sync'
 
 /**
- * Kalender-Konten: einrichten (Discovery), Passwort ersetzen, testen, entfernen.
- * Zugangsdaten liegen im Vault unter `cal:<id>:password`; ein Mail-Konto dient
- * nur als Vorlage (Adresse/Host/Passwort), das Kalender-Konto bleibt eigenständig.
+ * Calendar accounts: set up (discovery), replace password, test, remove.
+ * Credentials live in the vault under `cal:<id>:password`; a mail account only
+ * serves as a template (address/host/password), the calendar account stays independent.
  */
 
 export interface AccountDeps {
@@ -20,13 +20,13 @@ export interface AccountDeps {
 export interface DiscoverRequest {
   serverInput: string
   username: string
-  /** Leer erlaubt, wenn `mailAccountId` + `reuseMailPassword` gesetzt sind */
+  /** May be empty if `mailAccountId` + `reuseMailPassword` are set */
   password?: string
   mailAccountId?: number
   reuseMailPassword?: boolean
 }
 
-/** App-Passwörter kommen oft mit Leerzeichen formatiert (wie bei den Mail-Konten). */
+/** App passwords often come formatted with spaces (as with the mail accounts). */
 function cleanPassword(raw: string): string {
   return raw.replace(/\s+/g, '')
 }
@@ -50,7 +50,7 @@ function resolvePassword(db: Database.Database, req: DiscoverRequest): string {
   return pw
 }
 
-/** Vorschlag für die Einrichtung aus einem Mail-Konto: Benutzername = Adresse, Server aus der Domain. */
+/** Setup suggestion from a mail account: username = address, server from the domain. */
 export function suggestFromMailAccount(
   db: Database.Database,
   mailAccountId: number
@@ -60,7 +60,7 @@ export function suggestFromMailAccount(
   if (!mail) throw new Error('Konto nicht gefunden')
   return {
     username: mail.email,
-    // Die Discovery löst Adresse → Server auf (Anbieter-Tabelle, well-known, SRV)
+    // Discovery resolves address → server (provider table, well-known, SRV)
     serverInput: mail.email,
     canReusePassword: mail.credential_type === 'password' || mail.credential_type === 'bridge'
   }
@@ -139,7 +139,7 @@ export function updateAccountName(db: Database.Database, accountId: number, name
   db.prepare('UPDATE cal_accounts SET name = ? WHERE id = ?').run(name.trim(), accountId)
 }
 
-/** Verbindung prüfen: Kalenderliste mit den gespeicherten Zugangsdaten abrufen. */
+/** Check the connection: fetch the calendar list with the stored credentials. */
 export async function testAccount(
   db: Database.Database,
   accountId: number,
@@ -154,7 +154,7 @@ export async function testAccount(
   return { calendarCount: calendars.length, autoSchedule: account.auto_schedule === 1 }
 }
 
-/** Neues Passwort: erst prüfen, dann speichern; die Sync-Schleife startet neu (verlässt needs-reauth). */
+/** New password: verify first, then save; the sync loop restarts (leaves needs-reauth). */
 export async function updateAccountPassword(
   db: Database.Database,
   accountId: number,

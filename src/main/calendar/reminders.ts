@@ -3,10 +3,10 @@ import { DAY_MS, expandResource, parseCalendar, readAlarms, type Occurrence } fr
 import { resolveZone, systemTimeZone } from './tz'
 
 /**
- * Erinnerungen (VALARM): ein Scheduler prüft regelmäßig die sichtbaren Kalender
- * und löst DISPLAY-/AUDIO-Alarme als Benachrichtigung aus. Bereits ausgelöste
- * Alarme stehen in cal_reminders_fired — nach einem Neustart feuert nichts doppelt,
- * Verpasstes aus den letzten Minuten wird nachgeholt.
+ * Reminders (VALARM): a scheduler regularly checks the visible calendars
+ * and fires DISPLAY/AUDIO alarms as notifications. Alarms already fired
+ * are recorded in cal_reminders_fired — after a restart nothing fires twice,
+ * missed alarms from the last few minutes are caught up.
  */
 
 export interface ReminderNotice {
@@ -20,9 +20,9 @@ export interface ReminderNotice {
 
 export type NotifyFn = (notice: ReminderNotice) => void
 
-/** Wie lange nach der Auslösezeit ein (verpasster) Alarm noch nachgeholt wird. */
+/** How long after the trigger time a (missed) alarm is still caught up. */
 export const CATCH_UP_MS = 15 * 60_000
-/** Alarme weiter als so weit voraus werden nicht betrachtet. */
+/** Alarms further ahead than this are not considered. */
 export const LOOKAHEAD_MS = 31 * DAY_MS
 const TICK_MS = 30_000
 const FIRED_RETENTION_MS = 7 * DAY_MS
@@ -85,7 +85,7 @@ export class ReminderScheduler {
     this.timer = null
   }
 
-  /** Erinnerung später erneut zeigen (nur im Speicher — überlebt keinen Neustart). */
+  /** Show a reminder again later (in memory only — does not survive a restart). */
   snooze(notice: ReminderNotice, minutes: number, now = Date.now()): void {
     this.snoozed.set(`${notice.objectId}:${notice.recurrenceId ?? ''}`, {
       until: now + minutes * 60_000,
@@ -99,7 +99,7 @@ export class ReminderScheduler {
     return row?.value !== '0'
   }
 
-  /** Ein Durchlauf. Rückgabe: Anzahl ausgelöster Benachrichtigungen. */
+  /** One pass. Returns: number of notifications fired. */
   tick(now = Date.now()): number {
     const db = this.db
     if (!db) return 0
@@ -161,7 +161,7 @@ export class ReminderScheduler {
         else {
           let base: number
           if (occ.allDay) {
-            // Ganztägig: relativ zu Mitternacht in der Zone des Nutzers
+            // All-day: relative to midnight in the user's zone
             const day = (alarm.relativeTo === 'END' ? occ.endDay : occ.startDay) ?? occ.startDay!
             const [y, m, d] = day.split('-').map(Number)
             base = zone.wallToUtc({ y, m, d, h: 0, mi: 0, s: 0 })

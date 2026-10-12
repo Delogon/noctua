@@ -47,20 +47,20 @@ import { calendarSync } from './sync'
 import { systemTimeZone, resolveZone } from './tz'
 
 /**
- * Domain-API des Kalenders. Alle Schreibzugriffe sind optimistisch: sofort in
- * der lokalen DB (und damit in listEvents), die Übertragung zum Server läuft
- * über cal_pending_ops und die Sync-Engine.
+ * Calendar domain API. All writes are optimistic: immediately in
+ * the local DB (and thus in listEvents), the upload to the server goes
+ * through cal_pending_ops and the sync engine.
  */
 
 type ChangedFn = (accountId: number, calendarIds: number[]) => void
 let changedFn: ChangedFn = () => {}
 
-/** Vom Bootstrap gesetzt: Push `calendar:changed` nach lokalen Änderungen. */
+/** Set by the bootstrap: push `calendar:changed` after local changes. */
 export function setCalendarChangedHandler(fn: ChangedFn): void {
   changedFn = fn
 }
 
-// --- Konten & Kalender -----------------------------------------------------------------------
+// --- Accounts & calendars --------------------------------------------------------------------
 
 export function accountSummary(
   db: Database.Database,
@@ -82,7 +82,7 @@ export function accountSummary(
     serverUrl: row.server_url,
     username: row.username,
     mailAccountId: row.mail_account_id,
-    // Läuft die Engine nicht (z. B. gestoppt), zeigt die zuletzt gespeicherte Zustandsinfo
+    // If the engine isn't running (e.g. stopped), show the last stored state info
     state: state?.state ?? (engine.state === 'off' ? (row.state as never) : engine.state),
     lastError: engine.state === 'off' ? row.last_error : engine.detail,
     errorSince: state?.errorSince ?? engine.errorSince,
@@ -137,7 +137,7 @@ export function setCalendarVisible(
   changedFn(cal.account_id, [])
 }
 
-/** Farbe setzen (#RRGGBB); null = zurück auf die Server-Farbe beim nächsten Sync. */
+/** Set the color (#RRGGBB); null = back to the server color on the next sync. */
 export function setCalendarColor(
   calendarId: number,
   color: string | null,
@@ -159,16 +159,16 @@ function requireCalendar(db: Database.Database, id: number): CalendarRow {
   return cal
 }
 
-// --- Ereignisse lesen ------------------------------------------------------------------------------
+// --- Reading events --------------------------------------------------------------------------------
 
 export interface ListEventsInput {
-  /** Beginn der Spanne (UTC ms, inklusiv) */
+  /** Start of the range (UTC ms, inclusive) */
   rangeStart: number
-  /** Ende der Spanne (UTC ms, exklusiv) */
+  /** End of the range (UTC ms, exclusive) */
   rangeEnd: number
-  /** Nur diese Kalender (unabhängig von `visible`); sonst alle sichtbaren */
+  /** Only these calendars (regardless of `visible`); otherwise all visible ones */
   calendarIds?: number[]
-  /** Zeitzone des Betrachters für ganztägige Einträge (Default: Systemzone) */
+  /** The viewer's time zone for all-day entries (default: system zone) */
   tz?: string
 }
 
@@ -212,9 +212,9 @@ function rowToInstance(r: InstanceJoinRow): CalendarInstance {
 }
 
 /**
- * Vorkommen in [rangeStart, rangeEnd), expandiert, nach Start sortiert.
- * Liegt die Spanne im materialisierten Fenster, kommt alles aus cal_instances;
- * darüber hinaus werden wiederkehrende Ereignisse direkt expandiert.
+ * Occurrences in [rangeStart, rangeEnd), expanded, sorted by start.
+ * If the range lies within the materialized window, everything comes from cal_instances;
+ * beyond it, recurring events are expanded directly.
  */
 export function listEvents(
   input: ListEventsInput,
@@ -314,7 +314,7 @@ function resolveZoneSafe(tz: string): boolean {
   }
 }
 
-/** Details eines Ereignisses bzw. eines Vorkommens (`recurrenceId` aus CalendarInstance). */
+/** Details of an event or an occurrence (`recurrenceId` from CalendarInstance). */
 export function getEvent(
   objectId: number,
   recurrenceId: string | null = null,
@@ -338,7 +338,7 @@ export function getEvent(
       windowStart: center - 86_400_000,
       windowEnd: center + 4 * 86_400_000
     }).find((o) => o.recurrenceId === recurrenceId)
-    // Verschobene Ausnahme: liegt eventuell außerhalb der Suchspanne
+    // Moved exception: may lie outside the search range
     occ ??= expandResource(root, { windowStart: 0, windowEnd: 0, all: true }).find(
       (o) => o.recurrenceId === recurrenceId
     )
@@ -347,7 +347,7 @@ export function getEvent(
     const all = expandResource(root, { windowStart: 0, windowEnd: 0, all: true })
     occ = all[0]
     if (!occ) {
-      // Serie ohne Vorkommen im Zählbereich: Stamm-Termin selbst zeigen
+      // Series without occurrences in the counting range: show the master event itself
       const first = expandResource(root, {
         windowStart: obj.dtstart_utc ?? 0,
         windowEnd: (obj.dtstart_utc ?? 0) + 1
@@ -367,7 +367,7 @@ export function getEvent(
     zone: resolveZone(zoneId, vtz),
     tzid: zoneId
   })
-  // Stamm-Regel auch für generierte Vorkommen anzeigen
+  // Show the master rule for generated occurrences too
   if (master && !occ.isOverride)
     fields.rrule = master.getFirstPropertyValue('rrule')?.toString() ?? null
   const sequence = Number(comp.getFirstPropertyValue('sequence') ?? 0)
@@ -391,7 +391,7 @@ export function getEvent(
   }
 }
 
-// --- Ereignisse schreiben -----------------------------------------------------------------------------
+// --- Writing events -----------------------------------------------------------------------------------
 
 function writableCalendar(db: Database.Database, id: number): CalendarRow {
   const cal = requireCalendar(db, id)
@@ -406,7 +406,7 @@ function afterWrite(cal: CalendarRow): void {
   calendarSync.kick(cal.account_id)
 }
 
-/** Neuen Termin anlegen (optimistisch lokal, Übertragung im Hintergrund). */
+/** Create a new event (optimistically local, upload in the background). */
 export function createEvent(
   input: CalendarEventInput,
   db: Database.Database = getDb(),
@@ -417,13 +417,13 @@ export function createEvent(
   const account = getCalAccount(db, cal.account_id)
   const { calendarId: _calendarId, ...rawFields } = input
   void _calendarId
-  // Mit Teilnehmern ist der Nutzer Organisator (Standard: Hauptadresse des Kontos)
+  // With attendees the user is the organizer (default: primary address of the account)
   const fields = account ? withDefaultOrganizer(db, account, rawFields) : rawFields
   const { ics, uid } = createEventIcs(fields, ctx)
   let objectId = 0
   db.transaction(() => {
     objectId = enqueueCreate(db, cal, uid, ics)
-    // Ohne Server-Scheduling: Einladung geht nach erfolgreichem PUT per Mail raus
+    // Without server scheduling: the invitation goes out by mail after a successful PUT
     if (account) queueForCreate(db, account, uid, ics, scheduling, ctx?.now)
   })()
   afterWrite(cal)
@@ -431,10 +431,10 @@ export function createEvent(
 }
 
 /**
- * Termin ändern. `scope`: 'this' = nur dieses Vorkommen (RECURRENCE-ID-Override),
- * 'following' = dieses und alle folgenden (Serie wird per UNTIL geteilt, die
- * Fortsetzung ist ein neues Objekt), 'all' = ganze Serie. Bei nicht
- * wiederkehrenden Terminen gilt immer 'all'.
+ * Update an event. `scope`: 'this' = this occurrence only (RECURRENCE-ID override),
+ * 'following' = this and all following (the series is split via UNTIL, the
+ * continuation is a new object), 'all' = whole series. For non-recurring
+ * events 'all' always applies.
  */
 export function updateEvent(
   objectId: number,
@@ -460,7 +460,7 @@ export function updateEvent(
   )
   let createdObjectId: number | null = null
   db.transaction(() => {
-    // Organisator mit Teilnehmern: SEQUENCE/PARTSTAT nach RFC 5546 führen, Mails einreihen
+    // Organizer with attendees: maintain SEQUENCE/PARTSTAT per RFC 5546, queue mails
     const plan = account
       ? planUpdate(db, account, obj.uid, obj.ics, result.ics, scheduling, ctx?.now)
       : { ics: result.ics }
@@ -474,7 +474,7 @@ export function updateEvent(
   return { objectId, createdObjectId }
 }
 
-/** Termin (bzw. Vorkommen / Rest einer Serie) löschen. Scopes wie bei updateEvent. */
+/** Delete an event (or an occurrence / the rest of a series). Scopes as for updateEvent. */
 export function deleteEvent(
   objectId: number,
   scope: CalendarEditScope,
@@ -492,7 +492,7 @@ export function deleteEvent(
     if (result.kind === 'delete') {
       if (account) {
         if (obj.pending_op === 'create') {
-          // Nie übertragen, nie eingeladen: wartende Einladung verwerfen, nichts absagen
+          // Never uploaded, never invited: discard the pending invitation, cancel nothing
           dropQueuedItip(db, account.id, obj.uid)
         } else {
           queueForDelete(db, account, obj.uid, obj.ics, { range: 'all' }, scheduling, ctx?.now)
@@ -518,10 +518,10 @@ export function deleteEvent(
 }
 
 /**
- * Setzt eine fertig gebaute ICS-Fassung für ein vorhandenes Objekt (z. B.
- * PARTSTAT-Änderung durch RSVP oder eine eingegangene Antwort). Optimistisch
- * lokal, Übertragung per Sync; kein Teilnehmer-Versand (der Aufrufer
- * entscheidet über den Antwortweg).
+ * Sets a fully built ICS version for an existing object (e.g. a
+ * PARTSTAT change through RSVP or an incoming reply). Optimistically
+ * local, upload via sync; no sending to attendees (the caller
+ * decides on the reply path).
  */
 export function applyIcsToObject(
   objectId: number,
@@ -535,7 +535,7 @@ export function applyIcsToObject(
   afterWrite(cal)
 }
 
-/** Legt eine fertig gebaute ICS-Ressource im Kalender an (Einladung angenommen). */
+/** Creates a fully built ICS resource in the calendar (invitation accepted). */
 export function createObjectFromIcs(
   calendarId: number,
   uid: string,

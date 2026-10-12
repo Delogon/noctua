@@ -9,8 +9,8 @@ import { afterCalendarChanged, initTasksSync } from '../tasks/caldav-sync'
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
 /**
- * Verdrahtet Kalender-Sync, Domain-Service und Erinnerungen mit Push-Kanal und
- * Benachrichtigungen. Vom Main-Bootstrap nach openDb() aufgerufen.
+ * Wires calendar sync, domain service and reminders to the push channel and
+ * notifications. Called by the main bootstrap after openDb().
  */
 export function initCalendar(
   db: Database.Database,
@@ -28,7 +28,7 @@ export function initCalendar(
       onChanged: (accountId, calendarIds) => {
         push('calendar:changed', { accountId, calendarIds })
         reminderScheduler.tick()
-        // Aufgaben <-> VTODO (3.2): nach Sync/Push die gewählte Liste abgleichen
+        // Tasks <-> VTODO (3.2): reconcile the selected list after sync/push
         afterCalendarChanged(db, accountId, calendarIds)
       },
       onConflict: (info) => push('calendar:conflict', info),
@@ -41,7 +41,7 @@ export function initCalendar(
     onConflict: (info) => push('calendar:conflict', { ...info, kind: 'update', reason: 'conflict' })
   })
   ensureInstanceWindow(db)
-  // startSync=false: nur der Dev-Demo-Modus (keine Server hinter den Demo-Konten)
+  // startSync=false: dev demo mode only (no servers behind the demo accounts)
   if (opts.startSync !== false) calendarSync.startAll()
   reminderScheduler.init(db, notify)
   reminderScheduler.start()

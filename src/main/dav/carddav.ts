@@ -21,14 +21,14 @@ import { escapeXml, NS } from './xml'
 import { isRelatedHost, parseServerInput } from './url'
 
 /**
- * CardDAV-Schicht (RFC 6352) auf dem DavClient: Discovery (.well-known/carddav,
- * `_carddavs._tcp`-SRV nur innerhalb der Domain), Adressbuchliste, Reports
- * (addressbook-multiget; sync-collection und ETag-Listen teilen sich die
- * Funktionen aus caldav.ts, sie sind nicht CalDAV-spezifisch).
+ * CardDAV layer (RFC 6352) on top of the DavClient: discovery (.well-known/carddav,
+ * `_carddavs._tcp` SRV only within the domain), address book list, reports
+ * (addressbook-multiget; sync-collection and ETag lists share the
+ * functions from caldav.ts, they are not CalDAV-specific).
  */
 
 export interface DavAddressBookInfo {
-  /** Absolute, normalisierte Collection-URL (mit Slash am Ende) */
+  /** Absolute, normalized collection URL (with trailing slash) */
   url: string
   displayName: string | null
   ctag: string | null
@@ -57,7 +57,7 @@ function multigetBody(hrefs: string[]): string {
   return `${XML_HEAD}<card:addressbook-multiget ${NS_ATTRS}><d:prop><d:getetag/><card:address-data/></d:prop>${list}</card:addressbook-multiget>`
 }
 
-/** CardDAV-Server großer Anbieter, die sich nicht per SRV/well-known erraten lassen. */
+/** CardDAV servers of large providers that cannot be guessed via SRV/well-known. */
 const KNOWN_CARDDAV_PROVIDERS: Record<string, string> = {
   'mailbox.org': 'https://dav.mailbox.org/',
   'fastmail.com': 'https://carddav.fastmail.com/dav/',
@@ -73,14 +73,14 @@ export interface CardDavDiscoverOptions {
   fetch?: DavClientOptions['fetch']
   timeoutMs?: number
   dns?: DnsResolver
-  /** Zusätzliche Start-URLs vor den abgeleiteten (z. B. der Principal des Kalender-Kontos) */
+  /** Additional start URLs before the derived ones (e.g. the calendar account's principal) */
   hints?: string[]
 }
 
 /**
- * Server finden und Adressbücher auflisten. `input` darf URL, Domain oder
- * Mail-Adresse sein; Zugangsdaten gehen nur an den Origin der jeweiligen
- * Kandidaten-URL, Hrefs auf fremde Hosts werden verworfen.
+ * Find the server and list address books. `input` may be a URL, domain or
+ * mail address; credentials only go to the origin of the respective
+ * candidate URL, hrefs to foreign hosts are discarded.
  */
 export async function discoverCardDav(
   input: string,
@@ -179,7 +179,7 @@ async function discoverFrom(client: DavClient, startUrl: string): Promise<CardDa
     const pr = pms?.responses[0]
     if (pr && pms) homeUrl = trusted(okPropUrl(pr, NS.carddav, 'addressbook-home-set', pms.baseUrl))
   }
-  // Die eingegebene URL könnte selbst das Adressbuch-Home sein
+  // The entered URL could itself be the address book home
   if (!homeUrl) homeUrl = collectionUrl(self.url)
 
   const addressBooks = await listAddressBooks(client, homeUrl)
@@ -218,7 +218,7 @@ export async function listAddressBooks(
   return out
 }
 
-/** Alle Karten eines Adressbuchs mit ETag (PROPFIND Depth 1; Collections haben keinen ETag). */
+/** All cards of an address book with ETag (PROPFIND Depth 1; collections have no ETag). */
 export async function queryCardEtags(client: DavClient, bookUrl: string): Promise<EtagEntry[]> {
   const ms = await client.propfind(bookUrl, PROPFIND_ETAGS, '1')
   const out: EtagEntry[] = []
@@ -239,9 +239,9 @@ export interface FetchedCard {
 }
 
 /**
- * addressbook-multiget in Blöcken. Vollständige Karten (Fotos stecken inline
- * darin) können Antworten aufblähen: bei „Antwort zu groß" wird der Block
- * halbiert, eine einzelne zu große Karte wird übersprungen.
+ * addressbook-multiget in chunks. Full cards (photos are embedded
+ * inline) can bloat responses: on "response too large" the chunk is
+ * halved, a single oversized card is skipped.
  */
 export async function multigetCards(
   client: DavClient,

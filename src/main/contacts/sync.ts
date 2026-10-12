@@ -20,11 +20,11 @@ import {
 } from './repo'
 
 /**
- * Sync der CardDAV-Adressbücher (nur lesend), eingehängt in die Konto-Schleife
- * des Kalenders: gleiche Zugangsdaten, gleicher Backoff, needs-reauth wird über
- * DavAuthError geteilt. Pro Adressbuch: ctag prüfen, dann sync-collection
- * (RFC 6578) oder — ohne Unterstützung/bei ungültigem Token — ETag-Vergleich
- * mit addressbook-multiget. Siehe docs/CARDDAV.md.
+ * Sync of the CardDAV address books (read-only), hooked into the calendar's account
+ * loop: same credentials, same backoff, needs-reauth is shared via
+ * DavAuthError. Per address book: check ctag, then sync-collection
+ * (RFC 6578) or — without support/with an invalid token — ETag comparison
+ * with addressbook-multiget. See docs/CARDDAV.md.
  */
 
 export interface ContactsSyncContext {
@@ -34,7 +34,7 @@ export interface ContactsSyncContext {
 }
 
 const MAX_SYNC_PAGES = 50
-/** Obergrenze je Adressbuch; darüber wird abgeschnitten, damit die DB nicht explodiert */
+/** Upper limit per address book; anything beyond is cut off so the DB doesn't explode */
 export const MAX_CONTACTS_PER_BOOK = 50_000
 
 interface Collected {
@@ -49,7 +49,7 @@ function lastSegment(url: string): string {
   return decodeURIComponent(parts[parts.length - 1] ?? 'Kontakte')
 }
 
-/** Adressbuchliste des Servers abgleichen (neue → aktiviert, verschwundene → entfernt). */
+/** Reconcile the server's address book list (new → enabled, vanished → removed). */
 export async function refreshAddressBooks(
   ctx: ContactsSyncContext,
   account: CalAccountRow,
@@ -78,7 +78,7 @@ export async function refreshAddressBooks(
         )
       }
     }
-    // Leere Antwort = Server-Aussetzer: nichts löschen
+    // Empty response = server hiccup: delete nothing
     if (infos.length > 0) {
       const present = new Set(infos.map((i) => i.url))
       for (const b of existing) {
@@ -145,7 +145,7 @@ async function collectChanges(
   }
 }
 
-/** Gleicht ein Adressbuch ab. Rückgabe: true, wenn sich lokale Daten geändert haben. */
+/** Reconciles an address book. Returns: true if local data changed. */
 export async function syncAddressBook(
   ctx: ContactsSyncContext,
   book: AddressBookRow,
@@ -210,7 +210,7 @@ export async function syncAddressBook(
   return changed
 }
 
-/** Kompletter Kontakt-Lauf eines Kontos. Auth-Fehler werden weitergereicht, alles andere nur vermerkt. */
+/** Complete contact run for an account. Auth errors are rethrown, everything else is only noted. */
 export async function syncAccountContacts(
   ctx: ContactsSyncContext,
   account: CalAccountRow,
@@ -229,7 +229,7 @@ export async function syncAccountContacts(
         if (await syncAddressBook(ctx, row, info, opts)) changed = true
       } catch (error) {
         if (error instanceof DavAuthError) throw error
-        // Ein defektes Adressbuch hält die übrigen nicht auf
+        // One broken address book doesn't hold up the others
         firstError ??= new Error(
           `„${row.display_name}“: ${error instanceof Error ? error.message : String(error)}`
         )

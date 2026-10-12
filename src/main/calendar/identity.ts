@@ -2,9 +2,9 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import type { CalAccountRow } from './repo'
 
 /**
- * „Ich" im Sinne von Einladungen: alle Adressen der Mail-Konten sowie
- * Benutzername und Kalenderadressen (calendar-user-address-set) der
- * Kalender-Konten. Alles kleingeschrieben.
+ * "Me" in terms of invitations: all addresses of the mail accounts plus
+ * username and calendar addresses (calendar-user-address-set) of the
+ * calendar accounts. All lowercase.
  */
 
 function norm(value: string): string | null {
@@ -29,7 +29,7 @@ export function calendarAccountAddresses(row: CalAccountRow): string[] {
       }
     }
   } catch {
-    // defektes JSON ignorieren
+    // ignore broken JSON
   }
   return out
 }
@@ -46,7 +46,7 @@ export function myAddresses(db: Database.Database): Set<string> {
   return out
 }
 
-/** Eigene Hauptadresse eines Kalender-Kontos (Organisator neuer Termine). */
+/** Own primary address of a calendar account (organizer of new events). */
 export function ownAddressOf(db: Database.Database, row: CalAccountRow): string | null {
   if (row.mail_account_id !== null) {
     const m = db.prepare('SELECT email FROM accounts WHERE id = ?').get(row.mail_account_id) as
@@ -57,7 +57,7 @@ export function ownAddressOf(db: Database.Database, row: CalAccountRow): string 
   return calendarAccountAddresses(row)[0] ?? null
 }
 
-/** Mail-Konto, das die Adresse besitzt (für Versand als Organisator/Teilnehmer). */
+/** Mail account that owns the address (for sending as organizer/attendee). */
 export function mailAccountForAddress(
   db: Database.Database,
   address: string,

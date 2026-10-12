@@ -1,10 +1,10 @@
 import type { Partstat } from './itip'
 
 /**
- * Versand von iMIP-Nachrichten (RFC 6047) über die Outbox. Die Outbox wird vom
- * Main-Bootstrap eingehängt (`setItipMailer`) — so bleibt das Kalendermodul
- * ohne SMTP/Electron testbar. Jede Nachricht ist multipart/alternative
- * (Text + text/calendar; method=…) plus .ics-Anhang (nodemailer `icalEvent`).
+ * Sending iMIP messages (RFC 6047) via the outbox. The outbox is plugged in by the
+ * main bootstrap (`setItipMailer`) — this keeps the calendar module
+ * testable without SMTP/Electron. Every message is multipart/alternative
+ * (text + text/calendar; method=…) plus an .ics attachment (nodemailer `icalEvent`).
  */
 
 export interface ItipMail {
@@ -32,7 +32,7 @@ export function sendItipMail(mailAccountId: number, mail: ItipMail): void {
   mailer(mailAccountId, mail)
 }
 
-// --- Texte ----------------------------------------------------------------------------------
+// --- Texts ----------------------------------------------------------------------------------
 
 export type MailLang = 'de' | 'en'
 
@@ -74,7 +74,7 @@ export interface WhenInfo {
   tzid: string | null
 }
 
-/** Lesbare Zeitangabe für Mailtexte (Zeitzone des Termins, sonst UTC). */
+/** Readable time for mail texts (the event's time zone, otherwise UTC). */
 export function formatWhen(lang: MailLang, when: WhenInfo): string {
   if (when.startUtc === null) return ''
   const locale = lang === 'de' ? 'de-DE' : 'en-GB'

@@ -11,38 +11,38 @@ import {
 import { resolveZone, systemTimeZone } from '../calendar/tz'
 
 /**
- * Abbildung Noctua-Aufgabe <-> iCalendar-VTODO (RFC 5545 §3.6.2).
+ * Mapping Noctua task <-> iCalendar VTODO (RFC 5545 §3.6.2).
  *
  *   title  <-> SUMMARY
  *   notes  <-> DESCRIPTION
- *   due    <-> DUE (Datum 'YYYY-MM-DD'; DATE-TIME wird auf das Wanddatum reduziert)
+ *   due    <-> DUE (date 'YYYY-MM-DD'; DATE-TIME is reduced to the wall date)
  *   done   <-> STATUS:COMPLETED | COMPLETED | PERCENT-COMPLETE:100
  *
- * Beim Schreiben wird immer die vorhandene Komponente verändert und nur das
- * angefasst, was sich gegenüber dem Server-Stand unterscheidet — unbekannte
- * Properties (X-*, ATTACH, VALARM, RRULE, PRIORITY …) bleiben erhalten.
+ * When writing, the existing component is always modified and only what
+ * differs from the server state is touched — unknown
+ * properties (X-*, ATTACH, VALARM, RRULE, PRIORITY …) are preserved.
  */
 
 export interface TaskFields {
   title: string
   notes: string | null
-  /** 'YYYY-MM-DD' oder null */
+  /** 'YYYY-MM-DD' or null */
   due: string | null
   done: boolean
 }
 
 export interface TodoFields extends TaskFields {
   uid: string
-  /** RFC-Message-ID aus X-NOCTUA-MESSAGE-ID (ohne spitze Klammern) */
+  /** RFC Message-ID from X-NOCTUA-MESSAGE-ID (without angle brackets) */
   messageId: string | null
 }
 
 export const MESSAGE_ID_PROP = 'x-noctua-message-id'
 
-/** Stabile UID einer lokal angelegten Aufgabe (Dedupe beim erneuten Aktivieren). */
+/** Stable UID of a locally created task (dedupe when re-enabling). */
 export const taskUid = (taskId: number): string => `noctua-task-${taskId}@noctua`
 
-/** Hash der abgleichsrelevanten Felder (Zeilenenden und Rand-Whitespace normalisiert). */
+/** Hash of the sync-relevant fields (line endings and edge whitespace normalized). */
 export function fieldsHash(f: TaskFields): string {
   const norm = (s: string | null): string | null =>
     s === null ? null : s.replace(/\r\n?/g, '\n').trim() || null
@@ -63,7 +63,7 @@ function todoOf(root: ICAL.Component): ICAL.Component {
   return master
 }
 
-/** Fälligkeit als Wanddatum; UTC-Zeitpunkte in der Systemzone, sonst im eigenen Zeitzonen-Wanddatum. */
+/** Due as wall date; UTC instants in the system zone, otherwise the wall date of its own zone. */
 function dueDate(comp: ICAL.Component, root: ICAL.Component): string | null {
   const info = readTime(comp.getFirstProperty('due'), vtimezonesOf(root))
   if (!info) return null
@@ -106,7 +106,7 @@ function dateValue(day: string): ICAL.Time {
   return ICAL.Time.fromData({ year: y, month: m, day: d, isDate: true })
 }
 
-/** Setzt die Property, ersetzt dabei Parameter (TZID/VALUE) vollständig. */
+/** Sets the property, fully replacing its parameters (TZID/VALUE). */
 function setTextProp(comp: ICAL.Component, name: string, value: string | null): void {
   comp.removeAllProperties(name)
   if (value !== null && value !== '') comp.addPropertyWithValue(name, value)
@@ -123,7 +123,7 @@ function applyFields(
     setTextProp(comp, 'description', next.notes)
   if (!prev || prev.due !== next.due) {
     comp.removeAllProperties('due')
-    // Kollidiert DURATION mit DUE nicht, aber DTSTART+DURATION bleibt erhalten
+    // DURATION does not collide with DUE, but DTSTART+DURATION is kept
     if (next.due) comp.addPropertyWithValue('due', dateValue(next.due))
   }
   if (!prev || prev.done !== next.done) {
@@ -144,7 +144,7 @@ function applyFields(
   comp.updatePropertyWithValue('sequence', (Number.isFinite(seq) ? seq : 0) + 1)
 }
 
-/** Neues VTODO-Objekt (VCALENDAR-Hülle) aus einer Aufgabe. */
+/** New VTODO object (VCALENDAR wrapper) from a task. */
 export function buildTodoIcs(
   uid: string,
   fields: TaskFields,
@@ -158,20 +158,20 @@ export function buildTodoIcs(
   comp.updatePropertyWithValue('created', utcTime(opts.created ?? opts.now))
   root.addSubcomponent(comp)
   applyFields(comp, fields, null, opts.now)
-  // Frisch angelegt: Sequenz bei 0 beginnen
+  // Freshly created: start the sequence at 0
   comp.updatePropertyWithValue('sequence', 0)
   if (opts.messageId) {
     const mid = opts.messageId.replace(/^<|>$/g, '')
     comp.addPropertyWithValue(MESSAGE_ID_PROP, mid)
-    // Rückverweis als URI (RFC 2392 mid:), damit auch fremde Clients ihn zeigen
+    // Back link as a URI (RFC 2392 mid:), so that other clients show it too
     comp.addPropertyWithValue('url', `mid:${mid}`)
   }
   return serializeCalendar(root)
 }
 
 /**
- * Ändert nur die Felder, die sich von `prev` (Server-Stand) zu `next` (lokal)
- * unterscheiden, und lässt alles andere unberührt.
+ * Changes only the fields that differ between `prev` (server state) and `next` (local),
+ * and leaves everything else untouched.
  */
 export function patchTodoIcs(ics: string, next: TaskFields, prev: TaskFields, now: number): string {
   const root = parseCalendar(ics)

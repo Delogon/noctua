@@ -1,10 +1,10 @@
 import ICAL from 'ical.js'
 
 /**
- * Zeitzonen-Schicht. IANA-Zonen laufen über Intl (Node bringt volle ICU-Daten
- * mit), unabhängig davon, ob die ICS ein VTIMEZONE enthält. Unbekannte TZIDs
- * (Windows-Namen, proprietäre IDs) fallen auf ein eingebettetes VTIMEZONE
- * (ical.js), eine kleine Windows→IANA-Tabelle oder die Systemzone zurück.
+ * Time zone layer. IANA zones go through Intl (Node ships full ICU data),
+ * regardless of whether the ICS contains a VTIMEZONE. Unknown TZIDs
+ * (Windows names, proprietary IDs) fall back to an embedded VTIMEZONE
+ * (ical.js), a small Windows→IANA table or the system zone.
  */
 
 export interface Wall {
@@ -17,7 +17,7 @@ export interface Wall {
 }
 
 export interface Zone {
-  /** Zonen-ID, wie sie in TZID geschrieben wird (null = UTC-/Floating-Ersatz) */
+  /** Zone ID as written in TZID (null = UTC/floating substitute) */
   id: string
   wallToUtc(w: Wall): number
   utcToWall(ms: number): Wall
@@ -30,7 +30,7 @@ export function isValidIana(tzid: string): boolean {
   const hit = validCache.get(tzid)
   if (hit !== undefined) return hit
   let ok = false
-  // Intl akzeptiert auch Offsets ('+01:00') und alte Aliase; wir wollen Region/Stadt-IDs und UTC
+  // Intl also accepts offsets ('+01:00') and old aliases; we want Region/City IDs and UTC
   if (/^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+){0,2}$/.test(tzid)) {
     try {
       new Intl.DateTimeFormat('en-US', { timeZone: tzid })
@@ -75,20 +75,20 @@ export function utcToWallIana(ms: number, tzid: string): Wall {
 }
 
 export function wallAsUtcMs(w: Wall): number {
-  // Date.UTC kennt Jahre < 100 nur als 1900+; Kalenderdaten bleiben im sicheren Bereich
+  // Date.UTC only knows years < 100 as 1900+; calendar data stays in the safe range
   return Date.UTC(w.y, w.m - 1, w.d, w.h, w.mi, w.s)
 }
 
-/** Offset (ms, positiv = östlich von UTC) der Zone zum Zeitpunkt utcMs. */
+/** Offset (ms, positive = east of UTC) of the zone at time utcMs. */
 export function offsetAtIana(utcMs: number, tzid: string): number {
   const floor = Math.floor(utcMs / 1000) * 1000
   return wallAsUtcMs(utcToWallIana(floor, tzid)) - floor
 }
 
 /**
- * Wandzeit → UTC. Mehrdeutige Zeiten (Herbst, doppelte Stunde) nehmen den
- * ersten Zeitpunkt; nicht existierende (Frühjahrslücke) werden mit dem Offset
- * vor der Umstellung gerechnet (RFC 5545 §3.3.5).
+ * Wall time → UTC. Ambiguous times (autumn, repeated hour) take the
+ * first instant; non-existent ones (spring gap) are computed with the offset
+ * before the transition (RFC 5545 §3.3.5).
  */
 export function wallToUtcIana(w: Wall, tzid: string): number {
   const guess = wallAsUtcMs(w)
@@ -137,7 +137,7 @@ export function systemTimeZone(): string {
   }
 }
 
-/** Häufige Windows-/Exchange-Zonennamen → IANA. */
+/** Common Windows/Exchange zone names → IANA. */
 const WINDOWS_ZONES: Record<string, string> = {
   'W. Europe Standard Time': 'Europe/Berlin',
   'Central Europe Standard Time': 'Europe/Budapest',
@@ -170,7 +170,7 @@ const WINDOWS_ZONES: Record<string, string> = {
   UTC: 'UTC'
 }
 
-/** Gespeicherte VTIMEZONE-Komponenten einer ICS, nach TZID. */
+/** Stored VTIMEZONE components of an ICS, by TZID. */
 export type VTimezones = Map<string, ICAL.Component>
 
 function customZone(tzid: string, vtimezone: ICAL.Component): Zone {
@@ -192,8 +192,8 @@ function customZone(tzid: string, vtimezone: ICAL.Component): Zone {
 }
 
 /**
- * Löst eine TZID zu einer Zone auf. `null`/leer = floating → Systemzone.
- * `Z`-Zeiten (UTC) werden vom Aufrufer direkt über UTC_ZONE behandelt.
+ * Resolves a TZID to a zone. `null`/empty = floating → system zone.
+ * `Z` times (UTC) are handled directly by the caller via UTC_ZONE.
  */
 export function resolveZone(tzid: string | null, vtimezones?: VTimezones): Zone {
   if (!tzid) return ianaZone(systemTimeZone())
@@ -204,12 +204,12 @@ export function resolveZone(tzid: string | null, vtimezones?: VTimezones): Zone 
     try {
       return customZone(tzid, embedded)
     } catch {
-      // defektes VTIMEZONE → weiter mit Fallbacks
+      // broken VTIMEZONE → continue with fallbacks
     }
   }
   const windows = WINDOWS_ZONES[tzid]
   if (windows) return ianaZone(windows)
-  // Pfad-Präfixe wie /freeassociation.sourceforge.net/Europe/Berlin
+  // Path prefixes like /freeassociation.sourceforge.net/Europe/Berlin
   const segs = tzid.split('/')
   for (let n = 2; n >= 1; n--) {
     const tail = segs.slice(-n).join('/')
@@ -218,7 +218,7 @@ export function resolveZone(tzid: string | null, vtimezones?: VTimezones): Zone 
   return ianaZone(systemTimeZone())
 }
 
-// --- VTIMEZONE-Erzeugung (für neue Ereignisse mit TZID) ----------------------------
+// --- VTIMEZONE generation (for new events with TZID) -------------------------------
 
 interface Transition {
   utc: number
@@ -236,7 +236,7 @@ function findTransitions(tzid: string, fromYear: number, toYear: number): Transi
     const next = t + step
     const off = offsetAtIana(next, tzid)
     if (off !== prev) {
-      // Umstellung innerhalb (t, next]: auf die Sekunde eingrenzen
+      // Transition within (t, next]: narrow it down to the second
       let lo = t
       let hi = next
       while (hi - lo > 1000) {
@@ -257,10 +257,10 @@ function pad(n: number, len = 2): string {
 }
 
 /**
- * Baut ein VTIMEZONE für eine IANA-Zone: Regeln mit jährlicher Wiederholung
- * (z. B. letzter Sonntag im März), sofern über mehrere Jahre gleichförmig,
- * sonst RDATE-Listen. Reicht für Interoperabilität mit Clients, die kein IANA
- * kennen; die eigentliche Berechnung macht Noctua selbst über Intl.
+ * Builds a VTIMEZONE for an IANA zone: rules with yearly recurrence
+ * (e.g. last Sunday in March) if uniform across several years,
+ * otherwise RDATE lists. Sufficient for interoperability with clients that don't
+ * know IANA; the actual calculation is done by Noctua itself via Intl.
  */
 export function buildVTimezone(tzid: string, aroundYear: number): ICAL.Component {
   const vtz = new ICAL.Component('vtimezone')
@@ -294,7 +294,7 @@ export function buildVTimezone(tzid: string, aroundYear: number): ICAL.Component
     return vtz
   }
 
-  // Gruppieren nach (fromOffset→toOffset): gleiche Regel pro Jahr?
+  // Group by (fromOffset→toOffset): same rule every year?
   const groups = new Map<string, Transition[]>()
   for (const tr of transitions) {
     const key = `${tr.fromOffset}>${tr.toOffset}`
@@ -326,7 +326,7 @@ function utcToWallOffset(utc: number, offset: number): Wall {
   return UTC_ZONE.utcToWall(utc + offset)
 }
 
-/** Gleiche Regel in allen Jahren? → 'FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU' (letzter/n-ter Wochentag). */
+/** Same rule in all years? → 'FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU' (last/nth weekday). */
 function yearlyRule(locals: Wall[]): string | null {
   const days = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
   const descr = locals.map((w) => {
