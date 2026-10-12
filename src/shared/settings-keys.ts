@@ -18,6 +18,15 @@ const WRITABLE_EXACT = new Set([
   'ui.showList',
   'ui.showRail',
   'ui.language',
+  // Darstellung: 'letterpress' (Standard) | 'classic' (Outlook-nah)
+  'ui.layout',
+  // 'light' | 'dark'
+  'ui.theme',
+  // Spaltenbreiten als JSON {folders,list,rail}; Ordnerleiste ein/aus
+  'ui.paneWidths',
+  'ui.showFolderPane',
+  // Ordneransicht + Sync eigener Ordner; '1' = an
+  'mail.showFolders',
   'noctua.onboarded',
   'noctua.onboardingStarted',
   'mail.remoteImagesDefault',

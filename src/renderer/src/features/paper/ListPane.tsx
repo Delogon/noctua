@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { TaskSyncGlyph } from './TaskSyncGlyph'
 import { contrastOn, type AccountSummary, type ThreadListItem } from '@shared/types'
-import { useMboxCounts, useThreads } from '@renderer/queries/threads'
+import { useFolders, useMboxCounts, useThreads } from '@renderer/queries/threads'
 import { useDrafts } from '@renderer/queries/drafts'
 import { useFollowups } from '@renderer/queries/followups'
 import { useTasks } from '@renderer/queries/tasks'
@@ -18,6 +18,7 @@ import { nudgedToday } from '@renderer/features/paper/nudge-send'
 import { priorityTickTone } from '@renderer/features/paper/priority'
 import { applyFilters, filterCounts } from '@renderer/features/paper/inbox-filters'
 import { InboxFilterMenu } from '@renderer/features/paper/InboxFilterMenu'
+import { FolderTree } from '@renderer/features/paper/FolderTree'
 import { OwlConversationsPane } from '@renderer/features/owl/OwlConversationsPane'
 import { useOwl } from '@renderer/stores/owl'
 import { CalendarSidebar } from '@renderer/features/calendar/CalendarSidebar'
@@ -457,6 +458,28 @@ function RefreshButton(): React.JSX.Element {
   )
 }
 
+/** Schalter der Ordneransicht (Einstellung mail.showFolders) neben dem Refresh. */
+function FoldersToggle(): React.JSX.Element {
+  const t = useT()
+  const showFolders = usePaper((s) => s.showFolders)
+  const setShowFolders = usePaper((s) => s.setShowFolders)
+  return (
+    <button
+      type="button"
+      className="mailbox-refresh"
+      aria-pressed={showFolders}
+      data-active={showFolders}
+      onClick={() => setShowFolders(!showFolders)}
+      title={t('foldersToggleAria')}
+      aria-label={t('foldersToggleAria')}
+    >
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M1.75 3.25h4.5l1.5 1.5h6.5v8h-12.5z" />
+      </svg>
+    </button>
+  )
+}
+
 function SendingDots(): React.JSX.Element {
   const [dots, setDots] = useState('…')
   useEffect(() => {
@@ -479,6 +502,7 @@ function InboxList(): React.JSX.Element {
     comp,
     hiddenThreads,
     mbox,
+    folderId,
     setMbox,
     inboxFilters
   } = usePaper()
@@ -488,8 +512,11 @@ function InboxList(): React.JSX.Element {
     setSelThreadKey(threadKey)
     if (view === 'compose') setView('inbox')
   }
-  const threadsQuery = useThreads(filter, mbox)
+  const threadsQuery = useThreads(filter, mbox, folderId)
   const counts = useMboxCounts(filter)
+  const layout = usePaper((s) => s.layout)
+  const showFolders = usePaper((s) => s.showFolders)
+  const folders = useFolders(layout === 'classic' || showFolders)
   const accounts = useAccounts()
   const listRef = useScrollToSelected(selThreadKey)
   const labels = useMemo(() => accountLabels(accounts.data ?? []), [accounts.data])
@@ -511,6 +538,26 @@ function InboxList(): React.JSX.Element {
     [allRows, inboxFilters, mbox]
   )
   const sel = rows.find((r) => r.threadKey === selThreadKey) ?? rows[0]
+  const locationLabel = useMemo(() => {
+    const folder = folderId !== null ? folders.data?.find((f) => f.id === folderId) : undefined
+    const place = folder
+      ? folder.role === 'archive'
+        ? t('folderArchive')
+        : folder.role === 'junk'
+          ? t('folderJunk')
+          : folder.role === 'sent'
+            ? t('folderSent')
+            : folder.name
+      : filter === null && mbox === 'inbox'
+        ? t('folderUnified')
+        : mbox === 'sent'
+          ? t('folderSent')
+          : mbox === 'spam'
+            ? t('folderJunk')
+            : t('folderInbox')
+    const account = accounts.data?.find((a) => a.id === filter)
+    return account ? `${account.accountName || account.email} › ${place}` : place
+  }, [folderId, folders.data, filter, mbox, accounts.data, t])
 
   // Optimistische Echos: frisch Gesendetes sofort anzeigen, bis die Server-Kopie da ist
   const echoes = useSendState((s) => s.echoes)
@@ -529,42 +576,63 @@ function InboxList(): React.JSX.Element {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="inbox-controls">
-        <AccountFilter
-          accounts={accounts.data ?? []}
-          loading={accounts.isLoading}
-          filter={filter}
-          onChange={setFilter}
-        />
-        <div className="flex items-stretch gap-1.5">
-          <div
-            className="mailbox-tabs min-w-0 flex-1"
-            role="group"
-            aria-label={t('mailboxTabsAria')}
-          >
-            {(
-              [
-                ['inbox', t('mboxInbox'), counts.data?.inbox],
-                ['sent', t('mboxSent'), counts.data?.sent],
-                ['spam', t('mboxSpam'), counts.data?.spam]
-              ] as Array<['inbox' | 'sent' | 'spam', string, number | undefined]>
-            ).map(([key, label, count], i) => {
-              const active = mbox === key
-              return (
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  key={key}
-                  onClick={() => setMbox(key)}
-                  className="mailbox-tab"
-                  data-first={i === 0}
-                >
-                  {label} <span>{count ?? ''}</span>
-                </button>
-              )
-            })}
+        {layout === 'classic' ? (
+          <div className="classic-list-head">
+            <span className="classic-list-head__title">{locationLabel}</span>
+            <RefreshButton />
           </div>
-          <RefreshButton />
-        </div>
+        ) : showFolders ? (
+          <>
+            <div className="flex items-stretch gap-1.5">
+              <div className="folder-panel-head min-w-0 flex-1">{locationLabel}</div>
+              <FoldersToggle />
+              <RefreshButton />
+            </div>
+            <div className="folder-tree-box">
+              <FolderTree showUserFolders />
+            </div>
+          </>
+        ) : (
+          <>
+            <AccountFilter
+              accounts={accounts.data ?? []}
+              loading={accounts.isLoading}
+              filter={filter}
+              onChange={setFilter}
+            />
+            <div className="flex items-stretch gap-1.5">
+              <div
+                className="mailbox-tabs min-w-0 flex-1"
+                role="group"
+                aria-label={t('mailboxTabsAria')}
+              >
+                {(
+                  [
+                    ['inbox', t('mboxInbox'), counts.data?.inbox],
+                    ['sent', t('mboxSent'), counts.data?.sent],
+                    ['spam', t('mboxSpam'), counts.data?.spam]
+                  ] as Array<['inbox' | 'sent' | 'spam', string, number | undefined]>
+                ).map(([key, label, count], i) => {
+                  const active = mbox === key
+                  return (
+                    <button
+                      type="button"
+                      aria-pressed={active}
+                      key={key}
+                      onClick={() => setMbox(key)}
+                      className="mailbox-tab"
+                      data-first={i === 0}
+                    >
+                      {label} <span>{count ?? ''}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <FoldersToggle />
+              <RefreshButton />
+            </div>
+          </>
+        )}
         {mbox === 'inbox' && (
           <div style={{ marginTop: 7 }}>
             <InboxFilterMenu counts={inboxFilterCounts} totalRows={allRows.length} />
@@ -609,7 +677,7 @@ function InboxList(): React.JSX.Element {
               {e.subject.trim() && (
                 <div
                   className="truncate"
-                  style={{ font: '400 12px var(--serif)', color: '#8a8272', marginTop: 2 }}
+                  style={{ font: '400 12px var(--serif)', color: 'var(--meta)', marginTop: 2 }}
                 >
                   {e.subject}
                 </div>
@@ -667,7 +735,7 @@ function InboxList(): React.JSX.Element {
                   style={{
                     font: '400 12px var(--serif)',
                     fontStyle: 'italic',
-                    color: r.unread ? 'var(--secondary)' : '#8a8272',
+                    color: r.unread ? 'var(--secondary)' : 'var(--meta)',
                     marginTop: 2
                   }}
                 >
@@ -677,7 +745,7 @@ function InboxList(): React.JSX.Element {
               {!r.aiSummary && r.subject && (
                 <div
                   className="truncate"
-                  style={{ font: '400 12px var(--serif)', color: '#8a8272', marginTop: 2 }}
+                  style={{ font: '400 12px var(--serif)', color: 'var(--meta)', marginTop: 2 }}
                 >
                   {r.subject}
                 </div>
@@ -967,6 +1035,7 @@ function SettingsList(): React.JSX.Element {
       name: t('setAccounts'),
       sub: t('setAccountsSub', { n: accounts.data?.length ?? 0 })
     },
+    { id: 'appearance', name: t('setAppearance'), sub: t('setAppearanceSub') },
     { id: 'style', name: t('setStyle'), sub: t('setStyleSub') },
     { id: 'sig', name: t('setSig'), sub: t('setSigSub') },
     {
@@ -1015,8 +1084,8 @@ function SettingsList(): React.JSX.Element {
 
 export function ListPane(): React.JSX.Element {
   const t = useT()
-  const { view, filter, hiddenThreads, mbox } = usePaper()
-  const threadsQuery = useThreads(filter, mbox)
+  const { view, filter, hiddenThreads, mbox, folderId } = usePaper()
+  const threadsQuery = useThreads(filter, mbox, folderId)
   const followups = useFollowups()
   const openTasks = useTasks('open')
   const doneTasks = useTasks('done')
@@ -1047,7 +1116,7 @@ export function ListPane(): React.JSX.Element {
         const cur = rows.findIndex((r) => r.id === st.selTaskId)
         st.setSelTaskId(rows[clamp((cur === -1 ? 0 : cur) + dir, rows.length)].id)
       } else if (st.view === 'settings') {
-        const order = ['accounts', 'style', 'sig', 'intel', 'tech'] as const
+        const order = ['accounts', 'appearance', 'style', 'sig', 'intel', 'tech'] as const
         const cur = order.indexOf(st.setSel)
         st.setSetSel(order[clamp(cur + dir, order.length)])
       }
@@ -1056,7 +1125,7 @@ export function ListPane(): React.JSX.Element {
     return () => window.removeEventListener('paper:move', onMove)
   }, [threadsQuery.data, followups.data, openTasks.data, doneTasks.data, hiddenThreads, mbox])
   return (
-    <div className="flex min-h-0 w-[400px] flex-none flex-col border-r border-ink">
+    <div className="flex min-h-0 w-full min-w-0 flex-col border-r border-ink">
       {(view === 'inbox' || view === 'compose') && <InboxList />}
       {view === 'waiting' && <WaitingList />}
       {view === 'tasks' && <TasksList />}

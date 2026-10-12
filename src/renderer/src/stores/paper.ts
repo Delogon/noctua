@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { InboxFilterId } from '@renderer/features/paper/inbox-filters'
+import { PANE_LIMITS, clampPaneWidth, type PaneId } from '@renderer/features/paper/pane-layout'
 import { invoke } from '@renderer/lib/ipc'
 import { toast } from './toast'
 
@@ -7,7 +8,11 @@ import { toast } from './toast'
 // lebt hier, damit Owl-Rail und Listen-Chips („DRAFT READY") ihn sehen.
 
 export type PaperView = 'inbox' | 'waiting' | 'tasks' | 'calendar' | 'settings' | 'chat' | 'compose'
-export type SettingsSection = 'accounts' | 'style' | 'sig' | 'intel' | 'tech'
+export type SettingsSection = 'accounts' | 'appearance' | 'style' | 'sig' | 'intel' | 'tech'
+/** Darstellung (Einstellung ui.layout): Letterpress-Original oder Outlook-nahes Classic. */
+export type PaperLayout = 'letterpress' | 'classic'
+export type Mbox = 'inbox' | 'sent' | 'spam'
+export type PaperTheme = 'light' | 'dark'
 export type CompMode = 'idle' | 'listening' | 'transcribing' | 'drafting' | 'ready' | 'sending'
 
 export type CompResultKind = 'transcribed' | 'generated'
@@ -78,11 +83,33 @@ interface PaperState {
   setSel: SettingsSection
   setSetSel: (s: SettingsSection) => void
   // Ordner (EINGANG/GESENDET/SPAM)
-  mbox: 'inbox' | 'sent' | 'spam'
-  setMbox: (m: 'inbox' | 'sent' | 'spam') => void
+  mbox: Mbox
+  setMbox: (m: Mbox) => void
   // Konto-Filter (1/2/3, Chips)
   filter: number | null
   setFilter: (accountId: number | null) => void
+  /** Ordneransicht: gewählter Einzelordner (null = vereinheitlichte Sicht über mbox). */
+  folderId: number | null
+  /** Ordner wählen: Konto + Sicht in einem Schritt; folderId nur für eigene Ordner/Archiv. */
+  openFolder: (target: { accountId: number | null; mbox: Mbox; folderId: number | null }) => void
+  // Darstellung (persistiert in settings ui.layout / mail.showFolders)
+  layout: PaperLayout
+  setLayout: (layout: PaperLayout) => void
+  showFolders: boolean
+  setShowFolders: (show: boolean) => void
+  theme: PaperTheme
+  setTheme: (theme: PaperTheme) => void
+  // Spalten: Breite (gezogen) und Ordnerleiste ein/aus (Classic)
+  paneWidths: Record<PaneId, number>
+  /** persist=false während des Ziehens, true beim Loslassen (settings ui.paneWidths). */
+  setPaneWidth: (id: PaneId, width: number, persist?: boolean) => void
+  showFolderPane: boolean
+  toggleFolderPane: () => void
+  /** Spalten, die trotz Platzmangel offen bleiben sollen (Sitzung, nicht persistiert). */
+  pinnedPanes: ReadonlySet<PaneId>
+  /** Klick auf eine Leiste: aufklappen bzw. bei Platzmangel anheften. */
+  expandPane: (id: PaneId, autoCollapsed: boolean) => void
+  collapsePane: (id: PaneId) => void
   // Listen-Filter (Design Turn 7): Sitzungszustand, nicht persistiert
   inboxFilters: Set<InboxFilterId>
   toggleInboxFilter: (id: InboxFilterId) => void
@@ -146,9 +173,73 @@ export const usePaper = create<PaperState>((set) => ({
   setSel: 'accounts',
   setSetSel: (setSel) => set({ setSel }),
   mbox: 'inbox',
-  setMbox: (mbox) => set({ mbox, selThreadKey: null }),
+  setMbox: (mbox) => set({ mbox, folderId: null, selThreadKey: null }),
   filter: null,
-  setFilter: (filter) => set({ filter, selThreadKey: null }),
+  setFilter: (filter) => set({ filter, folderId: null, selThreadKey: null }),
+  folderId: null,
+  openFolder: ({ accountId, mbox, folderId }) =>
+    set({ filter: accountId, mbox, folderId, selThreadKey: null, view: 'inbox' }),
+  layout: 'letterpress',
+  setLayout: (layout) => {
+    void invoke('settings:set', { key: 'ui.layout', value: layout })
+    set({ layout })
+  },
+  theme: 'light',
+  setTheme: (theme) => {
+    void invoke('settings:set', { key: 'ui.theme', value: theme })
+    set({ theme })
+  },
+  paneWidths: {
+    folders: PANE_LIMITS.folders.default,
+    list: PANE_LIMITS.list.default,
+    rail: PANE_LIMITS.rail.default
+  },
+  setPaneWidth: (id, width, persist = false) =>
+    set((s) => {
+      const paneWidths = { ...s.paneWidths, [id]: clampPaneWidth(id, width) }
+      if (persist) {
+        void invoke('settings:set', { key: 'ui.paneWidths', value: JSON.stringify(paneWidths) })
+      }
+      return { paneWidths }
+    }),
+  showFolderPane: true,
+  toggleFolderPane: () =>
+    set((s) => {
+      const next = !s.showFolderPane
+      void invoke('settings:set', { key: 'ui.showFolderPane', value: next ? '1' : '0' })
+      return { showFolderPane: next }
+    }),
+  pinnedPanes: new Set<PaneId>(),
+  expandPane: (id, autoCollapsed) => {
+    const s = usePaper.getState()
+    if (autoCollapsed) {
+      set({ pinnedPanes: new Set([...s.pinnedPanes, id]) })
+      return
+    }
+    if (id === 'folders' && !s.showFolderPane) s.toggleFolderPane()
+    if (id === 'list' && !s.showList) s.toggleList()
+    if (id === 'rail' && !s.showRail) s.toggleRail()
+  },
+  collapsePane: (id) => {
+    const s = usePaper.getState()
+    const pinned = new Set(s.pinnedPanes)
+    pinned.delete(id)
+    set({ pinnedPanes: pinned })
+    if (id === 'folders' && s.showFolderPane) s.toggleFolderPane()
+    if (id === 'list' && s.showList) s.toggleList()
+    if (id === 'rail' && s.showRail) s.toggleRail()
+  },
+  showFolders: false,
+  setShowFolders: (showFolders) => {
+    // Main liest mail.showFolders beim Ordner-Listing; der Refresh holt die Ordner sofort
+    void invoke('settings:set', { key: 'mail.showFolders', value: showFolders ? '1' : '0' }).then(
+      () => invoke('sync:trigger', undefined).catch(() => {})
+    )
+    set((s) => ({
+      showFolders,
+      ...(showFolders || s.folderId === null ? {} : { folderId: null, selThreadKey: null })
+    }))
+  },
   inboxFilters: new Set<InboxFilterId>(),
   toggleInboxFilter: (id) =>
     set((s) => {
@@ -224,5 +315,30 @@ export function initPanelPrefs(): void {
   })
   void invoke('settings:get', { key: 'ui.showRail' }).then((r) => {
     if (r.value === '0') usePaper.setState({ showRail: false })
+  })
+  void invoke('settings:get', { key: 'ui.layout' }).then((r) => {
+    if (r.value === 'classic') usePaper.setState({ layout: 'classic' })
+  })
+  void invoke('settings:get', { key: 'mail.showFolders' }).then((r) => {
+    if (r.value === '1') usePaper.setState({ showFolders: true })
+  })
+  void invoke('settings:get', { key: 'ui.theme' }).then((r) => {
+    if (r.value === 'dark') usePaper.setState({ theme: 'dark' })
+  })
+  void invoke('settings:get', { key: 'ui.showFolderPane' }).then((r) => {
+    if (r.value === '0') usePaper.setState({ showFolderPane: false })
+  })
+  void invoke('settings:get', { key: 'ui.paneWidths' }).then((r) => {
+    if (!r.value) return
+    try {
+      const saved = JSON.parse(r.value) as Partial<Record<PaneId, unknown>>
+      const widths = { ...usePaper.getState().paneWidths }
+      for (const id of ['folders', 'list', 'rail'] as const) {
+        if (typeof saved[id] === 'number') widths[id] = clampPaneWidth(id, saved[id])
+      }
+      usePaper.setState({ paneWidths: widths })
+    } catch {
+      // kaputter Wert: Standardbreiten behalten
+    }
   })
 }

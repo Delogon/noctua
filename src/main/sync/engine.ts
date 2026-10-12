@@ -261,6 +261,12 @@ class SyncEngine {
             kind: 'move',
             payload: { folderId: folder_id, uids, targetSpecialUse: '\\Inbox' }
           }
+        } else if (action === 'spam') {
+          db.prepare(`DELETE FROM messages WHERE id IN (${idPlaceholders})`).run(...ids)
+          op = {
+            kind: 'move',
+            payload: { folderId: folder_id, uids, targetSpecialUse: '\\Junk' }
+          }
         } else if (action === 'delete') {
           db.prepare(`DELETE FROM messages WHERE id IN (${idPlaceholders})`).run(...ids)
           op = {

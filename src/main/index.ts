@@ -27,6 +27,7 @@ import { installAppMenu } from './menu'
 import { cleanupForwardTasksWithoutRequest } from './db/repos/tasks'
 import { reindexHtmlOnlyMessages } from './mail/ingest'
 import { isDev } from './dev-mode'
+import { trafficLightPosition } from './window-chrome'
 import {
   APP_CSP,
   isPermissionAllowed,
@@ -70,9 +71,9 @@ function createWindow(): BrowserWindow {
     title: productName(),
     backgroundColor: '#F4F1EA',
     titleBarStyle: 'hiddenInset',
-    // Traffic lights vertically centered on the masthead wordmark: its box
-    // spans 18–42px (center 30), the buttons are 12px tall → top at 24.
-    trafficLightPosition: { x: 16, y: 24 },
+    // Start mit der Letterpress-Lage; der Renderer meldet ein anderes Layout
+    // über app:setWindowChrome (window-chrome.ts erklärt die Werte).
+    trafficLightPosition: trafficLightPosition('letterpress'),
     ...(process.platform !== 'darwin' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

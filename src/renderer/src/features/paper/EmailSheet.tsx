@@ -585,11 +585,20 @@ export function EmailSheet(): React.JSX.Element {
   const t = useT()
   const lang = useI18n((s) => s.lang)
   const queryClient = useQueryClient()
-  const { selThreadKey, filter, comp, setComp, resetComp, toastNow, setSelThreadKey, mbox } =
-    usePaper()
+  const {
+    selThreadKey,
+    filter,
+    comp,
+    setComp,
+    resetComp,
+    toastNow,
+    setSelThreadKey,
+    mbox,
+    folderId
+  } = usePaper()
   const overrideMenuOpen = useUiStore((s) => s.overrideMenuOpen)
   const setOverrideMenuOpen = useUiStore((s) => s.setOverrideMenuOpen)
-  const threads = useThreads(filter, mbox)
+  const threads = useThreads(filter, mbox, folderId)
   const accounts = useAccounts()
   const beginSend = useSendState((st) => st.begin)
 
@@ -1250,6 +1259,31 @@ export function EmailSheet(): React.JSX.Element {
     })
   }, [threadKey, messages.data, setSelThreadKey, toastNow, t, queryClient])
 
+  // Classic-Befehlsleiste: Löschen (überall) und Als Spam melden (nur Eingang/Ordner).
+  // Optimistisch wie Ablegen — die Liste springt zum Nachbar-Thread.
+  const removeThread = useCallback(
+    (action: 'delete' | 'spam'): void => {
+      if (!threadKey || !messages.data) return
+      if (action === 'spam' && usePaper.getState().mbox !== 'inbox') return
+      const rows = (threads.data ?? []).filter(
+        (r) => !usePaper.getState().hiddenThreads.has(r.threadKey)
+      )
+      const i = rows.findIndex((r) => r.threadKey === threadKey)
+      const next = rows[i + 1] ?? rows[i - 1] ?? null
+      void invoke('messages:action', {
+        messageIds: messages.data.map((m) => m.id),
+        action
+      }).then(() => {
+        toastNow(t(action === 'delete' ? 'toastDeleted' : 'toastJunked'))
+        void queryClient.invalidateQueries({ queryKey: ['threads'] })
+        void queryClient.invalidateQueries({ queryKey: ['mboxCounts'] })
+      })
+      setSelThreadKey(next && next.threadKey !== threadKey ? next.threadKey : null)
+      if (usePaper.getState().comp.threadKey === threadKey) resetComp()
+    },
+    [threadKey, messages.data, threads.data, setSelThreadKey, resetComp, toastNow, t, queryClient]
+  )
+
   // Keymap-Aktionen (Custom-Events aus keymap.ts)
   useEffect(() => {
     const onAction = (e: Event): void => {
@@ -1269,6 +1303,10 @@ export function EmailSheet(): React.JSX.Element {
         if (listItem?.aiSummary)
           toast.info(t('toastOwlGist', { gist: listItem.aiSummary }), { owl: true })
         else toastNow(t('toastNoQuestion'))
+      } else if (action === 'delete') removeThread('delete')
+      else if (action === 'spam') removeThread('spam')
+      else if (action === 'notSpam') {
+        if (usePaper.getState().mbox === 'spam') notSpam()
       } else if (action === 'undo') undoArchive()
       else if (action === 'taskAccept') decideTask(true)
       else if (action === 'taskDismiss') decideTask(false)
@@ -1288,6 +1326,8 @@ export function EmailSheet(): React.JSX.Element {
     startDictation,
     sendDraft,
     archive,
+    removeThread,
+    notSpam,
     manualReply,
     replyAllReply,
     redraft,

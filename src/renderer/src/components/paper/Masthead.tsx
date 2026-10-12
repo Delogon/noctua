@@ -5,6 +5,7 @@ import { useMboxCounts } from '@renderer/queries/threads'
 import { useFollowups } from '@renderer/queries/followups'
 import { useTasks } from '@renderer/queries/tasks'
 import { useLocalOnly } from '@renderer/queries/intel'
+import { ThemeToggle } from './ThemeToggle'
 
 function NavItem({
   label,
@@ -176,6 +177,7 @@ export function Masthead(): React.JSX.Element {
             onClick={toggleRail}
             label={t('toggleRailLabel')}
           />
+          <ThemeToggle className="masthead-theme-toggle" />
         </span>
       </div>
     </div>

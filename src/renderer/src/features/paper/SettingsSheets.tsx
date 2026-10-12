@@ -20,7 +20,8 @@ import {
   TaskProviderPicker,
   DecisionCard
 } from '@renderer/features/settings/AiProvidersSection'
-import { usePaper } from '@renderer/stores/paper'
+import { usePaper, type PaperLayout } from '@renderer/stores/paper'
+import { PANE_LIMITS } from '@renderer/features/paper/pane-layout'
 import { rowTime, useI18n, useT } from '@renderer/lib/i18n'
 import { useStyleMeta, useStyleProfile } from '@renderer/features/paper/useVoiceTag'
 import {
@@ -1040,7 +1041,7 @@ function PrivacyToggle({
           <span
             className="toggle-dot"
             style={{
-              background: on ? '#F4F1EA' : 'var(--ink)',
+              background: on ? 'var(--paper)' : 'var(--ink)',
               marginLeft: on ? 12 : 0
             }}
           />
@@ -1298,7 +1299,10 @@ function VoiceCard({ account }: { account: AccountSummary }): React.JSX.Element 
           >
             <span
               className="toggle-dot"
-              style={{ background: learn ? '#F4F1EA' : 'var(--ink)', marginLeft: learn ? 12 : 0 }}
+              style={{
+                background: learn ? 'var(--paper)' : 'var(--ink)',
+                marginLeft: learn ? 12 : 0
+              }}
             />
           </span>
           <span style={{ font: '400 9px var(--mono)', color: 'var(--muted)' }}>
@@ -2031,7 +2035,7 @@ function TasksAutoCard(): React.JSX.Element {
           <span className="toggle-track" style={{ background: on ? 'var(--ink)' : 'transparent' }}>
             <span
               className="toggle-dot"
-              style={{ background: on ? '#F4F1EA' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
+              style={{ background: on ? 'var(--paper)' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
             />
           </span>
           <span style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}>
@@ -2043,5 +2047,112 @@ function TasksAutoCard(): React.JSX.Element {
         </span>
       </div>
     </>
+  )
+}
+
+/** Mini-Vorschau eines Layouts für die Auswahlkarte (rein dekorativ). */
+function LayoutPreview({ classic }: { classic: boolean }): React.JSX.Element {
+  return (
+    <div className="layout-preview" data-classic={classic} aria-hidden="true">
+      <div className="layout-preview__bar" />
+      <div className="layout-preview__body">
+        {classic && <div className="layout-preview__folders" />}
+        <div className="layout-preview__list" />
+        <div className="layout-preview__sheet" />
+        {!classic && <div className="layout-preview__rail" />}
+      </div>
+    </div>
+  )
+}
+
+/** Einstellungen › Darstellung: Layout-Wahl und Ordneransicht. */
+export function AppearanceSheet(): React.JSX.Element {
+  const t = useT()
+  const layout = usePaper((s) => s.layout)
+  const setLayout = usePaper((s) => s.setLayout)
+  const showFolders = usePaper((s) => s.showFolders)
+  const setShowFolders = usePaper((s) => s.setShowFolders)
+  const theme = usePaper((s) => s.theme)
+  const setTheme = usePaper((s) => s.setTheme)
+  const resetPaneWidths = (): void => {
+    const { setPaneWidth } = usePaper.getState()
+    for (const id of ['folders', 'list', 'rail'] as const) {
+      setPaneWidth(id, PANE_LIMITS[id].default, id === 'rail')
+    }
+  }
+  const options: Array<{ id: PaperLayout; name: string; desc: string }> = [
+    { id: 'letterpress', name: t('layoutLetterpress'), desc: t('layoutLetterpressDesc') },
+    { id: 'classic', name: t('layoutClassic'), desc: t('layoutClassicDesc') }
+  ]
+  return (
+    <SheetShell title={t('appearanceHead')} sub={t('appearanceSub')}>
+      <div className="mlabel" style={{ marginTop: 22, color: 'var(--muted)' }}>
+        {t('layoutHead')}
+      </div>
+      <div className="layout-options" role="radiogroup" aria-label={t('layoutHead')}>
+        {options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={layout === o.id}
+            className="layout-option"
+            onClick={() => setLayout(o.id)}
+          >
+            <LayoutPreview classic={o.id === 'classic'} />
+            <span className="layout-option__copy">
+              <strong>{o.name}</strong>
+              <small>{o.desc}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
+        {t('themeHead')}
+      </div>
+      <div className="appearance-segment" role="radiogroup" aria-label={t('themeHead')}>
+        {(['light', 'dark'] as const).map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={theme === id}
+            onClick={() => setTheme(id)}
+          >
+            {t(id === 'light' ? 'themeLight' : 'themeDark')}
+          </button>
+        ))}
+      </div>
+      <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
+        {t('panesHead')}
+      </div>
+      <div className="appearance-note" style={{ alignItems: 'center' }}>
+        <span style={{ flex: 1 }}>{t('panesHint')}</span>
+        <button type="button" className="appearance-reset" onClick={resetPaneWidths}>
+          {t('panesReset')}
+        </button>
+      </div>
+      <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
+        {t('mailboxHead')}
+      </div>
+      <label className="appearance-check" htmlFor="appearance-show-folders">
+        <input
+          id="appearance-show-folders"
+          type="checkbox"
+          checked={showFolders}
+          onChange={(e) => setShowFolders(e.target.checked)}
+        />
+        <span>
+          <strong>{t('showFoldersLabel')}</strong>
+          <small>{t('showFoldersHint')}</small>
+        </span>
+      </label>
+      <div className="appearance-note">
+        <span className="mlabel" style={{ color: 'var(--ac)' }}>
+          {t('junkAlways')}
+        </span>
+        <span>{t('junkAlwaysNote')}</span>
+      </div>
+    </SheetShell>
   )
 }

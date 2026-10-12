@@ -38,6 +38,18 @@ export const aiCategorySchema = z.enum([
   'other'
 ])
 
+/** Ein Ordner der Ordneransicht (nur voll synchronisierte Ordner). */
+export const folderListItemSchema = z.object({
+  id: z.number(),
+  accountId: z.number(),
+  path: z.string(),
+  name: z.string(),
+  delimiter: z.string().nullable(),
+  role: z.enum(['inbox', 'sent', 'drafts', 'archive', 'junk', 'trash', 'other']),
+  threadCount: z.number(),
+  unreadCount: z.number()
+})
+
 export const threadListItemSchema = z.object({
   threadKey: z.string(),
   accountId: z.number(),
@@ -229,7 +241,9 @@ export const messageActionSchema = z.enum([
   'archive',
   'delete',
   // Spam zurück in den Eingang (Ordner-Filter M31)
-  'notSpam'
+  'notSpam',
+  // Als Spam melden: in den Junk-Ordner verschieben (Classic-Befehlsleiste)
+  'spam'
 ])
 
 export const taskItemSchema = z.object({
@@ -280,6 +294,7 @@ export type NetworkConnection = z.infer<typeof networkConnectionSchema>
 export type AccountSummary = z.infer<typeof accountSummarySchema>
 export type DraftItem = z.infer<typeof draftItemSchema>
 export type ThreadListItem = z.infer<typeof threadListItemSchema>
+export type FolderListItem = z.infer<typeof folderListItemSchema>
 export type SemanticSearchSignal = z.infer<typeof semanticSearchSignalSchema>
 export type SemanticSearchHit = z.infer<typeof semanticSearchHitSchema>
 export type SemanticSearchIndex = z.infer<typeof semanticSearchIndexSchema>

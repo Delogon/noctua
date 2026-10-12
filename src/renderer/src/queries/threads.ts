@@ -18,6 +18,7 @@ export function useThreadInvalidation(): void {
       onPush('messages:changed', ({ threadKeys }) => {
         void queryClient.invalidateQueries({ queryKey: ['threads'] })
         void queryClient.invalidateQueries({ queryKey: ['mboxCounts'] })
+        void queryClient.invalidateQueries({ queryKey: ['folders'] })
         for (const key of threadKeys) {
           void queryClient.invalidateQueries({ queryKey: ['thread', key] })
         }
@@ -37,11 +38,18 @@ export function useThreadInvalidation(): void {
 
 export function useThreads(
   accountId: number | null,
-  mbox: 'inbox' | 'sent' | 'spam'
+  mbox: 'inbox' | 'sent' | 'spam',
+  folderId: number | null = null
 ): UseQueryResult<InvokeOutput<'threads:list'>['threads']> {
   return useQuery({
-    queryKey: ['threads', accountId, mbox],
-    queryFn: () => invoke('threads:list', { limit: 300, accountId: accountId ?? undefined, mbox }),
+    queryKey: ['threads', accountId, mbox, folderId],
+    queryFn: () =>
+      invoke('threads:list', {
+        limit: 300,
+        accountId: accountId ?? undefined,
+        mbox,
+        folderId: folderId ?? undefined
+      }),
     select: (data) => data.threads,
     staleTime: 5_000
   })
@@ -78,5 +86,18 @@ export function useMboxCounts(
     queryKey: ['mboxCounts', accountId],
     queryFn: () => invoke('threads:mboxCounts', { accountId: accountId ?? undefined }),
     staleTime: 10_000
+  })
+}
+
+/** Ordnerbaum aller Konten (nur voll synchronisierte Ordner). */
+export function useFolders(
+  enabled = true
+): UseQueryResult<InvokeOutput<'folders:list'>['folders']> {
+  return useQuery({
+    queryKey: ['folders'],
+    queryFn: () => invoke('folders:list', undefined),
+    select: (data) => data.folders,
+    staleTime: 10_000,
+    enabled
   })
 }

@@ -32,7 +32,7 @@ function Toggle({
       <span className="toggle-track" style={{ background: on ? 'var(--ink)' : 'transparent' }}>
         <span
           className="toggle-dot"
-          style={{ background: on ? '#F4F1EA' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
+          style={{ background: on ? 'var(--paper)' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
         />
       </span>
     </button>

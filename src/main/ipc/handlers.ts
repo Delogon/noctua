@@ -1,10 +1,17 @@
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
+import { trafficLightPosition } from '../window-chrome'
 import { ImapFlow } from 'imapflow'
 import type { InvokeOutput, IpcHandlers } from '@shared/ipc-contract'
 import type { AccountSummary } from '@shared/types'
 import { ACCOUNT_COLORS, PASTEL_COLORS } from '@shared/types'
 import { getDb, getSetting, setSetting } from '../db'
-import { getThreadMessages, imagesAllowKey, listThreads, mboxCounts } from '../db/repos/threads'
+import {
+  getThreadMessages,
+  imagesAllowKey,
+  listFolders,
+  listThreads,
+  mboxCounts
+} from '../db/repos/threads'
 import { getInlineImages, saveAttachment } from '../mail/attachments'
 import { listTaskLists, setTasksSyncCalendar, targetCalendar } from '../tasks/caldav-sync'
 import { countOpenTasks, decideSuggestion, listTasks, updateTaskStatus } from '../db/repos/tasks'
@@ -206,6 +213,15 @@ export const handlers: IpcHandlers = {
   }),
 
   'app:openExternal': ({ url }) => ({ ok: openExternalSafe(url) }),
+
+  'app:setWindowChrome': ({ layout }) => {
+    if (process.platform === 'darwin') {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.setWindowButtonPosition(trafficLightPosition(layout))
+      }
+    }
+    return { ok: true }
+  },
 
   // Allowlist hier nochmals erzwungen (nicht nur im zod-Schema): OAuth-Client-
   // Konfiguration und fremde Secrets bleiben für den Renderer unerreichbar.
@@ -576,9 +592,11 @@ export const handlers: IpcHandlers = {
     return { ok: true }
   },
 
-  'threads:list': ({ limit, accountId, mbox }) => ({
-    threads: listThreads(getDb(), limit, accountId, mbox)
+  'threads:list': ({ limit, accountId, mbox, folderId }) => ({
+    threads: listThreads(getDb(), limit, accountId, mbox, folderId)
   }),
+
+  'folders:list': () => ({ folders: listFolders(getDb()) }),
 
   'threads:mboxCounts': ({ accountId }) => mboxCounts(getDb(), accountId),
 
