@@ -17,6 +17,7 @@ import { toast } from '@renderer/stores/toast'
 import { Masthead } from '@renderer/components/paper/Masthead'
 import {
   ClassicAppRail,
+  ClassicCommandBar,
   ClassicFolderPane,
   ClassicTopBar
 } from '@renderer/components/paper/ClassicChrome'
@@ -59,9 +60,20 @@ function PanelGate(): React.JSX.Element {
 
 function CenterSheet(): React.JSX.Element {
   const { view, setSel } = usePaper()
+  const classic = usePaper((s) => s.layout === 'classic')
   return (
     <div className="flex min-w-0 flex-1 overflow-hidden" style={{ padding: '18px 20px' }}>
-      {view === 'inbox' && <EmailSheet />}
+      {view === 'inbox' &&
+        (classic ? (
+          <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+            <ClassicCommandBar />
+            <div className="flex min-h-0 flex-1">
+              <EmailSheet />
+            </div>
+          </div>
+        ) : (
+          <EmailSheet />
+        ))}
       {view === 'compose' && <ComposeSheet />}
       {view === 'waiting' && <WaitingSheet />}
       {view === 'tasks' && <TaskSheet />}

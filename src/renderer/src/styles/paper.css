@@ -5229,3 +5229,54 @@ kbd,
   text-overflow: ellipsis;
   font: 600 15px var(--serif);
 }
+
+/* Classic-Befehlsleiste über der E-Mail */
+.classic-cmdbar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px !important;
+  background: var(--sheet);
+}
+
+.classic-cmdbar__item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px !important;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: 400 13px var(--serif);
+}
+
+.classic-cmdbar__item .classic-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--classic-accent);
+}
+
+.classic-cmdbar__item:hover:not(:disabled) {
+  background: var(--highlight);
+}
+
+.classic-cmdbar__item:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.classic-cmdbar__item:disabled .classic-icon {
+  color: var(--faint);
+}
+
+.classic-cmdbar__item:focus-visible {
+  outline: 2px solid var(--classic-accent);
+  outline-offset: 1px;
+}

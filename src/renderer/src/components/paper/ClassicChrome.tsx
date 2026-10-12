@@ -5,6 +5,7 @@ import type { StringKey } from '@renderer/i18n/strings'
 import { useFollowups } from '@renderer/queries/followups'
 import { useTasks } from '@renderer/queries/tasks'
 import { useLocalOnly } from '@renderer/queries/intel'
+import { useThreads } from '@renderer/queries/threads'
 import { FolderTree } from '@renderer/features/paper/FolderTree'
 
 /**
@@ -159,6 +160,73 @@ export function ClassicFolderPane(): React.JSX.Element {
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: '0 8px 8px' }}>
         <FolderTree showUserFolders={showFolders} />
       </div>
+    </div>
+  )
+}
+
+const CMD_ICONS = {
+  reply: 'M6.5 4 2.5 8l4 4 M2.5 8h7a4 4 0 0 1 4 4v1',
+  replyAll: 'M8.5 4 4.5 8l4 4 M5 4 1 8l4 4 M4.5 8h6a4 4 0 0 1 4 4v1',
+  dictate: 'M8 2a2 2 0 0 1 2 2v4a2 2 0 0 1-4 0V4a2 2 0 0 1 2-2z M4 7.5a4 4 0 0 0 8 0 M8 11.5V14',
+  archive: 'M2 3h12v3H2z M3 6v7h10V6 M6.5 8.5h3',
+  delete: 'M3 4.5h10 M6.5 4.5V3h3v1.5 M4.5 4.5l.7 9h5.6l.7-9',
+  junk: 'M8 2 14 13H2z M8 6.5v3 M8 11.2v.1',
+  notJunk: 'M2.5 8.5 6 12l7.5-8'
+} as const
+
+type CmdAction = 'reply' | 'replyAll' | 'dictate' | 'file' | 'delete' | 'spam' | 'notSpam'
+
+/**
+ * Befehlsleiste über der geöffneten E-Mail (nur Classic) — Outlooks
+ * Menüband in klein. Löst dieselben paper:mail-Aktionen aus wie die Tasten,
+ * damit EmailSheet die einzige Stelle bleibt, die Threads verändert.
+ */
+export function ClassicCommandBar(): React.JSX.Element {
+  const t = useT()
+  const { filter, mbox, folderId, hiddenThreads } = usePaper()
+  const threads = useThreads(filter, mbox, folderId)
+  const hasThread = (threads.data ?? []).some((r) => !hiddenThreads.has(r.threadKey))
+  const run = (action: CmdAction): void => {
+    window.dispatchEvent(new CustomEvent('paper:mail', { detail: action }))
+  }
+  const items: Array<{
+    action: CmdAction
+    icon: keyof typeof CMD_ICONS
+    label: StringKey
+    kbd?: string
+  }> =
+    mbox === 'inbox'
+      ? [
+          { action: 'reply', icon: 'reply', label: 'barReply', kbd: 'r' },
+          { action: 'replyAll', icon: 'replyAll', label: 'barReplyAll', kbd: 'a' },
+          { action: 'dictate', icon: 'dictate', label: 'barDictate', kbd: '⌘D' },
+          { action: 'file', icon: 'archive', label: 'barArchive', kbd: 'e' },
+          { action: 'delete', icon: 'delete', label: 'barDelete' },
+          { action: 'spam', icon: 'junk', label: 'barJunk' }
+        ]
+      : mbox === 'spam'
+        ? [
+            { action: 'notSpam', icon: 'notJunk', label: 'barNotJunk' },
+            { action: 'delete', icon: 'delete', label: 'barDelete' }
+          ]
+        : [{ action: 'delete', icon: 'delete', label: 'barDelete' }]
+  return (
+    <div className="classic-cmdbar" role="toolbar" aria-label={t('barAria')}>
+      {items.map((item) => (
+        <button
+          key={item.action}
+          type="button"
+          className="classic-cmdbar__item"
+          disabled={!hasThread}
+          title={item.kbd ? `${t(item.label)} (${item.kbd})` : t(item.label)}
+          onClick={() => run(item.action)}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" className="classic-icon">
+            <path d={CMD_ICONS[item.icon]} />
+          </svg>
+          {t(item.label)}
+        </button>
+      ))}
     </div>
   )
 }

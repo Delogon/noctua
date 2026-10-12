@@ -241,7 +241,9 @@ export const messageActionSchema = z.enum([
   'archive',
   'delete',
   // Spam zurück in den Eingang (Ordner-Filter M31)
-  'notSpam'
+  'notSpam',
+  // Als Spam melden: in den Junk-Ordner verschieben (Classic-Befehlsleiste)
+  'spam'
 ])
 
 export const taskItemSchema = z.object({
