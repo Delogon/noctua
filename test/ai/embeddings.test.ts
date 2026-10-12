@@ -1,6 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3-multiple-ciphers'
-import { EMBEDDING_MODEL, EmbeddingIndexer, type EmbeddingIndexStatus } from '@main/ai/embeddings'
+import {
+  EMBEDDING_MODEL,
+  EmbeddingIndexer,
+  PENDING_ROWS_SQL,
+  setEmbedBackend,
+  type EmbeddingIndexStatus
+} from '@main/ai/embeddings'
 import { storeBody, upsertEnvelope } from '@main/mail/ingest'
 import { closeTestDb, createTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 
@@ -91,5 +97,74 @@ describe('EmbeddingIndexer status', () => {
     const indexer = new EmbeddingIndexer()
     indexer.init(db)
     expect(indexer.getStatus()).toMatchObject({ eligible: 1, indexed: 0, pending: 1 })
+  })
+})
+
+describe('EmbeddingIndexer drain', () => {
+  let db: Database.Database
+  afterEach(() => {
+    setEmbedBackend(null)
+    closeTestDb(db)
+  })
+
+  function seed(count: number): number[] {
+    db = createTestDb()
+    const accountId = seedAccount(db)
+    const inbox = seedFolder(db, accountId, '\\Inbox')
+    const junk = seedFolder(db, accountId, '\\Junk')
+    const ids: number[] = []
+    for (let i = 0; i < count; i++) {
+      const message = upsertEnvelope(
+        db,
+        accountId,
+        i === 0 ? junk : inbox,
+        makeEnvelope({ uid: i + 1, messageId: `<drain-${i}@test>`, date: 1_700_000_000_000 + i })
+      )!
+      storeTestBody(db, message.messageId, `Inhalt ${i}`)
+      ids.push(message.messageId)
+    }
+    return ids
+  }
+
+  async function drain(indexer: EmbeddingIndexer): Promise<void> {
+    indexer.kick()
+    await vi.waitFor(() => expect(indexer.getStatus().running).toBe(false))
+  }
+
+  it('embeds pending messages through the backend and marks them indexed', async () => {
+    const ids = seed(20)
+    const calls: number[] = []
+    setEmbedBackend({
+      embed: async (texts) => {
+        calls.push(texts.length)
+        return texts.map(() => new Float32Array(768).fill(0.5))
+      }
+    })
+    const indexer = new EmbeddingIndexer()
+    indexer.init(db)
+    await drain(indexer)
+
+    // 19 searchable messages (the Junk one is skipped) in batches of 8
+    expect(calls).toEqual([8, 8, 3])
+    expect(indexer.getStatus()).toMatchObject({ eligible: 19, indexed: 19, pending: 0 })
+    expect(db.prepare('SELECT count(*) FROM message_vecs').pluck().get()).toBe(19)
+    expect(
+      db.prepare('SELECT count(*) FROM message_vecs WHERE rowid = ?').pluck().get(BigInt(ids[0]))
+    ).toBe(0)
+
+    // Nothing pending: the next kick does not call the backend
+    await drain(indexer)
+    expect(calls).toEqual([8, 8, 3])
+  })
+
+  it('selects pending states from the partial index', () => {
+    seed(3)
+    const plan = (
+      db.prepare(`EXPLAIN QUERY PLAN ${PENDING_ROWS_SQL}`).all(48) as Array<{ detail: string }>
+    )
+      .map((row) => row.detail)
+      .join('\n')
+    expect(plan).toMatch(/SCAN s USING (?:COVERING )?INDEX idx_embed_pending/)
+    expect(plan).not.toMatch(/SCAN m\b/)
   })
 })
