@@ -258,7 +258,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
     expect(await runTriage(db, id)).toBe('done')
     expect(fakeCreate).toHaveBeenCalledTimes(1)
     const call = fakeCreate.mock.calls[0][0] as { messages: Array<{ content: string }> }
-    expect(call.messages[0].content).toContain('Kategorie (work)')
+    expect(call.messages[0].content).toContain('Category (work)')
     expect(call.messages[0].content).toContain('"action_items"')
     const a = annotation(db, id)
     expect(a.summary).toBe('Marie bittet bis Freitag um das Angebot.')
@@ -358,10 +358,10 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
     await runTriage(db, id)
     const state = JSON.parse((systemOne.mock.calls[0] as [string, RequestInit])[1].body as string)
       .state as string
-    expect(state).toContain('Sicherheits-Prüfung')
+    expect(state).toContain('Security check')
     expect(state).toContain('paypal.com')
-    expect(state).toContain('Antworten gehen an other.io')
-    expect(state).toContain('1 Link')
+    expect(state).toContain('Replies go to other.io')
+    expect(state).toContain('1 link')
     const p = getMailSecurity(db, id)
     expect(p?.phishing).toMatchObject({ ai: 1.8, level: 'high' })
     expect(p?.model).toBe('clef-flash')
@@ -394,7 +394,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
     const body = JSON.parse((systemOne.mock.calls[0] as [string, RequestInit])[1].body as string)
     expect(Object.keys(body.questions)).toEqual(['phishing', 'spam'])
     expect(body.state).toContain('<<<BEGIN MAIL (UNTRUSTED DATA)>>>')
-    expect(body.state).toContain('Ersatzzeichen')
+    expect(body.state).toContain('look-alike characters')
     const report = getMailSecurity(db, id)!
     expect(report.phishing).toMatchObject({ ai: 1.5, level: 'high' })
     expect(report.canCheck).toBe(false)

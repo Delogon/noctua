@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getSetting, setSetting } from '../db'
 import { resolveTask } from './providers/registry'
 import { logUsage } from './budget'
+import { outputLanguageName } from './output-language'
 
 const STYLE_KEY = 'ai.styleProfile'
 
@@ -103,8 +104,9 @@ export async function refreshStyleProfile(
     messages: [
       {
         role: 'system',
-        content: `Analysiere den Schreibstil dieser gesendeten E-Mails. Antworte NUR mit JSON:
-{"languages": ["de", …], "formality": "wann duzt/siezt die Person (kurz)", "greetings": ["typische Anreden"], "closings": ["typische Grußformeln"], "style_notes": ["knappe Stil-Merkmale: Satzlänge, Ton, Emojis, Eigenheiten"]}`
+        content: `Analyse the writing style of these sent emails. Reply ONLY with JSON:
+{"languages": ["de", …], "formality": "when the person uses informal vs. formal address, e.g. du/Sie (short)", "greetings": ["typical salutations, verbatim"], "closings": ["typical sign-offs, verbatim"], "style_notes": ["short style traits: sentence length, tone, emojis, quirks"]}
+Write formality and style_notes in ${outputLanguageName()}; copy greetings and closings verbatim from the emails.`
       },
       { role: 'user', content: corpus }
     ],

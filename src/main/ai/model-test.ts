@@ -7,12 +7,12 @@ import { getClient, getProfile } from './providers/registry'
 // besteht ein Modell den Test, kann es auch den Posteingang sortieren.
 
 const TEST_SYSTEM =
-  'Du sortierst E-Mails. Antworte AUSSCHLIESSLICH mit einem JSON-Objekt der Form ' +
-  '{"category":"work|personal|newsletter|other","priority":1-5} — kein weiterer Text.'
+  'You sort emails. Reply ONLY with a JSON object of the form ' +
+  '{"category":"work|personal|newsletter|other","priority":1-5} — no other text.'
 
 const TEST_MAIL =
-  'Von: anna@beispiel.de\nBetreff: Angebot bis Freitag\n\n' +
-  'Hallo, kannst du mir bis Freitag das überarbeitete Angebot schicken? Danke!'
+  'From: anna@example.org\nSubject: Quote by Friday\n\n' +
+  'Hi, could you send me the revised quote by Friday? Thanks!'
 
 export interface ModelTestResult {
   ok: boolean

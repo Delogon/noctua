@@ -118,7 +118,7 @@ export function loadThreatInput(
 /** Signal-Zeilen als Block für den state-Text des Entscheidungsmodells. */
 export function signalStateBlock(signals: MailSignals): string {
   return signals.lines.length > 0
-    ? `\nSicherheits-Prüfung (lokal, vor der Analyse berechnet):\n${signals.lines.map((l) => `- ${sanitizeUntrustedLine(l, 240)}`).join('\n')}`
+    ? `\nSecurity check (computed locally before the analysis):\n${signals.lines.map((l) => `- ${sanitizeUntrustedLine(l, 240)}`).join('\n')}`
     : ''
 }
 
@@ -198,14 +198,14 @@ export async function runThreatCheck(
   const state = [
     DECISION_STATE_NOTE,
     '',
-    `Von: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unbekannt', 200)}>`,
-    `Betreff: ${sanitizeUntrustedLine(row.subject, 300) || '(kein Betreff)'}`,
+    `From: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unknown', 200)}>`,
+    `Subject: ${sanitizeUntrustedLine(row.subject, 300) || '(no subject)'}`,
     input.knownSender
-      ? 'Signale: Der Empfänger hat diesem Absender schon geschrieben (bekannter Kontakt)'
+      ? 'Signals: The recipient has written to this sender before (known contact)'
       : null,
     '',
-    'Inhalt:',
-    wrapUntrusted('MAIL', body || '(kein Textinhalt)'),
+    'Content:',
+    wrapUntrusted('MAIL', body || '(no text content)'),
     signalStateBlock(signals)
   ]
     .filter((line) => line !== null)

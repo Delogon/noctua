@@ -110,11 +110,11 @@ async function expandQuery(
     messages: [
       {
         role: 'system',
-        content: `${currentDateLine()} Erzeuge Suchbegriffe für die Suche über ein E-Mail-Postfach. Namen, Firmen, Fachbegriffe, deutsche UND englische Varianten. Zeitbezüge ("diesen Monat", "letzte Woche") anhand des heutigen Datums auflösen. Beschreibt die Frage einen Dienst/ein Produkt, ohne ihn zu nennen, rate die wahrscheinlichsten Firmen-/Produktnamen dazu (z. B. "künstliche Stimmen" → ElevenLabs).
+        content: `${currentDateLine()} Generate search terms for searching an email mailbox. Names, companies, technical terms, German AND English variants. Resolve time references ("this month", "last week") using today's date. If the question describes a service or product without naming it, guess the most likely company or product names (e.g. "artificial voices" → ElevenLabs).
 
-Absender in diesem Postfach (nutze passende davon als Suchbegriffe — beschreibt die Frage eine Kategorie wie "meine Bank" oder "mein Hoster", wähle die passenden Absender aus dieser Liste): ${senderInventory(db)}
+Senders in this mailbox (use matching ones as search terms — if the question describes a category such as "my bank" or "my hosting provider", pick the matching senders from this list): ${senderInventory(db)}
 
-Antworte NUR mit JSON: {"keywords": ["…"]}`
+Reply ONLY with JSON: {"keywords": ["…"]}`
       },
       { role: 'user', content: question }
     ],
@@ -238,7 +238,7 @@ export function loadThreadContexts(db: Database.Database, threadKeys: string[]):
         // mehr als das Datum, und UTC würde abends das Datum verschieben.
         const when = m.date ? localStamp(m.date) : '?'
         const from = sanitizeUntrustedLine(m.from_name ?? m.from_addr ?? '?')
-        return `Von ${from} am ${when}:\n${body}`
+        return `From ${from} on ${when}:\n${body}`
       })
       .join('\n---\n')
     return { threadKey: thread_key, subject: messages[0]?.subject ?? null, context }
@@ -251,14 +251,14 @@ export function loadThreadContexts(db: Database.Database, threadKeys: string[]):
  * Antwort nicht per eingebetteter Anweisung steuern.
  */
 export function formatContextBlock(threads: RetrievedThread[]): string {
-  if (threads.length === 0) return '(keine passenden Mails gefunden)'
+  if (threads.length === 0) return '(no matching emails found)'
   return threads
     .map(
       (t, i) =>
         `[${i + 1}]\n` +
         wrapUntrusted(
           'THREAD',
-          `Betreff: ${sanitizeUntrustedLine(t.subject) || '(ohne Betreff)'}\n${t.context}`
+          `Subject: ${sanitizeUntrustedLine(t.subject) || '(no subject)'}\n${t.context}`
         )
     )
     .join('\n\n')
@@ -339,21 +339,20 @@ async function runChat(
         {
           role: 'system',
           content: `${currentDateLine()}
-Du beantwortest Fragen über das E-Mail-Postfach des Nutzers.
-Zeitbezüge wie „diesen Monat" oder „gestern" beziehen sich auf das heutige Datum.
-Der Kontext enthält thematisch passende UND die zuletzt eingetroffenen Mails
-(mit Datum und Uhrzeit) — Fragen nach neuen/heutigen Mails beantwortest du aus
-diesen Zeitangaben.
-Nutze AUSSCHLIESSLICH den bereitgestellten Mail-Kontext. Verweise auf Quellen mit [n].
-Wenn die Antwort nicht im Kontext steht, sage das ehrlich statt zu raten.
-Antworte knapp und konkret auf Deutsch (Beträge, Daten, Namen nennen).
+You answer questions about the user's email mailbox.
+Time references such as "this month" or "yesterday" refer to today's date.
+The context contains topically matching emails AND the most recently received emails
+(with date and time) — answer questions about new or today's emails from these timestamps.
+Use ONLY the provided email context. Cite sources with [n].
+If the answer is not in the context, say so honestly instead of guessing.
+Answer briefly and concretely in the language of the user's question (state amounts, dates, names).
 
 ${UNTRUSTED_SYSTEM_NOTE}`
         },
         ...input.history.slice(-6),
         {
           role: 'user' as const,
-          content: `Mail-Kontext:\n\n${contextBlock}\n\nFrage: ${input.question}`
+          content: `Email context:\n\n${contextBlock}\n\nQuestion: ${input.question}`
         }
       ],
       temperature: 0.2,

@@ -25,6 +25,7 @@ import {
   stripRedundantSignatureTail,
   type SignatureConfig
 } from '@shared/signature'
+import { outputLanguage } from './output-language'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
@@ -105,16 +106,16 @@ function formalityBlock(
     .map((m) => stripQuoted(bodyText(m as ThreadMessageRow)))
   const form = detectAddressForm([...ownInThread, ...ownSent]) ?? detectAddressForm(foreign)
   if (!form) return ''
-  return `\n\nANREDE-REGEL (hat VORRANG vor dem Stil-Profil und allen anderen Vorgaben): Im Verlauf mit diesem Kontakt gilt ${
+  return `\n\nADDRESS RULE (takes PRIORITY over the style profile and all other instructions): in the conversation with this contact, ${
     form === 'sie'
-      ? 'das förmliche SIE — konsequent siezen (Sie/Ihnen/Ihre), keinesfalls duzen'
-      : 'das DU — konsequent duzen, nicht siezen'
+      ? 'the formal "Sie" applies — consistently use the formal address (Sie/Ihnen/Ihre), never "du"'
+      : 'the informal "du" applies — consistently use "du", never the formal "Sie"'
   }.`
 }
 
 /** Harte Schreibregeln für ALLE Entwürfe (Tims Vorgabe, M30). */
 const BASE_STYLE_RULES =
-  '- Keine Spiegelstriche oder Aufzählungszeichen, keine Gedankenstriche (– oder —) und keine Semikolons: schreibe in vollständigen Sätzen und normalen Absätzen.'
+  '- No bullet points or list markers, no dashes (– or —) and no semicolons: write in complete sentences and normal paragraphs.'
 
 /**
  * Manuelle Stil-Anweisungen (haben Vorrang vor dem gelernten Profil):
@@ -126,7 +127,7 @@ function styleInstructionsBlock(accountId?: number | null): string {
     accountId ? getSetting(`ai.styleInstructions.${accountId}`)?.trim() : null
   ].filter((x): x is string => !!x)
   if (parts.length === 0) return ''
-  return `\n\nVom Nutzer festgelegte Stil-Anweisungen (haben VORRANG vor allem anderen):\n${parts.join('\n')}`
+  return `\n\nStyle instructions set by the user (take PRIORITY over everything else):\n${parts.join('\n')}`
 }
 
 function signatureState(
@@ -241,48 +242,48 @@ async function runDraft(
   })
 
   const profileBlock = profile
-    ? `\n\nSchreibstil-Profil des Nutzers (gelernt aus gesendeten Mails):
-- Sprachen: ${profile.languages.join(', ') || 'unbekannt'}
-- Du/Sie: ${profile.formality || 'unbekannt'}
-- Typische Anreden: ${profile.greetings.join(' | ') || '—'}
-- Typische Grußformeln: ${replySignature.configured ? 'werden durch die separate Signatur abgedeckt und NICHT in den Antworttext geschrieben' : profile.closings.join(' | ') || '—'}
-- Merkmale: ${profile.style_notes.join('; ') || '—'}`
+    ? `\n\nThe user's writing style profile (learned from sent emails):
+- Languages: ${profile.languages.join(', ') || 'unknown'}
+- Informal/formal address (du/Sie): ${profile.formality || 'unknown'}
+- Typical salutations: ${profile.greetings.join(' | ') || '—'}
+- Typical sign-offs: ${replySignature.configured ? 'covered by the separate signature and NOT written into the reply text' : profile.closings.join(' | ') || '—'}
+- Traits: ${profile.style_notes.join('; ') || '—'}`
     : ''
   const contactBlock =
     contactStyle.salutation || (!replySignature.configured && contactStyle.closing)
-      ? `\n\nBei GENAU DIESEM Kontakt schreibt der Nutzer üblicherweise:${
-          contactStyle.salutation ? `\n- Anrede: "${contactStyle.salutation}"` : ''
-        }${!replySignature.configured && contactStyle.closing ? `\n- Gruß: "${contactStyle.closing}"` : ''}
-Verwende exakt dieses Register.`
+      ? `\n\nWith EXACTLY THIS contact the user usually writes:${
+          contactStyle.salutation ? `\n- Salutation: "${contactStyle.salutation}"` : ''
+        }${!replySignature.configured && contactStyle.closing ? `\n- Sign-off: "${contactStyle.closing}"` : ''}
+Use exactly this register.`
       : ''
 
   const systemPrompt = `${currentDateLine()}
-Du entwirfst E-Mail-Antworten für ${account.display_name ?? account.email} <${account.email}>.
+You draft email replies for ${account.display_name ?? account.email} <${account.email}>.
 ${UNTRUSTED_SYSTEM_NOTE}
-Regeln:
-- Antworte in der Sprache der letzten eingehenden Nachricht.
-- Triff den Ton des Nutzers: Stil-Profil und Kontakt-Register unten sind maßgeblich,
-  die Stilbeispiele zeigen ihn in Aktion.
-- Gib NUR den E-Mail-Text aus: keine Betreffzeile, keine Erklärungen, keine Platzhalter wie [Name].
+Rules:
+- Reply in the language of the last incoming message.
+- Match the user's tone: the style profile and contact register below are authoritative,
+  the style examples show it in action.
+- Output ONLY the email text: no subject line, no explanations, no placeholders such as [Name].
 ${
   replySignature.configured
-    ? '- Für dieses Postfach ist eine separate Signatur eingerichtet. Beende direkt nach dem letzten inhaltlichen Satz. Schreibe KEINE Grußformel, KEINEN Namen und KEINE Signatur-, Titel-, Organisations- oder Kontaktzeile.'
-    : '- Beende mit der Grußformel des Nutzers und höchstens seinem Vornamen.'
+    ? '- A separate signature is set up for this mailbox. End right after the last sentence of content. Write NO sign-off, NO name and NO signature, title, organisation or contact line.'
+    : "- End with the user's sign-off and at most their first name."
 }
-- Sei konkret und knapp und erfinde keine Fakten, die nicht im Thread stehen.
+- Be concrete and brief, and do not invent facts that are not in the thread.
 ${BASE_STYLE_RULES}${profileBlock}${contactBlock}${formality}${styleInstructionsBlock(accountId)}${availability ?? ''}${
     examples.length > 0
-      ? `\n\nStilbeispiele des Nutzers (frühere gesendete Mails):\n\n${examples.map((e, i) => `Beispiel ${i + 1}:\n${e}`).join('\n\n')}`
+      ? `\n\nStyle examples from the user (earlier sent emails):\n\n${examples.map((e, i) => `Example ${i + 1}:\n${e}`).join('\n\n')}`
       : ''
   }`
 
-  const userPrompt = `Unterhaltung (älteste zuerst):\n\n${threadContext}\n\nSchreibe eine Antwort auf die letzte Nachricht von ${sanitizeUntrustedLine(lastForeign.from_name ?? lastForeign.from_addr, 120)}.${
-    input.instruction ? `\nAnweisung des Nutzers: ${input.instruction}` : ''
+  const userPrompt = `Conversation (oldest first):\n\n${threadContext}\n\nWrite a reply to the last message from ${sanitizeUntrustedLine(lastForeign.from_name ?? lastForeign.from_addr, 120)}.${
+    input.instruction ? `\nInstruction from the user: ${input.instruction}` : ''
   }${
     input.reviseText?.trim() && input.idea?.trim()
-      ? `\nEs existiert bereits dieser Entwurf des Nutzers:\n---ENTWURF---\n${input.reviseText.trim()}\n---ENDE ENTWURF---\nArbeite die folgenden Änderungswünsche in den Entwurf ein und gib die vollständige überarbeitete Antwort aus. Alles, was von den Wünschen nicht betroffen ist, bleibt wortgleich erhalten:\n${input.idea.trim()}`
+      ? `\nThe user already has this draft:\n---DRAFT---\n${input.reviseText.trim()}\n---END DRAFT---\nApply the following change requests to the draft and output the complete revised reply. Everything the requests do not affect stays word for word:\n${input.idea.trim()}`
       : input.idea?.trim()
-        ? `\nDer Nutzer hat als Grundlage diese Stichpunkte/dieses Diktat geliefert — forme daraus die Antwort:\n${input.idea.trim()}`
+        ? `\nThe user provided these bullet points/this dictation as the basis — turn it into the reply:\n${input.idea.trim()}`
         : ''
   }`
 
@@ -338,7 +339,7 @@ export function createCompositionModeParser(): {
   feed: (delta: string) => ParsedCompositionMode
   flush: () => ParsedCompositionMode
 } {
-  const HEADER = 'MODUS:'
+  const HEADER = 'MODE:'
   let state: 'detect' | 'mode' | 'pass' = 'detect'
   let buffer = ''
 
@@ -364,7 +365,7 @@ export function createCompositionModeParser(): {
       buffer = ''
       state = 'pass'
       return {
-        mode: rawMode === 'DIKTAT' ? 'dictation' : rawMode === 'IDEE' ? 'idea' : null,
+        mode: rawMode === 'DICTATION' ? 'dictation' : rawMode === 'IDEA' ? 'idea' : null,
         text
       }
     }
@@ -385,7 +386,7 @@ export function createCompositionModeParser(): {
         buffer = ''
         state = 'pass'
         return {
-          mode: rawMode === 'DIKTAT' ? 'dictation' : rawMode === 'IDEE' ? 'idea' : null,
+          mode: rawMode === 'DICTATION' ? 'dictation' : rawMode === 'IDEA' ? 'idea' : null,
           text: ''
         }
       }
@@ -407,7 +408,7 @@ export function createSubjectProtocolParser(): {
   feed: (delta: string) => ParsedChunk
   flush: () => ParsedChunk
 } {
-  const HEADER = 'BETREFF:'
+  const HEADER = 'SUBJECT:'
   let state: 'detect' | 'subject' | 'separator' | 'pass' = 'detect'
   let buf = ''
 
@@ -545,22 +546,22 @@ async function runDraftNudge(
   const days = sent.date ? Math.floor((Date.now() - sent.date) / 86_400_000) : 0
 
   const profileBlock = profile
-    ? `\nStil des Nutzers: ${profile.formality || '?'}; typische Grußformeln: ${nudgeSignature.configured ? 'werden durch die separate Signatur abgedeckt und NICHT in den Text geschrieben' : profile.closings.join(' | ') || '—'}; Merkmale: ${profile.style_notes.join('; ') || '—'}`
+    ? `\nUser's style: ${profile.formality || '?'}; typical sign-offs: ${nudgeSignature.configured ? 'covered by the separate signature and NOT written into the text' : profile.closings.join(' | ') || '—'}; traits: ${profile.style_notes.join('; ') || '—'}`
     : ''
   const formality = formalityBlock(db, sent.account_id, account.email, to?.address ?? null, [
     { from_addr: account.email, text_plain: sent.text_plain, html_raw: null }
   ])
   const signatureRule = nudgeSignature.configured
-    ? 'Für dieses Postfach ist eine separate Signatur eingerichtet: beende direkt nach dem letzten inhaltlichen Satz und schreibe KEINE Grußformel, KEINEN Namen und KEINE Signatur-, Titel-, Organisations- oder Kontaktzeile'
-    : 'Grußformel des Nutzers, KEINE Signatur'
+    ? 'a separate signature is set up for this mailbox: end right after the last sentence of content and write NO sign-off, NO name and NO signature, title, organisation or contact line'
+    : "the user's sign-off, NO signature"
   const systemPrompt = `${currentDateLine()}
-Du schreibst einen sehr kurzen, freundlichen Nachfass ("Stups") im Namen von ${account.display_name ?? account.email} <${account.email}>.
-Regeln: höflich, ohne Druck, 2–4 Sätze, Sprache der Original-Mail, ${signatureRule}, keine Betreffzeile, keine Erklärungen.
+You write a very short, friendly follow-up ("nudge") on behalf of ${account.display_name ?? account.email} <${account.email}>.
+Rules: polite, no pressure, 2–4 sentences, the language of the original email, ${signatureRule}, no subject line, no explanations.
 ${BASE_STYLE_RULES}${profileBlock}${formality}${styleInstructionsBlock(sent.account_id)}`
-  const userPrompt = `Vor ${days} Tagen gesendete Mail an ${to?.name ?? to?.address ?? '?'} (Betreff: ${sent.subject ?? '—'}):\n${(sent.text_plain ?? '').slice(0, 1200)}\n\nEs kam keine Antwort. ${
+  const userPrompt = `Email sent ${days} days ago to ${to?.name ?? to?.address ?? '?'} (subject: ${sent.subject ?? '—'}):\n${(sent.text_plain ?? '').slice(0, 1200)}\n\nThere was no reply. ${
     input.idea?.trim()
-      ? `Der Nutzer hat bereits einen Stups-Entwurf bearbeitet bzw. Stichpunkte diktiert — forme daraus den Nachfass und bewahre seinen Wortsinn:\n${input.idea.trim()}`
-      : 'Schreibe den Nachfass.'
+      ? `The user has already edited a nudge draft or dictated bullet points — turn it into the follow-up and keep its meaning:\n${input.idea.trim()}`
+      : 'Write the follow-up.'
   }`
 
   // Mit Signatur wird gepuffert, damit eine trotz Anweisung erzeugte
@@ -659,55 +660,55 @@ async function runDraftNew(
     : { salutation: null, closing: null }
 
   const profileBlock = profile
-    ? `\n\nSchreibstil-Profil des Nutzers (gelernt aus gesendeten Mails):
-- Sprachen: ${profile.languages.join(', ') || 'unbekannt'}
-- Du/Sie: ${profile.formality || 'unbekannt'}
-- Typische Anreden: ${profile.greetings.join(' | ') || '—'}
-- Typische Grußformeln: ${signatureConfigured ? 'werden durch die separate Signatur abgedeckt und NICHT in den Mailtext geschrieben' : profile.closings.join(' | ') || '—'}
-- Merkmale: ${profile.style_notes.join('; ') || '—'}`
+    ? `\n\nThe user's writing style profile (learned from sent emails):
+- Languages: ${profile.languages.join(', ') || 'unknown'}
+- Informal/formal address (du/Sie): ${profile.formality || 'unknown'}
+- Typical salutations: ${profile.greetings.join(' | ') || '—'}
+- Typical sign-offs: ${signatureConfigured ? 'covered by the separate signature and NOT written into the email text' : profile.closings.join(' | ') || '—'}
+- Traits: ${profile.style_notes.join('; ') || '—'}`
     : ''
   const contactBlock =
     contactStyle.salutation || (!signatureConfigured && contactStyle.closing)
-      ? `\n\nBei GENAU DIESEM Kontakt schreibt der Nutzer üblicherweise:${
-          contactStyle.salutation ? `\n- Anrede: "${contactStyle.salutation}"` : ''
-        }${!signatureConfigured && contactStyle.closing ? `\n- Gruß: "${contactStyle.closing}"` : ''}
-Verwende exakt dieses Register.`
+      ? `\n\nWith EXACTLY THIS contact the user usually writes:${
+          contactStyle.salutation ? `\n- Salutation: "${contactStyle.salutation}"` : ''
+        }${!signatureConfigured && contactStyle.closing ? `\n- Sign-off: "${contactStyle.closing}"` : ''}
+Use exactly this register.`
       : ''
 
   const signatureRule = signatureConfigured
-    ? `- SIGNATUR-REGEL MIT HÖCHSTER PRIORITÄT: Für dieses Postfach ist bereits eine separate Signatur eingerichtet. Beende den Mailtext direkt nach dem letzten inhaltlichen Satz. Schreibe KEINE Grußformel, KEINEN Namen, KEINE Initialen, KEINE Rolle/Funktion und KEINE Organisations- oder Kontaktzeile. Entferne solche Schlusszeilen auch dann, wenn sie im Diktat vorkommen oder in Stilbeispielen stehen.`
-    : `- Für dieses Postfach ist keine separate Signatur eingerichtet. Eine kurze Grußformel ist erlaubt.`
+    ? `- SIGNATURE RULE WITH THE HIGHEST PRIORITY: A separate signature is already set up for this mailbox. End the email text right after the last sentence of content. Write NO sign-off, NO name, NO initials, NO role/function and NO organisation or contact line. Remove such closing lines even if they appear in the dictation or in the style examples.`
+    : `- No separate signature is set up for this mailbox. A short sign-off is allowed.`
 
   const needsSubject = !input.subject.trim()
   const formatRule = needsSubject
-    ? `- Ausgabeformat: Erste Zeile exakt \`MODUS: DIKTAT\` oder \`MODUS: IDEE\`. Zweite Zeile exakt \`BETREFF: <prägnanter Betreff, max. 60 Zeichen>\`, dritte Zeile exakt \`---\`, danach NUR der E-Mail-Text.`
-    : `- Ausgabeformat: Erste Zeile exakt \`MODUS: DIKTAT\` oder \`MODUS: IDEE\`, danach direkt NUR der E-Mail-Text ohne Betreffzeile.`
+    ? `- Output format: first line exactly \`MODE: DICTATION\` or \`MODE: IDEA\`. Second line exactly \`SUBJECT: <concise subject in the language of the email, max. 60 characters>\`, third line exactly \`---\`, then ONLY the email text.`
+    : `- Output format: first line exactly \`MODE: DICTATION\` or \`MODE: IDEA\`, then directly ONLY the email text without a subject line.`
 
   const systemPrompt = `${currentDateLine()}
-Du verfasst eine neue E-Mail im Namen von ${account.display_name ?? account.email} <${account.email}>.
-Der Nutzer liefert gesprochenen oder getippten Inhalt. Erkenne selbst, ob er bereits eine fertige Mail diktiert oder nur eine Idee beschrieben hat.
-Regeln:
-- MODUS DIKTAT: Der Inhalt enthält bereits Anrede, zusammenhängenden Mailtext oder möglicherweise einen gesprochenen Schluss und kann grundsätzlich so versendet werden. Bewahre Wortlaut, Fakten, Reihenfolge und Anrede möglichst exakt.${signatureConfigured ? ' Entferne wegen der separaten Signatur jeden gesprochenen oder erzeugten Schlussblock.' : ' Bewahre auch eine vorhandene Grußformel.'} Korrigiere nur Versprecher, Füllwörter, Zeichensetzung und Absätze. Ergänze nichts Inhaltliches.
-- MODUS IDEE: Der Inhalt besteht aus Stichpunkten, einer Beschreibung des gewünschten Inhalts oder einer Aufforderung, eine Mail zu verfassen. Forme daraus eine vollständige Mail.
-- Bei Unsicherheit wähle DIKTAT und verändere so wenig wie möglich.
-- Bei einem weitgehend fertigen Diktat mit einer zusätzlichen Änderungsanweisung wähle DIKTAT, wende die Anweisung an und erhalte den übrigen Text.
-- Schreibe in der Sprache der Idee.
-- Im Modus IDEE triff den Ton des Nutzers anhand von Stil-Profil und Kontakt-Register. Im Modus DIKTAT hat der ausdrücklich diktierte Ton Vorrang.
-- Keine Erklärungen, keine Platzhalter wie [Name].
+You compose a new email on behalf of ${account.display_name ?? account.email} <${account.email}>.
+The user provides spoken or typed content. Decide yourself whether they have already dictated a finished email or only described an idea.
+Rules:
+- MODE DICTATION: the content already contains a salutation, coherent email text or possibly a spoken closing, and could basically be sent as is. Keep the wording, facts, order and salutation as exactly as possible.${signatureConfigured ? ' Because of the separate signature, remove any spoken or generated closing block.' : ' Also keep an existing sign-off.'} Only fix slips of the tongue, filler words, punctuation and paragraphs. Do not add any content.
+- MODE IDEA: the content consists of bullet points, a description of the desired content or a request to write an email. Turn it into a complete email.
+- When unsure, choose DICTATION and change as little as possible.
+- For a largely finished dictation with an additional change request, choose DICTATION, apply the request and keep the rest of the text.
+- Write in the language of the idea.
+- In MODE IDEA, match the user's tone using the style profile and contact register. In MODE DICTATION, the explicitly dictated tone takes priority.
+- No explanations, no placeholders such as [Name].
 ${signatureRule}
-- Erfinde keine Fakten, die nicht in der Idee stehen.
-- Erkenne Schreibanweisungen innerhalb der Idee (z. B. „bitte förmlich“, „maximal fünf Sätze“) als Regie. Befolge sie, aber übernimm sie nicht in den Mailtext.
+- Do not invent facts that are not in the idea.
+- Treat writing instructions inside the idea (e.g. "please formal", "at most five sentences") as directions. Follow them, but do not copy them into the email text.
 ${BASE_STYLE_RULES}
 ${formatRule}${profileBlock}${contactBlock}${styleInstructionsBlock(input.accountId)}${
     examples.length > 0
-      ? `\n\nStilbeispiele des Nutzers (frühere gesendete Mails):\n\n${examples.map((e, i) => `Beispiel ${i + 1}:\n${e}`).join('\n\n')}`
+      ? `\n\nStyle examples from the user (earlier sent emails):\n\n${examples.map((e, i) => `Example ${i + 1}:\n${e}`).join('\n\n')}`
       : ''
   }`
 
-  const userPrompt = `Empfänger: ${input.to.length > 0 ? input.to.join(', ') : 'noch nicht angegeben'}${
-    input.subject.trim() ? `\nBetreff (vorgegeben): ${input.subject.trim()}` : ''
-  }${input.instruction?.trim() ? `\nRegie-Anweisung: ${input.instruction.trim()}` : ''}
-Idee/Diktat des Nutzers:
+  const userPrompt = `Recipients: ${input.to.length > 0 ? input.to.join(', ') : 'not specified yet'}${
+    input.subject.trim() ? `\nSubject (given): ${input.subject.trim()}` : ''
+  }${input.instruction?.trim() ? `\nDirection: ${input.instruction.trim()}` : ''}
+The user's idea/dictation:
 ${input.idea.trim()}`
 
   const modeParser = createCompositionModeParser()
@@ -788,19 +789,24 @@ export async function stylePreview(db: Database.Database, accountId: number): Pr
   const profile = getStyleProfile(accountId)
   const examples = styleExamples(db, accountId, null)
   const profileBlock = profile
-    ? `\n\nSchreibstil-Profil: Sprachen ${profile.languages.join('/')}; ${profile.formality}; Anreden: ${profile.greetings.join(' | ')}; Grußformeln: ${profile.closings.join(' | ')}; Merkmale: ${profile.style_notes.join('; ')}`
+    ? `\n\nWriting style profile: languages ${profile.languages.join('/')}; ${profile.formality}; salutations: ${profile.greetings.join(' | ')}; sign-offs: ${profile.closings.join(' | ')}; traits: ${profile.style_notes.join('; ')}`
     : ''
 
   const systemPrompt = `${currentDateLine()}
-Du entwirfst E-Mail-Antworten für ${account.display_name ?? account.email} <${account.email}>.
-Regeln:
-- Gib NUR den E-Mail-Text aus.
+You draft email replies for ${account.display_name ?? account.email} <${account.email}>.
+Rules:
+- Output ONLY the email text.
 ${BASE_STYLE_RULES}${profileBlock}${styleInstructionsBlock(accountId)}${
     examples.length > 0
-      ? `\n\nStilbeispiele:\n${examples.map((e, i) => `Beispiel ${i + 1}:\n${e}`).join('\n\n')}`
+      ? `\n\nStyle examples:\n${examples.map((e, i) => `Example ${i + 1}:\n${e}`).join('\n\n')}`
       : ''
   }`
-  const userPrompt = `Testnachricht:\n---\nHallo,\nkönntest du mir bis Freitag kurz Rückmeldung geben, ob der Termin am Dienstag um 15 Uhr für dich klappt?\nViele Grüße\nAlex\n---\nSchreibe eine zusagende Antwort darauf.`
+  // Die Testnachricht folgt der App-Sprache, damit die Probe den Stil in dieser Sprache zeigt
+  const sample =
+    outputLanguage() === 'en'
+      ? 'Hi,\ncould you let me know by Friday whether the meeting on Tuesday at 3 pm works for you?\nBest regards\nAlex'
+      : 'Hallo,\nkönntest du mir bis Freitag kurz Rückmeldung geben, ob der Termin am Dienstag um 15 Uhr für dich klappt?\nViele Grüße\nAlex'
+  const userPrompt = `Test message:\n---\n${sample}\n---\nWrite a reply accepting it, in the language of the test message.`
 
   const completion = await client.complete({
     model,

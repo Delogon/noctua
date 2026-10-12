@@ -110,8 +110,8 @@ describe('startDraftNudge — Signatur & Idee', () => {
       'Hallo Heike,\n\nwollte kurz nachhaken, ob du meine Mail gesehen hast.'
     )
     const systemPrompt = fakeCreate.mock.calls[0][0].messages[0].content as string
-    expect(systemPrompt).toContain('KEINE Grußformel')
-    expect(systemPrompt).not.toContain('Grußformel des Nutzers')
+    expect(systemPrompt).toContain('NO sign-off')
+    expect(systemPrompt).not.toContain("the user's sign-off")
   })
 
   it('ohne Signatur: Grußformel des Nutzers bleibt erlaubt und erhalten', async () => {
@@ -123,7 +123,7 @@ describe('startDraftNudge — Signatur & Idee', () => {
     expect(result.error).toBeNull()
     expect(result.text).toBe('Hallo Heike,\n\nkurzer Stups.\n\nViele Grüße\nTim')
     const systemPrompt = fakeCreate.mock.calls[0][0].messages[0].content as string
-    expect(systemPrompt).toContain('Grußformel des Nutzers')
+    expect(systemPrompt).toContain("the user's sign-off")
   })
 
   it('reicht eine Nutzer-Idee (bearbeiteter Stups/Diktat) in den Prompt durch', async () => {
@@ -134,7 +134,7 @@ describe('startDraftNudge — Signatur & Idee', () => {
 
     const userPrompt = fakeCreate.mock.calls[0][0].messages[1].content as string
     expect(userPrompt).toContain('Bitte deutlich dringlicher, Frist Freitag.')
-    expect(userPrompt).not.toContain('Schreibe den Nachfass.')
+    expect(userPrompt).not.toContain('Write the follow-up.')
   })
 
   it('ohne Idee bleibt der klassische Auftrag bestehen', async () => {
@@ -144,6 +144,6 @@ describe('startDraftNudge — Signatur & Idee', () => {
     await collectNudge(db, { messageId })
 
     const userPrompt = fakeCreate.mock.calls[0][0].messages[1].content as string
-    expect(userPrompt).toContain('Schreibe den Nachfass.')
+    expect(userPrompt).toContain('Write the follow-up.')
   })
 })

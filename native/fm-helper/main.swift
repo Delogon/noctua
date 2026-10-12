@@ -12,9 +12,9 @@ import FoundationModels
 
 @Generable
 struct FMActionItem {
-  @Guide(description: "Konkrete Aufgabe für den Empfänger, kurz")
+  @Guide(description: "Concrete task for the recipient, short, in the language the instructions ask for")
   var title: String
-  @Guide(description: "Frist als YYYY-MM-DD, sonst leerer String")
+  @Guide(description: "Deadline as YYYY-MM-DD, otherwise an empty string")
   var due: String
 }
 
@@ -22,10 +22,10 @@ struct FMActionItem {
 struct FMGate {
   @Guide(
     description:
-      "true NUR wenn ein Mensch den Kontoinhaber PERSÖNLICH um etwas bittet, eine echte Frist für IHN existiert oder er erkennbar auf eine persönliche Antwort wartet. false bei Newslettern, Werbung, Benachrichtigungen, Rundmails, Sicherheitshinweisen"
+      "true ONLY if a human asks the account owner PERSONALLY to do something, there is a real deadline for THEM, or the sender is clearly waiting for a personal reply. false for newsletters, advertising, notifications, mass mailings, security notices"
   )
   var isPersonalRequest: Bool
-  @Guide(description: "Begründung in einem kurzen Satz")
+  @Guide(description: "Reason in one short sentence")
   var reason: String
 }
 
@@ -33,20 +33,20 @@ struct FMGate {
 struct FMTriage {
   @Guide(
     description:
-      "Genau eine von: personal, work, newsletter, promotions, notifications, transactional, other"
+      "Exactly one of: personal, work, newsletter, promotions, notifications, transactional, other"
   )
   var category: String
-  @Guide(description: "Priorität als Ganzzahl von 1 (ignorierbar) bis 5 (dringend)")
+  @Guide(description: "Priority as an integer from 1 (ignorable) to 5 (urgent)")
   var priority: Int
-  @Guide(description: "Ein sachlicher Satz auf Deutsch, maximal 140 Zeichen")
+  @Guide(description: "One factual sentence in the language the instructions ask for, at most 140 characters")
   var summary: String
-  @Guide(description: "Aufgaben NUR bei persönlicher Bitte an den Kontoinhaber, sonst leer")
+  @Guide(description: "Tasks ONLY for a personal request to the account owner, otherwise empty")
   var actionItems: [FMActionItem]
-  @Guide(description: "true nur bei echten Menschen mit Antworterwartung")
+  @Guide(description: "true only for real people who expect a reply")
   var needsReply: Bool
-  @Guide(description: "true nur, wenn der Kontoinhaber persönlich gemeint ist")
+  @Guide(description: "true only if the account owner is meant personally")
   var addressedToMe: Bool
-  @Guide(description: "Zuversicht von 0.0 bis 1.0")
+  @Guide(description: "Confidence from 0.0 to 1.0")
   var confidence: Double
 }
 

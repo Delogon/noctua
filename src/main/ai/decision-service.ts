@@ -50,17 +50,17 @@ export interface DecisionTestResult {
 const TEST_QUESTIONS: Questions = {
   invoice: {
     type: 'noul',
-    instructions: 'Ist das eine Rechnung?',
-    criteria: { false: 'Keine Rechnung', true: 'Eine Rechnung' }
+    instructions: 'Is this an invoice?',
+    criteria: { false: 'Not an invoice', true: 'An invoice' }
   },
   urgency: {
     type: 'score',
-    instructions: 'Wie dringend ist diese E-Mail?',
-    criteria: ['Routine: keine Eile', 'Bald: Frist in Sicht', 'Sofort: Frist läuft ab']
+    instructions: 'How urgent is this email?',
+    criteria: ['Routine: no hurry', 'Soon: deadline approaching', 'Immediate: deadline expiring']
   }
 }
 const TEST_STATE =
-  'Betreff: Rechnung Nr. 4711\n\nHallo, anbei die Rechnung über 120 Euro. Bitte überweise den Betrag bis Freitag.'
+  'Subject: Invoice no. 4711\n\nHello, please find attached the invoice for 120 euros. Please transfer the amount by Friday.'
 
 /** Funktions-Test: zwei Mini-Fragen. Wie runModelTest nur gegen lokale Profile bei Local only. */
 export async function runDecisionTest(

@@ -4,14 +4,14 @@ import { currentDateLine, localStamp } from '@main/ai/prompt-date'
 describe('currentDateLine', () => {
   it('nennt Wochentag, lesbares Datum, ISO-Form und Uhrzeit', () => {
     const line = currentDateLine(new Date(2026, 6, 16, 9, 5))
-    expect(line).toBe('Heute ist Donnerstag, 16. Juli 2026 (2026-07-16), 09:05 Uhr.')
+    expect(line).toBe('Today is Thursday, 16 July 2026 (2026-07-16), 09:05.')
   })
 
   it('nutzt lokale Zeit, nicht UTC (Mitternachts-Grenze)', () => {
     // 00:30 lokal am 1. Januar — in UTC wäre das je nach Zone noch der Vortag
     const line = currentDateLine(new Date(2027, 0, 1, 0, 30))
     expect(line).toContain('(2027-01-01)')
-    expect(line).toContain('1. Januar 2027')
+    expect(line).toContain('1 January 2027')
   })
 })
 

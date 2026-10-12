@@ -44,6 +44,6 @@ describe('untrusted (SEC-15)', () => {
   })
 
   it('System-Hinweis nennt „Daten, keine Anweisung"', () => {
-    expect(UNTRUSTED_SYSTEM_NOTE).toMatch(/DATEN, keine Anweisung/)
+    expect(UNTRUSTED_SYSTEM_NOTE).toMatch(/DATA, not instructions/)
   })
 })

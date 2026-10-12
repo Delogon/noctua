@@ -29,6 +29,7 @@ import { createTasksFromTriage, isUserAuthoredMail } from '../db/repos/tasks'
 import { isForwardWithoutRequest, textBeforeForwardedMessage } from '../mail/forwarded'
 import { recipientPlacement, salutationTarget } from './addressee'
 import { localStamp } from './prompt-date'
+import { outputLanguage, outputLanguageName, type OutputLanguage } from './output-language'
 import {
   UNTRUSTED_SYSTEM_NOTE,
   sanitizeUntrusted,
@@ -84,64 +85,62 @@ const triageResultSchema = z.object({
  * Formulierung ist eval-getrieben (scripts/apple-triage-eval) — Änderungen
  * dort nachmessen, nicht nach Gefühl umtexten.
  */
-export const APPLE_GATE_PROMPT = `Du prüfst für einen E-Mail-Client GENAU EINE Frage:
-Bittet in dieser Mail ein einzelner Mensch den im EMPFÄNGER-Block genannten
-Kontoinhaber PERSÖNLICH um etwas, existiert eine echte Frist für IHN
-(zahlen, Formular abgeben, buchen), oder wartet der Absender erkennbar auf
-eine persönliche Antwort des Kontoinhabers (z. B. eine direkte Frage an ihn)?
+export const APPLE_GATE_PROMPT = `You check EXACTLY ONE question for an email client:
+Does a single human in this email ask the account owner named in the RECIPIENT block to do
+something PERSONALLY, is there a real deadline for THEM (pay, submit a form, book), or is the
+sender clearly waiting for a personal reply from the account owner (e.g. a direct question to them)?
 
-NEIN bei: Newslettern, Werbung (auch mit Frist „nur bis Sonntag"),
-Benachrichtigungen von Diensten, Sicherheitshinweisen und Codes, Reports,
-automatischen Erinnerungen, Rundmails mit Gruppenanrede, Mails deren Anrede
-eine andere Person nennt, reinen Infos ohne Bitte.
-Im Zweifel: NEIN.`
+Answer NO for: newsletters, advertising (even with a deadline such as "only until Sunday"),
+service notifications, security notices and codes, reports, automatic reminders, mass mailings
+with a group salutation, emails whose salutation names a different person, and pure information
+without a request.
+When in doubt: NO.`
 
-const SYSTEM_PROMPT = `Du bist der Triage-Klassifikator eines persönlichen E-Mail-Clients.
+function systemPrompt(language: OutputLanguage = outputLanguage()): string {
+  return `You are the triage classifier of a personal email client.
 ${UNTRUSTED_SYSTEM_NOTE}
-Analysiere die E-Mail und antworte AUSSCHLIESSLICH mit einem JSON-Objekt, exakt in dieser Form:
+Analyse the email and reply ONLY with a JSON object, exactly in this form:
 {
   "category": "personal" | "work" | "newsletter" | "promotions" | "notifications" | "transactional" | "other",
   "priority": 1-5,
-  "summary": "Einzeiler auf Deutsch, max. 140 Zeichen, sachlich",
-  "action_items": [{"title": "konkrete Aufgabe für den Empfänger", "due": "YYYY-MM-DD oder null"}],
+  "summary": "one line in ${outputLanguageName(language)}, max. 140 characters, factual",
+  "action_items": [{"title": "concrete task for the recipient, in ${outputLanguageName(language)}", "due": "YYYY-MM-DD or null"}],
   "needs_reply": true|false,
   "addressed_to_me": true|false,
   "confidence": 0.0-1.0
 }
 
-addressed_to_me: true NUR, wenn der im EMPFÄNGER-Block genannte Kontoinhaber
-persönlich gemeint ist (namentlich angesprochen, direkt adressiert oder klar
-Adressat der Bitte). false, wenn Anrede oder Bitte sich an eine andere Person
-richtet (z. B. Anrede mit fremdem Namen, Verteiler-Mail für jemand anderen,
-Mail nur zur Kenntnis).
-action_items NUR, wenn ein Mensch den genannten Kontoinhaber persönlich um
-etwas bittet oder eine echte Frist für IHN existiert (zahlen, antworten,
-buchen, kündigen, vorbereiten). Richtet sich die Anrede oder Bitte an eine
-andere Person, KEINE action_items und needs_reply=false.
-NIEMALS action_items aus: Login-/Anmelde-Benachrichtigungen („neue Anmeldung",
-„Sicherheitswarnung", 2FA-/Verifizierungs-Codes), Passwort-Mails,
-Systembenachrichtigungen, Newslettern, Werbung oder reinen Infos — auch wenn
-der Text Handlungsaufforderungen wie „überprüfe/ändere dein Passwort" enthält;
-solche Standard-Sicherheitshinweise sind KEINE Aufgaben des Nutzers.
-due nur setzen, wenn eine konkrete Frist erkennbar ist (relativ zum Mail-Datum
-in ein absolutes Datum umrechnen), sonst null.
+addressed_to_me: true ONLY if the account owner named in the RECIPIENT block is meant personally
+(addressed by name, addressed directly, or clearly the person the request is for). false if the
+salutation or request is aimed at someone else (e.g. a salutation with another name, a mailing-list
+email meant for someone else, an email sent for information only).
+action_items ONLY if a human asks the named account owner personally to do something, or there is
+a real deadline for THEM (pay, reply, book, cancel, prepare). If the salutation or request is aimed
+at another person: NO action_items and needs_reply=false.
+NEVER create action_items from: sign-in notifications ("new sign-in", "security alert", 2FA or
+verification codes), password emails, system notifications, newsletters, advertising or pure
+information — even if the text contains calls to action such as "check/change your password";
+such standard security notices are NOT tasks for the user.
+Set due only if a concrete deadline is recognisable (convert it to an absolute date relative to the
+email's date), otherwise null.
 
-Kategorien:
-- personal: echte Menschen, private Kommunikation
-- work: berufliche Kommunikation von echten Menschen
-- newsletter: redaktionelle Mailings, Digests
-- promotions: Werbung, Angebote, Marketing — auch Produktankündigungen und
-  Feature-Marketing von Diensten, die der Empfänger bereits nutzt
-- notifications: automatische Benachrichtigungen von Diensten (Social, Tools, Kalender)
-- transactional: Rechnungen, Bestellungen, Versand, Sicherheitscodes, Verträge
-- other: nichts davon
+Categories:
+- personal: real people, private communication
+- work: professional communication from real people
+- newsletter: editorial mailings, digests
+- promotions: advertising, offers, marketing — including product announcements and feature
+  marketing from services the recipient already uses
+- notifications: automatic notifications from services (social, tools, calendar)
+- transactional: invoices, orders, shipping, security codes, contracts
+- other: none of these
 
-Priorität: 5 = dringend/wichtig für den Empfänger (Mensch wartet auf Antwort, harte Frist,
-Sicherheitsvorfall), 4 = Dienst-Warnungen, die bei Ignorieren zu Einschränkungen führen
-(Speicher voll, Zahlung fehlgeschlagen, Konto-Sperrung droht), 3 = normal,
-1 = ignorierbar (Massenwerbung, Smalltalk-Duplikate).
-needs_reply nur bei echten Menschen mit Antworterwartung.
-summary nennt den Kern (wer will was), keine Floskeln.`
+Priority: 5 = urgent/important for the recipient (a human is waiting for a reply, hard deadline,
+security incident), 4 = service warnings that lead to restrictions if ignored (storage full, payment
+failed, account suspension pending), 3 = normal, 1 = ignorable (mass advertising, small-talk
+duplicates).
+needs_reply only for real people who expect a reply.
+summary states the core (who wants what), no filler phrases.`
+}
 
 interface TriageRow {
   id: number
@@ -183,11 +182,11 @@ function buildUserPrompt(
     .get(row.account_id, row.from_addr ?? '') as { cat: string } | undefined
 
   const signals = [
-    row.list_unsubscribe ? 'List-Unsubscribe-Header vorhanden (Massenmail-Signal)' : null,
+    row.list_unsubscribe ? 'List-Unsubscribe header present (bulk mail signal)' : null,
     stats && stats.sent_count > 0
-      ? `Der Empfänger hat diesem Absender schon ${stats.sent_count}× geschrieben (bekannter Kontakt)`
+      ? `The recipient has written to this sender ${stats.sent_count} times before (known contact)`
       : null,
-    previous ? `Frühere Mails dieses Absenders wurden als "${previous.cat}" eingeordnet` : null,
+    previous ? `Earlier emails from this sender were classified as "${previous.cat}"` : null,
     ...extraSignals
   ].filter(Boolean)
 
@@ -196,27 +195,27 @@ function buildUserPrompt(
   const ownerName = row.account_display_name?.trim() || row.account_name?.trim() || null
   const placement = recipientPlacement(row.account_email, row.to_json, row.cc_json)
   const placementLabel = {
-    to: 'steht im An',
-    cc: 'steht nur im CC',
-    absent: 'ist weder in An noch CC (Verteiler-/Bcc-Zustellung)'
+    to: 'is in To',
+    cc: 'is only in CC',
+    absent: 'is neither in To nor CC (mailing list / Bcc delivery)'
   }[placement]
   const salutation = salutationTarget(bodyText)
   const salutationLabel =
     salutation.kind === 'named'
-      ? `nennt namentlich: ${salutation.names.join(', ')}`
+      ? `names: ${salutation.names.join(', ')}`
       : salutation.kind === 'group'
-        ? 'Gruppenanrede (z. B. „Hallo zusammen")'
-        : 'keine erkennbare Anrede'
+        ? 'group salutation (e.g. "Hello everyone")'
+        : 'no recognisable salutation'
 
   return [
-    `Von: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unbekannt', 200)}>`,
-    `Betreff: ${sanitizeUntrustedLine(row.subject, 300) || '(kein Betreff)'}`,
-    `Datum: ${row.date ? localStamp(row.date) : 'unbekannt'}`,
-    `EMPFÄNGER (Kontoinhaber): ${ownerName ? `${ownerName} ` : ''}<${row.account_email ?? 'unbekannt'}>; ${placementLabel}; Anrede der Mail: ${salutationLabel}`,
-    signals.length > 0 ? `Signale: ${signals.join('; ')}` : null,
+    `From: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unknown', 200)}>`,
+    `Subject: ${sanitizeUntrustedLine(row.subject, 300) || '(no subject)'}`,
+    `Date: ${row.date ? localStamp(row.date) : 'unknown'}`,
+    `RECIPIENT (account owner): ${ownerName ? `${ownerName} ` : ''}<${row.account_email ?? 'unknown'}>; ${placementLabel}; salutation of the email: ${salutationLabel}`,
+    signals.length > 0 ? `Signals: ${signals.join('; ')}` : null,
     '',
-    'Inhalt:',
-    wrapUntrusted('MAIL', bodyText || '(kein Textinhalt)')
+    'Content:',
+    wrapUntrusted('MAIL', bodyText || '(no text content)')
   ]
     .filter((line) => line !== null)
     .join('\n')
@@ -321,7 +320,7 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
     const gateOpen = await appleGate(APPLE_GATE_PROMPT, userPrompt)
     let parsed: TriageVerdict
     try {
-      parsed = sanitizeAppleVerdict(await appleTriage(SYSTEM_PROMPT, userPrompt))
+      parsed = sanitizeAppleVerdict(await appleTriage(systemPrompt(), userPrompt))
     } catch (error) {
       if (!(error instanceof AppleGuardrailError)) throw error
       parsed = neutralVerdict(row.subject)
@@ -343,13 +342,13 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
     const result = await client.complete({
       model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt() },
         {
           role: 'user',
           content:
             attempt === 0
               ? userPrompt
-              : `${userPrompt}\n\nDeine letzte Antwort war ungültig (${lastError}). Antworte exakt nach Schema.`
+              : `${userPrompt}\n\nYour last answer was invalid (${lastError}). Reply exactly according to the schema.`
         }
       ],
       json: true,
@@ -449,7 +448,7 @@ async function runHybridTriage(
             content:
               attempt === 0
                 ? userPrompt
-                : `${userPrompt}\n\nDeine letzte Antwort war ungültig (${lastError}). Antworte exakt nach Schema.`
+                : `${userPrompt}\n\nYour last answer was invalid (${lastError}). Reply exactly according to the schema.`
           }
         ],
         json: true,
