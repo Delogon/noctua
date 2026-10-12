@@ -109,9 +109,10 @@ describe('SQL-Profiler und Benchmark', () => {
       expect(c.error, c.name).toBeNull()
       expect(c.runs).toBe(2)
     }
-    // listThreads runs follow-up queries per thread – the benchmark shows that
+    // listThreads builds a page with a fixed number of set-based queries, not per thread
     const list = result.cases.find((c) => c.name === 'threads.list.inbox(300)')!
-    expect(list.statements).toBeGreaterThan(10)
+    expect(list.statements).toBeGreaterThan(0)
+    expect(list.statements).toBeLessThanOrEqual(10)
     expect(db.prepare('SELECT count(*) n FROM ai_jobs').get()).toEqual(jobsBefore)
     expect(db.prepare('SELECT count(*) n FROM contact_stats').get()).toEqual(contactsBefore)
     expect(result.plans.length).toBeGreaterThan(5)
