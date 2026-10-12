@@ -37,7 +37,9 @@ newest thread, search index status, lexical search with a fixed term, AI triage 
 contact-statistics rebuild. Writing operations run inside a `SAVEPOINT` and are rolled back. For every
 statement that ran, it records `EXPLAIN QUERY PLAN` and flags tables read without an index
 (`SCAN x`), full index walks (`SCAN x USING INDEX i`, still O(n)) and temporary B-trees. The "statements" column shows N+1 patterns, for example a list that
-runs 2,500 queries for 300 rows.
+runs 2,500 queries for 300 rows. Statements are attributed per case via an `AsyncLocalStorage`
+context, so SQL that sync or the AI queue runs while an async case (the search) waits is not
+counted toward it.
 
 The benchmark blocks the main process while it runs, on purpose: those queries block it the same way
 in daily use.

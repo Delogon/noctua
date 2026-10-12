@@ -6,7 +6,7 @@ import { searchSemantic, semanticIndexStatus } from '../search'
 import { TRIAGE_DISCOVERY_SQL, TRIAGE_WINDOW_MS } from '../ai/queue'
 import { PROMPT_VERSION } from '../ai/triage'
 import { sqlFingerprint } from './metrics'
-import { setSqlCapture } from './db-profiler'
+import { withSqlCapture } from './db-profiler'
 
 // Benchmark against the real, local database: the operations that stand out with
 // large mailboxes (list, counters, folders, open thread, search, AI discovery,
@@ -141,7 +141,7 @@ export async function runBenchmark(
     const times: number[] = []
     let statements = 0
     let error: string | null = null
-    setSqlCapture((sql, args) => {
+    const capture = (sql: string, args: unknown[]): void => {
       statements += 1
       const fp = sqlFingerprint(sql)
       const entry = captured.get(fp)
@@ -149,33 +149,35 @@ export async function runBenchmark(
       else if (captured.size < MAX_PLANS) {
         captured.set(fp, { sql, args, usedBy: new Set([spec.name]) })
       }
-    })
-    try {
-      for (let i = 0; i < runs; i++) {
-        const t = performance.now()
-        if (spec.write) {
-          // Strictly synchronous: between SAVEPOINT and ROLLBACK no other
-          // task (sync, AI queue) may write – otherwise it would be rolled back too.
-          db.exec('SAVEPOINT noctua_bench')
-          try {
-            spec.run()
-          } finally {
-            times.push(performance.now() - t)
-            db.exec('ROLLBACK TO noctua_bench; RELEASE noctua_bench')
-          }
-        } else {
-          try {
-            await spec.run()
-          } finally {
-            times.push(performance.now() - t)
+    }
+    // Only SQL of this case (and what it awaits) counts, not concurrent sync
+    // or AI-queue statements while an async case waits
+    await withSqlCapture(capture, async () => {
+      try {
+        for (let i = 0; i < runs; i++) {
+          const t = performance.now()
+          if (spec.write) {
+            // Strictly synchronous: between SAVEPOINT and ROLLBACK no other
+            // task (sync, AI queue) may write – otherwise it would be rolled back too.
+            db.exec('SAVEPOINT noctua_bench')
+            try {
+              spec.run()
+            } finally {
+              times.push(performance.now() - t)
+              db.exec('ROLLBACK TO noctua_bench; RELEASE noctua_bench')
+            }
+          } else {
+            try {
+              await spec.run()
+            } finally {
+              times.push(performance.now() - t)
+            }
           }
         }
+      } catch (e) {
+        error = e instanceof Error ? e.message.slice(0, 200) : String(e)
       }
-    } catch (e) {
-      error = e instanceof Error ? e.message.slice(0, 200) : String(e)
-    } finally {
-      setSqlCapture(null)
-    }
+    })
     cases.push({
       name: spec.name,
       runs: times.length,
