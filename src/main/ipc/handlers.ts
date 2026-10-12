@@ -189,7 +189,11 @@ function assertAccountNameAvailable(accountName: string, exceptAccountId?: numbe
 function countThreads(accountId: number): number {
   try {
     const row = getDb()
-      .prepare('SELECT count(DISTINCT thread_key) n FROM messages WHERE account_id = ?')
+      .prepare(
+        `SELECT count(DISTINCT m.thread_key) n FROM folders f
+         CROSS JOIN messages m ON m.folder_id = f.id
+         WHERE f.account_id = ?`
+      )
       .get(accountId) as { n: number }
     return row.n
   } catch {
