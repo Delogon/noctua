@@ -1,8 +1,8 @@
 /**
- * Ordner-Rollen: IMAP SPECIAL-USE ist optional — viele Server (und ältere
- * Exchange-/Dovecot-Setups) liefern Junk, Papierkorb & Co. nur als Namen.
- * Ohne Flag landete ein „Junk-E-Mail"-Ordner sonst als normaler Ordner in
- * der Ansicht. Die Rolle steuert Sync-Modus, Ordnerbaum und Spam-Ausschluss.
+ * Folder roles: IMAP SPECIAL-USE is optional — many servers (and older
+ * Exchange/Dovecot setups) deliver Junk, Trash & co. only as names.
+ * Without a flag a "Junk-E-Mail" folder would otherwise show up as a normal
+ * folder. The role drives sync mode, folder tree and spam exclusion.
  */
 
 export type FolderRole = 'inbox' | 'sent' | 'drafts' | 'archive' | 'junk' | 'trash' | 'other'
@@ -24,7 +24,7 @@ const SPECIAL_USE_BY_ROLE: Partial<Record<FolderRole, string>> = {
   trash: '\\Trash'
 }
 
-/** Bekannte Ordnernamen (kleingeschrieben, letzter Pfadteil) je Rolle. */
+/** Known folder names (lowercase, last path segment) per role. */
 const ROLE_NAMES: Array<[FolderRole, string[]]> = [
   [
     'junk',
@@ -77,14 +77,14 @@ export function folderRole(specialUse: string | null | undefined): FolderRole {
   return (specialUse && ROLE_BY_SPECIAL_USE[specialUse]) || 'other'
 }
 
-/** Letzter Pfadteil — der Anzeigename eines Ordners. */
+/** Last path segment — a folder's display name. */
 export function folderLeaf(path: string, delimiter: string | null | undefined): string {
   if (!delimiter) return path
   const parts = path.split(delimiter)
   return parts[parts.length - 1] || path
 }
 
-/** Rolle allein aus dem Namen; nur für Ordner auf oberster Ebene oder direkt unter INBOX/[Gmail]. */
+/** Role from the name alone; only for top-level folders or directly under INBOX/[Gmail]. */
 export function roleFromName(path: string, delimiter: string | null | undefined): FolderRole {
   const parts = delimiter ? path.split(delimiter) : [path]
   if (parts.length > 2) return 'other'
@@ -100,10 +100,10 @@ export function roleFromName(path: string, delimiter: string | null | undefined)
 }
 
 /**
- * SPECIAL-USE für eine ganze LIST-Antwort ergänzen. Server-Flags gewinnen
- * immer. Junk wird per Name auch dann erkannt, wenn schon ein \Junk-Ordner
- * existiert (Spam lieber einmal zu viel aussortieren); die übrigen Rollen nur,
- * wenn der Server sie gar nicht meldet — sonst gäbe es zwei „Gesendet".
+ * Fill in SPECIAL-USE for a whole LIST response. Server flags always win.
+ * Junk is detected by name even if a \Junk folder already exists (better to
+ * filter spam once too often); the other roles only if the server doesn't
+ * report them at all — otherwise there would be two "Sent".
  */
 export function inferSpecialUses(
   boxes: Array<{ path: string; delimiter?: string | null; specialUse?: string | null }>

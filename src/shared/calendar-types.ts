@@ -1,12 +1,12 @@
 import { z } from 'zod'
 
 /**
- * Gemeinsame Typen/Schemas des Kalenders (Phase 2.1). Zeiten:
- * - `startUtc`/`endUtc`: Millisekunden seit Epoch (UTC) — für Sortierung/Layout.
- * - Ganztägige Einträge tragen zusätzlich Kalendertage `startDay` (inklusiv) und
- *   `endDay` (EXKLUSIV) als 'YYYY-MM-DD'; die UI rendert sie nach diesen Tagen,
- *   nicht nach den UTC-Zeitstempeln.
- * - `CalendarEventTime` ist die editierbare Form (Wandzeit + TZID).
+ * Shared calendar types/schemas (phase 2.1). Times:
+ * - `startUtc`/`endUtc`: milliseconds since epoch (UTC) — for sorting/layout.
+ * - All-day entries additionally carry calendar days `startDay` (inclusive) and
+ *   `endDay` (EXCLUSIVE) as 'YYYY-MM-DD'; the UI renders them by these days,
+ *   not by the UTC timestamps.
+ * - `CalendarEventTime` is the editable form (wall time + TZID).
  */
 
 export const calendarAccountStateSchema = z.enum([
@@ -27,15 +27,15 @@ export const calendarAccountSummarySchema = z.object({
   mailAccountId: z.number().nullable(),
   state: calendarAccountStateSchema,
   lastError: z.string().nullable(),
-  /** Seit wann der Fehlerzustand besteht (ms) */
+  /** Since when the error state has existed (ms) */
   errorSince: z.number().nullable(),
   lastSync: z.number().nullable(),
-  /** Server unterstützt calendar-auto-schedule (RFC 6638) */
+  /** Server supports calendar-auto-schedule (RFC 6638) */
   autoSchedule: z.boolean(),
   calendarCount: z.number(),
-  /** Lokale Änderungen, die noch auf die Übertragung warten */
+  /** Local changes still waiting to be uploaded */
   pendingOps: z.number(),
-  /** Endgültig gescheiterte/verworfene Änderungen */
+  /** Permanently failed/discarded changes */
   deadOps: z.number()
 })
 export type CalendarAccountSummary = z.infer<typeof calendarAccountSummarySchema>
@@ -45,7 +45,7 @@ export const calendarSummarySchema = z.object({
   accountId: z.number(),
   url: z.string(),
   displayName: z.string(),
-  /** #RRGGBB (Nutzerfarbe vor Serverfarbe) oder null */
+  /** #RRGGBB (user color over server color) or null */
   color: z.string().nullable(),
   components: z.array(z.string()),
   readOnly: z.boolean(),
@@ -54,7 +54,7 @@ export const calendarSummarySchema = z.object({
 })
 export type CalendarSummary = z.infer<typeof calendarSummarySchema>
 
-/** Ergebnis von discover (noch nicht gespeichert). */
+/** Result of discover (not saved yet). */
 export const discoveredCalendarSchema = z.object({
   displayName: z.string(),
   color: z.string().nullable(),
@@ -66,10 +66,10 @@ export const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 export const wallDateTimeString = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
 
 /**
- * Editierbare Zeitangabe.
- * - allDay: `start`/`end` = 'YYYY-MM-DD', `end` exklusiv, `tzid` ignoriert (null).
- * - sonst: `start`/`end` = Wandzeit 'YYYY-MM-DDTHH:mm:ss' in `tzid`
- *   (IANA, z. B. 'Europe/Berlin'; 'UTC' → mit Z gespeichert; null → floating).
+ * Editable time specification.
+ * - allDay: `start`/`end` = 'YYYY-MM-DD', `end` exclusive, `tzid` ignored (null).
+ * - otherwise: `start`/`end` = wall time 'YYYY-MM-DDTHH:mm:ss' in `tzid`
+ *   (IANA, e.g. 'Europe/Berlin'; 'UTC' → stored with Z; null → floating).
  */
 export const calendarEventTimeSchema = z.object({
   allDay: z.boolean(),
@@ -82,9 +82,9 @@ export type CalendarEventTime = z.infer<typeof calendarEventTimeSchema>
 export const calendarAlarmSchema = z.object({
   action: z.enum(['DISPLAY', 'AUDIO', 'EMAIL']),
   relativeTo: z.enum(['START', 'END']),
-  /** Sekunden relativ zu START/END; negativ = davor */
+  /** Seconds relative to START/END; negative = before */
   offsetSeconds: z.number().int().min(-31_536_000).max(31_536_000),
-  /** Absoluter Alarm (UTC ms) — ersetzt dann offsetSeconds */
+  /** Absolute alarm (UTC ms) — replaces offsetSeconds in that case */
   absoluteUtc: z.number().nullable(),
   description: z.string().max(1000).nullable()
 })
@@ -107,16 +107,16 @@ export const calendarOrganizerSchema = z.object({
 
 const statusSchema = z.enum(['CONFIRMED', 'TENTATIVE', 'CANCELLED'])
 
-/** Felder, die beim Anlegen/Ändern gesetzt werden können. */
+/** Fields that can be set when creating/editing. */
 export const calendarEventFieldsSchema = z.object({
   summary: z.string().max(1000),
   location: z.string().max(1000).nullable(),
   description: z.string().max(50_000).nullable(),
   time: calendarEventTimeSchema,
-  /** RRULE-Wert ohne Präfix, z. B. 'FREQ=WEEKLY;BYDAY=MO'; null = nicht wiederkehrend */
+  /** RRULE value without prefix, e.g. 'FREQ=WEEKLY;BYDAY=MO'; null = not recurring */
   rrule: z.string().max(500).nullable(),
   status: statusSchema.nullable(),
-  /** OPAQUE = beschäftigt, TRANSPARENT = frei */
+  /** OPAQUE = busy, TRANSPARENT = free */
   transparency: z.enum(['OPAQUE', 'TRANSPARENT']).nullable(),
   alarms: z.array(calendarAlarmSchema).max(20),
   attendees: z.array(calendarAttendeeSchema).max(200),
@@ -129,20 +129,20 @@ export const calendarEventInputSchema = calendarEventFieldsSchema.extend({
 })
 export type CalendarEventInput = z.infer<typeof calendarEventInputSchema>
 
-/** Teiländerung: nicht gesetzte Felder bleiben unverändert. */
+/** Partial update: unset fields stay unchanged. */
 export const calendarEventPatchSchema = calendarEventFieldsSchema.partial()
 export type CalendarEventPatch = z.infer<typeof calendarEventPatchSchema>
 
 export const calendarEditScopeSchema = z.enum(['this', 'following', 'all'])
 export type CalendarEditScope = z.infer<typeof calendarEditScopeSchema>
 
-/** Ein Vorkommen in einer Zeitspanne (Listenansicht). */
+/** One occurrence within a time range (list view). */
 export const calendarInstanceSchema = z.object({
-  /** Stabiler Schlüssel: `${objectId}:${recurrenceId ?? ''}` */
+  /** Stable key: `${objectId}:${recurrenceId ?? ''}` */
   key: z.string(),
   objectId: z.number(),
   calendarId: z.number(),
-  /** Ursprünglicher Start dieses Vorkommens (UTC-ISO bzw. Datum); null = nicht wiederkehrend */
+  /** Original start of this occurrence (UTC ISO or date); null = not recurring */
   recurrenceId: z.string().nullable(),
   startUtc: z.number(),
   endUtc: z.number(),
@@ -153,9 +153,9 @@ export const calendarInstanceSchema = z.object({
   location: z.string().nullable(),
   status: z.string().nullable(),
   recurring: z.boolean(),
-  /** Abweichendes Einzelvorkommen (RECURRENCE-ID) */
+  /** Modified single occurrence (RECURRENCE-ID) */
   isOverride: z.boolean(),
-  /** Lokale Änderung noch nicht auf dem Server */
+  /** Local change not yet on the server */
   pending: z.boolean(),
   readOnly: z.boolean()
 })
@@ -168,7 +168,7 @@ export const calendarEventDetailSchema = z.object({
   etag: z.string().nullable(),
   readOnly: z.boolean(),
   pending: z.boolean(),
-  /** Vorkommen, für das die Felder gelten (null = nicht wiederkehrend/Serie) */
+  /** Occurrence the fields apply to (null = not recurring/series) */
   recurrenceId: z.string().nullable(),
   recurring: z.boolean(),
   isOverride: z.boolean(),
@@ -177,7 +177,7 @@ export const calendarEventDetailSchema = z.object({
   startDay: dateString.nullable(),
   endDay: dateString.nullable(),
   fields: calendarEventFieldsSchema,
-  /** EXDATE-Einträge (UTC-ISO/Datum) der Serie */
+  /** EXDATE entries (UTC ISO/date) of the series */
   exdates: z.array(z.string()),
   sequence: z.number()
 })

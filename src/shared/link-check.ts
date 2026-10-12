@@ -1,6 +1,6 @@
 /**
- * Erkennt Phishing-Muster „sichtbarer Linktext sieht wie eine URL aus, führt aber
- * zu einem anderen Host" (SEC-12). Rein, ohne DOM.
+ * Detects the phishing pattern "visible link text looks like a URL but leads
+ * to a different host" (SEC-12). Pure, no DOM.
  */
 
 const URL_LIKE =
@@ -15,8 +15,8 @@ function hostOf(url: string): string | null {
 }
 
 /**
- * Liefert die Hosts, wenn der im Linktext sichtbare Host vom href-Host abweicht
- * (Subdomain-Beziehungen gelten als gleich), sonst null.
+ * Returns the hosts if the host shown in the link text differs from the href host
+ * (subdomain relationships count as equal), otherwise null.
  */
 export function linkHostMismatch(
   text: string,

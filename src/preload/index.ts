@@ -5,9 +5,9 @@ const invokeChannels: ReadonlySet<string> = new Set(INVOKE_CHANNELS)
 const pushChannels: ReadonlySet<string> = new Set(PUSH_CHANNELS)
 
 /**
- * Generische, aber whitelist-geschützte Brücke: Es sind ausschließlich die im
- * IPC-Vertrag deklarierten Kanäle erreichbar. Payload-Validierung passiert
- * main-seitig (der Renderer gilt als weniger vertrauenswürdig).
+ * Generic but whitelist-protected bridge: only the channels declared in the
+ * IPC contract are reachable. Payload validation happens on the main side
+ * (the renderer is considered less trustworthy).
  */
 const api: NoctuaApi = {
   invoke: (channel, input) => {

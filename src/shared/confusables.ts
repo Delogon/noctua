@@ -1,19 +1,19 @@
 /**
- * Erkennung von Ersatzzeichen (Homoglyphen), Schriftmischung und unsichtbaren
- * Zeichen — klassische Tricks in Phishing- und Spam-Mails: „pаypal.com" mit
- * kyrillischem „а", „Rechnung" mit Nullbreiten-Leerzeichen zwischen den
- * Buchstaben gegen Spamfilter, „rechnung‮fdp.exe" mit Richtungsumkehr.
- * Rein, ohne DOM und ohne Node-APIs (Main und Renderer).
+ * Detection of lookalike characters (homoglyphs), script mixing and invisible
+ * characters — classic tricks in phishing and spam mails: "pаypal.com" with
+ * Cyrillic "а", "Rechnung" with zero-width spaces between the
+ * letters to beat spam filters, "rechnung‮fdp.exe" with direction override.
+ * Pure, no DOM and no Node APIs (main and renderer).
  */
 
 export type Script = 'latin' | 'cyrillic' | 'greek' | 'other'
 
 /**
- * Kyrillische und griechische Zeichen, die lateinischen zum Verwechseln ähneln
- * (Auszug aus Unicode confusables.txt, auf das in Mails Übliche beschränkt).
+ * Cyrillic and Greek characters that look confusingly like Latin ones
+ * (excerpt from Unicode confusables.txt, limited to what is common in mails).
  */
 const CONFUSABLE_TO_LATIN: Record<string, string> = {
-  // Kyrillisch klein
+  // Cyrillic lowercase
   а: 'a',
   в: 'b',
   с: 'c',
@@ -38,7 +38,7 @@ const CONFUSABLE_TO_LATIN: Record<string, string> = {
   ԝ: 'w',
   х: 'x',
   ү: 'y',
-  // Kyrillisch groß
+  // Cyrillic uppercase
   А: 'a',
   В: 'b',
   С: 'c',
@@ -54,7 +54,7 @@ const CONFUSABLE_TO_LATIN: Record<string, string> = {
   Т: 't',
   Х: 'x',
   Ү: 'y',
-  // Griechisch klein
+  // Greek lowercase
   α: 'a',
   ε: 'e',
   ι: 'i',
@@ -65,7 +65,7 @@ const CONFUSABLE_TO_LATIN: Record<string, string> = {
   τ: 't',
   υ: 'u',
   χ: 'x',
-  // Griechisch groß
+  // Greek uppercase
   Α: 'a',
   Β: 'b',
   Ε: 'e',
@@ -92,9 +92,9 @@ export function scriptOf(char: string): Script | null {
 }
 
 /**
- * Ein Wort mischt lateinische mit kyrillischen/griechischen Buchstaben — in
- * echter Sprache praktisch nie, bei Täuschung („Pаypal") typisch. Reine
- * kyrillische/griechische Wörter sind unauffällig.
+ * A word mixes Latin with Cyrillic/Greek letters — practically never in
+ * real language, typical for deception ("Pаypal"). Purely
+ * Cyrillic/Greek words are inconspicuous.
  */
 export function isMixedScriptWord(word: string): boolean {
   let latin = false
@@ -108,7 +108,7 @@ export function isMixedScriptWord(word: string): boolean {
   return false
 }
 
-/** Wörter mit Schriftmischung (max. `limit`, für Anzeige/Kontext). */
+/** Words with mixed scripts (max. `limit`, for display/context). */
 export function findMixedScriptWords(text: string, limit = 5): string[] {
   const out: string[] = []
   for (const word of text.normalize('NFC').match(/[\p{L}\p{M}]+/gu) ?? []) {
@@ -119,8 +119,8 @@ export function findMixedScriptWords(text: string, limit = 5): string[] {
 }
 
 /**
- * „Skelett" eines Textes: Kompatibilitätsformen (Vollbreite, mathematische
- * Alphabete 𝐩𝐚𝐲) aufgelöst, klein, Homoglyphen auf Latein abgebildet.
+ * "Skeleton" of a text: compatibility forms (full-width, mathematical
+ * alphabets 𝐩𝐚𝐲) resolved, lowercased, homoglyphs mapped to Latin.
  */
 export function skeleton(text: string): string {
   let out = ''
@@ -131,8 +131,8 @@ export function skeleton(text: string): string {
 }
 
 /**
- * Domain-Skelett zusätzlich mit typischen Ziffern-/Buchstabentricks
- * (paypa1, g00gle, rnicrosoft, vvells). Nur für den Vergleich mit Marken.
+ * Domain skeleton, additionally with typical digit/letter tricks
+ * (paypa1, g00gle, rnicrosoft, vvells). Only for comparison with brands.
  */
 export function domainSkeleton(domain: string): string {
   return skeleton(domain)
@@ -142,7 +142,7 @@ export function domainSkeleton(domain: string): string {
     .replace(/vv/g, 'w')
 }
 
-/** Enthält der Text Homoglyphen, die im Skelett zu Latein werden? */
+/** Does the text contain homoglyphs that become Latin in the skeleton? */
 export function hasConfusableChars(text: string): boolean {
   for (const char of text) if (char in CONFUSABLE_TO_LATIN) return true
   return false
@@ -155,11 +155,11 @@ const BIDI_CONTROLS = new Set([
 ])
 
 /**
- * Unsichtbare Zeichen (Nullbreiten-Leerzeichen, Wortverbinder, BOM mitten im
- * Text). ZWJ/ZWNJ zählen nur zwischen zwei lateinischen Buchstaben — in Emoji-
- * Sequenzen und persischer/indischer Schrift sind sie legitim. Mit `insideWords`
- * zählen auch die übrigen nur zwischen Buchstaben (HTML-Newsletter füllen ihren
- * Vorschautext gern mit Nullbreiten-Zeichen zwischen Leerzeichen auf).
+ * Invisible characters (zero-width spaces, word joiners, BOM mid-text).
+ * ZWJ/ZWNJ only count between two Latin letters — in emoji sequences and
+ * Persian/Indic scripts they are legitimate. With `insideWords` the others
+ * also only count between letters (HTML newsletters like to pad their
+ * preview text with zero-width characters between spaces).
  */
 export function countInvisibleChars(text: string, insideWords = false): number {
   const chars = [...text]
@@ -178,7 +178,7 @@ export function countInvisibleChars(text: string, insideWords = false): number {
   return count
 }
 
-/** Richtungs-Steuerzeichen (RLO-Trick „rechnung‮fdp.exe"). */
+/** Direction control characters (RLO trick "rechnung‮fdp.exe"). */
 export function hasBidiControls(text: string): boolean {
   for (const char of text) if (BIDI_CONTROLS.has(char.codePointAt(0) ?? 0)) return true
   return false

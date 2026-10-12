@@ -1,7 +1,7 @@
-// Heuristik: Ist die Basis-URL eines Profils lokal/On-Prem? Nur ein Vorschlag
-// fürs Anlegen — der Nutzer entscheidet über das Flag.
+// Heuristic: is a profile's base URL local/on-prem? Only a suggestion when
+// creating it — the user decides on the flag.
 
-/** Host einer URL ohne Port/Klammern, kleingeschrieben; null bei ungültiger URL. */
+/** Host of a URL without port/brackets, lowercased; null for an invalid URL. */
 export function hostOf(url: string): string | null {
   try {
     const h = new URL(url).hostname.toLowerCase()
@@ -11,7 +11,7 @@ export function hostOf(url: string): string | null {
   }
 }
 
-/** localhost, 127.0.0.0/8, ::1, *.local und RFC1918 (10/8, 172.16/12, 192.168/16). */
+/** localhost, 127.0.0.0/8, ::1, *.local and RFC1918 (10/8, 172.16/12, 192.168/16). */
 export function suggestIsLocal(url: string): boolean {
   const host = hostOf(url)
   if (!host) return false
