@@ -35,5 +35,9 @@
     "google": { "clientId": "123456789-example.apps.googleusercontent.com" },
     "microsoft": { "clientId": "00000000-0000-0000-0000-000000000000" }
   },
-  "hideOpenRouterOnboarding": true
+  "hideOpenRouterOnboarding": true,
+  "security": {
+    "brands": { "acme": ["example.com", "acme-mail.example"] },
+    "trustedDomains": ["intranet.example.com"]
+  }
 }

@@ -1,4 +1,6 @@
 import { domainToUnicode } from 'node:url'
+import type { OrgConfig } from '@shared/org-config'
+import { getOrgConfig } from '../org-config'
 import { linkHostMismatch } from '@shared/link-check'
 import {
   countInvisibleChars,
@@ -169,7 +171,39 @@ const BRANDS: Record<string, string[]> = {
   binance: ['binance.com'],
   adobe: ['adobe.com'],
   telekom: ['telekom.de', 't-online.de'],
-  vodafone: ['vodafone.de', 'vodafone.com']
+  vodafone: ['vodafone.de', 'vodafone.com'],
+  // Banks and payment (DE/AT/CH and international)
+  volksbank: ['volksbank.de', 'vr.de'],
+  raiffeisen: ['raiffeisen.de', 'raiffeisen.at', 'raiffeisen.ch'],
+  comdirect: ['comdirect.de'],
+  consorsbank: ['consorsbank.de'],
+  dkb: ['dkb.de'],
+  targobank: ['targobank.de'],
+  hypovereinsbank: ['hypovereinsbank.de', 'unicredit.de'],
+  santander: ['santander.de', 'santander.com'],
+  postfinance: ['postfinance.ch'],
+  revolut: ['revolut.com'],
+  klarna: ['klarna.com', 'klarna.de'],
+  visa: ['visa.com', 'visa.de'],
+  mastercard: ['mastercard.com', 'mastercard.de'],
+  americanexpress: ['americanexpress.com', 'aexp.com'],
+  // Parcel carriers
+  dpd: ['dpd.de', 'dpd.com'],
+  hermes: ['myhermes.de', 'hermesworld.com', 'hermes-europe.eu'],
+  gls: ['gls-group.eu', 'gls-group.com', 'gls-pakete.de'],
+  ups: ['ups.com'],
+  usps: ['usps.com'],
+  // Tax and government
+  elster: ['elster.de'],
+  irs: ['irs.gov'],
+  // Services commonly imitated
+  spotify: ['spotify.com'],
+  zoom: ['zoom.us', 'zoom.com'],
+  wetransfer: ['wetransfer.com'],
+  airbnb: ['airbnb.com', 'airbnb.de'],
+  zalando: ['zalando.de', 'zalando.com'],
+  ionos: ['ionos.de', 'ionos.com'],
+  strato: ['strato.de']
 }
 
 /** Freemail providers: a bank/service never writes from here. */
@@ -192,11 +226,66 @@ const FREEMAIL = new Set([
   'mail.ru',
   'yandex.ru',
   'proton.me',
-  'protonmail.com'
+  'protonmail.com',
+  'gmx.ch',
+  'gmx.com',
+  'mail.com',
+  'outlook.de',
+  'hotmail.de',
+  'live.de',
+  'msn.com',
+  'yahoo.co.uk',
+  'yahoo.fr',
+  'freenet.de',
+  'arcor.de',
+  'posteo.de',
+  'posteo.net',
+  'mailbox.org',
+  'tutanota.com',
+  'tuta.io',
+  'zoho.com',
+  'yandex.com',
+  'qq.com',
+  '163.com'
 ])
 
+interface ThreatPolicy {
+  brands: Record<string, string[]>
+  trustedDomains: string[]
+}
+
+let policyCache: { config: OrgConfig | null; policy: ThreatPolicy } | null = null
+
+/** Built-in brands plus the org configuration's brands and trusted domains. */
+function threatPolicy(): ThreatPolicy {
+  const config = getOrgConfig()
+  if (policyCache?.config === config) return policyCache.policy
+  const brands: Record<string, string[]> = { ...BRANDS }
+  for (const [brand, domains] of Object.entries(config?.security?.brands ?? {})) {
+    brands[brand] = [...new Set([...(brands[brand] ?? []), ...domains])]
+  }
+  const policy = { brands, trustedDomains: config?.security?.trustedDomains ?? [] }
+  policyCache = { config, policy }
+  return policy
+}
+
+function hostOf(href: string): string | null {
+  try {
+    return new URL(href).hostname
+  } catch {
+    return null
+  }
+}
+
+/** Trusted by the organisation: the domain itself or a subdomain of it. */
+function isTrusted(host: string | null | undefined): boolean {
+  if (!host) return false
+  const h = host.toLowerCase()
+  return threatPolicy().trustedDomains.some((d) => h === d || h.endsWith(`.${d}`))
+}
+
 function isOfficial(brand: string, domain: string): boolean {
-  return (BRANDS[brand] ?? []).some((d) => sameDomain(d, domain))
+  return (threatPolicy().brands[brand] ?? []).some((d) => sameDomain(d, domain))
 }
 
 /**
@@ -215,7 +304,7 @@ export function lookalikeBrand(host: string): string | null {
     if (!label) continue
     const skel = domainSkeleton(label)
     if (skel === label) continue
-    for (const brand of Object.keys(BRANDS)) {
+    for (const brand of Object.keys(threatPolicy().brands)) {
       if (skel === brand && !isOfficial(brand, domain)) return brand
     }
   }
@@ -225,7 +314,7 @@ export function lookalikeBrand(host: string): string | null {
 /** Brand in the display name (whole word, homoglyphs resolved). */
 function brandInName(name: string): string | null {
   const words: string[] = skeleton(name).match(/[a-z0-9]+/g) ?? []
-  return Object.keys(BRANDS).find((brand) => words.includes(brand)) ?? null
+  return Object.keys(threatPolicy().brands).find((brand) => words.includes(brand)) ?? null
 }
 
 const SHORTENERS = new Set([
@@ -245,7 +334,12 @@ const SHORTENERS = new Set([
   's.id',
   'shorte.st',
   'adf.ly',
-  'qrco.de'
+  'qrco.de',
+  'bit.do',
+  'tr.im',
+  'clck.ru',
+  'urlz.fr',
+  'cutt.us'
 ])
 
 // --- Links -------------------------------------------------------------------------------------
@@ -387,7 +481,9 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
   const text = (input.text ?? '').slice(0, MAX_TEXT_SCAN)
 
   // --- Sender ---
-  if (fromDomain && fromName) {
+  // Domains the organisation trusts never count as impersonation
+  const senderTrusted = isTrusted(fromDomain)
+  if (fromDomain && fromName && !senderTrusted) {
     const found = fromName.match(/(?:[a-z0-9][a-z0-9-]*\.)+(?:[a-z]{2,})\b/gi) ?? []
     const other = found.map((d) => d.toLowerCase()).find((d) => !sameDomain(d, fromDomain))
     if (other) {
@@ -406,7 +502,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       const list = JSON.parse(input.replyToJson) as Array<{ address?: string }>
       const other = list
         .map((r) => domainOfAddr(r.address))
-        .find((d): d is string => !!d && !sameDomain(d, fromDomain))
+        .find((d): d is string => !!d && !sameDomain(d, fromDomain) && !isTrusted(d))
       if (other) {
         add('reply_to_differs', 1, 1, 0, `Replies go to ${other}, but the sender is ${fromDomain}`)
       }
@@ -416,7 +512,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
   }
 
   let senderHomoglyph = false
-  if (fromDomain && isHomoglyphHost(fromDomain)) {
+  if (fromDomain && !senderTrusted && isHomoglyphHost(fromDomain)) {
     senderHomoglyph = true
     add(
       'homoglyph_sender',
@@ -426,7 +522,8 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       `The sender domain ${unicodeHost(fromDomain)} contains look-alike characters from another alphabet (e.g. Cyrillic) that resemble Latin letters`
     )
   }
-  const senderLookalike = fromDomain && !senderHomoglyph ? lookalikeBrand(fromDomain) : null
+  const senderLookalike =
+    fromDomain && !senderHomoglyph && !senderTrusted ? lookalikeBrand(fromDomain) : null
   if (senderLookalike) {
     add(
       'lookalike_sender',
@@ -436,7 +533,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       `The sender domain ${fromDomain} imitates "${senderLookalike}" with swapped characters`
     )
   }
-  const nameBrand = fromName ? brandInName(fromName) : null
+  const nameBrand = fromName && !senderTrusted ? brandInName(fromName) : null
   if (
     nameBrand &&
     fromDomain &&
@@ -470,6 +567,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
   }
   if (
     fromName &&
+    !senderTrusted &&
     EXECUTIVE_TITLE.test(fromName) &&
     fromDomain &&
     FREEMAIL.has(baseDomain(fromDomain))
@@ -548,7 +646,9 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
   const anchors = html ? extractLinks(html) : []
   const hrefs = anchors.length > 0 ? anchors.map((a) => a.href) : extractTextUrls(text)
   let mismatches = 0
-  for (const link of anchors) if (linkHostMismatch(link.text, link.href)) mismatches += 1
+  for (const link of anchors) {
+    if (linkHostMismatch(link.text, link.href) && !isTrusted(hostOf(link.href))) mismatches += 1
+  }
   let ipLinks = 0
   let puny = 0
   let homoglyph = 0
@@ -569,6 +669,8 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
     }
     if (url.protocol !== 'http:' && url.protocol !== 'https:') continue
     const host = url.hostname.toLowerCase()
+    // Link targets the organisation trusts (its own tools, tracking domains)
+    if (isTrusted(host)) continue
     if (url.username) userinfo += 1
     if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.startsWith('[')) ipLinks += 1
     // Homoglyph rules out lookalike/punycode – one link, one deception

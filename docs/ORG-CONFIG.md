@@ -46,6 +46,7 @@ Alle Felder sind optional. Unbekannte Felder sind ein Fehler.
 | `aiProfiles`               | Liste                             | Von der Organisation bereitgestellte KI-Profile (managed).                                                                                                 |
 | `oauth`                    | `{ google?, microsoft? }`         | Eigene OAuth-Clients statt der Thunderbird-Defaults.                                                                                                       |
 | `hideOpenRouterOnboarding` | boolean                           | Onboarding-Schritt 3 zeigt die Org-Profile statt der KI-Wahl (lokaler Server / Apple / Cloud / Überspringen).                                              |
+| `security`                 | siehe unten                       | Spam-/Phishing-Regeln: eigene geschützte Marken und vertrauenswürdige Domains.                                                                             |
 
 ### `updates`
 
@@ -130,6 +131,24 @@ Desktop-App.
 
 Microsoft nutzt weiterhin die Authority `common`; Tenant-spezifische
 Authorities sind nicht Teil dieser Konfiguration.
+
+### `security`
+
+```json
+{
+  "brands": { "acme": ["acme.com", "acme-mail.net"] },
+  "trustedDomains": ["partner-tools.example"]
+}
+```
+
+- `brands`: zusätzliche geschützte Marken (ein Wort, Kleinbuchstaben/Ziffern, 3–30 Zeichen) mit
+  ihren offiziellen Domains, z. B. der eigene Firmenname. Ein Anzeigename „ACME IT-Support“ von
+  einer fremden Domain, aus einem Freemail-Postfach oder eine Lookalike-Domain („acrne.com“) wird
+  dann wie bei eingebauten Marken (PayPal, Sparkasse, DHL …) als Warnzeichen gewertet. Höchstens
+  50 Marken mit je 20 Domains; eingebaute Marken bleiben erhalten.
+- `trustedDomains`: Domains (inklusive Subdomains), deren Absender und Linkziele nie als
+  Identitätstäuschung oder Link-Täuschung zählen, z. B. eigene Tools oder Tracking-Domains eines
+  Dienstleisters. Inhaltliche Signale (Spam-Formulierungen, gefährliche Anhänge) gelten weiter.
 
 ## Transparenz: Netzwerkverbindungen
 
