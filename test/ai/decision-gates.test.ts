@@ -5,6 +5,7 @@ import { runEventExtraction } from '@main/ai/events'
 import {
   applyRulesPostTriage,
   evaluateAiConditions,
+  MAX_AI_CONDITIONS_PER_MAIL,
   matches,
   ruleJsonSchema,
   ruleNeedsAi,
@@ -249,7 +250,7 @@ describe('Regeln mit KI-Bedingung', () => {
     expect(matches(rule, facts, 'skip')).toBe(true)
   })
 
-  it('bündelt alle KI-Bedingungen in EINEN Aufruf (eine Frage je Regel)', async () => {
+  it('fragt jede KI-Bedingung in einem eigenen Aufruf', async () => {
     configureDecision()
     const id = seedInbox()
     const r1 = addRule({
@@ -267,15 +268,20 @@ describe('Regeln mit KI-Bedingung', () => {
       [ruleQuestionName(r3)]: 0.7
     })
     await applyRulesPostTriage(db, id)
-    expect(systemOne).toHaveBeenCalledTimes(1)
-    const body = JSON.parse(String((systemOne.mock.calls[0] as [string, RequestInit])[1].body))
-    expect(Object.keys(body.questions)).toEqual([r1, r2, r3].map(ruleQuestionName))
-    expect(body.questions[ruleQuestionName(r1)]).toMatchObject({
+    expect(systemOne).toHaveBeenCalledTimes(3)
+    const bodies = systemOne.mock.calls.map((call) =>
+      JSON.parse(String((call as [string, RequestInit])[1].body))
+    )
+    expect(bodies.flatMap((b) => Object.keys(b.questions)).sort()).toEqual(
+      [r1, r2, r3].map(ruleQuestionName).sort()
+    )
+    const first = bodies.find((b) => ruleQuestionName(r1) in b.questions)
+    expect(first.questions[ruleQuestionName(r1)]).toMatchObject({
       type: 'noul',
       instructions: 'Ist das eine Rechnung?'
     })
     // Mail is in the state as untrusted data
-    expect(body.state).toContain('<<<BEGIN MAIL (UNTRUSTED DATA)>>>')
+    for (const b of bodies) expect(b.state).toContain('<<<BEGIN MAIL (UNTRUSTED DATA)>>>')
     expect(flagged).toEqual([id, id]) // r1 and r3
     expect(archived).toEqual([])
     expect(db.prepare('SELECT hits FROM rules WHERE id = ?').get(r1)).toEqual({ hits: 1 })
@@ -311,8 +317,21 @@ describe('Regeln mit KI-Bedingung', () => {
     expect(flagged).toEqual([id]) // only the category rule
   })
 
-  it('höchstens 64 Fragen je Aufruf', async () => {
+  it('prüft höchstens 16 KI-Bedingungen je Mail (ein Aufruf pro Regel)', async () => {
     configureDecision()
+    const id = seedInbox()
+    for (let i = 0; i < 20; i++) {
+      addRule({ match: { aiCondition: `Frage ${i}?` }, actions: { flag: true } }, `r${i}`)
+    }
+    stubNoul({})
+    const probs = await evaluateAiConditions(db, id)
+    expect(systemOne).toHaveBeenCalledTimes(MAX_AI_CONDITIONS_PER_MAIL)
+    expect(Object.keys(probs)).toHaveLength(MAX_AI_CONDITIONS_PER_MAIL)
+  })
+
+  it('single-call mode: höchstens 64 Fragen in einem Aufruf', async () => {
+    configureDecision()
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('ai.decisionMode', 'single')`).run()
     const id = seedInbox()
     for (let i = 0; i < 70; i++) {
       addRule({ match: { aiCondition: `Frage ${i}?` }, actions: { flag: true } }, `r${i}`)

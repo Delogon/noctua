@@ -9,10 +9,13 @@ import {
   type ResolvedDecision
 } from './providers/registry'
 import type { ResolvedTask } from './providers/types'
-import { decide, isDecisionConfigError } from './providers/systemone'
+import { decide, decideEach, isDecisionConfigError } from './providers/systemone'
 import {
-  DECISION_STATE_NOTE,
   TRIAGE_QUESTIONS,
+  fullState,
+  questionState,
+  decisionMode,
+  type StateBlocks,
   buildHybridWritePrompt,
   hybridWriteSchema,
   interpretTriageAnswers,
@@ -163,11 +166,21 @@ interface TriageRow {
   folder_special_use: string | null
 }
 
-function buildUserPrompt(
+interface PromptBlocks {
+  /** From/Subject/Date */
+  header: string
+  replyTo: string | null
+  recipient: string
+  signals: string | null
+  /** Sanitized body (not yet wrapped) */
+  bodyText: string
+}
+
+function buildPromptBlocks(
   db: Database.Database,
   row: TriageRow,
   extraSignals: string[] = []
-): string {
+): PromptBlocks {
   const fullBodyText = row.text_plain?.trim() || htmlToText(row.html_raw ?? '')
   const bodyText = sanitizeUntrusted(textBeforeForwardedMessage(row.subject, fullBodyText), 6000)
   const stats = db
@@ -207,15 +220,43 @@ function buildUserPrompt(
         ? 'group salutation (e.g. "Hello everyone")'
         : 'no recognisable salutation'
 
+  let replyTo: string | null = null
+  try {
+    const list = JSON.parse(row.reply_to ?? '[]') as Array<{ address?: string }>
+    const addresses = list.map((r) => r.address).filter((a): a is string => !!a)
+    if (addresses.length > 0) {
+      replyTo = `Reply-To: ${sanitizeUntrustedLine(addresses.join(', '), 300)}`
+    }
+  } catch {
+    // broken JSON: no Reply-To line
+  }
+
+  return {
+    header: [
+      `From: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unknown', 200)}>`,
+      `Subject: ${sanitizeUntrustedLine(row.subject, 300) || '(no subject)'}`,
+      `Date: ${row.date ? localStamp(row.date) : 'unknown'}`
+    ].join('\n'),
+    replyTo,
+    recipient: `RECIPIENT (account owner): ${ownerName ? `${ownerName} ` : ''}<${row.account_email ?? 'unknown'}>; ${placementLabel}; salutation of the email: ${salutationLabel}`,
+    signals: signals.length > 0 ? `Signals: ${signals.join('; ')}` : null,
+    bodyText
+  }
+}
+
+function buildUserPrompt(
+  db: Database.Database,
+  row: TriageRow,
+  extraSignals: string[] = []
+): string {
+  const blocks = buildPromptBlocks(db, row, extraSignals)
   return [
-    `From: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unknown', 200)}>`,
-    `Subject: ${sanitizeUntrustedLine(row.subject, 300) || '(no subject)'}`,
-    `Date: ${row.date ? localStamp(row.date) : 'unknown'}`,
-    `RECIPIENT (account owner): ${ownerName ? `${ownerName} ` : ''}<${row.account_email ?? 'unknown'}>; ${placementLabel}; salutation of the email: ${salutationLabel}`,
-    signals.length > 0 ? `Signals: ${signals.join('; ')}` : null,
+    blocks.header,
+    blocks.recipient,
+    blocks.signals,
     '',
     'Content:',
-    wrapUntrusted('MAIL', bodyText || '(no text content)')
+    wrapUntrusted('MAIL', blocks.bodyText || '(no text content)')
   ]
     .filter((line) => line !== null)
     .join('\n')
@@ -408,20 +449,31 @@ async function runHybridTriage(
   const bodyText = textBeforeForwardedMessage(row.subject, fullBodyText)
   const signals = computeMailSignals(loadThreatInput(db, messageId, row)!)
   const userPrompt = buildUserPrompt(db, row)
-  const state = [DECISION_STATE_NOTE, '', userPrompt, signalStateBlock(signals)].join('\n')
+  const prompt = buildPromptBlocks(db, row)
+  const security = signalStateBlock(signals).trim()
+  const blocks: StateBlocks = {
+    header: prompt.header,
+    replyTo: prompt.replyTo,
+    recipient: prompt.recipient,
+    signals: prompt.signals,
+    security: security || null,
+    body: `Content:\n${wrapUntrusted('MAIL', prompt.bodyText || '(no text content)')}`,
+    bodyShort: `Content (excerpt):\n${wrapUntrusted('MAIL', prompt.bodyText.slice(0, 2000) || '(no text content)')}`
+  }
+  const params = { baseUrl: cfg.profile.baseUrl, apiKey: cfg.apiKey, model: cfg.model }
 
-  let result: Awaited<ReturnType<typeof decide>>
+  let result: {
+    answers: Awaited<ReturnType<typeof decide>>['answers']
+    usage: { inputTokens: number; outputTokens: number }
+  }
   try {
-    result = await decide({
-      baseUrl: cfg.profile.baseUrl,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
-      state,
-      questions: TRIAGE_QUESTIONS
-    })
+    result =
+      decisionMode() === 'single'
+        ? await decide({ ...params, state: fullState(blocks), questions: TRIAGE_QUESTIONS })
+        : await decideEach(params, TRIAGE_QUESTIONS, (name) => questionState(name, blocks))
   } catch (error) {
     if (isDecisionConfigError(error)) {
-      console.warn('[ai] Entscheidungsmodell unbrauchbar, klassische Triage:', error)
+      console.warn('[ai] decision model unusable, falling back to classic triage:', error)
       return null
     }
     throw error

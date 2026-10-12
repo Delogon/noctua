@@ -1,7 +1,14 @@
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
 import { requireTask, resolveDecision } from './providers/registry'
-import { decide, isDecisionConfigError, MAX_QUESTIONS, type Questions } from './providers/systemone'
+import {
+  decide,
+  decideEach,
+  isDecisionConfigError,
+  MAX_QUESTIONS,
+  type Questions
+} from './providers/systemone'
+import { decisionMode } from './decision-triage'
 import { RULE_AI_CONDITION_THRESHOLD } from '@shared/decision-thresholds'
 import { htmlToText } from '../mail/parser'
 import {
@@ -217,6 +224,13 @@ function loadFacts(db: Database.Database, messageId: number): MessageFacts | und
 /** Question name of a rule in the bundled System One call. */
 export const ruleQuestionName = (ruleId: number): string => `rule_${ruleId}`
 
+/** Per-question mode makes one call per rule: cap the AI conditions checked per email. */
+export const MAX_AI_CONDITIONS_PER_MAIL = 16
+
+function maxConditions(): number {
+  return decisionMode() === 'single' ? MAX_QUESTIONS : MAX_AI_CONDITIONS_PER_MAIL
+}
+
 /**
  * AI conditions of ALL active rules for a mail in ONE System One call
  * (one noul question per rule, at most 64). Only rules whose other criteria
@@ -238,7 +252,7 @@ export async function evaluateAiConditions(
 
   const questions: Questions = {}
   for (const row of rows) {
-    if (Object.keys(questions).length >= MAX_QUESTIONS) break
+    if (Object.keys(questions).length >= maxConditions()) break
     let rule: RuleJson
     try {
       rule = ruleJsonSchema.parse(JSON.parse(row.rule_json))
@@ -283,13 +297,12 @@ export async function evaluateAiConditions(
   ].join('\n')
 
   try {
-    const result = await decide({
-      baseUrl: cfg.profile.baseUrl,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
-      state,
-      questions
-    })
+    const params = { baseUrl: cfg.profile.baseUrl, apiKey: cfg.apiKey, model: cfg.model }
+    // Per-question mode: one call per rule, so each condition is judged alone
+    const result =
+      decisionMode() === 'single'
+        ? await decide({ ...params, state, questions })
+        : await decideEach(params, questions, () => state)
     logUsage(db, cfg.model, result.usage.inputTokens, result.usage.outputTokens, 0)
     const out: Record<number, number> = {}
     for (const name of Object.keys(questions)) {

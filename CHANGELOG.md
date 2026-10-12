@@ -18,6 +18,10 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 - Fixes from the strix audit: Proton Bridge connections now require STARTTLS and pin the Bridge certificate on first use. If the certificate changes, sync stops and asks for the password again. Deeply nested MIME structures and oversized `References` headers can no longer block mail sync. Owl chat treats mail content as untrusted data (SEC-15). The encrypted database keeps temp files in memory. Notifications no longer show sender, subject or summary by default; a new privacy switch turns the details back on. `nanoid` 2.x (via the spellchecker) is replaced by a crypto-backed drop-in. Removing a Microsoft account also removes its refresh token, and changing an AI provider's base URL discards its stored key.
 
+### Changed
+
+- **More reliable AI decisions**: the decision model (System One) now gets one short call per question instead of one long call with every question at once. Each question defines exactly what counts (e.g. a request means a concrete action asked of you, not a newsletter's call to action) and only sees the parts of the email it needs. The security check and rules with an AI condition work the same way (at most 16 AI conditions per email). `ai.decisionMode = single` restores the combined call. `pnpm test:decision-eval` compares both modes on a labelled set of emails against your own Ollama.
+
 ### Added
 - **English code comments** (internal): all code comments, including SQL migration comments, are now English. New code is commented in English.
 - **English AI prompts**: all prompts, decision-model questions and context labels sent to models are now English. Generated summaries, task and event titles follow the app language (German stays the default); Owl answers follow the language of the question, drafts the language of the conversation. The new-email draft protocol uses `MODE: DICTATION|IDEA` and `SUBJECT:`. The Apple on-device eval script measures the English prompts by default (`EVAL_PROMPT_LANG=de` for the previous German ones).
