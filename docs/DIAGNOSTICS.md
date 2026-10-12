@@ -73,6 +73,24 @@ seeds mails with marker strings and asserts that none of them appear anywhere in
 
 "Delete measurements" resets the in-memory data and removes `userData/diagnostics/`.
 
+## Measured: synthetic mailbox, 5,000 vs. 20,000 messages
+
+`pnpm test:perf`, encrypted WAL database on disk, Linux container (absolute times vary by machine;
+the growth is what matters). Median of three runs.
+
+| Operation                                            | 5,000    | 20,000        | SQL statements |
+| ---------------------------------------------------- | -------- | ------------- | -------------- |
+| `contacts.rebuildStats` (main thread, sync)          | 2,199 ms | **33,539 ms** | 4              |
+| ingest per message (seeding, incl. threading)        | ~3 ms    | **~66 ms**    | –              |
+| `threads.list.inbox(300)`                            | 389 ms   | 332 ms        | **~2,350**     |
+| `threads.list.spam(300)` (tiny folder)               | 72 ms    | 185 ms        | ~2,300         |
+| lexical search                                       | 112 ms   | 331 ms        | 4              |
+| `threads.mboxCounts` / `folders.list`                | 8 / 7 ms | 67 / 49 ms    | 3 / 1          |
+| one `messages:changed` refresh (list+counts+folders) | 231 ms   | 283 ms        | –              |
+
+The contact-statistics rebuild and ingest grow quadratically and are the clearest culprits. The thread
+list runs thousands of statements per refresh, and every `messages:changed` repeats that refresh.
+
 ## First findings (code review + query plans, synthetic data)
 
 These are candidates for the large-mailbox slowdown, each tied to a metric above to confirm with
