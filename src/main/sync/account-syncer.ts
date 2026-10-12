@@ -20,6 +20,7 @@ import {
 import { OpDeadError } from './op-queue'
 import { resetFolderForUidValidity } from './uidvalidity'
 import { inferSpecialUses } from '@shared/folder-roles'
+import { metrics } from '../diagnostics/metrics'
 
 const DEFAULT_ENVELOPE_BACKFILL_DAYS = 90
 export const SEARCH_BACKFILL_DAYS = 183
@@ -311,7 +312,11 @@ export class AccountSyncer {
     for (const folder of folders) {
       if (folder.sync_mode !== 'full') continue
       await this.enqueue(() => this.syncFolder(folder))
-      if (folder.special_use === '\\Sent') rebuildContactStats(this.db, this.account.id)
+      if (folder.special_use === '\\Sent') {
+        metrics.time('db.contacts.rebuildStats', () =>
+          rebuildContactStats(this.db, this.account.id)
+        )
+      }
     }
     const inbox = folders.find((f) => f.special_use === '\\Inbox')
     // IDLE zuerst starten; der progressive Body-Backfill darf neue Mails nicht
@@ -377,7 +382,11 @@ export class AccountSyncer {
     const folder = this.folders.find((f) => f.special_use === specialUse)
     if (!folder || !this.cmd) return Promise.resolve()
     return this.enqueueFolderSync(folder).then(() => {
-      if (specialUse === '\\Sent') rebuildContactStats(this.db, this.account.id)
+      if (specialUse === '\\Sent') {
+        metrics.time('db.contacts.rebuildStats', () =>
+          rebuildContactStats(this.db, this.account.id)
+        )
+      }
     })
   }
 
@@ -479,6 +488,7 @@ export class AccountSyncer {
   }
 
   private async syncFolder(folder: FolderRow): Promise<void> {
+    const endSpan = metrics.span('sync.folder')
     const lock = await this.cmd!.getMailboxLock(folder.path)
     try {
       const mailbox = this.cmd!.mailbox
@@ -511,6 +521,7 @@ export class AccountSyncer {
       folder.uidnext = mailbox.uidNext ?? folder.uidnext
     } finally {
       lock.release()
+      endSpan()
     }
   }
 
@@ -544,7 +555,8 @@ export class AccountSyncer {
         if (result) threadKeys.add(result.threadKey)
       }
     })
-    tx()
+    metrics.time('sync.ingestBatch', tx, { messages: messages.length })
+    metrics.count('sync.envelopesIngested', messages.length)
     return [...threadKeys]
   }
 
@@ -574,6 +586,7 @@ export class AccountSyncer {
     for (let i = 0; i < missing.length; i += ENVELOPE_CHUNK) {
       if (this.stopped) return
       const chunk = missing.slice(i, i + ENVELOPE_CHUNK)
+      const endChunk = metrics.span('sync.backfill.envelopeChunk')
       const messages: FetchMessageObject[] = []
       for await (const msg of this.cmd!.fetch(chunk.join(','), this.fetchOptions(), {
         uid: true
@@ -581,6 +594,7 @@ export class AccountSyncer {
         messages.push(msg)
       }
       const threadKeys = this.ingestBatch(folder, messages)
+      endChunk({ messages: messages.length })
       this.events.onMessagesChanged(folder.id, threadKeys)
     }
     if (isSearchableFolder(folder)) {
@@ -593,12 +607,14 @@ export class AccountSyncer {
 
   private async incrementalSync(folder: FolderRow): Promise<void> {
     // 1) Neue Nachrichten ab bekanntem UIDNEXT
+    const endNew = metrics.span('sync.incremental.newMessages')
     const messages: FetchMessageObject[] = []
     for await (const msg of this.cmd!.fetch(`${folder.uidnext}:*`, this.fetchOptions(), {
       uid: true
     })) {
       if (msg.uid >= (folder.uidnext ?? 0)) messages.push(msg)
     }
+    endNew({ messages: messages.length })
     if (messages.length > 0) {
       const threadKeys = this.ingestBatch(folder, messages)
       this.events.onMessagesChanged(folder.id, threadKeys)
@@ -610,6 +626,7 @@ export class AccountSyncer {
       .all(folder.id, FLAG_RESYNC_WINDOW) as Array<{ uid: number }>
     if (known.length === 0) return
     const minUid = known[known.length - 1].uid
+    const endFlags = metrics.span('sync.incremental.flags')
     const serverUids = new Set<number>()
     const changedThreads = new Set<string>()
     for await (const msg of this.cmd!.fetch(
@@ -627,6 +644,11 @@ export class AccountSyncer {
     }
     const vanished = known.filter((k) => !serverUids.has(k.uid)).map((k) => k.uid)
     if (vanished.length > 0) deleteByUids(this.db, folder.id, vanished)
+    endFlags({
+      uids: serverUids.size,
+      changedThreads: changedThreads.size,
+      vanished: vanished.length
+    })
     if (vanished.length > 0 || changedThreads.size > 0) {
       this.events.onMessagesChanged(folder.id, [...changedThreads])
     }
@@ -634,6 +656,7 @@ export class AccountSyncer {
 
   private async backfillBodies(folder: FolderRow, skippedIds: number[] = []): Promise<void> {
     if (!isSearchableFolder(folder)) return
+    const endPass = metrics.span('sync.bodies.pass')
     const cutoff = backfillCutoff(this.account.sync_days, true)
     const excluded = [...new Set(skippedIds)]
     const exclusionSql =
@@ -667,6 +690,7 @@ export class AccountSyncer {
       }
       this.events.onMessagesChanged(folder.id, [...threadKeys])
     }
+    endPass({ pending: pending.length, failed: failedIds.length })
 
     const remaining = this.db
       .prepare(
@@ -707,9 +731,15 @@ export class AccountSyncer {
       .prepare('SELECT uid, thread_key FROM messages WHERE id = ?')
       .get(messageId) as { uid: number; thread_key: string } | undefined
     if (!row) return null
-    const msg = await this.cmd!.fetchOne(String(row.uid), { source: true }, { uid: true })
+    const msg = await metrics.timeAsync('sync.bodies.fetchOne', () =>
+      this.cmd!.fetchOne(String(row.uid), { source: true }, { uid: true })
+    )
     if (!msg || !msg.source) return null
-    const parsed = await parseMail(msg.source)
+    metrics.count('sync.bodies.bytes', msg.source.length)
+    const parsed = await metrics.timeAsync('mail.parse', () => parseMail(msg.source!), {
+      kb: Math.round(msg.source.length / 1024)
+    })
+    const endStore = metrics.span('sync.bodies.store')
     storeBody(this.db, messageId, parsed)
     storeMessageHeaderDetails(this.db, messageId, {
       from: parsed.from ? [parsed.from] : [],
@@ -725,6 +755,7 @@ export class AccountSyncer {
     } catch (error) {
       console.warn('[rules]', error)
     }
+    endStore()
     return row.thread_key
   }
 

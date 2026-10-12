@@ -2356,6 +2356,44 @@ const table = {
     de: 'Links nutzen eine Domain mit Ersatzzeichen (Punycode) ({n})'
   },
 
+  // Leistungsdiagnose (Technik-Seite)
+  diagTitle: { en: 'Performance diagnostics', de: 'Leistungsdiagnose' },
+  diagToggle: { en: 'Measure', de: 'Messen' },
+  diagCap: {
+    en: 'Measures on this Mac where time and CPU go: operations, database queries, sync, AI queue and the UI. Only names of operations and numbers are recorded, never email content. Nothing is sent: export a ZIP when you want to share it.',
+    de: 'Misst auf diesem Mac, wohin Zeit und CPU gehen: Operationen, Datenbankabfragen, Sync, KI-Warteschlange und Oberfläche. Erfasst werden nur Namen von Operationen und Zahlen, nie Inhalte von E-Mails. Nichts wird gesendet: Exportiere ein ZIP, wenn du es teilen möchtest.'
+  },
+  diagCpu: { en: 'CPU main · all', de: 'CPU Haupt · alle' },
+  diagMemory: { en: 'Memory main · all', de: 'Speicher Haupt · alle' },
+  diagLoop: { en: 'Event loop p99 / max', de: 'Event-Loop p99 / max' },
+  diagSql: { en: 'SQL last 5 s', de: 'SQL letzte 5 s' },
+  diagOperation: { en: 'Operation', de: 'Operation' },
+  diagCalls: { en: 'Calls', de: 'Aufrufe' },
+  diagMax: { en: 'Max', de: 'Max' },
+  diagTotal: { en: 'Total', de: 'Summe' },
+  diagMedian: { en: 'Median', de: 'Median' },
+  diagDuration: { en: 'Duration', de: 'Dauer' },
+  diagStatements: { en: 'Queries', de: 'Abfragen' },
+  diagSlowest: { en: 'Slowest events', de: 'Langsamste Ereignisse' },
+  diagBenchCase: { en: 'Benchmark', de: 'Benchmark' },
+  diagBenchRun: { en: 'Run benchmark', de: 'Benchmark starten' },
+  diagBenchRunning: { en: 'Measuring …', de: 'Misst …' },
+  diagFullScans: {
+    en: '{n} of {total} queries read a whole table without an index',
+    de: '{n} von {total} Abfragen lesen eine ganze Tabelle ohne Index'
+  },
+  diagExport: { en: 'Export diagnostics (.zip)', de: 'Diagnose exportieren (.zip)' },
+  diagExporting: { en: 'Exporting …', de: 'Exportiert …' },
+  diagWithBenchmark: { en: 'with benchmark', de: 'mit Benchmark' },
+  diagExported: { en: 'Saved {file}.', de: '{file} gespeichert.' },
+  diagExportFailed: { en: 'Export failed.', de: 'Export fehlgeschlagen.' },
+  diagClear: { en: 'Delete measurements', de: 'Messwerte löschen' },
+  diagCleared: { en: 'Measurements deleted.', de: 'Messwerte gelöscht.' },
+  diagStored: {
+    en: '{samples} samples · {n} earlier sessions on this Mac',
+    de: '{samples} Messpunkte · {n} frühere Sitzungen auf diesem Mac'
+  },
+
   // Regeln mit KI-Bedingung
   ruleAiCondition: { en: 'AI condition', de: 'KI-Bedingung' },
   ruleAiNeedsModel: {

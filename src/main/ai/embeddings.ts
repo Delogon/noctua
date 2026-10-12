@@ -5,6 +5,7 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import { htmlToText } from '../mail/parser'
 import { cleanupSearchOrphans, refreshMessageSearchIndex } from '../mail/ingest'
 import { isLocalOnly } from '../privacy'
+import { metrics } from '../diagnostics/metrics'
 
 export const EMBEDDING_MODEL = 'Xenova/multilingual-e5-base'
 const DIMS = 768
@@ -311,7 +312,7 @@ export class EmbeddingIndexer {
   }
 
   private pendingRows(): IndexRow[] {
-    this.ensureSearchStates()
+    metrics.time('ai.embed.ensureStates', () => this.ensureSearchStates())
     return this.db!.prepare(
       `SELECT m.id, m.subject, m.from_name, m.from_addr, b.text_plain, b.html_raw,
                 coalesce((
@@ -347,7 +348,7 @@ export class EmbeddingIndexer {
     // Normalfall (nichts zu indexieren) lohnt das nicht alle 60 Sekunden —
     // init() räumt beim Start auf, danach nur noch bei echter Arbeit.
     if (rows.length === 0) return
-    cleanupSearchOrphans(this.db!)
+    metrics.time('ai.embed.cleanupOrphans', () => cleanupSearchOrphans(this.db!))
     const insert = this.db!.prepare('INSERT INTO message_vecs (rowid, embedding) VALUES (?, ?)')
     const remove = this.db!.prepare('DELETE FROM message_vecs WHERE rowid = ?')
     const currentHash = this.db!.prepare(
@@ -370,7 +371,10 @@ export class EmbeddingIndexer {
         })
         if (this.modelState !== 'ready') this.modelState = 'loading'
         this.modelError = null
-        const vectors = await embed(texts, 'passage')
+        const vectors = await metrics.timeAsync('ai.embed.batch', () => embed(texts, 'passage'), {
+          messages: batch.length
+        })
+        metrics.count('ai.embed.messages', batch.length)
         this.modelState = 'ready'
         const tx = this.db!.transaction(() => {
           batch.forEach((row, index) => {

@@ -125,6 +125,81 @@ const calendarCredentialsSchema = z.object({
 /** Sync-Zeitraum in Tagen: 0 = alles, null = Standard (90 Tage Liste / 183 Suche). */
 const syncDaysSchema = z.union([z.literal(0), z.number().int().min(7).max(3650)]).nullable()
 
+const timingSummarySchema = z.object({
+  name: z.string().max(600),
+  count: z.number(),
+  totalMs: z.number(),
+  meanMs: z.number(),
+  maxMs: z.number(),
+  p50Ms: z.number(),
+  p95Ms: z.number(),
+  p99Ms: z.number()
+})
+const benchmarkResultSchema = z.object({
+  startedAt: z.number(),
+  durationMs: z.number(),
+  cases: z
+    .array(
+      z.object({
+        name: z.string().max(120),
+        runs: z.number(),
+        minMs: z.number(),
+        medianMs: z.number(),
+        maxMs: z.number(),
+        statements: z.number(),
+        error: z.string().max(300).nullable()
+      })
+    )
+    .max(40),
+  plans: z
+    .array(
+      z.object({
+        sql: z.string().max(600),
+        usedBy: z.array(z.string().max(120)).max(40),
+        plan: z.array(z.string().max(400)).max(100),
+        fullScans: z.array(z.string().max(120)).max(40),
+        indexScans: z.array(z.string().max(120)).max(40),
+        tempBtrees: z.number()
+      })
+    )
+    .max(100)
+})
+/** Vom Renderer gemessene Werte für den Export (nur Kanalnamen und Zahlen). */
+const rendererDiagnosticsSchema = z.object({
+  ipc: z.array(timingSummarySchema.extend({ name: z.string().regex(/^[\w.:-]{1,80}$/) })).max(300),
+  longTasks: z.object({
+    count: z.number(),
+    totalMs: z.number(),
+    maxMs: z.number(),
+    recent: z.array(z.object({ at: z.number(), ms: z.number() })).max(100)
+  }),
+  heapUsedMb: z.number().nullable()
+})
+const diagnosticsStatusSchema = z.object({
+  enabled: z.boolean(),
+  startedAt: z.number(),
+  sampleCount: z.number(),
+  storedSessions: z.number(),
+  latest: z
+    .object({
+      t: z.number(),
+      mainCpuPct: z.number(),
+      rssMb: z.number(),
+      heapUsedMb: z.number(),
+      loopP99Ms: z.number(),
+      loopMaxMs: z.number(),
+      appCpuPct: z.number().nullable(),
+      appMemMb: z.number().nullable(),
+      sqlCalls: z.number(),
+      sqlMs: z.number()
+    })
+    .nullable(),
+  topOperations: z.array(timingSummarySchema).max(20),
+  topQueries: z.array(timingSummarySchema).max(20),
+  slow: z.array(z.object({ name: z.string().max(200), ms: z.number(), at: z.number() })).max(20),
+  benchmark: benchmarkResultSchema.nullable()
+})
+
 const threatLevelSchema = z.enum(['none', 'suspicious', 'high'])
 const threatVerdictSchema = z.object({
   level: threatLevelSchema,
@@ -430,6 +505,35 @@ export const invokeContract = {
   'messages:details': {
     input: z.object({ messageId: z.number().int().positive() }),
     output: messageHeaderDetailsSchema
+  },
+  // Leistungsdiagnose (lokal): Status, an/aus, Benchmark, ZIP-Export, Löschen
+  'diagnostics:status': {
+    input: z.void(),
+    output: diagnosticsStatusSchema
+  },
+  'diagnostics:setEnabled': {
+    input: z.object({ enabled: z.boolean() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'diagnostics:benchmark': {
+    input: z.void(),
+    output: benchmarkResultSchema
+  },
+  // Main zeigt den Speichern-Dialog; zurück kommt nur der Dateiname
+  'diagnostics:export': {
+    input: z.object({
+      renderer: rendererDiagnosticsSchema.nullable(),
+      withBenchmark: z.boolean()
+    }),
+    output: z.object({
+      saved: z.boolean(),
+      fileName: z.string().max(255).nullable(),
+      bytes: z.number()
+    })
+  },
+  'diagnostics:clear': {
+    input: z.void(),
+    output: z.object({ ok: z.literal(true) })
   },
   'messages:action': {
     input: z.object({

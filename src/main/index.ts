@@ -28,6 +28,9 @@ import { installAppMenu } from './menu'
 import { cleanupForwardTasksWithoutRequest } from './db/repos/tasks'
 import { reindexHtmlOnlyMessages } from './mail/ingest'
 import { isDev } from './dev-mode'
+import { diagnostics } from './diagnostics/service'
+import { diagnosticsAppInfo } from './diagnostics/app-info'
+import { metrics } from './diagnostics/metrics'
 import { trafficLightPosition } from './window-chrome'
 import {
   APP_CSP,
@@ -204,10 +207,18 @@ app
     electronApp.setAppUserModelId(appId())
 
     const db = openDb()
+    // Lokale Leistungsdiagnose (nur auf dem Gerät; Export als ZIP auf Wunsch)
+    diagnostics.init({
+      db,
+      dbPath: join(app.getPath('userData'), 'noctua.sqlite'),
+      dir: join(app.getPath('userData'), 'diagnostics'),
+      appInfo: diagnosticsAppInfo,
+      getAppMetrics: () => app.getAppMetrics()
+    })
     // Org-Defaults + bereitgestellte AI-Profile (No-op ohne Org-Konfiguration)
     applyOrgConfig(db, app.getLocale())
-    cleanupForwardTasksWithoutRequest(db)
-    reindexHtmlOnlyMessages(db)
+    metrics.time('startup.cleanupForwardTasks', () => cleanupForwardTasksWithoutRequest(db))
+    metrics.time('startup.reindexHtmlOnly', () => reindexHtmlOnlyMessages(db))
     if (isDev) seedFromEnv(db)
     // Dev-only Demo-Daten (NOCTUA_DEMO_SEED=1): kein IMAP-/CalDAV-Sync für Demo-Konten
     const demo = isDev && process.env.NOCTUA_DEMO_SEED === '1'
@@ -222,6 +233,11 @@ app
       push(channel, payload)
       // Neue/aktualisierte Nachrichten können triage-/index-fähig geworden sein.
       if (channel === 'messages:changed') {
+        metrics.count('events.messagesChanged')
+        metrics.count(
+          'events.messagesChanged.threadKeys',
+          (payload as { threadKeys?: string[] }).threadKeys?.length ?? 0
+        )
         aiQueue.kick()
         embeddingIndexer.kick()
         updateBadge()
@@ -397,6 +413,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('quit', () => {
+  diagnostics.persist()
+  diagnostics.stop()
   aiQueue.stop()
   followupRadar.stop()
   embeddingIndexer.stop()

@@ -6,6 +6,7 @@ import { EVENT_CATEGORIES, runEventExtraction } from './events'
 import { applyRulesPostTriage } from './rules'
 import { maybeAutoJunk } from './threat-check'
 import { maybeNotify, updateBadge } from '../notifications'
+import { metrics } from '../diagnostics/metrics'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
@@ -23,6 +24,25 @@ const PROMPT_VERSION_SETTING = 'ai.queuePromptVersion'
 // Termin-Extraktion (Job 'events'): nur Mails, die NACH diesem Zeitpunkt ankamen — beim ersten
 // Lauf mit Kalender-Konto gesetzt, damit nie das 30-Tage-Fenster rückwirkend bezahlt wird.
 const EVENTS_SINCE_SETTING = 'ai.eventsSince'
+
+/**
+ * Triage-Kandidaten einreihen (Parameter: since, PROMPT_VERSION). Exportiert,
+ * damit der Diagnose-Benchmark dieselbe Abfrage misst.
+ */
+export const TRIAGE_DISCOVERY_SQL = `INSERT OR IGNORE INTO ai_jobs (message_id, kind, status)
+  SELECT m.id, 'triage', 'pending'
+  FROM messages m
+  JOIN folders f ON f.id = m.folder_id
+  JOIN accounts a ON a.id = m.account_id
+  WHERE f.special_use = '\\Inbox'
+    AND m.body_state = 'full'
+    AND a.ai_enabled = 1
+    AND coalesce(m.date, m.internal_date, 0) >= ?
+    AND NOT EXISTS (
+      SELECT 1 FROM ai_annotations an
+      WHERE an.message_id = m.id AND an.prompt_version = ?
+    )`
+export const TRIAGE_WINDOW_MS = TRIAGE_WINDOW_DAYS * 24 * 3600 * 1000
 
 const TRANSIENT_NET_CODES = new Set([
   'ECONNREFUSED',
@@ -155,23 +175,11 @@ export class AiQueue {
   }
 
   private discover(): void {
-    this.discoverEvents()
-    const since = Date.now() - TRIAGE_WINDOW_DAYS * 24 * 3600 * 1000
-    this.db!.prepare(
-      `INSERT OR IGNORE INTO ai_jobs (message_id, kind, status)
-       SELECT m.id, 'triage', 'pending'
-       FROM messages m
-       JOIN folders f ON f.id = m.folder_id
-       JOIN accounts a ON a.id = m.account_id
-       WHERE f.special_use = '\\Inbox'
-         AND m.body_state = 'full'
-         AND a.ai_enabled = 1
-         AND coalesce(m.date, m.internal_date, 0) >= ?
-         AND NOT EXISTS (
-           SELECT 1 FROM ai_annotations an
-           WHERE an.message_id = m.id AND an.prompt_version = ?
-         )`
-    ).run(since, PROMPT_VERSION)
+    metrics.time('ai.queue.discover', () => {
+      this.discoverEvents()
+      const since = Date.now() - TRIAGE_WINDOW_MS
+      this.db!.prepare(TRIAGE_DISCOVERY_SQL).run(since, PROMPT_VERSION)
+    })
   }
 
   /**
@@ -247,6 +255,7 @@ export class AiQueue {
     kind?: 'triage' | 'events'
   }): Promise<void> {
     const db = this.db!
+    const endJob = metrics.span(`ai.job.${job.kind ?? 'triage'}`)
     try {
       if (job.kind === 'events') {
         const outcome = await runEventExtraction(db, job.message_id)
@@ -312,12 +321,15 @@ export class AiQueue {
           `UPDATE ai_jobs SET status = 'error', attempts = ?, last_error = ? WHERE id = ?`
         ).run(attempts, message, job.id)
         console.warn(`[ai] job ${job.id} failed permanently: ${message}`)
+        metrics.count('ai.job.failedPermanently')
       } else {
         const backoff = 30_000 * 2 ** attempts
         db.prepare(
           `UPDATE ai_jobs SET status = 'pending', attempts = ?, last_error = ?, next_attempt_at = ? WHERE id = ?`
         ).run(attempts, message, Date.now() + backoff, job.id)
       }
+    } finally {
+      endJob()
     }
   }
 }

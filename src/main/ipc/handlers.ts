@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
+import { basename, join } from 'node:path'
 import { trafficLightPosition } from '../window-chrome'
 import { ImapFlow } from 'imapflow'
 import type { InvokeOutput, IpcHandlers } from '@shared/ipc-contract'
@@ -81,6 +82,7 @@ import { refreshStyleProfile } from '../ai/style'
 import { runModelTest, testProfileConnection } from '../ai/model-test'
 import { listProfileModels, runDecisionTest } from '../ai/decision-service'
 import { getMailSecurity, runThreatCheck } from '../ai/threat-check'
+import { diagnostics } from '../diagnostics/service'
 import {
   clearProfileKey,
   createProfile,
@@ -666,6 +668,27 @@ export const handlers: IpcHandlers = {
     return { models: await listProfileModels(profile, kind), skipped: false }
   },
   'ai:decisions:test': ({ profileId, model }) => runDecisionTest(profileId, model),
+  'diagnostics:status': () => diagnostics.status(),
+  'diagnostics:setEnabled': ({ enabled }) => {
+    diagnostics.setEnabled(enabled)
+    return { ok: true as const }
+  },
+  'diagnostics:benchmark': () => diagnostics.benchmark(),
+  'diagnostics:export': async ({ renderer, withBenchmark }) => {
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      defaultPath: join(app.getPath('downloads'), `noctua-diagnostics-${stamp}.zip`),
+      filters: [{ name: 'ZIP', extensions: ['zip'] }],
+      securityScopedBookmarks: false
+    })
+    if (canceled || !filePath) return { saved: false, fileName: null, bytes: 0 }
+    const bytes = await diagnostics.exportZip(filePath, renderer, withBenchmark)
+    return { saved: true, fileName: basename(filePath), bytes }
+  },
+  'diagnostics:clear': () => {
+    diagnostics.clear()
+    return { ok: true as const }
+  },
   'security:get': ({ messageId }) => ({ security: getMailSecurity(getDb(), messageId) }),
   'security:check': async ({ messageId }) => {
     await runThreatCheck(getDb(), messageId)

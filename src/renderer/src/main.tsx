@@ -13,6 +13,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
+import { startLongTaskObserver } from './lib/diagnostics'
+
+startLongTaskObserver()
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({

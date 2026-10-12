@@ -18,6 +18,7 @@ import {
   Sq
 } from '@renderer/features/settings/TechFigures'
 import { NetworkConnections } from '@renderer/features/settings/NetworkConnections'
+import { DiagnosticsPanel } from '@renderer/features/settings/DiagnosticsPanel'
 import { chipWidth } from '@renderer/features/settings/tech-metrics'
 
 // Technik-Seite: „Wie die Eule denkt" — jede Pipeline als kleine
@@ -885,6 +886,7 @@ export function TechSheet(): React.JSX.Element {
           </Fig>
         </div>
         <NetworkConnections />
+        <DiagnosticsPanel />
       </div>
     </div>
   )
