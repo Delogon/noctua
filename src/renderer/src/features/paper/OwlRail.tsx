@@ -49,12 +49,21 @@ export function railOwlPose(compMode: string, hasKey: boolean | undefined): OwlP
 
 export function OwlRail(): React.JSX.Element {
   const t = useT()
-  const { comp, setView, setMbox, setSelThreadKey, setSelWaitingId, filter, mbox, resetComp } =
-    usePaper()
+  const {
+    comp,
+    setView,
+    setMbox,
+    setSelThreadKey,
+    setSelWaitingId,
+    filter,
+    mbox,
+    folderId,
+    resetComp
+  } = usePaper()
   const toastNow = usePaper((s) => s.toastNow)
   const tasks = useTasks('open')
   const followups = useFollowups()
-  const activeThreads = useThreads(filter, mbox)
+  const activeThreads = useThreads(filter, mbox, folderId)
   const inboxThreads = useThreads(filter, 'inbox')
   const accounts = useAccounts()
   const savedDrafts = useDrafts()

@@ -1484,6 +1484,64 @@ const table = {
   },
   composeChipRemove: { en: 'Remove {addr}', de: '{addr} entfernen' },
 
+  // ── Ordneransicht + Darstellung ──
+  folderUnified: { en: 'Unified inbox', de: 'Alle Posteingänge' },
+  folderUnifiedSent: { en: 'All sent', de: 'Alle gesendeten' },
+  folderUnifiedJunk: { en: 'All junk', de: 'Gesamter Spam' },
+  folderInbox: { en: 'Inbox', de: 'Posteingang' },
+  folderSent: { en: 'Sent', de: 'Gesendet' },
+  folderArchive: { en: 'Archive', de: 'Archiv' },
+  folderJunk: { en: 'Junk', de: 'Spam' },
+  folderFavorites: { en: 'Favorites', de: 'Favoriten' },
+  foldersToggle: { en: 'FOLDERS', de: 'ORDNER' },
+  foldersToggleAria: { en: 'Show folders', de: 'Ordner anzeigen' },
+  foldersTreeAria: { en: 'Folders', de: 'Ordner' },
+  foldersJunkNote: {
+    en: 'Junk stays out of the unified inbox and search.',
+    de: 'Spam bleibt aus dem Posteingang und der Suche draußen.'
+  },
+  foldersSyncing: {
+    en: 'Your own folders appear after the next sync.',
+    de: 'Eigene Ordner erscheinen nach dem nächsten Abgleich.'
+  },
+  setAppearance: { en: 'Appearance', de: 'Darstellung' },
+  setAppearanceSub: { en: 'layout, folders', de: 'Layout, Ordner' },
+  appearanceHead: { en: 'Appearance', de: 'Darstellung' },
+  appearanceSub: {
+    en: 'Same email, same owl — pick the frame that feels like home.',
+    de: 'Dieselben E-Mails, dieselbe Eule – wähle den Rahmen, in dem du dich zu Hause fühlst.'
+  },
+  layoutHead: { en: 'Layout', de: 'Layout' },
+  layoutLetterpress: { en: 'Letterpress', de: 'Letterpress' },
+  layoutLetterpressDesc: {
+    en: 'Calm paper, top navigation, owl rail. The Noctua original.',
+    de: 'Ruhiges Papier, Navigation oben, Eulen-Leiste. Das Noctua-Original.'
+  },
+  layoutClassic: { en: 'Classic', de: 'Klassisch' },
+  layoutClassicDesc: {
+    en: 'Folder pane on the left, command bar, blue accents — familiar if you come from Outlook.',
+    de: 'Ordnerleiste links, Befehlsleiste, blaue Akzente – vertraut, wenn du von Outlook kommst.'
+  },
+  mailboxHead: { en: 'Folders', de: 'Ordner' },
+  showFoldersLabel: { en: 'Show folders', de: 'Ordner anzeigen' },
+  showFoldersHint: {
+    en: "Browse each account's folders next to the unified inbox. Your own folders sync in the background once this is on.",
+    de: 'Die Ordner jedes Kontos neben dem gemeinsamen Posteingang durchsuchen. Eigene Ordner werden dann im Hintergrund abgeglichen.'
+  },
+  junkAlways: { en: 'ALWAYS', de: 'IMMER' },
+  junkAlwaysNote: {
+    en: 'Junk and spam folders never appear in the unified inbox, “needs you” or search — open them only on purpose.',
+    de: 'Spam-Ordner erscheinen nie im gemeinsamen Posteingang, bei „Braucht dich“ oder in der Suche – nur, wenn du sie gezielt öffnest.'
+  },
+  classicNewMail: { en: 'New email', de: 'Neue E-Mail' },
+  classicSearch: { en: 'Search or ask the owl', de: 'Suchen oder die Eule fragen' },
+  classicAppsAria: { en: 'Apps', de: 'Apps' },
+  classicMail: { en: 'Email', de: 'E-Mail' },
+  classicWaiting: { en: 'Waiting', de: 'Ausstehend' },
+  classicTasks: { en: 'Tasks', de: 'Aufgaben' },
+  classicCalendar: { en: 'Calendar', de: 'Kalender' },
+  classicOwl: { en: 'Owl', de: 'Eule' },
+  classicSettings: { en: 'Settings', de: 'Einstellungen' },
   mboxInbox: { en: 'INBOX', de: 'POSTEINGANG' },
   mboxSent: { en: 'SENT', de: 'GESENDET' },
   mboxSpam: { en: 'SPAM', de: 'SPAM' },

@@ -34,7 +34,7 @@ function PaperPaletteOpen(): React.JSX.Element {
   const t = useT()
   const { lang, setLang } = useI18n()
   const paper = usePaper()
-  const threads = useThreads(paper.filter, paper.mbox)
+  const threads = useThreads(paper.filter, paper.mbox, paper.folderId)
   const followups = useFollowups()
   const accounts = useAccounts()
   const setAddAccountOpen = useUiStore((s) => s.setAddAccountOpen)

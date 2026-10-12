@@ -20,7 +20,7 @@ import {
   TaskProviderPicker,
   DecisionCard
 } from '@renderer/features/settings/AiProvidersSection'
-import { usePaper } from '@renderer/stores/paper'
+import { usePaper, type PaperLayout } from '@renderer/stores/paper'
 import { rowTime, useI18n, useT } from '@renderer/lib/i18n'
 import { useStyleMeta, useStyleProfile } from '@renderer/features/paper/useVoiceTag'
 import {
@@ -2043,5 +2043,79 @@ function TasksAutoCard(): React.JSX.Element {
         </span>
       </div>
     </>
+  )
+}
+
+/** Mini-Vorschau eines Layouts für die Auswahlkarte (rein dekorativ). */
+function LayoutPreview({ classic }: { classic: boolean }): React.JSX.Element {
+  return (
+    <div className="layout-preview" data-classic={classic} aria-hidden="true">
+      <div className="layout-preview__bar" />
+      <div className="layout-preview__body">
+        {classic && <div className="layout-preview__folders" />}
+        <div className="layout-preview__list" />
+        <div className="layout-preview__sheet" />
+        {!classic && <div className="layout-preview__rail" />}
+      </div>
+    </div>
+  )
+}
+
+/** Einstellungen › Darstellung: Layout-Wahl und Ordneransicht. */
+export function AppearanceSheet(): React.JSX.Element {
+  const t = useT()
+  const layout = usePaper((s) => s.layout)
+  const setLayout = usePaper((s) => s.setLayout)
+  const showFolders = usePaper((s) => s.showFolders)
+  const setShowFolders = usePaper((s) => s.setShowFolders)
+  const options: Array<{ id: PaperLayout; name: string; desc: string }> = [
+    { id: 'letterpress', name: t('layoutLetterpress'), desc: t('layoutLetterpressDesc') },
+    { id: 'classic', name: t('layoutClassic'), desc: t('layoutClassicDesc') }
+  ]
+  return (
+    <SheetShell title={t('appearanceHead')} sub={t('appearanceSub')}>
+      <div className="mlabel" style={{ marginTop: 22, color: 'var(--muted)' }}>
+        {t('layoutHead')}
+      </div>
+      <div className="layout-options" role="radiogroup" aria-label={t('layoutHead')}>
+        {options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={layout === o.id}
+            className="layout-option"
+            onClick={() => setLayout(o.id)}
+          >
+            <LayoutPreview classic={o.id === 'classic'} />
+            <span className="layout-option__copy">
+              <strong>{o.name}</strong>
+              <small>{o.desc}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
+        {t('mailboxHead')}
+      </div>
+      <label className="appearance-check" htmlFor="appearance-show-folders">
+        <input
+          id="appearance-show-folders"
+          type="checkbox"
+          checked={showFolders}
+          onChange={(e) => setShowFolders(e.target.checked)}
+        />
+        <span>
+          <strong>{t('showFoldersLabel')}</strong>
+          <small>{t('showFoldersHint')}</small>
+        </span>
+      </label>
+      <div className="appearance-note">
+        <span className="mlabel" style={{ color: 'var(--ac)' }}>
+          {t('junkAlways')}
+        </span>
+        <span>{t('junkAlwaysNote')}</span>
+      </div>
+    </SheetShell>
   )
 }

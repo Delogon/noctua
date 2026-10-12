@@ -4,7 +4,13 @@ import type { InvokeOutput, IpcHandlers } from '@shared/ipc-contract'
 import type { AccountSummary } from '@shared/types'
 import { ACCOUNT_COLORS, PASTEL_COLORS } from '@shared/types'
 import { getDb, getSetting, setSetting } from '../db'
-import { getThreadMessages, imagesAllowKey, listThreads, mboxCounts } from '../db/repos/threads'
+import {
+  getThreadMessages,
+  imagesAllowKey,
+  listFolders,
+  listThreads,
+  mboxCounts
+} from '../db/repos/threads'
 import { getInlineImages, saveAttachment } from '../mail/attachments'
 import { listTaskLists, setTasksSyncCalendar, targetCalendar } from '../tasks/caldav-sync'
 import { countOpenTasks, decideSuggestion, listTasks, updateTaskStatus } from '../db/repos/tasks'
@@ -576,9 +582,11 @@ export const handlers: IpcHandlers = {
     return { ok: true }
   },
 
-  'threads:list': ({ limit, accountId, mbox }) => ({
-    threads: listThreads(getDb(), limit, accountId, mbox)
+  'threads:list': ({ limit, accountId, mbox, folderId }) => ({
+    threads: listThreads(getDb(), limit, accountId, mbox, folderId)
   }),
+
+  'folders:list': () => ({ folders: listFolders(getDb()) }),
 
   'threads:mboxCounts': ({ accountId }) => mboxCounts(getDb(), accountId),
 

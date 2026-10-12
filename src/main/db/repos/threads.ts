@@ -1,7 +1,14 @@
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { isSecurityNotification, isUserAuthoredMail } from './tasks'
 import { taskAddresseeVerdict } from '../../ai/addressee'
-import type { AiCategory, MessageDetail, Recipient, ThreadListItem } from '@shared/types'
+import type {
+  AiCategory,
+  FolderListItem,
+  MessageDetail,
+  Recipient,
+  ThreadListItem
+} from '@shared/types'
+import { folderLeaf, folderRole } from '@shared/folder-roles'
 import { htmlToText } from '../../mail/parser'
 import { isForwardWithoutRequest, textBeforeForwardedMessage } from '../../mail/forwarded'
 import { isVisibleMailAttachment } from '../../mail/attachment-visibility'
@@ -219,18 +226,61 @@ export function listThreads(
   db: Database.Database,
   limit: number,
   accountId?: number,
-  mbox: 'inbox' | 'sent' | 'spam' = 'inbox'
+  mbox: 'inbox' | 'sent' | 'spam' = 'inbox',
+  folderId?: number
 ): ThreadListItem[] {
-  const where = `JOIN folders f ON m.folder_id = f.id WHERE f.special_use = ?`
+  // Ordneransicht: genau ein Ordner. Sonst die vereinheitlichte Sicht über die
+  // Special-Use — \Junk taucht damit nur auf, wenn SPAM ausdrücklich gewählt ist.
+  const where =
+    folderId != null
+      ? `JOIN folders f ON m.folder_id = f.id WHERE f.id = ?`
+      : `JOIN folders f ON m.folder_id = f.id WHERE f.special_use = ?`
   const accountFilter = accountId != null ? ' AND m.account_id = ?' : ''
-  const params: unknown[] =
-    accountId != null ? [MBOX_SPECIAL[mbox], accountId, limit] : [MBOX_SPECIAL[mbox], limit]
+  const params: unknown[] = [folderId != null ? folderId : MBOX_SPECIAL[mbox]]
+  if (accountId != null) params.push(accountId)
+  params.push(limit)
   const rows = db
     .prepare(
       `${THREAD_AGG_SELECT} ${where}${accountFilter} GROUP BY m.thread_key ORDER BY max_date DESC LIMIT ?`
     )
     .all(...params) as ThreadAggRow[]
   return rows.map((agg) => buildThreadItem(db, agg))
+}
+
+/**
+ * Ordnerbaum je Konto für die Ordneransicht: nur Ordner mit Envelopes
+ * (Voll-Sync). Papierkorb/Entwürfe/„Alle Nachrichten" bleiben draußen.
+ */
+export function listFolders(db: Database.Database): FolderListItem[] {
+  const rows = db
+    .prepare(
+      `SELECT f.id, f.account_id, f.path, f.delimiter, f.special_use,
+              count(DISTINCT m.thread_key) AS threads,
+              count(DISTINCT CASE WHEN m.seen = 0 THEN m.thread_key END) AS unread
+       FROM folders f LEFT JOIN messages m ON m.folder_id = f.id
+       WHERE f.sync_mode = 'full'
+       GROUP BY f.id
+       ORDER BY f.account_id, f.path COLLATE NOCASE`
+    )
+    .all() as Array<{
+    id: number
+    account_id: number
+    path: string
+    delimiter: string | null
+    special_use: string | null
+    threads: number
+    unread: number
+  }>
+  return rows.map((r) => ({
+    id: r.id,
+    accountId: r.account_id,
+    path: r.path,
+    name: folderLeaf(r.path, r.delimiter),
+    delimiter: r.delimiter,
+    role: folderRole(r.special_use),
+    threadCount: r.threads,
+    unreadCount: r.unread
+  }))
 }
 
 export function imagesAllowKey(addr: string): string {

@@ -31,6 +31,7 @@ import m030 from './030_carddav.sql?raw'
 import m031 from './031_invitations.sql?raw'
 import m032 from './032_event_suggestions.sql?raw'
 import m033 from './033_ai_decisions.sql?raw'
+import m034 from './034_folder_delimiter.sql?raw'
 
 /**
  * Migrationen als ?raw-Importe, damit sie in das Main-Bundle eingebettet werden
@@ -70,5 +71,6 @@ export const migrations: ReadonlyArray<{ version: number; name: string; sql: str
   { version: 30, name: '030_carddav', sql: m030 },
   { version: 31, name: '031_invitations', sql: m031 },
   { version: 32, name: '032_event_suggestions', sql: m032 },
-  { version: 33, name: '033_ai_decisions', sql: m033 }
+  { version: 33, name: '033_ai_decisions', sql: m033 },
+  { version: 34, name: '034_folder_delimiter', sql: m034 }
 ]

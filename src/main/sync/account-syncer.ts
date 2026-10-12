@@ -19,6 +19,7 @@ import {
 } from '../db/repos/message-headers'
 import { OpDeadError } from './op-queue'
 import { resetFolderForUidValidity } from './uidvalidity'
+import { inferSpecialUses } from '@shared/folder-roles'
 
 const DEFAULT_ENVELOPE_BACKFILL_DAYS = 90
 export const SEARCH_BACKFILL_DAYS = 183
@@ -355,12 +356,20 @@ export class AccountSyncer {
     // Getrennt/Backoff: aufwecken reicht — der Reconnect synct ohnehin alles.
     this.retryNow()
     if (!this.cmd) return
-    for (const folder of this.folders) {
-      if (folder.sync_mode !== 'full') continue
-      void this.enqueueFolderSync(folder).catch((error) =>
-        console.warn(`[sync:${this.account.email}] Refresh ${folder.path}:`, error)
-      )
-    }
+    // Ordnerliste neu lesen: neue Ordner und ein umgeschalteter Ordner-Sync
+    // (mail.showFolders) greifen so ohne Reconnect.
+    void this.enqueue(async () => {
+      this.folders = await this.syncFolderList()
+    })
+      .catch((error) => console.warn(`[sync:${this.account.email}] Ordnerliste:`, error))
+      .then(() => {
+        for (const folder of this.folders) {
+          if (folder.sync_mode !== 'full') continue
+          void this.enqueueFolderSync(folder).catch((error) =>
+            console.warn(`[sync:${this.account.email}] Refresh ${folder.path}:`, error)
+          )
+        }
+      })
   }
 
   /** Gezielter Resync eines Ordners (z. B. Sent direkt nach dem Senden). */
@@ -423,16 +432,24 @@ export class AccountSyncer {
     const list = await this.cmd!.list()
     const rows: FolderRow[] = []
     const upsert = this.db.prepare(
-      `INSERT INTO folders (account_id, path, special_use, sync_mode)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO folders (account_id, path, special_use, sync_mode, delimiter)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(account_id, path) DO UPDATE SET
-         special_use = excluded.special_use, sync_mode = excluded.sync_mode
+         special_use = excluded.special_use, sync_mode = excluded.sync_mode,
+         delimiter = excluded.delimiter
        RETURNING id, path, special_use, uidvalidity, uidnext, sync_mode,
                  envelope_backfill_since, body_backfill_since`
     )
-    for (const box of list) {
-      let specialUse = box.specialUse ?? null
-      if (box.path.toUpperCase() === 'INBOX') specialUse = '\\Inbox'
+    // Ordneransicht an: eigene Ordner ebenfalls (Envelopes im Backfill-Fenster) syncen
+    const userFolders =
+      (
+        this.db.prepare("SELECT value FROM settings WHERE key = 'mail.showFolders'").get() as
+          { value: string } | undefined
+      )?.value === '1'
+    // Server ohne SPECIAL-USE: Rollen über den Namen ergänzen — v. a. Junk
+    const specialUses = inferSpecialUses(list)
+    list.forEach((box, i) => {
+      const specialUse = specialUses[i]
       let syncMode = 'off'
       // Junk voll syncen: der SPAM-Ordner-Filter braucht die Envelopes.
       // Triage/Embeddings/Badge bleiben auf \Inbox begrenzt — Spam kostet nichts.
@@ -444,10 +461,20 @@ export class AccountSyncer {
       )
         syncMode = 'full'
       else if (specialUse === '\\Trash') syncMode = 'flags'
+      else if (specialUse === null && userFolders && !box.flags?.has('\\Noselect'))
+        syncMode = 'full'
       // Gmail "Alle Nachrichten" ist die Duplikat-Falle — nie synchronisieren.
       if (specialUse === '\\All' || specialUse === '\\Flagged') syncMode = 'off'
-      rows.push(upsert.get(this.account.id, box.path, specialUse, syncMode) as FolderRow)
-    }
+      rows.push(
+        upsert.get(
+          this.account.id,
+          box.path,
+          specialUse,
+          syncMode,
+          box.delimiter ?? null
+        ) as FolderRow
+      )
+    })
     return rows
   }
 

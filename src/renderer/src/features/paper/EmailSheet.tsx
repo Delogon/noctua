@@ -585,11 +585,20 @@ export function EmailSheet(): React.JSX.Element {
   const t = useT()
   const lang = useI18n((s) => s.lang)
   const queryClient = useQueryClient()
-  const { selThreadKey, filter, comp, setComp, resetComp, toastNow, setSelThreadKey, mbox } =
-    usePaper()
+  const {
+    selThreadKey,
+    filter,
+    comp,
+    setComp,
+    resetComp,
+    toastNow,
+    setSelThreadKey,
+    mbox,
+    folderId
+  } = usePaper()
   const overrideMenuOpen = useUiStore((s) => s.overrideMenuOpen)
   const setOverrideMenuOpen = useUiStore((s) => s.setOverrideMenuOpen)
-  const threads = useThreads(filter, mbox)
+  const threads = useThreads(filter, mbox, folderId)
   const accounts = useAccounts()
   const beginSend = useSendState((st) => st.begin)
 

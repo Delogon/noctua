@@ -15,11 +15,21 @@ import { installPaperKeymap } from '@renderer/keyboard/keymap'
 import { initLanguage, t } from '@renderer/lib/i18n'
 import { toast } from '@renderer/stores/toast'
 import { Masthead } from '@renderer/components/paper/Masthead'
+import {
+  ClassicAppRail,
+  ClassicFolderPane,
+  ClassicTopBar
+} from '@renderer/components/paper/ClassicChrome'
 import { ListPane } from '@renderer/features/paper/ListPane'
 import { EmailSheet } from '@renderer/features/paper/EmailSheet'
 import { WaitingSheet } from '@renderer/features/paper/WaitingSheet'
 import { TaskSheet } from '@renderer/features/paper/TaskSheet'
-import { AccountsSheet, IntelSheet, StyleSheetView } from '@renderer/features/paper/SettingsSheets'
+import {
+  AccountsSheet,
+  AppearanceSheet,
+  IntelSheet,
+  StyleSheetView
+} from '@renderer/features/paper/SettingsSheets'
 import { SigSheet } from '@renderer/features/paper/SigSheet'
 import { TechSheet } from '@renderer/features/settings/TechSheet'
 import { ComposeSheet } from '@renderer/features/paper/ComposeSheet'
@@ -35,8 +45,11 @@ import { AddAccountDialog } from '@renderer/features/onboarding/AddAccountDialog
 function PanelGate(): React.JSX.Element {
   const showList = usePaper((s) => s.showList)
   const showRail = usePaper((s) => s.showRail)
+  const classic = usePaper((s) => s.layout === 'classic')
+  const view = usePaper((s) => s.view)
   return (
     <>
+      {classic && showList && (view === 'inbox' || view === 'compose') && <ClassicFolderPane />}
       {showList && <ListPane />}
       <CenterSheet />
       {showRail && <OwlRail />}
@@ -54,6 +67,7 @@ function CenterSheet(): React.JSX.Element {
       {view === 'tasks' && <TaskSheet />}
       {view === 'calendar' && <CalendarSheet />}
       {view === 'settings' && setSel === 'accounts' && <AccountsSheet />}
+      {view === 'settings' && setSel === 'appearance' && <AppearanceSheet />}
       {view === 'settings' && setSel === 'style' && <StyleSheetView />}
       {view === 'settings' && setSel === 'sig' && <SigSheet />}
       {view === 'settings' && setSel === 'intel' && <IntelSheet />}
@@ -67,6 +81,7 @@ function App(): React.JSX.Element {
   const accounts = useAccounts()
   const accountIdsRef = useRef<readonly number[]>([])
   const onboarding = usePaper((s) => s.onboarding)
+  const layout = usePaper((s) => s.layout)
   const queryClient = useQueryClient()
   useThreadInvalidation()
   useTaskInvalidation()
@@ -198,10 +213,19 @@ function App(): React.JSX.Element {
   return (
     <div
       className="relative flex h-full flex-col overflow-hidden"
+      data-layout={onboarding ? 'letterpress' : layout}
       style={{ minWidth: 1180, background: 'var(--paper)', color: 'var(--ink)' }}
     >
       {onboarding ? (
         <Onboarding />
+      ) : layout === 'classic' ? (
+        <>
+          <ClassicTopBar />
+          <div className="flex min-h-0 flex-1">
+            <ClassicAppRail />
+            <PanelGate />
+          </div>
+        </>
       ) : (
         <>
           <Masthead />

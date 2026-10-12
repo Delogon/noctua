@@ -13,7 +13,8 @@ import {
   semanticSearchHitSchema,
   semanticSearchIndexSchema,
   taskItemSchema,
-  threadListItemSchema
+  threadListItemSchema,
+  folderListItemSchema
 } from './types'
 import {
   calendarAccountStateSchema,
@@ -385,9 +386,15 @@ export const invokeContract = {
     input: z.object({
       limit: z.number().int().min(1).max(500).default(200),
       accountId: z.number().int().optional(),
-      mbox: z.enum(['inbox', 'sent', 'spam']).default('inbox')
+      mbox: z.enum(['inbox', 'sent', 'spam']).default('inbox'),
+      // Ordneransicht: ein bestimmter Ordner statt der vereinheitlichten Sicht
+      folderId: z.number().int().positive().optional()
     }),
     output: z.object({ threads: z.array(threadListItemSchema) })
+  },
+  'folders:list': {
+    input: z.void(),
+    output: z.object({ folders: z.array(folderListItemSchema) })
   },
   'threads:mboxCounts': {
     input: z.object({ accountId: z.number().int().optional() }),
