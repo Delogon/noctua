@@ -100,17 +100,24 @@ export function refreshMessageSearchIndex(db: Database.Database, messageId: numb
     .prepare('SELECT content_hash FROM message_embedding_state WHERE message_id = ?')
     .get(messageId) as { content_hash: string } | undefined
 
-  db.prepare('DELETE FROM messages_fts WHERE rowid = ?').run(messageId)
-  db.prepare(
-    `INSERT INTO messages_fts (rowid, subject, sender, recipients, body)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(
-    messageId,
-    foldSharpS(row.subject ?? ''),
-    foldSharpS(sender),
-    foldSharpS(recipients),
-    foldSharpS(searchableBody)
-  )
+  // The hash covers every indexed field: unchanged content (e.g. a body
+  // fetched again) keeps its FTS row instead of a delete + re-insert.
+  const unchanged =
+    previous?.content_hash === contentHash &&
+    db.prepare('SELECT 1 FROM messages_fts_docsize WHERE id = ?').get(messageId) !== undefined
+  if (!unchanged) {
+    db.prepare('DELETE FROM messages_fts WHERE rowid = ?').run(messageId)
+    db.prepare(
+      `INSERT INTO messages_fts (rowid, subject, sender, recipients, body)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      messageId,
+      foldSharpS(row.subject ?? ''),
+      foldSharpS(sender),
+      foldSharpS(recipients),
+      foldSharpS(searchableBody)
+    )
+  }
 
   if (!previous || previous.content_hash !== contentHash) {
     // An old vector must not produce wrong hits during the rebuild.

@@ -2,7 +2,7 @@ import { ImapFlow, type FetchMessageObject, type MessageAddressObject } from 'im
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { isTlsPinMismatch } from '../auth/loopback-tls'
 import { imapConnectOptions, type AccountRow, type MailCredentials } from '../auth/providers'
-import { parseMail } from '../mail/parser'
+import { parseMail, type ParsedMail } from '../mail/parser'
 import {
   applyFlagUpdates,
   deleteByUids,
@@ -27,6 +27,8 @@ export const SEARCH_BACKFILL_DAYS = 183
 const ENVELOPE_CHUNK = 200
 const BODY_CHUNK = 10
 const BODY_PASS_LIMIT = 50
+/** After this many failed fetches the backfill skips a message (opening it still fetches). */
+export const MAX_BODY_ATTEMPTS = 3
 const FLAG_RESYNC_WINDOW = 500
 const BACKOFF_BASE_MS = 5_000
 const BACKOFF_MAX_MS = 5 * 60_000
@@ -82,6 +84,22 @@ interface FolderRow {
 }
 
 const SEARCHABLE_SPECIAL_USES = new Set(['\\Inbox', '\\Sent', '\\Archive'])
+
+/**
+ * Next messages for the body backfill (parameters: folder id,
+ * MAX_BODY_ATTEMPTS, cutoff, excluded ids, limit). Walks the partial index
+ * idx_msg_body_pending (only messages without a body) newest first.
+ */
+export function pendingBodiesSql(excludedCount: number): string {
+  const exclusion =
+    excludedCount > 0 ? `AND id NOT IN (${Array(excludedCount).fill('?').join(',')})` : ''
+  return `SELECT id, uid, thread_key FROM messages
+    WHERE folder_id = ? AND body_state = 'none' AND body_attempts < ?
+      AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
+      ${exclusion}
+    ORDER BY coalesce(date, internal_date) DESC, id DESC
+    LIMIT ?`
+}
 
 function isSearchableFolder(folder: Pick<FolderRow, 'special_use'>): boolean {
   return folder.special_use !== null && SEARCHABLE_SPECIAL_USES.has(folder.special_use)
@@ -656,47 +674,87 @@ export class AccountSyncer {
     const endPass = metrics.span('sync.bodies.pass')
     const cutoff = backfillCutoff(this.account.sync_days, true)
     const excluded = [...new Set(skippedIds)]
-    const exclusionSql =
-      excluded.length > 0 ? `AND id NOT IN (${excluded.map(() => '?').join(',')})` : ''
     const pending = this.db
-      .prepare(
-        `SELECT id FROM messages
-         WHERE folder_id = ? AND body_state = 'none'
-           AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
-           ${exclusionSql}
-         ORDER BY coalesce(date, internal_date) DESC, id DESC
-         LIMIT ?`
-      )
-      .all(folder.id, cutoff, ...excluded, BODY_PASS_LIMIT) as Array<{ id: number }>
+      .prepare(pendingBodiesSql(excluded.length))
+      .all(folder.id, MAX_BODY_ATTEMPTS, cutoff, ...excluded, BODY_PASS_LIMIT) as Array<{
+      id: number
+      uid: number
+      thread_key: string
+    }>
 
     const failedIds: number[] = []
     for (let i = 0; i < pending.length; i += BODY_CHUNK) {
       if (this.stopped) return
       const batch = pending.slice(i, i + BODY_CHUNK)
-      const threadKeys = new Set<string>()
-      // One lock per batch — guarantees the right selected mailbox.
+      // One FETCH per batch instead of one round trip per message. The lock
+      // guarantees the right selected mailbox.
+      const sources = new Map<number, Buffer>()
       const lock = await this.cmd!.getMailboxLock(folder.path)
       try {
-        for (const { id } of batch) {
-          const key = await this.fetchBodyInSelectedMailbox(id)
-          if (key) threadKeys.add(key)
-          else failedIds.push(id)
-        }
+        await metrics.timeAsync(
+          'sync.bodies.fetchChunk',
+          async () => {
+            for await (const msg of this.cmd!.fetch(
+              batch.map((row) => row.uid).join(','),
+              { source: true },
+              { uid: true }
+            )) {
+              if (msg.source) sources.set(msg.uid, msg.source)
+            }
+          },
+          { messages: batch.length }
+        )
       } finally {
         lock.release()
       }
+
+      const stored: Array<{ id: number; threadKey: string; source: Buffer; parsed: ParsedMail }> =
+        []
+      for (const row of batch) {
+        const source = sources.get(row.uid)
+        if (!source) {
+          failedIds.push(row.id)
+          continue
+        }
+        metrics.count('sync.bodies.bytes', source.length)
+        try {
+          const parsed = await metrics.timeAsync('mail.parse', () => parseMail(source), {
+            kb: Math.round(source.length / 1024)
+          })
+          stored.push({ id: row.id, threadKey: row.thread_key, source, parsed })
+        } catch (error) {
+          console.warn(`[sync:${this.account.email}] parse failed:`, error)
+          failedIds.push(row.id)
+        }
+      }
+      const batchFailed = batch.filter((row) => !stored.some((s) => s.id === row.id))
+      metrics.time(
+        'sync.bodies.store',
+        () =>
+          this.db.transaction(() => {
+            for (const s of stored) this.storeFetchedBody(s.id, s.source, s.parsed)
+            const countAttempt = this.db.prepare(
+              'UPDATE messages SET body_attempts = body_attempts + 1 WHERE id = ?'
+            )
+            for (const row of batchFailed) countAttempt.run(row.id)
+          })(),
+        { messages: stored.length }
+      )
+      for (const s of stored) this.applyIngestRules(s.id)
       // A batch where every fetch failed changed nothing: no refresh
-      if (threadKeys.size > 0) this.events.onMessagesChanged(folder.id, [...threadKeys])
+      if (stored.length > 0) {
+        this.events.onMessagesChanged(folder.id, [...new Set(stored.map((s) => s.threadKey))])
+      }
     }
     endPass({ pending: pending.length, failed: failedIds.length })
 
     const remaining = this.db
       .prepare(
         `SELECT count(*) AS count FROM messages
-         WHERE folder_id = ? AND body_state = 'none'
+         WHERE folder_id = ? AND body_state = 'none' AND body_attempts < ?
            AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)`
       )
-      .get(folder.id, cutoff) as { count: number }
+      .get(folder.id, MAX_BODY_ATTEMPTS, cutoff) as { count: number }
     if (remaining.count === 0) {
       this.db
         .prepare('UPDATE folders SET body_backfill_since = ? WHERE id = ?')
@@ -709,17 +767,39 @@ export class AccountSyncer {
       const untried = this.db
         .prepare(
           `SELECT count(*) AS count FROM messages
-           WHERE folder_id = ? AND body_state = 'none'
+           WHERE folder_id = ? AND body_state = 'none' AND body_attempts < ?
              AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
              ${nextExclusionSql}`
         )
-        .get(folder.id, cutoff, ...nextExcluded) as { count: number }
+        .get(folder.id, MAX_BODY_ATTEMPTS, cutoff, ...nextExcluded) as { count: number }
       if (untried.count === 0) return
       // Queue the next small pass at the back. That way the backfill reaches
       // more than 500 bodies without blocking sending/archiving for minutes.
       void this.enqueue(() => this.backfillBodies(folder, nextExcluded)).catch((error) =>
         console.warn(`[sync:${this.account.email}] Body-Backfill ${folder.path}:`, error)
       )
+    }
+  }
+
+  /** Body, attachments, search index and header details of a fetched message. */
+  private storeFetchedBody(messageId: number, source: Buffer, parsed: ParsedMail): void {
+    storeBody(this.db, messageId, parsed)
+    storeMessageHeaderDetails(this.db, messageId, {
+      from: parsed.from ? [parsed.from] : [],
+      sender: parsed.sender ? [parsed.sender] : [],
+      to: parsed.to,
+      cc: parsed.cc,
+      bcc: parsed.bcc ?? [],
+      replyTo: parsed.replyTo,
+      rawHeaders: rawHeaderBlock(source)
+    })
+  }
+
+  private applyIngestRules(messageId: number): void {
+    try {
+      applyRules(this.db, messageId, 'ingest')
+    } catch (error) {
+      console.warn('[rules]', error)
     }
   }
 
@@ -737,23 +817,10 @@ export class AccountSyncer {
     const parsed = await metrics.timeAsync('mail.parse', () => parseMail(msg.source!), {
       kb: Math.round(msg.source.length / 1024)
     })
-    const endStore = metrics.span('sync.bodies.store')
-    storeBody(this.db, messageId, parsed)
-    storeMessageHeaderDetails(this.db, messageId, {
-      from: parsed.from ? [parsed.from] : [],
-      sender: parsed.sender ? [parsed.sender] : [],
-      to: parsed.to,
-      cc: parsed.cc,
-      bcc: parsed.bcc ?? [],
-      replyTo: parsed.replyTo,
-      rawHeaders: rawHeaderBlock(msg.source)
-    })
-    try {
-      applyRules(this.db, messageId, 'ingest')
-    } catch (error) {
-      console.warn('[rules]', error)
-    }
-    endStore()
+    metrics.time('sync.bodies.store', () =>
+      this.db.transaction(() => this.storeFetchedBody(messageId, msg.source!, parsed))()
+    )
+    this.applyIngestRules(messageId)
     return row.thread_key
   }
 
