@@ -9,9 +9,9 @@ export function isForwardedSubject(subject: string | null | undefined): boolean 
 }
 
 /**
- * Bei einer Weiterleitung zählt nur der Text, den der aktuelle Absender vor
- * dem eingebetteten Original ergänzt hat. So werden Fragen aus der
- * weitergeleiteten Mail nicht versehentlich dem aktuellen Absender zugerechnet.
+ * For a forward, only the text the current sender added before the
+ * embedded original counts. That way questions from the
+ * forwarded mail aren't accidentally attributed to the current sender.
  */
 export function textBeforeForwardedMessage(
   subject: string | null | undefined,
@@ -27,7 +27,7 @@ export function textBeforeForwardedMessage(
     .trim()
 }
 
-/** Weiterleitung ohne Auftrag: leer oder lediglich als FYI/zur Kenntnis. */
+/** Forward without a request: empty or merely FYI. */
 export function isForwardWithoutRequest(subject: string | null | undefined, text: string): boolean {
   if (!isForwardedSubject(subject)) return false
   const ownText = textBeforeForwardedMessage(subject, text)

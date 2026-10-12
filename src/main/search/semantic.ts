@@ -49,8 +49,8 @@ export interface SemanticSearchDependencies {
   ) => RankedMessage[]
 }
 
-// `draft` fängt auch Entwürfe in Ordnern ohne Special-Use ab. Die
-// normalisierte Special-Use-Prüfung deckt \Junk/\Spam, \Trash und \Drafts ab.
+// `draft` also catches drafts in folders without special-use. The
+// normalized special-use check covers \Junk/\Spam, \Trash and \Drafts.
 const SEARCHABLE_MESSAGE_SQL = `
   m.draft = 0
   AND lower(replace(coalesce(f.special_use, ''), char(92), ''))
@@ -59,7 +59,7 @@ const SEARCHABLE_MESSAGE_SQL = `
       NOT IN ('junk', 'spam', 'trash', 'drafts', 'entwürfe', 'papierkorb')`
 
 const STOP_WORDS = new Set([
-  // Natürliche deutsche Fragen
+  // Natural German questions
   'aber',
   'als',
   'auch',
@@ -115,7 +115,7 @@ const STOP_WORDS = new Set([
   'wurden',
   'zum',
   'zur',
-  // Englische Fragen in einem gemischten Postfach
+  // English questions in a mixed mailbox
   'a',
   'an',
   'and',
@@ -151,7 +151,7 @@ function rawQueryTokens(query: string): string[] {
   )
 }
 
-/** Aussagekräftige Terme für den lokalen FTS-Pfad. */
+/** Meaningful terms for the local FTS path. */
 export function queryTerms(query: string): string[] {
   const raw = rawQueryTokens(query)
   const meaningful = raw.filter((token) => !STOP_WORDS.has(token))
@@ -206,8 +206,8 @@ export function sqliteVectorCandidates(
   limit: number,
   accountId?: number
 ): RankedMessage[] {
-  // Mehr Nachbarn holen als am Ende gebraucht werden: verbotene Ordner und
-  // andere Konten werden erst nach dem vec0-KNN-Schritt herausgefiltert.
+  // Fetch more neighbors than needed in the end: forbidden folders and
+  // other accounts are only filtered out after the vec0 KNN step.
   const k = Math.min(500, Math.max(64, limit * 6))
   return db
     .prepare(
@@ -244,8 +244,8 @@ async function semanticCandidates(
       accountId
     )
   } catch (error) {
-    // Modell noch nicht geladen, Download offline oder Index leer: Die
-    // lokale Volltextsuche bleibt ohne sichtbaren Fehler nutzbar.
+    // Model not loaded yet, download offline or index empty: the
+    // local full-text search stays usable without a visible error.
     console.warn(
       '[search] Semantischer Pfad nicht verfügbar, nutze Volltext:',
       error instanceof Error ? error.message : String(error)
@@ -268,11 +268,11 @@ let indexStatusCache: {
 } | null = null
 
 /**
- * Der Indexstand speist nur die Fusszeile der Eule, zaehlt dafuer aber ueber
- * den gesamten Volltext- und Vektorindex. Frueher lief das bei jedem
- * Sucheingabe-Request mit und blockierte den Main-Prozess sekundenlang. Die
- * Zahl aendert sich nur, waehrend der Indexer im Hintergrund arbeitet — ein
- * Cache von einer Minute reicht dafuer voellig.
+ * The index state only feeds the owl's footer, but counts across the
+ * entire full-text and vector index for it. This used to run with every
+ * search input request and blocked the main process for seconds. The
+ * number only changes while the indexer works in the background — a
+ * one-minute cache is entirely sufficient for that.
  */
 function cachedIndexStatus(db: Database.Database, accountId?: number): SemanticSearchIndex {
   const key = accountId ?? 'all'
@@ -303,10 +303,10 @@ export function semanticIndexStatus(
   let searchableMessages = 0
   let embeddedMessages = 0
   try {
-    // Über messages_fts selbst zu zählen liest den kompletten Trigram-Index —
-    // auf einem 40k-Postfach bis zu zweieinhalb Sekunden. Die Schattentabelle
-    // _docsize hat genau eine Zeile pro indexiertem Dokument, der Treffer wird
-    // also zum Punkt-Lookup. Fällt sie weg, zählt der alte Weg weiter.
+    // Counting via messages_fts itself reads the complete trigram index —
+    // up to two and a half seconds on a 40k mailbox. The shadow table
+    // _docsize has exactly one row per indexed document, so the hit
+    // becomes a point lookup. If it is missing, the old path keeps counting.
     searchableMessages = countRows(
       db,
       `SELECT count(*) AS count FROM messages m
@@ -328,7 +328,7 @@ export function semanticIndexStatus(
         accountId
       )
     } catch {
-      // Eine alte/teilmigrierte DB soll die restliche Suche nicht blockieren.
+      // An old/partially migrated DB should not block the rest of the search.
     }
   }
   try {
@@ -342,12 +342,12 @@ export function semanticIndexStatus(
       accountId
     )
   } catch {
-    // sqlite-vec nicht geladen: FTS-Status bleibt trotzdem korrekt.
+    // sqlite-vec not loaded: the FTS status is still correct.
   }
 
-  // Der laufende Indexer kennt zusätzlich Content-Hash und Modellversion und
-  // ist deshalb für den globalen Stand genauer als ein bloßer vec0-Count.
-  // In isolierten Tests oder vor `init()` bleibt der robuste DB-Wert erhalten.
+  // The running indexer additionally knows the content hash and model version and
+  // is therefore more accurate for the global state than a mere vec0 count.
+  // In isolated tests or before `init()` the robust DB value is kept.
   if (accountId == null) {
     try {
       const liveStatus = embeddingIndexer.getStatus()
@@ -355,7 +355,7 @@ export function semanticIndexStatus(
         embeddedMessages = Math.min(totalMessages, liveStatus.indexed)
       }
     } catch {
-      // Teilmigrierte DB: der oben ermittelte Tabellenstand bleibt erhalten.
+      // Partially migrated DB: the table state determined above is kept.
     }
   }
 
@@ -449,9 +449,9 @@ function matchingTermCount(row: SearchRow, terms: string[]): number {
 }
 
 /**
- * Vollständig lokale Hybrid-Suche: FTS5/BM25 und multilingual-e5/sqlite-vec
- * liefern unabhängige Nachrichten-Ranglisten, RRF verbindet sie. Erst danach
- * wird pro Thread dedupliziert.
+ * Fully local hybrid search: FTS5/BM25 and multilingual-e5/sqlite-vec
+ * yield independent ranked message lists, RRF combines them. Only then
+ * is it deduplicated per thread.
  */
 export async function searchSemantic(
   db: Database.Database,
@@ -462,8 +462,8 @@ export async function searchSemantic(
   const limit = Math.max(1, Math.min(100, input.limit))
   const candidateLimit = Math.min(400, Math.max(60, limit * 8))
 
-  // Embedding-Erzeugung startet vor der synchronen FTS-Abfrage und kann
-  // dadurch parallel Modell-/I/O-Arbeit erledigen.
+  // Embedding generation starts before the synchronous FTS query and can
+  // thus do model/I/O work in parallel.
   const vectorPromise = semanticCandidates(db, query, candidateLimit, input.accountId, dependencies)
   const lexical = ftsCandidates(db, query, candidateLimit, input.accountId)
   // Typo-tolerant sender channel: "mail von jens buetfisch" finds the sender
@@ -522,5 +522,5 @@ export async function searchSemantic(
   }
 }
 
-/** Lesbarer Alias für Evaluationen und andere Main-Prozess-Aufrufer. */
+/** Readable alias for evaluations and other main-process callers. */
 export const semanticSearch = searchSemantic

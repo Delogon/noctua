@@ -1,16 +1,16 @@
 import { connect } from 'node:net'
 
 /**
- * Implizites TLS oder STARTTLS? Auf Loopback (Proton Bridge) ist die
- * Betriebsart pro Protokoll konfigurierbar und am Port nicht ablesbar —
- * Tims Bridge z. B. fährt SMTP als „SSL" auf 1025. Die Unterscheidung ist
- * zum Glück deterministisch: Im Klartext-/STARTTLS-Modus schickt der Server
- * sofort seine 220-Begrüßung, im SSL-Modus wartet er stumm auf den
- * TLS-Handshake des Clients.
+ * Implicit TLS or STARTTLS? On loopback (Proton Bridge) the
+ * mode is configurable per protocol and cannot be read from the port —
+ * Tim's Bridge, e.g., runs SMTP as "SSL" on 1025. Fortunately the distinction
+ * is deterministic: in plaintext/STARTTLS mode the server sends
+ * its 220 greeting right away, in SSL mode it silently waits for the
+ * client's TLS handshake.
  */
 
-// Erkannte Betriebsart je Ziel — die Bridge-Einstellung ändert sich selten.
-// Nach einem Sendefehler wird der Eintrag verworfen und neu erkannt.
+// Detected mode per target — the Bridge setting rarely changes.
+// After a send error the entry is discarded and detected again.
 const detectedModes = new Map<string, boolean>()
 
 export async function detectImplicitTls(
@@ -29,11 +29,11 @@ export async function detectImplicitTls(
       socket.destroy()
       resolve({ implicitTls, cache })
     }
-    // Stumm bis zum Timeout → Server erwartet den TLS-Handshake zuerst
+    // Silent until timeout → server expects the TLS handshake first
     const timer = setTimeout(() => finish(true, true), timeoutMs)
     socket.once('data', () => finish(false, true))
-    // Verbindungsfehler sagt nichts über die Betriebsart — nicht cachen,
-    // der eigentliche Versand liefert die verständliche Fehlermeldung.
+    // A connection error says nothing about the mode — don't cache,
+    // the actual send delivers the understandable error message.
     socket.once('error', () => finish(false, false))
   })
 
@@ -41,7 +41,7 @@ export async function detectImplicitTls(
   return result.implicitTls
 }
 
-/** Nach einem Sendefehler aufrufen — der nächste Versuch erkennt neu. */
+/** Call after a send error — the next attempt detects again. */
 export function forgetTlsMode(host: string, port: number): void {
   detectedModes.delete(`${host}:${port}`)
 }

@@ -10,25 +10,25 @@ import {
 } from '@shared/confusables'
 import type { MailAuthenticationStatus } from '@shared/types'
 
-// Lokale, regelbasierte Spam- und Phishing-Signale (ohne KI). Jedes Signal hat
-// ein Gewicht für Phishing und für Spam; die Summen ergeben die lokalen Scores.
-// Sie gehen außerdem als Kontext in den `state` des Entscheidungsmodells (das
-// Modell urteilt mit) und werden in der Mail-Ansicht als Warnzeichen gezeigt.
-// Alles läuft rein lokal auf Daten, die ohnehin in der Datenbank liegen.
+// Local, rule-based spam and phishing signals (without AI). Each signal has
+// a weight for phishing and for spam; the sums yield the local scores.
+// They also go as context into the decision model's `state` (the
+// model weighs in) and are shown as warning signs in the mail view.
+// Everything runs purely locally on data that is in the database anyway.
 
 export interface MailSignal {
-  /** maschinenlesbar, ohne Zähler (z. B. "link_mismatch") */
+  /** machine-readable, without counter (e.g. "link_mismatch") */
   name: string
   count: number
   phishing: number
   spam: number
-  /** englische Zeile für den state-Text des Entscheidungsmodells */
+  /** English line for the decision model's state text */
   line: string
 }
 
 export interface MailSignals {
   signals: MailSignal[]
-  /** z. B. ["reply_to_differs", "link_mismatch:2"] – Zähler nur bei Mengen-Signalen */
+  /** e.g. ["reply_to_differs", "link_mismatch:2"] – counter only for count signals */
   codes: string[]
   lines: string[]
   phishingScore: number
@@ -38,26 +38,26 @@ export interface MailSignals {
 export interface MailSignalInput {
   fromName: string | null
   fromAddr: string | null
-  /** JSON-Array [{name, address}] aus messages.reply_to */
+  /** JSON array [{name, address}] from messages.reply_to */
   replyToJson: string | null
   html: string | null
   subject?: string | null
-  /** Klartext der Mail (text/plain oder aus HTML gewonnen) */
+  /** Plain text of the mail (text/plain or derived from HTML) */
   text?: string | null
   attachments?: Array<{ filename: string | null; mimeType: string | null }>
-  /** Ergebnis aus Authentication-Results (nur wenn die Kopfzeilen vorliegen) */
+  /** Result from Authentication-Results (only if the header lines are present) */
   auth?: {
     spf: MailAuthenticationStatus
     dkim: MailAuthenticationStatus
     dmarc: MailAuthenticationStatus
   } | null
-  /** Der Mailserver hat die Mail selbst als Spam markiert (X-Spam-Flag/-Status) */
+  /** The mail server itself flagged the mail as spam (X-Spam-Flag/-Status) */
   serverSpamFlag?: boolean
-  /** Der Kontoinhaber hat diesem Absender schon geschrieben */
+  /** The account owner has written to this sender before */
   knownSender?: boolean
 }
 
-/** Mengen-Signale tragen immer einen Zähler im Code ("ip_link:1"), Einzel-Signale nie. */
+/** Count signals always carry a counter in the code ("ip_link:1"), single signals never. */
 const COUNTED = new Set([
   'link_mismatch',
   'ip_link',
@@ -75,13 +75,13 @@ const COUNTED = new Set([
   'spam_phrases'
 ])
 
-/** Max. Zeichen Mailtext, die die Text-Heuristiken ansehen (Kosten begrenzen). */
+/** Max. characters of mail text the text heuristics look at (limits cost). */
 const MAX_TEXT_SCAN = 20_000
 const MAX_HTML_SCAN = 400_000
 
 // --- Domains -----------------------------------------------------------------------------------
 
-/** Grobe „registrierbare Domain": letzte zwei Labels (co.uk & Co. bewusst nicht gepflegt). */
+/** Rough "registrable domain": last two labels (co.uk & co. deliberately not maintained). */
 export function baseDomain(host: string): string {
   const parts = host
     .toLowerCase()
@@ -89,7 +89,7 @@ export function baseDomain(host: string): string {
     .split('.')
     .filter(Boolean)
   const last = parts.slice(-2).join('.')
-  // eine Handvoll gängiger Zwei-Label-TLDs, sonst gäbe es Fehlalarme bei *.co.uk
+  // a handful of common two-label TLDs, otherwise *.co.uk would cause false alarms
   if (/^(?:co|com|org|net|ac|gov)\.[a-z]{2}$/.test(last) && parts.length >= 3) {
     return parts.slice(-3).join('.')
   }
@@ -110,7 +110,7 @@ function sameDomain(a: string, b: string): boolean {
   return baseDomain(a) === baseDomain(b)
 }
 
-/** Punycode (xn--) in Unicode zurückverwandeln; bei Fehlern der Eingabewert. */
+/** Convert punycode (xn--) back to Unicode; on errors the input value. */
 function unicodeHost(host: string): string {
   try {
     return domainToUnicode(host) || host
@@ -120,9 +120,9 @@ function unicodeHost(host: string): string {
 }
 
 /**
- * Host, dessen Labels aus Ersatzzeichen bestehen, die wie Latein aussehen
- * („pаypal.com" mit kyrillischem а, „аррӏе.com" ganz aus Kyrillisch).
- * Rein kyrillische Domains (пример.рф, яндекс.ru) sind unauffällig.
+ * Host whose labels consist of substitute characters that look like Latin
+ * ("pаypal.com" with Cyrillic а, "аррӏе.com" entirely in Cyrillic).
+ * Purely Cyrillic domains (пример.рф, яндекс.ru) are inconspicuous.
  */
 export function isHomoglyphHost(host: string): boolean {
   const decoded = unicodeHost(host.toLowerCase())
@@ -134,14 +134,14 @@ export function isHomoglyphHost(host: string): boolean {
     else if (script === 'cyrillic' || script === 'greek') hasLookalike = true
   }
   if (!hasLookalike || !hasLatin) return false
-  // Mindestens ein Label mit Fremdschrift wird im Skelett zu reinem ASCII:
-  // es ist gebaut, um wie ein lateinisches Wort auszusehen.
+  // At least one label in a foreign script becomes pure ASCII in the skeleton:
+  // it is built to look like a Latin word.
   return decoded
     .split('.')
     .some((label) => /[^ -~]/.test(label) && /^[ -~]+$/.test(skeleton(label)))
 }
 
-/** Marken, die häufig gefälscht werden → ihre echten (Basis-)Domains. */
+/** Brands that are often spoofed → their real (base) domains. */
 const BRANDS: Record<string, string[]> = {
   paypal: ['paypal.com', 'paypal.de', 'paypal.me'],
   apple: ['apple.com', 'icloud.com', 'me.com'],
@@ -172,7 +172,7 @@ const BRANDS: Record<string, string[]> = {
   vodafone: ['vodafone.de', 'vodafone.com']
 }
 
-/** Freemail-Anbieter: eine Bank/ein Dienst schreibt nie von hier. */
+/** Freemail providers: a bank/service never writes from here. */
 const FREEMAIL = new Set([
   'gmail.com',
   'googlemail.com',
@@ -200,9 +200,9 @@ function isOfficial(brand: string, domain: string): boolean {
 }
 
 /**
- * Lookalike-Domain: ein Label wird erst durch Ziffer-/Zeichentricks zur Marke
- * („paypa1.com", „rnicrosoft-login.net", „g00gle.de"). Nur echte Verschleierung
- * zählt — „paypal-community.com" ist unverschleiert und bleibt unauffällig.
+ * Lookalike domain: a label only becomes the brand through digit/character tricks
+ * ("paypa1.com", "rnicrosoft-login.net", "g00gle.de"). Only real obfuscation
+ * counts — "paypal-community.com" is not obfuscated and stays inconspicuous.
  */
 export function lookalikeBrand(host: string): string | null {
   const domain = unicodeHost(host.toLowerCase())
@@ -222,7 +222,7 @@ export function lookalikeBrand(host: string): string | null {
   return null
 }
 
-/** Marke im Anzeigenamen (ganzes Wort, Homoglyphen aufgelöst). */
+/** Brand in the display name (whole word, homoglyphs resolved). */
 function brandInName(name: string): string | null {
   const words: string[] = skeleton(name).match(/[a-z0-9]+/g) ?? []
   return Object.keys(BRANDS).find((brand) => words.includes(brand)) ?? null
@@ -250,7 +250,7 @@ const SHORTENERS = new Set([
 
 // --- Links -------------------------------------------------------------------------------------
 
-/** href/Linktext-Paare aus HTML (regex, kein DOM im Main-Prozess). */
+/** href/link text pairs from HTML (regex, no DOM in the main process). */
 export function extractLinks(html: string): Array<{ text: string; href: string }> {
   const out: Array<{ text: string; href: string }> = []
   const re = /<a\s[^>]*?href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi
@@ -268,14 +268,14 @@ export function extractLinks(html: string): Array<{ text: string; href: string }
   return out
 }
 
-/** Nackte URLs aus Klartext (für reine Text-Mails). */
+/** Bare URLs from plain text (for text-only mails). */
 function extractTextUrls(text: string): string[] {
   return (text.match(/\bhttps?:\/\/[^\s<>"')\]]+/gi) ?? []).slice(0, 300)
 }
 
-// --- Texte -------------------------------------------------------------------------------------
+// --- Texts -------------------------------------------------------------------------------------
 
-// Bewusst zweisprachig: die Muster erkennen deutschen UND englischen Mailinhalt
+// Deliberately bilingual: the patterns recognize German AND English mail content
 const URGENCY_PHRASES = [
   /verify your (?:account|identity|email)/i,
   /confirm your (?:account|identity|details|payment)/i,
@@ -319,7 +319,7 @@ function countMatches(text: string, patterns: RegExp[]): number {
   return patterns.filter((re) => re.test(text)).length
 }
 
-/** Betreff in Großbuchstaben oder mit !!!/$$$ — klassisches Spam-Muster. */
+/** Subject in capitals or with !!!/$$$ — classic spam pattern. */
 function isShoutingSubject(subject: string): boolean {
   const letters = subject.match(/\p{L}/gu) ?? []
   const upper = subject.match(/\p{Lu}/gu) ?? []
@@ -327,7 +327,7 @@ function isShoutingSubject(subject: string): boolean {
   return caps || /[!?]{3,}|[$€£]{2,}/.test(subject)
 }
 
-/** Unsichtbare Zeichen auch dann finden, wenn sie als HTML-Entity im Quelltext stehen. */
+/** Find invisible characters even when they appear as HTML entities in the source. */
 function decodeInvisibleEntities(html: string): string {
   return html
     .replace(/&#8203;|&#x200b;/gi, '​')
@@ -338,7 +338,7 @@ function decodeInvisibleEntities(html: string): string {
     .replace(/<[^>]*>/g, '')
 }
 
-// --- Anhänge -----------------------------------------------------------------------------------
+// --- Attachments -------------------------------------------------------------------------------
 
 const DANGEROUS_EXT =
   /\.(?:exe|scr|com|pif|bat|cmd|vbs|vbe|js|jse|wsf|wsh|hta|msi|msp|jar|lnk|ps1|reg|cpl|iso|img|vhdx?|apk|xll|appx|msix)$/i
@@ -347,7 +347,7 @@ const HTML_EXT = /\.(?:html?|shtml|xhtml|svg|mht)$/i
 const DOUBLE_EXT =
   /\.(?:pdf|docx?|xlsx?|pptx?|jpe?g|png|gif|txt|rtf|zip|csv)\s*\.(?:[a-z0-9]{2,5})$/i
 
-// --- Hauptfunktion -----------------------------------------------------------------------------
+// --- Main function -----------------------------------------------------------------------------
 
 export function computeMailSignals(input: MailSignalInput): MailSignals {
   const signals: MailSignal[] = []
@@ -362,7 +362,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
   const html = (input.html ?? '').slice(0, MAX_HTML_SCAN)
   const text = (input.text ?? '').slice(0, MAX_TEXT_SCAN)
 
-  // --- Absender ---
+  // --- Sender ---
   if (fromDomain && fromName) {
     const found = fromName.match(/(?:[a-z0-9][a-z0-9-]*\.)+(?:[a-z]{2,})\b/gi) ?? []
     const other = found.map((d) => d.toLowerCase()).find((d) => !sameDomain(d, fromDomain))
@@ -387,7 +387,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
         add('reply_to_differs', 1, 1, 0, `Replies go to ${other}, but the sender is ${fromDomain}`)
       }
     } catch {
-      // kaputtes JSON: kein Signal
+      // broken JSON: no signal
     }
   }
 
@@ -428,7 +428,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
     )
   }
 
-  // --- Authentifizierung (Kopfzeilen) ---
+  // --- Authentication (header lines) ---
   if (input.auth) {
     if (input.auth.dmarc === 'fail') {
       add(
@@ -450,7 +450,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
     add('server_spam', 1, 0, 4, 'The mail server marked this email as spam')
   }
 
-  // --- Schrift-Tricks in Betreff, Name und Text ---
+  // --- Script tricks in subject, name and text ---
   const mixed = new Set([
     ...findMixedScriptWords(`${fromName} ${subject}`),
     ...findMixedScriptWords(text, 10)
@@ -516,7 +516,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
     const host = url.hostname.toLowerCase()
     if (url.username) userinfo += 1
     if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.startsWith('[')) ipLinks += 1
-    // Homoglyph schließt Lookalike/Punycode aus – ein Link, eine Täuschung
+    // Homoglyph rules out lookalike/punycode – one link, one deception
     if (isHomoglyphHost(host)) homoglyph += 1
     else if (lookalikeBrand(host)) lookalike += 1
     else if (/(?:^|\.)xn--/.test(host)) puny += 1
@@ -595,7 +595,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
     )
   }
 
-  // --- Formulare und Druck ---
+  // --- Forms and pressure ---
   if (/<form\b/i.test(html) || /<input\b[^>]*type\s*=\s*["']?password/i.test(html)) {
     add(
       'credential_form',
@@ -616,7 +616,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
     )
   }
 
-  // --- Anhänge ---
+  // --- Attachments ---
   let dangerous = 0
   let macro = 0
   let htmlAtt = 0
@@ -666,7 +666,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
     )
   }
 
-  // --- Spam-Muster ---
+  // --- Spam patterns ---
   const spamPhrases = countMatches(`${subject}\n${text}`, SPAM_PHRASES)
   if (spamPhrases > 0) {
     add(
@@ -698,7 +698,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
 
   let phishingScore = signals.reduce((sum, s) => sum + s.phishing, 0)
   let spamScore = signals.reduce((sum, s) => sum + s.spam, 0)
-  // Bekannter Kontakt: Spam ist unwahrscheinlich (Phishing über gekaperte Konten bleibt möglich)
+  // Known contact: spam is unlikely (phishing via hijacked accounts remains possible)
   if (input.knownSender) spamScore = Math.max(0, spamScore - 2)
   phishingScore = Math.min(phishingScore, 20)
   spamScore = Math.min(spamScore, 20)

@@ -12,9 +12,9 @@ function rgba(hex: string): { r: number; g: number; b: number; alpha: number } {
 }
 
 /**
- * Rechnet Groesse, Innenabstand und Hintergrund in die versendete PNG ein.
- * Mail-Clients koennen eingebettete Bildpixel im Dark Mode nicht wie eine
- * CSS-Hintergrundfarbe umfaerben.
+ * Bakes size, padding and background into the sent PNG.
+ * Mail clients cannot recolor embedded image pixels in dark mode like a
+ * CSS background color.
  */
 export async function renderSignatureImage(
   source: Buffer,

@@ -12,7 +12,7 @@ export interface ParsedAttachment {
   size: number
 }
 
-/** text/calendar-Teil (Einladung, iMIP): Methode aus dem MIME-Parameter + ICS-Text. */
+/** text/calendar part (invitation, iMIP): method from the MIME parameter + ICS text. */
 export interface ParsedCalendarPart {
   method: string | null
   content: string
@@ -24,7 +24,7 @@ const MAX_CALENDAR_PARTS = 4
 function isCalendarAttachment(att: { mimeType?: string; filename?: string | null }): boolean {
   const type = (att.mimeType ?? '').toLowerCase()
   if (type === 'text/calendar' || type === 'application/ics') return true
-  // Manche Clients senden .ics als application/octet-stream
+  // Some clients send .ics as application/octet-stream
   return /\.ics$/i.test(att.filename ?? '') && (type === '' || type === 'application/octet-stream')
 }
 
@@ -44,7 +44,7 @@ export interface ParsedMail {
   html: string | null
   snippet: string | null
   attachments: ParsedAttachment[]
-  /** Einladungsteile (text/calendar, application/ics) — unvertrauenswürdig, begrenzt */
+  /** Invitation parts (text/calendar, application/ics) — untrusted, limited */
   calendarParts?: ParsedCalendarPart[]
 }
 
@@ -64,7 +64,7 @@ function parseReferences(raw: string | undefined): string[] {
   return raw.match(/<[^<>]+>/g) ?? []
 }
 
-/** Grober Text-Extrakt aus HTML — nur für Snippets, nicht fürs Rendern. */
+/** Rough text extract from HTML — only for snippets, not for rendering. */
 export function htmlToText(html: string): string {
   return html
     .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, ' ')
@@ -106,7 +106,7 @@ function extractCalendarParts(
   return out
 }
 
-/** Parst eine rohe RFC822-Mail. Wirft nie — kaputte Mails liefern ein Minimal-Resultat. */
+/** Parses a raw RFC822 mail. Never throws — broken mails yield a minimal result. */
 export async function parseMail(source: Buffer | Uint8Array): Promise<ParsedMail> {
   try {
     const email = await PostalMime.parse(source, {
@@ -136,7 +136,7 @@ export async function parseMail(source: Buffer | Uint8Array): Promise<ParsedMail
         filename: att.filename ?? null,
         mimeType: att.mimeType ?? null,
         contentId: att.contentId?.replace(/[<>]/g, '') ?? null,
-        // postal-mime liefert Uint8Array (nicht ArrayBuffer) — sonst stünde überall 0 B
+        // postal-mime returns Uint8Array (not ArrayBuffer) — otherwise 0 B would show everywhere
         size:
           typeof att.content === 'string'
             ? att.content.length

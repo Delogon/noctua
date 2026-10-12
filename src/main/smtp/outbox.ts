@@ -16,15 +16,15 @@ export interface OutboxPayload {
   textBody: string
   htmlBody?: string
   replyToMessageId?: number
-  /** Kalendereinladung/-antwort (iMIP, RFC 6047): wird als text/calendar-Alternative gesendet. */
+  /** Calendar invitation/response (iMIP, RFC 6047): sent as a text/calendar alternative. */
   icalEvent?: { method: string; content: string }
 }
 
-/** Maximale Sendeversuche (inkl. des ersten) bei transienten Fehlern. */
+/** Maximum send attempts (incl. the first) on transient errors. */
 export const MAX_SEND_ATTEMPTS = 5
 const RETRY_BASE_MS = 30_000
 
-/** Backoff vor dem nächsten Versuch: 30 s, 60 s, 120 s, 240 s. */
+/** Backoff before the next attempt: 30 s, 60 s, 120 s, 240 s. */
 export function retryDelayMs(attempts: number): number {
   return RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1)
 }
@@ -44,10 +44,10 @@ const TRANSIENT_CODES = new Set([
 ])
 
 /**
- * Ordnet einen Sendefehler ein: 'retry' (transient, Mail sicher nicht
- * zugestellt), 'permanent' (5xx, Auth, Konfiguration) oder 'unknown'
- * (Verbindungsabbruch während der Datenübertragung — evtl. angekommen,
- * deshalb nie automatisch erneut senden).
+ * Classifies a send error: 'retry' (transient, mail certainly not
+ * delivered), 'permanent' (5xx, auth, configuration) or 'unknown'
+ * (connection dropped during data transfer — possibly arrived,
+ * so never resend automatically).
  */
 export function classifySendError(error: unknown): SendFailureKind {
   const err = error as { code?: unknown; responseCode?: unknown; command?: unknown } | null
@@ -59,7 +59,7 @@ export function classifySendError(error: unknown): SendFailureKind {
   const code = typeof err?.code === 'string' ? err.code : ''
   if (code === 'EAUTH' || code === 'EENVELOPE') return 'permanent'
   if (TRANSIENT_CODES.has(code)) {
-    // Abbruch nach Beginn der Datenübertragung: Ausgang ungewiss
+    // Aborted after data transfer began: outcome uncertain
     return err?.command === 'DATA' ? 'unknown' : 'retry'
   }
   return 'permanent'
@@ -71,8 +71,8 @@ export function undoSeconds(): number {
 }
 
 /**
- * Undo Send: compose:send legt hier ab, der Worker versendet nach Ablauf der
- * Rückgängig-Frist. Cancel gibt den Entwurf zurück in den Composer.
+ * Undo Send: compose:send stores here, the worker sends once the
+ * undo period expires. Cancel returns the draft to the composer.
  */
 class OutboxWorker {
   private db: Database.Database | null = null
@@ -86,7 +86,7 @@ class OutboxWorker {
   }
 
   start(): void {
-    // Neustart/Crash: nichts bleibt in 'sending' hängen
+    // Restart/crash: nothing stays stuck in 'sending'
     try {
       this.recoverInterrupted()
     } catch (error) {
@@ -103,9 +103,9 @@ class OutboxWorker {
   }
 
   /**
-   * Zeilen, die beim Beenden noch 'sending' waren (oder schon 'unknown' sind),
-   * wurden evtl. zugestellt. Steht die Message-ID im lokalen Gesendet-Ordner →
-   * 'sent'. Sonst 'unknown' — der Nutzer entscheidet, wir senden nie blind neu.
+   * Rows that were still 'sending' at shutdown (or are already 'unknown')
+   * may have been delivered. If the Message-ID is in the local Sent folder →
+   * 'sent'. Otherwise 'unknown' — the user decides, we never blindly resend.
    */
   recoverInterrupted(): void {
     const rows = this.db!.prepare(
@@ -141,10 +141,10 @@ class OutboxWorker {
     payload: OutboxPayload,
     opts: { immediate?: boolean } = {}
   ): { outboxId: number; sendAt: number } {
-    // Systemnachrichten (iMIP-Antworten) brauchen kein Undo-Fenster
+    // System messages (iMIP responses) need no undo window
     const sendAt = Date.now() + (opts.immediate ? 0 : undoSeconds() * 1000)
-    // Stabile Message-ID schon beim Einreihen: übersteht Neustarts und macht
-    // die Mail im Gesendet-Ordner wiedererkennbar.
+    // Stable Message-ID already at enqueue: survives restarts and makes
+    // the mail recognizable in the Sent folder.
     const account = this.db!.prepare('SELECT email FROM accounts WHERE id = ?').get(accountId) as
       { email: string } | undefined
     const domain = account?.email.split('@')[1] || 'noctua.local'
@@ -158,7 +158,7 @@ class OutboxWorker {
     return { outboxId, sendAt }
   }
 
-  /** Bricht einen wartenden Versand ab; gibt den Entwurf zurück (Composer reopen). */
+  /** Cancels a pending send; returns the draft (composer reopen). */
   cancel(outboxId: number): {
     ok: boolean
     accountId: number | null
@@ -177,8 +177,8 @@ class OutboxWorker {
   }
 
   private async tick(): Promise<void> {
-    // Kein überlappender Lauf: ein langsamer SMTP-Versand würde sonst vom
-    // nächsten Sekunden-Tick erneut angestoßen.
+    // No overlapping run: otherwise a slow SMTP send would be triggered
+    // again by the next one-second tick.
     if (this.ticking) return
     this.ticking = true
     try {
@@ -201,14 +201,14 @@ class OutboxWorker {
     }>
 
     for (const row of due) {
-      // Claim gegen Doppel-Versand (idempotent bei parallelem Tick)
+      // Claim against double sending (idempotent with a parallel tick)
       const claimed = this.db!.prepare(
         `UPDATE outbox SET state = 'sending', attempts = attempts + 1 WHERE id = ? AND state = 'pending'`
       ).run(row.id)
       if (claimed.changes === 0) continue
       const attempts = row.attempts + 1
-      // Auch 'sending' pushen — das Gesendet-Echo im Renderer kennt den
-      // Zustand, bekam ihn bisher aber nie zu sehen (QA-Befund).
+      // Push 'sending' too — the sent echo in the renderer knows the
+      // state but never got to see it so far (QA finding).
       this.push('outbox:changed', { outboxId: row.id, state: 'sending' })
 
       const payload = JSON.parse(row.payload_json) as Omit<OutboxPayload, 'bcc'> & {
@@ -240,7 +240,7 @@ class OutboxWorker {
         const message = error instanceof Error ? error.message.slice(0, 400) : String(error)
         const kind = classifySendError(error)
         if (kind === 'retry' && attempts < MAX_SEND_ATTEMPTS) {
-          // Transienter Fehler: zurück auf pending mit Backoff, gleiche Message-ID
+          // Transient error: back to pending with backoff, same Message-ID
           this.db!.prepare(
             `UPDATE outbox SET state = 'pending', send_at = ?, last_error = ? WHERE id = ?`
           ).run(Date.now() + retryDelayMs(attempts), message, row.id)

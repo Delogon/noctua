@@ -5,7 +5,7 @@ function sha1(input: string): string {
   return createHash('sha1').update(input).digest('hex').slice(0, 20)
 }
 
-/** Entfernt Re:/Fwd:/AW:/WG:/SV:-Präfixe iterativ und normalisiert. */
+/** Strips Re:/Fwd:/AW:/WG:/SV: prefixes iteratively and normalizes. */
 export function normalizeSubject(subject: string): string {
   let s = subject.trim()
   const prefix = /^(re|fwd?|aw|wg|sv|antw)\s*(\[\d+\])?\s*:\s*/i
@@ -24,9 +24,9 @@ export interface ThreadKeyInput {
 const MAX_THREAD_REFS = 500
 
 /**
- * Thread-Schlüssel pro Konto: Gmail autoritativ über X-GM-THRID, sonst
- * JWZ-light über References/In-Reply-To (erster Treffer in der DB gewinnt),
- * Fallback normalisiertes Subject, Notnagel Message-ID (Einzel-Thread).
+ * Thread key per account: Gmail authoritatively via X-GM-THRID, otherwise
+ * JWZ-light via References/In-Reply-To (first hit in the DB wins),
+ * fallback normalized subject, last resort Message-ID (single thread).
  */
 export function computeThreadKey(
   db: Database.Database,
@@ -35,9 +35,9 @@ export function computeThreadKey(
 ): string {
   if (input.gmThrid) return `${accountId}:gm:${input.gmThrid}`
 
-  // Nur die jüngsten Referenzen (RFC 5322: älteste zuerst, In-Reply-To hinten):
-  // ein References-Header mit Zehntausenden IDs sprengt sonst SQLites
-  // Bind-Variablen-Limit und blockiert den Sync dauerhaft (SEC, vuln-0011).
+  // Only the newest references (RFC 5322: oldest first, In-Reply-To last):
+  // otherwise a References header with tens of thousands of IDs blows SQLite's
+  // bind variable limit and blocks the sync permanently (SEC, vuln-0011).
   const refIds = [...input.references, ...(input.inReplyTo ? [input.inReplyTo] : [])]
     .filter(Boolean)
     .slice(-MAX_THREAD_REFS)
