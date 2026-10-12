@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { performance } from 'node:perf_hooks'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { metrics, sqlFingerprint, type Metrics } from './metrics'
@@ -7,14 +8,16 @@ const INSTRUMENTED = Symbol.for('noctua.diagnostics.instrumented')
 type StatementMethod = 'run' | 'get' | 'all'
 
 type SqlCapture = (sql: string, args: unknown[]) => void
-let capture: SqlCapture | null = null
+const captureContext = new AsyncLocalStorage<SqlCapture>()
 /**
- * Benchmark only: reports executed SQL including parameters so that
- * EXPLAIN QUERY PLAN can run with the same values. The values never leave
- * the process; only the plan is exported.
+ * Benchmark only: reports SQL executed within `run` (and the async work it
+ * awaits) including parameters, so that EXPLAIN QUERY PLAN can run with the
+ * same values. Statements of other async contexts (sync, AI queue) running
+ * meanwhile are not reported. The values never leave the process; only the
+ * plan is exported.
  */
-export function setSqlCapture(fn: SqlCapture | null): void {
-  capture = fn
+export function withSqlCapture<T>(fn: SqlCapture, run: () => T): T {
+  return captureContext.run(fn, run)
 }
 
 function rowsOf(method: StatementMethod, result: unknown): number {
@@ -36,7 +39,7 @@ export function instrumentDb(db: Database.Database, target: Metrics = metrics): 
 
   const prepare = db.prepare.bind(db)
   const wrappedPrepare = (sql: string): Database.Statement => {
-    if (!target.enabled && !capture) return prepare(sql)
+    if (!target.enabled && !captureContext.getStore()) return prepare(sql)
     const start = performance.now()
     const stmt = prepare(sql)
     const fp = sqlFingerprint(sql)
@@ -47,7 +50,7 @@ export function instrumentDb(db: Database.Database, target: Metrics = metrics): 
         configurable: true,
         writable: true,
         value: function (this: Database.Statement, ...args: unknown[]): unknown {
-          capture?.(sql, args)
+          captureContext.getStore()?.(sql, args)
           if (!target.enabled) return original.apply(this, args)
           const t = performance.now()
           let result: unknown

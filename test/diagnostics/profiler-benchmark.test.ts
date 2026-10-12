@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { metrics } from '@main/diagnostics/metrics'
-import { instrumentDb } from '@main/diagnostics/db-profiler'
+import { instrumentDb, withSqlCapture } from '@main/diagnostics/db-profiler'
 import { analysePlan, runBenchmark } from '@main/diagnostics/benchmark'
 import { DiagnosticsService } from '@main/diagnostics/service'
 import { upsertEnvelope, storeBody } from '@main/mail/ingest'
@@ -88,6 +88,26 @@ describe('SQL-Profiler und Benchmark', () => {
         'USE TEMP B-TREE FOR ORDER BY'
       ])
     ).toEqual({ fullScans: ['m'], indexScans: ['f'], tempBtrees: 1 })
+  })
+
+  it('captures only the SQL of the benchmark case, not concurrent statements', async () => {
+    const seen: string[] = []
+    const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+    const asyncCase = withSqlCapture(
+      (sql) => seen.push(sql),
+      async () => {
+        db.prepare(`SELECT 'case-1'`).get()
+        await sleep(20)
+        db.prepare(`SELECT 'case-2'`).get()
+      }
+    )
+    // Meanwhile sync/AI work runs in another async context
+    db.prepare(`SELECT 'unrelated-1'`).get()
+    await sleep(5)
+    db.prepare(`SELECT 'unrelated-2'`).get()
+    await asyncCase
+    db.prepare(`SELECT 'after'`).get()
+    expect(seen).toEqual([`SELECT 'case-1'`, `SELECT 'case-2'`])
   })
 
   it('Benchmark: alle Fälle ohne Fehler, Schreibfälle zurückgerollt, Pläne erfasst', async () => {
