@@ -15,7 +15,7 @@ function shortcut(
     shiftKey: boolean
     isComposing: boolean
   }> = {}
-) {
+): ReturnType<typeof composerShortcut> {
   return composerShortcut({
     key,
     metaKey: false,

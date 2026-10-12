@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { sendMail } from '../smtp/sender'
 import { syncEngine } from '../sync/engine'
 import { startDraftNew, startDraftReply } from '../ai/drafts'
@@ -46,8 +46,7 @@ export function runDraftTest(db: Database.Database): void {
 export function runDraftNewTest(db: Database.Database): void {
   setTimeout(() => {
     const account = db.prepare('SELECT id, email FROM accounts ORDER BY id LIMIT 1').get() as
-      | { id: number; email: string }
-      | undefined
+      { id: number; email: string } | undefined
     if (!account) {
       console.log('[draftnew] kein Konto vorhanden — übersprungen')
       return
@@ -56,13 +55,20 @@ export function runDraftNewTest(db: Database.Database): void {
     let text = ''
     let subject: string | null = null
     const logPush: Parameters<typeof startDraftNew>[1] = (_channel, payload) => {
-      const p = payload as { chunk: string; done: boolean; error: string | null; subject: string | null }
+      const p = payload as {
+        chunk: string
+        done: boolean
+        error: string | null
+        subject: string | null
+      }
       if (p.error) console.error(`[draftnew] FEHLER: ${p.error}`)
       else if (p.subject) {
         subject = p.subject
         console.log(`[draftnew] BETREFF-Vorschlag: "${p.subject}"`)
       } else if (p.done) {
-        console.log(`[draftnew] FERTIG — subject=${JSON.stringify(subject)} — Text (${text.length} Zeichen):`)
+        console.log(
+          `[draftnew] FERTIG — subject=${JSON.stringify(subject)} — Text (${text.length} Zeichen):`
+        )
         console.log(text)
       } else text += p.chunk
     }
@@ -86,8 +92,7 @@ export function runSelfSendTest(db: Database.Database): void {
   setTimeout(() => {
     void (async () => {
       const account = db.prepare('SELECT id, email FROM accounts ORDER BY id LIMIT 1').get() as
-        | { id: number; email: string }
-        | undefined
+        { id: number; email: string } | undefined
       if (!account) {
         console.log('[selftest] kein Konto vorhanden — übersprungen')
         return
@@ -126,7 +131,9 @@ export function runSelfSendTest(db: Database.Database): void {
         return
       }
       const latency = ((Date.now() - sentAt) / 1000).toFixed(1)
-      console.log(`[selftest] ZUGESTELLT nach ${latency}s (inkl. SMTP+Gmail-intern) — id=${delivered.id}`)
+      console.log(
+        `[selftest] ZUGESTELLT nach ${latency}s (inkl. SMTP+Gmail-intern) — id=${delivered.id}`
+      )
 
       console.log('[selftest] sende Antwort (Threading-Test)…')
       await sendMail(db, {
@@ -184,8 +191,7 @@ export function runM10Test(db: Database.Database): void {
     void (async () => {
       const { outboxWorker } = await import('../smtp/outbox')
       const account = db.prepare('SELECT id, email FROM accounts ORDER BY id LIMIT 1').get() as
-        | { id: number; email: string }
-        | undefined
+        { id: number; email: string } | undefined
       if (!account) return console.log('[m10test] kein Konto')
 
       // 1. Undo Send: einreihen, sofort abbrechen
@@ -196,15 +202,24 @@ export function runM10Test(db: Database.Database): void {
         textBody: 'abgebrochen'
       })
       const cancel = outboxWorker.cancel(outboxId)
-      console.log(`[m10test] Undo: cancel.ok=${cancel.ok}, draft=${cancel.draft ? 'zurück' : 'weg'}`)
-      const state = (db.prepare('SELECT state FROM outbox WHERE id = ?').get(outboxId) as { state: string }).state
+      console.log(
+        `[m10test] Undo: cancel.ok=${cancel.ok}, draft=${cancel.draft ? 'zurück' : 'weg'}`
+      )
+      const state = (
+        db.prepare('SELECT state FROM outbox WHERE id = ?').get(outboxId) as { state: string }
+      ).state
       console.log(`[m10test] Outbox-Status nach Cancel: ${state} (erwartet: canceled)`)
 
       // 2. NL-Regel übersetzen
       try {
         const { draftRule } = await import('../ai/rules')
-        const drafted = await draftRule(db, 'Google-Benachrichtigungen ueber Speicherplatz immer archivieren')
-        console.log(`[m10test] Regel: "${drafted.name}" match=${JSON.stringify(drafted.rule.match)} actions=${JSON.stringify(drafted.rule.actions)}`)
+        const drafted = await draftRule(
+          db,
+          'Google-Benachrichtigungen ueber Speicherplatz immer archivieren'
+        )
+        console.log(
+          `[m10test] Regel: "${drafted.name}" match=${JSON.stringify(drafted.rule.match)} actions=${JSON.stringify(drafted.rule.actions)}`
+        )
       } catch (e) {
         console.error('[m10test] Regel-Draft:', (e as Error).message)
       }

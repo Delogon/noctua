@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { EMBEDDING_MODEL, EmbeddingIndexer, type EmbeddingIndexStatus } from '@main/ai/embeddings'
 import { storeBody, upsertEnvelope } from '@main/mail/ingest'
 import { closeTestDb, createTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
@@ -53,7 +53,7 @@ describe('EmbeddingIndexer status', () => {
       indexed: 0,
       pending: 3,
       running: false,
-      model: { id: EMBEDDING_MODEL, state: 'not_loaded', error: null }
+      model: { id: EMBEDDING_MODEL, state: 'not_loaded', cached: expect.any(Boolean), error: null }
     })
 
     const current = db

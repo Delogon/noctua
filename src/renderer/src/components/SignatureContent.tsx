@@ -99,7 +99,12 @@ export function SignatureContent({
           key === 'rule' ? (
             <div
               key={`${key}-${index}`}
-              style={{ width: 220, maxWidth: '100%', borderTop: '1px solid var(--ink)', margin: '7px 0' }}
+              style={{
+                width: 220,
+                maxWidth: '100%',
+                borderTop: '1px solid var(--ink)',
+                margin: '7px 0'
+              }}
             />
           ) : (
             <div key={key} style={textStyleFor(key)}>

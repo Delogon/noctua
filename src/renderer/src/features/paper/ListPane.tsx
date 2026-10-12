@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { TaskSyncGlyph } from './TaskSyncGlyph'
 import { contrastOn, type AccountSummary, type ThreadListItem } from '@shared/types'
 import { useMboxCounts, useThreads } from '@renderer/queries/threads'
 import { useDrafts } from '@renderer/queries/drafts'
@@ -19,6 +20,7 @@ import { applyFilters, filterCounts } from '@renderer/features/paper/inbox-filte
 import { InboxFilterMenu } from '@renderer/features/paper/InboxFilterMenu'
 import { OwlConversationsPane } from '@renderer/features/owl/OwlConversationsPane'
 import { useOwl } from '@renderer/stores/owl'
+import { CalendarSidebar } from '@renderer/features/calendar/CalendarSidebar'
 import {
   taskIdAfterCompletion,
   taskIdAfterVisibilityChange,
@@ -572,7 +574,7 @@ function InboxList(): React.JSX.Element {
       <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto">
         {sentEchoes.map((e) => {
           const color = accounts.data?.find((a) => a.id === e.accountId)?.color ?? '#c3b8e0'
-          const failed = e.state === 'error'
+          const failed = e.state === 'error' || e.state === 'unknown'
           return (
             <div key={`echo-${e.outboxId}`} className="list-row" style={{ cursor: 'default' }}>
               <div className="flex items-baseline gap-1.5">
@@ -590,7 +592,7 @@ function InboxList(): React.JSX.Element {
                   style={{ color: failed ? 'var(--ac)' : 'var(--muted)' }}
                 >
                   {failed ? (
-                    t('echoSendFailed')
+                    t(e.state === 'unknown' ? 'echoSendUnknown' : 'echoSendFailed')
                   ) : (
                     <>
                       {t('echoSending')}
@@ -599,6 +601,11 @@ function InboxList(): React.JSX.Element {
                   )}
                 </span>
               </div>
+              {e.state === 'unknown' && (
+                <div style={{ font: '400 12px var(--serif)', color: 'var(--ac)', marginTop: 2 }}>
+                  {t('echoSendUnknownHint')}
+                </div>
+              )}
               {e.subject.trim() && (
                 <div
                   className="truncate"
@@ -887,6 +894,7 @@ function TasksList(): React.JSX.Element {
                 >
                   {task.title}
                 </span>
+                <TaskSyncGlyph state={task.syncState} />
                 {task.dueDate && (
                   <span
                     className="mchip flex-none"
@@ -951,7 +959,8 @@ function SettingsList(): React.JSX.Element {
   const orStatus = useOrKeyStatus()
   const models = useModels()
 
-  const short = (id: string | undefined): string => (id ? id.split('/')[1] : '—')
+  // Lokale Modelle (z. B. „llama3.1:8b") haben keinen „anbieter/"-Präfix
+  const short = (id: string | undefined): string => (id ? (id.split('/').pop() ?? id) : '—')
   const rows: Array<{ id: SettingsSection; name: string; sub: string }> = [
     {
       id: 'accounts',
@@ -1051,13 +1060,29 @@ export function ListPane(): React.JSX.Element {
       {(view === 'inbox' || view === 'compose') && <InboxList />}
       {view === 'waiting' && <WaitingList />}
       {view === 'tasks' && <TasksList />}
+      {view === 'calendar' && <CalendarSidebar />}
       {view === 'chat' && <OwlConversationsPane />}
       {view === 'settings' && <SettingsList />}
       <div
         className="flex flex-none items-baseline gap-3 border-t border-ink"
         style={{ padding: '10px 18px', font: '400 9.5px var(--mono)', color: 'var(--muted)' }}
       >
-        {view === 'chat' ? (
+        {view === 'calendar' ? (
+          <>
+            <span>
+              <span style={{ color: 'var(--ink)' }}>d/w/m</span> {t('cvKeyView')}
+            </span>
+            <span>
+              <span style={{ color: 'var(--ink)' }}>t</span> {t('cvKeyToday')}
+            </span>
+            <span>
+              <span style={{ color: 'var(--ink)' }}>n</span> {t('cvKeyNew')}
+            </span>
+            <span>
+              <span style={{ color: 'var(--ink)' }}>?</span> {t('keyKeys')}
+            </span>
+          </>
+        ) : view === 'chat' ? (
           <>
             <span>
               <span style={{ color: 'var(--ink)' }}>j/k</span> {t('keyMove')}

@@ -1,12 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { createHash } from 'node:crypto'
-import type Database from 'better-sqlite3'
-import {
-  emailFromIdToken,
-  googleAccessToken,
-  googleAuthUrl,
-  pkcePair
-} from '@main/auth/google'
+import type Database from 'better-sqlite3-multiple-ciphers'
+import { emailFromIdToken, googleAccessToken, googleAuthUrl, pkcePair } from '@main/auth/google'
 import { setSecret, getSecret } from '@main/auth/secrets'
 import { createTestDb, closeTestDb } from '../helpers/db'
 
@@ -20,7 +15,11 @@ function fakeIdToken(payload: Record<string, unknown>): string {
 }
 
 function tokenFetch(body: Record<string, unknown>): typeof fetch {
-  return vi.fn().mockResolvedValue({ json: () => Promise.resolve(body) }) as unknown as typeof fetch
+  return vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(body)
+  }) as unknown as typeof fetch
 }
 
 describe('google-auth', () => {
@@ -91,14 +90,37 @@ describe('google-auth', () => {
   it('verlangt ohne Refresh-Token einen Re-Login', async () => {
     db = createTestDb()
     await expect(googleAccessToken('unbekannt@gmail.com')).rejects.toThrow(
-      /nicht angemeldet.*neu verbinden/
+      /nicht angemeldet.*erneut anmelden/
     )
+  })
+
+  it('wirft einen klaren Fehler bei HTTP-Fehler ohne JSON-Body', async () => {
+    db = createTestDb()
+    setSecret('google:refresh:proxy@gmail.com', 'refresh-1')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: () => Promise.reject(new SyntaxError('Unexpected token <'))
+      })
+    )
+    await expect(googleAccessToken('proxy@gmail.com')).rejects.toThrow(/HTTP 502/)
+    // Refresh-Token bleibt erhalten (kein invalid_grant)
+    expect(getSecret('google:refresh:proxy@gmail.com')).toBe('refresh-1')
   })
 
   it('räumt bei widerrufenem Zugriff auf und verlangt einen Re-Login', async () => {
     db = createTestDb()
     setSecret('google:refresh:widerrufen@gmail.com', 'refresh-alt')
-    vi.stubGlobal('fetch', tokenFetch({ error: 'invalid_grant' }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: 'invalid_grant' })
+      }) as unknown as typeof fetch
+    )
 
     await expect(googleAccessToken('widerrufen@gmail.com')).rejects.toThrow(/widerrufen/)
     expect(getSecret('google:refresh:widerrufen@gmail.com')).toBeNull()

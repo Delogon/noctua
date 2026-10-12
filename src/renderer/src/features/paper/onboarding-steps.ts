@@ -1,5 +1,5 @@
 // Reine Schritt- und Zustandslogik des 4-Schritte-Onboardings (Design 1b):
-// welcome → connect → key → training. Vom Rendering getrennt, damit
+// welcome → connect → ai → training. Vom Rendering getrennt, damit
 // Enter-Gating, CTA-Freischaltung und Zeilen-Zustände testbar sind.
 
 export type ObStep = 1 | 2 | 3 | 4
@@ -14,7 +14,7 @@ export interface TrainRowFlags {
 }
 
 /**
- * Leitet den Zeilen-Zustand ab. Pausiert (kein Schlüssel) schlägt alles —
+ * Leitet den Zeilen-Zustand ab. Pausiert (keine Entwurfs-KI) schlägt alles —
  * dann gibt es weder Fortschritt noch Fehler, nur die leere Spur. Danach
  * gilt: gescheitert vor laufend vor fertig; sonst wartet die Zeile noch.
  */
@@ -26,9 +26,66 @@ export function rowState(row: TrainRowFlags, paused: boolean): TrainRowState {
   return 'idle'
 }
 
-/** Schritt-3-CTA (»TRAIN MY VOICE«) erst, wenn ein Schlüssel gespeichert ist oder schon existiert. */
-export function trainCtaEnabled(keyReady: boolean): boolean {
-  return keyReady
+/** Wo die KI laufen soll (Schritt 3). */
+export type AiChoice = 'local' | 'apple' | 'cloud' | 'skip'
+export type CloudKind = 'openrouter' | 'custom'
+
+/** Was der Nutzer in Schritt 3 bisher eingerichtet hat. */
+export interface AiStepState {
+  appleAvailable: boolean
+  /** Lokaler Server: Profil steht */
+  localProfile: boolean
+  localTriageModel: string
+  localDraftModel: string
+  cloudKind: CloudKind
+  /** OpenRouter: Schlüssel gespeichert (oder schon vorhanden) */
+  openrouterKey: boolean
+  /** Eigener Cloud-Endpunkt: Profil steht */
+  customProfile: boolean
+  customTriageModel: string
+  customDraftModel: string
+}
+
+/**
+ * Ist die gewählte Option vollständig eingerichtet? Überspringen gilt immer
+ * (Noctua als reiner Mail-Client); Apple nur, wenn das Gerät es kann.
+ */
+export function aiStepReady(choice: AiChoice, s: AiStepState): boolean {
+  switch (choice) {
+    case 'skip':
+      return true
+    case 'apple':
+      return s.appleAvailable
+    case 'local':
+      return s.localProfile && s.localTriageModel !== '' && s.localDraftModel !== ''
+    case 'cloud':
+      return s.cloudKind === 'openrouter'
+        ? s.openrouterKey
+        : s.customProfile && s.customTriageModel !== '' && s.customDraftModel !== ''
+  }
+}
+
+/**
+ * Kann das Stil-Training (Schritt 4) laufen? Es braucht eine Entwurfs-KI:
+ * Apple On-Device kann nur Triage, Überspringen hat gar keine — dann pausiert
+ * Schritt 4 ehrlich.
+ */
+export function aiTrainingRuns(choice: AiChoice, s: AiStepState): boolean {
+  return (choice === 'local' || choice === 'cloud') && aiStepReady(choice, s)
+}
+
+/** „Local only" ist bei lokalen Optionen standardmäßig an, sonst aus. */
+export function localOnlyDefault(choice: AiChoice): boolean {
+  return choice === 'local' || choice === 'apple'
+}
+
+/**
+ * Schritt-3-CTA: aktiv, sobald die gewählte Option fertig ist (Überspringen
+ * immer). `train` sagt, was der Klick tut: Training starten, oder pausiert
+ * weiter (Apple-only und Überspringen).
+ */
+export function aiStepCta(choice: AiChoice, s: AiStepState): { enabled: boolean; train: boolean } {
+  return { enabled: aiStepReady(choice, s), train: aiTrainingRuns(choice, s) }
 }
 
 /**
@@ -46,7 +103,7 @@ export function finishCtaEnabled(states: TrainRowState[]): boolean {
  * - `resume`: Onboarding lief bereits (Started-Flag) und wurde durch Neustart/
  *   Reload unterbrochen — fortsetzen, auch wenn schon Konten verbunden sind.
  *   Vorher schluckte die Bestandskonten-Heuristik diesen Fall: Wer mitten im
- *   Flow neu startete, wurde nie nach dem OpenRouter-Schlüssel gefragt.
+ *   Flow neu startete, wurde nie nach der KI gefragt.
  * - `legacyMarkOnboarded`: Konten existieren, aber das Onboarding lief nie —
  *   Bestandsinstallation von vor dem Onboarding, still als erledigt markieren.
  * - `show`: echter Erststart.
@@ -70,17 +127,30 @@ export type EnterAction =
   | { kind: 'toast-connect-one' }
   | { kind: 'to-key' }
   | { kind: 'to-training' }
+  | { kind: 'to-training-paused' }
   | { kind: 'finish' }
   | null
 
 export function enterAction(
   step: ObStep,
-  ctx: { connectedCount: number; keyReady: boolean; rowStates: TrainRowState[] }
+  ctx: {
+    connectedCount: number
+    /** Schritt-3-CTA aktiv (gewählte Option fertig eingerichtet) */
+    aiReady: boolean
+    /** Nach Schritt 3 läuft das Training (Entwurfs-KI vorhanden) */
+    aiTrains: boolean
+    /** Gewählte Option ist „Überspringen" */
+    aiSkip: boolean
+    rowStates: TrainRowState[]
+  }
 ): EnterAction {
   if (step === 1) return { kind: 'to-connect' }
   if (step === 2) return ctx.connectedCount > 0 ? { kind: 'to-key' } : { kind: 'toast-connect-one' }
-  // Schritt 3: Enter startet das Training nur mit Schlüssel — Überspringen
-  // bleibt ein bewusster Klick auf den Skip-Link, nie ein versehentliches Enter.
-  if (step === 3) return ctx.keyReady ? { kind: 'to-training' } : null
+  // Schritt 3: Enter geht nur weiter, wenn die gewählte Option fertig ist.
+  // „Überspringen" wählt man bewusst per Klick — nie per Enter-Reflex.
+  if (step === 3) {
+    if (!ctx.aiReady || ctx.aiSkip) return null
+    return { kind: ctx.aiTrains ? 'to-training' : 'to-training-paused' }
+  }
   return finishCtaEnabled(ctx.rowStates) ? { kind: 'finish' } : null
 }

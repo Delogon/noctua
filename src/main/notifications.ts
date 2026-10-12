@@ -1,5 +1,5 @@
 import { app, Notification, BrowserWindow } from 'electron'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import icon from '../../resources/icon.png?asset'
 import { getSetting } from './db'
@@ -18,6 +18,14 @@ export function initNotifications(database: Database.Database, pushFn: PushFn): 
 
 function enabled(): boolean {
   return (getSetting('notifications.enabled') ?? '1') === '1'
+}
+
+/**
+ * Sperrbildschirm-Schutz: nur „Neue E-Mail“ statt Absender, Betreff,
+ * Kurzfassung (vuln-0015). Privacy by default — nur ein explizites '0' zeigt Inhalte.
+ */
+function hideContent(): boolean {
+  return getSetting('notifications.hideContent') !== '0'
 }
 
 function minPriority(): number {
@@ -58,10 +66,12 @@ export function maybeNotify(messageId: number): void {
   if (row.priority < minPriority()) return
   if (!row.date || Date.now() - row.date > FRESH_WINDOW_MS) return
 
+  const hidden = hideContent()
+  const newMail = getSetting('ui.language') === 'en' ? 'New email' : 'Neue E-Mail'
   const notification = new Notification({
-    title: row.from_name ?? row.from_addr ?? 'Neue Mail',
-    subtitle: row.subject ?? undefined,
-    body: row.summary ?? row.subject ?? '',
+    title: hidden ? 'Noctua' : (row.from_name ?? row.from_addr ?? newMail),
+    subtitle: hidden ? undefined : (row.subject ?? undefined),
+    body: hidden ? newMail : (row.summary ?? row.subject ?? ''),
     silent: row.priority < 5,
     // macOS nutzt das Icon der Noctua.app; Windows/Linux brauchen es explizit.
     ...(process.platform === 'darwin' ? {} : { icon })
@@ -93,4 +103,32 @@ export function updateBadge(): void {
     )
     .get(minPriority()) as { n: number }
   app.setBadgeCount(row.n)
+}
+
+/**
+ * Kalender-Erinnerung (VALARM) als macOS-Benachrichtigung. Klick fokussiert das
+ * Fenster und meldet dem Renderer, welcher Termin gemeint war.
+ */
+export function notifyCalendarReminder(notice: {
+  objectId: number
+  recurrenceId: string | null
+  title: string
+  body: string
+}): void {
+  if (!Notification.isSupported()) return
+  const notification = new Notification({
+    title: notice.title,
+    body: notice.body,
+    ...(process.platform === 'darwin' ? {} : { icon })
+  })
+  notification.on('click', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+    }
+    push('calendar:openEvent', { objectId: notice.objectId, recurrenceId: notice.recurrenceId })
+  })
+  notification.show()
 }

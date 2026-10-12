@@ -88,6 +88,28 @@ func triagePayload(_ result: FMTriage) -> [String: Any] {
   ]
 }
 
+/// Dispatcher für die stt-Modi; Fehler werden strukturiert gemeldet (Exit 0,
+/// damit der Aufrufer die JSON-Zeile auswertet statt den Exit-Code).
+func runSpeech(mode: String, args: [String]) async {
+  do {
+    switch mode {
+    case "stt-check":
+      jsonLine(await speechCheck(localeId: args.first ?? "en-US"))
+    case "stt-install":
+      jsonLine(try await speechInstall(localeId: args.first ?? "en-US"))
+    default:  // transcribe <wav> <locale>
+      guard args.count >= 2 else {
+        throw SpeechFailure("failed", "Aufruf: transcribe <wav> <locale>")
+      }
+      jsonLine(try await speechTranscribe(path: args[0], localeId: args[1]))
+    }
+  } catch let failure as SpeechFailure {
+    jsonLine(["ok": false, "error": failure.code, "detail": failure.detail])
+  } catch {
+    jsonLine(["ok": false, "error": "failed", "detail": String(describing: error)])
+  }
+}
+
 @main
 struct Helper {
   static func main() async {
@@ -96,6 +118,12 @@ struct Helper {
 
     if mode == "check" {
       jsonLine(availabilityPayload())
+      return
+    }
+
+    // Spracherkennung (speech.swift): Einmal-Prozesse, unabhängig vom FM-Modell
+    if ["stt-check", "stt-install", "transcribe"].contains(mode) {
+      await runSpeech(mode: mode, args: Array(CommandLine.arguments.dropFirst(2)))
       return
     }
 

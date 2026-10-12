@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 import type { MessageAction } from '@shared/types'
 import { getSecret } from '../auth/secrets'
@@ -6,6 +6,7 @@ import { accountSecretKey, type AccountRow, type MailCredentials } from '../auth
 import { msAccessToken } from '../auth/msal'
 import { googleAccessToken } from '../auth/google'
 import { AccountSyncer, type QueuedOp, type SyncState } from './account-syncer'
+import { enqueueOp, processOpQueue } from './op-queue'
 import type { FetchedMessageHeaderData } from '../db/repos/message-headers'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
@@ -26,7 +27,7 @@ interface MessageRef {
  */
 export function nextErrorSince(prev: number | null, state: SyncState, now: number): number | null {
   if (state === 'idle' || state === 'off') return null
-  if (state === 'error') return prev ?? now
+  if (state === 'error' || state === 'needs-reauth') return prev ?? now
   return prev
 }
 
@@ -66,7 +67,7 @@ class SyncEngine {
     } else {
       const password = getSecret(accountSecretKey(account.id))
       if (!password) {
-        this.states.set(account.id, { state: 'error', detail: 'Kein Passwort im Vault' })
+        this.states.set(account.id, { state: 'error', detail: 'Kein Passwort im Tresor' })
         // Auch dieser Fehler bekommt seinen Zeitpunkt (Design 3b: „seit 11:42")
         if (!this.errorSince.has(account.id)) this.errorSince.set(account.id, Date.now())
         return
@@ -135,7 +136,22 @@ class SyncEngine {
 
   /** Sent-Ordner nach einem Versand zeitnah nachziehen. */
   resyncSent(accountId: number): void {
-    void this.syncers.get(accountId)?.resyncSpecialUse('\\Sent')
+    void this.syncers
+      .get(accountId)
+      ?.resyncSpecialUse('\\Sent')
+      .catch((error) => console.warn(`[sync] Sent-Resync (Konto ${accountId}):`, error))
+  }
+
+  /**
+   * Zugangsdaten eines Kontos haben sich geändert (Passwort im Vault): Syncer
+   * neu starten, damit er das neue Geheimnis liest und needs-reauth verlässt.
+   */
+  async credentialsChanged(secretKey: string): Promise<void> {
+    const accounts = this.db!.prepare('SELECT * FROM accounts').all() as AccountRow[]
+    const account = accounts.find((a) => accountSecretKey(a.id) === secretKey)
+    if (!account || !this.syncers.has(account.id)) return
+    await this.stopAccount(account.id)
+    this.startAccount(account)
   }
 
   async fetchRawSource(messageId: number): Promise<Buffer | null> {
@@ -191,9 +207,6 @@ class SyncEngine {
       groups.set(key, [...(groups.get(key) ?? []), ref])
     }
 
-    const enqueue = db.prepare(
-      'INSERT INTO op_queue (account_id, kind, payload_json, created_at) VALUES (?, ?, ?, ?)'
-    )
     const touchedAccounts = new Set<number>()
 
     const tx = db.transaction(() => {
@@ -256,7 +269,7 @@ class SyncEngine {
           }
         }
         if (op) {
-          enqueue.run(account_id, op.kind, JSON.stringify(op.payload), Date.now())
+          enqueueOp(db, account_id, op.kind, op.payload)
           touchedAccounts.add(account_id)
         }
       }
@@ -274,46 +287,25 @@ class SyncEngine {
   }
 
   private processing = new Set<number>()
+  private reprocess = new Set<number>()
 
   private async processQueue(accountId: number): Promise<void> {
-    if (this.processing.has(accountId)) return
+    if (this.processing.has(accountId)) {
+      // Während des Laufs eingereihte Ops nicht bis zum nächsten idle liegen lassen
+      this.reprocess.add(accountId)
+      return
+    }
     const syncer = this.syncers.get(accountId)
     if (!syncer) return
     this.processing.add(accountId)
     try {
-      const db = this.db!
-      const rows = db
-        .prepare(
-          'SELECT id, kind, payload_json, attempts FROM op_queue WHERE account_id = ? ORDER BY id'
-        )
-        .all(accountId) as Array<{
-        id: number
-        kind: QueuedOp['kind']
-        payload_json: string
-        attempts: number
-      }>
-      for (const row of rows) {
-        try {
-          await syncer.executeOp({
-            id: row.id,
-            kind: row.kind,
-            payload: JSON.parse(row.payload_json)
-          })
-          db.prepare('DELETE FROM op_queue WHERE id = ?').run(row.id)
-        } catch (error) {
-          const attempts = row.attempts + 1
-          if (attempts > 10) {
-            console.warn(`[ops] giving up on op ${row.id}:`, error)
-            db.prepare('DELETE FROM op_queue WHERE id = ?').run(row.id)
-          } else {
-            db.prepare('UPDATE op_queue SET attempts = ? WHERE id = ?').run(attempts, row.id)
-            break // Verbindung vermutlich weg — nächster Connect versucht erneut
-          }
-        }
-      }
+      await processOpQueue(this.db!, accountId, syncer, this.push)
+    } catch (error) {
+      console.warn(`[ops] Queue-Lauf (Konto ${accountId}) abgebrochen:`, error)
     } finally {
       this.processing.delete(accountId)
     }
+    if (this.reprocess.delete(accountId)) void this.processQueue(accountId)
   }
 }
 

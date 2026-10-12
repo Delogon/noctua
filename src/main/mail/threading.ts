@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 
 function sha1(input: string): string {
   return createHash('sha1').update(input).digest('hex').slice(0, 20)
@@ -21,6 +21,8 @@ export interface ThreadKeyInput {
   subject: string | null
 }
 
+const MAX_THREAD_REFS = 500
+
 /**
  * Thread-Schlüssel pro Konto: Gmail autoritativ über X-GM-THRID, sonst
  * JWZ-light über References/In-Reply-To (erster Treffer in der DB gewinnt),
@@ -33,9 +35,12 @@ export function computeThreadKey(
 ): string {
   if (input.gmThrid) return `${accountId}:gm:${input.gmThrid}`
 
-  const refIds = [...input.references, ...(input.inReplyTo ? [input.inReplyTo] : [])].filter(
-    Boolean
-  )
+  // Nur die jüngsten Referenzen (RFC 5322: älteste zuerst, In-Reply-To hinten):
+  // ein References-Header mit Zehntausenden IDs sprengt sonst SQLites
+  // Bind-Variablen-Limit und blockiert den Sync dauerhaft (SEC, vuln-0011).
+  const refIds = [...input.references, ...(input.inReplyTo ? [input.inReplyTo] : [])]
+    .filter(Boolean)
+    .slice(-MAX_THREAD_REFS)
   if (refIds.length > 0) {
     const placeholders = refIds.map(() => '?').join(',')
     const row = db

@@ -14,6 +14,35 @@ const electronViteCli = join(
   dirname(electronVitePackagePath),
   electronVitePackage.bin['electron-vite']
 )
+/**
+ * esbuild ist ein natives Binary. Liegt im node_modules eines für eine andere
+ * Plattform (z. B. aus einem Linux-Container in den Mac-Checkout kopiert),
+ * scheitert der Start sonst nur mit `[vite:esbuild] spawn ENOEXEC`.
+ */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- .mjs ohne TS-Syntax
+function assertNativeEsbuild() {
+  for (const owner of ['vite', 'electron-vite']) {
+    let esbuild
+    try {
+      esbuild = createRequire(rootRequire.resolve(`${owner}/package.json`))('esbuild')
+    } catch {
+      continue
+    }
+    try {
+      esbuild.transformSync('let a = 1')
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error ? error.code : ''
+      console.error(
+        `[dev] esbuild (über ${owner}) lässt sich nicht ausführen${code ? ` (${code})` : ''}.\n` +
+          '[dev] Vermutlich passt das Binary in node_modules nicht zu dieser Plattform.\n' +
+          '[dev] Abhilfe: rm -rf node_modules && pnpm install'
+      )
+      process.exit(1)
+    }
+  }
+}
+assertNativeEsbuild()
+
 const env = { ...process.env }
 const requestedCommand = process.argv[2]
 const command = requestedCommand === 'preview' ? 'preview' : 'dev'

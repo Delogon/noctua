@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { evaluateTestReply } from '@main/ai/model-test'
 import { providerBody, zdrOnly } from '@main/ai/openrouter'
 import { setSetting } from '@main/db'

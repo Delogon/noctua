@@ -27,12 +27,14 @@ export function useDictation(options: {
   const operationRef = useRef(0)
   const { bars, takeRecording } = useListeningAudio(state === 'listening')
   const optionsRef = useRef(options)
-  optionsRef.current = options
+  // Ref erst nach dem Commit nachziehen (nicht im Render schreiben)
+  useEffect(() => {
+    optionsRef.current = options
+  })
 
   useEffect(() => {
     if (state !== 'listening') return
     const startedAt = Date.now()
-    setSeconds(0)
     const timer = setInterval(() => {
       setSeconds(Math.floor((Date.now() - startedAt) / 1000))
     }, 250)
@@ -41,6 +43,7 @@ export function useDictation(options: {
 
   const start = useCallback((): void => {
     operationRef.current += 1
+    setSeconds(0)
     setState('listening')
   }, [])
 

@@ -3,7 +3,10 @@ import sharp from 'sharp'
 import { renderSignatureImage } from '@main/smtp/signature-image'
 
 async function pixel(image: Buffer, x: number, y: number): Promise<number[]> {
-  const { data, info } = await sharp(image).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const { data, info } = await sharp(image)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
   const offset = (y * info.width + x) * info.channels
   return Array.from(data.subarray(offset, offset + 4))
 }

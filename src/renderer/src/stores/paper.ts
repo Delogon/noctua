@@ -6,7 +6,7 @@ import { toast } from './toast'
 // Zentraler UI-Zustand des Letterpress-Frames (M19). Der Composer-Automat
 // lebt hier, damit Owl-Rail und Listen-Chips („DRAFT READY") ihn sehen.
 
-export type PaperView = 'inbox' | 'waiting' | 'tasks' | 'settings' | 'chat' | 'compose'
+export type PaperView = 'inbox' | 'waiting' | 'tasks' | 'calendar' | 'settings' | 'chat' | 'compose'
 export type SettingsSection = 'accounts' | 'style' | 'sig' | 'intel' | 'tech'
 export type CompMode = 'idle' | 'listening' | 'transcribing' | 'drafting' | 'ready' | 'sending'
 

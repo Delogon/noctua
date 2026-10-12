@@ -13,10 +13,14 @@ import type { AuthorizeResponse, ILoopbackClient } from '@azure/msal-node'
  * listenForAuthCode-Promise verwirft — acquireTokenInteractive bricht damit
  * sauber ab.
  */
+/** Wie google.ts: nach 5 Minuten ohne Redirect gibt der Login auf. */
+const LOGIN_TIMEOUT_MS = 5 * 60 * 1000
+
 export class CancelableLoopbackClient implements ILoopbackClient {
   private server: Server | null = null
   private rejectListener: ((error: Error) => void) | null = null
   private canceled = false
+  private timeout: NodeJS.Timeout | null = null
 
   listenForAuthCode(successTemplate?: string, errorTemplate?: string): Promise<AuthorizeResponse> {
     if (this.server) {
@@ -24,6 +28,12 @@ export class CancelableLoopbackClient implements ILoopbackClient {
     }
     return new Promise<AuthorizeResponse>((resolve, reject) => {
       this.rejectListener = reject
+      this.timeout = setTimeout(() => {
+        this.rejectListener = null
+        this.closeServer()
+        reject(new Error('Die Microsoft-Anmeldung ist abgelaufen – bitte versuche es erneut'))
+      }, LOGIN_TIMEOUT_MS)
+      this.timeout.unref?.()
       this.server = createServer((req, res) => {
         const url = req.url ?? ''
         if (url === '/') {
@@ -46,6 +56,10 @@ export class CancelableLoopbackClient implements ILoopbackClient {
         }
         this.rejectListener = null
         resolve(response)
+        // Der Redirect auf "/" (Erfolgsseite) braucht den Server noch kurz —
+        // danach zu, damit kein Port offen bleibt. state prüft msal selbst
+        // (validateState in acquireTokenByCode → state_mismatch).
+        setTimeout(() => this.closeServer(), 5000).unref?.()
       })
       this.server.listen(0, '127.0.0.1')
     })
@@ -70,6 +84,8 @@ export class CancelableLoopbackClient implements ILoopbackClient {
   }
 
   closeServer(): void {
+    if (this.timeout) clearTimeout(this.timeout)
+    this.timeout = null
     this.server?.close()
     this.server?.closeAllConnections()
     this.server = null

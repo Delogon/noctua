@@ -1,27 +1,7 @@
-import OpenAI from 'openai'
-import { getSecret } from '../auth/secrets'
 import { getSetting } from '../db'
 
-let client: OpenAI | null = null
-let cachedKey: string | null = null
-
-/** OpenRouter ist OpenAI-kompatibel — ein Client, Modell-IDs aus den Settings. */
-export function getOpenRouter(): OpenAI | null {
-  const key = getSecret('openrouter.apiKey')
-  if (!key) return null
-  if (!client || key !== cachedKey) {
-    client = new OpenAI({
-      apiKey: key,
-      baseURL: 'https://openrouter.ai/api/v1',
-      defaultHeaders: {
-        'HTTP-Referer': 'https://github.com/Schereo/noctua',
-        'X-Title': 'Noctua'
-      }
-    })
-    cachedKey = key
-  }
-  return client
-}
+// OpenRouter-Spezifika (ZDR-Routing, Kostenauslese). Der Client selbst kommt aus
+// der Provider-Schicht (providers/registry.ts).
 
 /**
  * Zero Data Retention (M86): standardmäßig routet OpenRouter nur zu
@@ -38,8 +18,19 @@ export function providerBody(): Record<string, unknown> {
   return zdrOnly() ? { provider: { data_collection: 'deny' } } : {}
 }
 
+/** Default-Modelle des OpenRouter-Profils (ohne ausdrückliche Wahl in den Settings). */
+export const OPENROUTER_DEFAULT_MODELS = {
+  triage: 'deepseek/deepseek-v4-flash',
+  draft: 'anthropic/claude-opus-4.8',
+  // Diktat-Transkription. Hinweis: dediziertes Whisper (openai/whisper-large-v3)
+  // listet OpenRouter derzeit nicht — gpt-audio-mini ist der günstigste
+  // Audio-Input-Chat; die Auswahl in den Einstellungen speist sich live
+  // aus dem Katalog und zeigt Whisper automatisch, sobald es existiert.
+  stt: 'openai/gpt-audio-mini'
+} as const
+
 export function getTriageModel(): string {
-  return getSetting('ai.triageModel') ?? 'deepseek/deepseek-v4-flash'
+  return getSetting('ai.triageModel') ?? OPENROUTER_DEFAULT_MODELS.triage
 }
 
 /** Wer rechnet die Triage: OpenRouter (Cloud) oder Apple Intelligence (lokal). */
@@ -48,15 +39,11 @@ export function getTriageProvider(): 'openrouter' | 'apple' {
 }
 
 export function getDraftModel(): string {
-  return getSetting('ai.draftModel') ?? 'anthropic/claude-opus-4.8'
+  return getSetting('ai.draftModel') ?? OPENROUTER_DEFAULT_MODELS.draft
 }
 
 export function getSttModel(): string {
-  // Diktat-Transkription. Hinweis: dediziertes Whisper (openai/whisper-large-v3)
-  // listet OpenRouter derzeit nicht — gpt-audio-mini ist der günstigste
-  // Audio-Input-Chat; die Auswahl in den Einstellungen speist sich live
-  // aus dem Katalog und zeigt Whisper automatisch, sobald es existiert.
-  return getSetting('ai.sttModel')?.trim() || 'openai/gpt-audio-mini'
+  return getSetting('ai.sttModel')?.trim() || OPENROUTER_DEFAULT_MODELS.stt
 }
 
 interface UsageLike {

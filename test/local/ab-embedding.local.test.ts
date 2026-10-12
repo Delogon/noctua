@@ -2,7 +2,7 @@
 // whose message_vecs were rebuilt with a candidate model (see M96).
 // Env: NOCTUA_AB=1, NOCTUA_AB_DB, NOCTUA_AB_GOLD, NOCTUA_AB_MODEL, NOCTUA_AB_CACHE
 import { readFileSync } from 'node:fs'
-import Database from 'better-sqlite3'
+import Database from 'better-sqlite3-multiple-ciphers'
 import * as sqliteVec from 'sqlite-vec'
 import { describe, expect, it } from 'vitest'
 import { pipeline, env as hfEnv } from '@huggingface/transformers'

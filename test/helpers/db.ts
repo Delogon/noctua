@@ -1,7 +1,8 @@
-import Database from 'better-sqlite3'
+import Database from 'better-sqlite3-multiple-ciphers'
 import * as sqliteVec from 'sqlite-vec'
 import { runMigrations } from '@main/db/migrate'
 import { __setTestDb } from '@main/db'
+import { setSecret } from '@main/auth/secrets'
 
 /**
  * Frische In-Memory-DB mit vollem Schema (alle Migrationen + sqlite-vec).
@@ -90,4 +91,15 @@ export function makeEnvelope(over: Partial<EnvelopeData> = {}): EnvelopeData {
     listUnsubscribePost: false,
     ...over
   }
+}
+
+/**
+ * Wie createTestDb, aber mit hinterlegtem OpenRouter-Key — der Resolver
+ * (providers/registry) gibt sonst keinen Client heraus. Gedacht für Tests, die
+ * `@main/ai/providers/openai-factory` mocken.
+ */
+export function createAiTestDb(): Database.Database {
+  const db = createTestDb()
+  setSecret('openrouter.apiKey', 'test-key')
+  return db
 }

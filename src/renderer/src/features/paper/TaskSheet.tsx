@@ -6,6 +6,7 @@ import { SheetEmpty } from '@renderer/components/paper/SheetEmpty'
 import { useT } from '@renderer/lib/i18n'
 import { useThread } from '@renderer/queries/threads'
 import { OriginalMailBody } from '@renderer/components/OriginalMailBody'
+import { TaskSyncGlyph } from './TaskSyncGlyph'
 import { taskIdAfterCompletion, visibleTaskRows } from './task-navigation'
 
 export function TaskSheet(): React.JSX.Element {
@@ -118,6 +119,7 @@ export function TaskSheet(): React.JSX.Element {
           </span>
         )}
         <span className="mmeta">{t('extractedAuto')}</span>
+        <TaskSyncGlyph state={sel.syncState} />
       </div>
       <div className="double-rule" style={{ marginTop: 18 }} />
       {sel.sourceSubject && (

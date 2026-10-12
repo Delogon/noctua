@@ -41,7 +41,9 @@ describe('draft-autosave', () => {
     expect(saveCalls()).toHaveLength(0)
 
     vi.advanceTimersByTime(700)
-    expect(saveCalls()).toEqual([['drafts:save', { threadKey: 't1', text: 'Hallo Alice', html: '' }]])
+    expect(saveCalls()).toEqual([
+      ['drafts:save', { threadKey: 't1', text: 'Hallo Alice', html: '' }]
+    ])
   })
 
   it('bündelt schnelles Tippen zu einer Speicherung mit dem letzten Stand', () => {
@@ -57,7 +59,9 @@ describe('draft-autosave', () => {
     usePaper.getState().setComp({ threadKey: 't1', text: 'Hallo Alice', mode: 'ready' })
     usePaper.getState().resetComp()
 
-    expect(saveCalls()).toEqual([['drafts:save', { threadKey: 't1', text: 'Hallo Alice', html: '' }]])
+    expect(saveCalls()).toEqual([
+      ['drafts:save', { threadKey: 't1', text: 'Hallo Alice', html: '' }]
+    ])
   })
 
   it('belebt den Entwurf nach Senden oder Löschen nicht wieder', () => {

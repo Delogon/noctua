@@ -36,9 +36,7 @@ export function parseSignatureConfig(value: string | null | undefined): Signatur
 }
 
 export function signatureImageBackground(value: string | null | undefined): string {
-  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
-    ? value
-    : 'transparent'
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : 'transparent'
 }
 
 export function renderSignatureText(config: Pick<SignatureConfig, 'blocks' | 'values'>): string {
@@ -78,8 +76,7 @@ function isClosingLine(line: string): boolean {
   return (
     /^(?:mit freundlichen|viele(?: liebe)?|liebe|beste|herzliche|freundliche|schöne|sonnige) grüße(?: aus .+)?$/.test(
       normalized
-    ) ||
-    /^(?:kind|best|warm) regards$|^regards$|^sincerely$|^cheers$|^(?:lg|vg)$/.test(normalized)
+    ) || /^(?:kind|best|warm) regards$|^regards$|^sincerely$|^cheers$|^(?:lg|vg)$/.test(normalized)
   )
 }
 

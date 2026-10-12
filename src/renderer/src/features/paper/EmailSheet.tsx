@@ -33,6 +33,9 @@ import {
   type ComposerActivity
 } from '@renderer/features/composer/composer-state'
 import { MessageAttachments } from '@renderer/features/paper/MessageAttachments'
+import { InvitationCards } from '@renderer/features/paper/InvitationCard'
+import { PhishingBanner } from '@renderer/features/paper/PhishingBanner'
+import { EventSuggestionCards } from '@renderer/features/paper/EventSuggestionCard'
 import { OverrideMenu } from '@renderer/features/inbox/OverrideMenu'
 import { useUiStore } from '@renderer/stores/ui'
 import {
@@ -520,6 +523,9 @@ function MessageBox({
         )}
       </div>
       <div style={{ padding: '4px 14px 12px' }}>
+        <PhishingBanner messageId={message.id} />
+        <InvitationCards messageId={message.id} />
+        <EventSuggestionCards messageId={message.id} />
         {message.bodyHtml ? (
           <InlineMailFrame message={message} html={parts.visible} />
         ) : (
@@ -628,9 +634,23 @@ export function EmailSheet(): React.JSX.Element {
     extraCcText.current = ''
     extraBccText.current = ''
   }, [])
+  // Beim Threadwechsel zurücksetzen: State direkt im Render nachziehen
+  // (React-Muster „State bei Prop-Änderung anpassen"), Refs im Effect.
+  const [extrasThreadKey, setExtrasThreadKey] = useState(threadKey)
+  if (extrasThreadKey !== threadKey) {
+    setExtrasThreadKey(threadKey)
+    setExtrasOpen(false)
+    setExtraTo([])
+    setExtraCc([])
+    setExtraBcc([])
+    setDroppedRecipients([])
+    setHasPendingExtra(false)
+  }
   useEffect(() => {
-    resetExtras()
-  }, [threadKey, resetExtras])
+    extraToText.current = ''
+    extraCcText.current = ''
+    extraBccText.current = ''
+  }, [threadKey])
   const transcriptionOpRef = useRef(0)
   const generationRequestRef = useRef(0)
   const [hasRetryableRecording, setHasRetryableRecording] = useState(false)

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- Build-Tooling in .mjs */
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {

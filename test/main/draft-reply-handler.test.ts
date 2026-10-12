@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { createTestDb, closeTestDb } from '../helpers/db'
 
 // Nur der Draft-Start wird gemockt — geprüft wird, dass der Handler den

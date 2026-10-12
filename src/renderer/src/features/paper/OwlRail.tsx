@@ -10,6 +10,7 @@ import { useVoiceTag } from '@renderer/features/paper/useVoiceTag'
 import { removeDraft } from '@renderer/features/paper/draft-autosave'
 import { useOrKeyStatus } from '@renderer/queries/intel'
 import { OwlGlyph, type OwlPose } from '@renderer/components/paper/OwlGlyph'
+import { RailAgenda } from '@renderer/features/calendar/RailAgenda'
 
 const RAIL_DRAFT_LIMIT = 5
 
@@ -38,10 +39,8 @@ function RailCard({ children }: { children: React.ReactNode }): React.JSX.Elemen
  * Diktat → listen, Transkription/Entwurf → scan, kein Schlüssel → asleep,
  * sonst awake (blinzelt live).
  */
-export function railOwlPose(
-  compMode: string,
-  hasKey: boolean | undefined
-): OwlPose {
+// eslint-disable-next-line react-refresh/only-export-components -- Reine Hilfsfunktion, von Tests importiert
+export function railOwlPose(compMode: string, hasKey: boolean | undefined): OwlPose {
   if (compMode === 'listening') return 'listen'
   if (compMode === 'transcribing' || compMode === 'drafting') return 'scan'
   if (hasKey === false) return 'asleep'
@@ -115,14 +114,14 @@ export function OwlRail(): React.JSX.Element {
   const waiting = followups.data ?? []
 
   const orStatus = useOrKeyStatus()
-  const railPose = railOwlPose(comp.mode, orStatus.data?.hasKey)
+  const railPose = railOwlPose(comp.mode, orStatus.data?.ready)
   const owlStatus =
     comp.mode === 'listening'
       ? t('owlListening')
       : comp.mode === 'transcribing' || comp.mode === 'drafting'
         ? t('owlDraftingS')
         : railPose === 'asleep'
-          ? t('owlAsleepNoKey')
+          ? t(orStatus.data?.block === 'local-only' ? 'owlAsleepLocalOnly' : 'owlAsleepNoKey')
           : t('owlQuiet')
 
   return (
@@ -149,7 +148,9 @@ export function OwlRail(): React.JSX.Element {
             {railDrafts.slice(0, RAIL_DRAFT_LIMIT).map((d, i) => (
               <div
                 key={d.threadKey}
-                style={i > 0 ? { marginTop: 10, borderTop: '1px solid var(--hairline)' } : undefined}
+                style={
+                  i > 0 ? { marginTop: 10, borderTop: '1px solid var(--hairline)' } : undefined
+                }
               >
                 <div className="flex items-baseline gap-2" style={{ marginTop: i > 0 ? 9 : 8 }}>
                   <span
@@ -262,6 +263,8 @@ export function OwlRail(): React.JSX.Element {
           </div>
         ))}
       </RailCard>
+
+      <RailAgenda />
 
       <RailCard>
         <div className="flex items-baseline">

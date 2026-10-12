@@ -10,6 +10,7 @@ import { useThreadInvalidation } from '@renderer/queries/threads'
 import { useOutboxEchoLifecycle } from '@renderer/stores/send'
 import { useTaskInvalidation } from '@renderer/queries/tasks'
 import { useFollowupInvalidation } from '@renderer/queries/followups'
+import { useCalendarLive } from '@renderer/queries/calendar'
 import { installPaperKeymap } from '@renderer/keyboard/keymap'
 import { initLanguage, t } from '@renderer/lib/i18n'
 import { toast } from '@renderer/stores/toast'
@@ -23,6 +24,7 @@ import { SigSheet } from '@renderer/features/paper/SigSheet'
 import { TechSheet } from '@renderer/features/settings/TechSheet'
 import { ComposeSheet } from '@renderer/features/paper/ComposeSheet'
 import { OwlRail } from '@renderer/features/paper/OwlRail'
+import { CalendarSheet } from '@renderer/features/calendar/CalendarSheet'
 import { Onboarding } from '@renderer/features/paper/Onboarding'
 import { HelpOverlay, PaperPalette } from '@renderer/components/paper/Overlays'
 import { ToastHost } from '@renderer/components/paper/Toast'
@@ -50,6 +52,7 @@ function CenterSheet(): React.JSX.Element {
       {view === 'compose' && <ComposeSheet />}
       {view === 'waiting' && <WaitingSheet />}
       {view === 'tasks' && <TaskSheet />}
+      {view === 'calendar' && <CalendarSheet />}
       {view === 'settings' && setSel === 'accounts' && <AccountsSheet />}
       {view === 'settings' && setSel === 'style' && <StyleSheetView />}
       {view === 'settings' && setSel === 'sig' && <SigSheet />}
@@ -68,6 +71,7 @@ function App(): React.JSX.Element {
   useThreadInvalidation()
   useTaskInvalidation()
   useFollowupInvalidation()
+  useCalendarLive()
   useOutboxEchoLifecycle()
 
   useEffect(
@@ -128,6 +132,40 @@ function App(): React.JSX.Element {
     []
   )
 
+  // Dead-Letter der IMAP-Op-Queue: nie still verwerfen, sondern sichtbar melden
+  useEffect(
+    () =>
+      onPush('sync:opsDead', ({ count, reason }) => {
+        const key =
+          reason === 'attempts'
+            ? 'opsDeadAttempts'
+            : reason === 'uidvalidity'
+              ? 'opsDeadUidvalidity'
+              : reason === 'folder-gone'
+                ? 'opsDeadFolderGone'
+                : 'opsDeadNoTarget'
+        toast.error(t(key, { n: count }))
+      }),
+    []
+  )
+
+  // Kalender: abgelehnte lokale Änderungen (Konflikt, Server-Version gewinnt) nie still verwerfen
+  useEffect(
+    () =>
+      onPush('calendar:conflict', ({ summary, reason }) => {
+        const key =
+          reason === 'conflict'
+            ? 'calConflictConflict'
+            : reason === 'deleted-on-server'
+              ? 'calConflictGone'
+              : reason === 'forbidden'
+                ? 'calConflictForbidden'
+                : 'calConflictAttempts'
+        toast.error(t(key, { title: summary ?? '' }))
+      }),
+    []
+  )
+
   // Native Menü-Aktionen + Notification-Klick
   useEffect(() => {
     const offMenu = onPush('app:menuAction', ({ action }) => {
@@ -136,6 +174,7 @@ function App(): React.JSX.Element {
       if (action === 'inbox') paper.setView('inbox')
       else if (action === 'waiting') paper.setView('waiting')
       else if (action === 'tasks') paper.setView('tasks')
+      else if (action === 'calendar') paper.setView('calendar')
       else if (action === 'chat') paper.setView('chat')
       else if (action === 'settings') paper.setView('settings')
       else if (action === 'shortcuts') paper.setHelpOpen(!paper.helpOpen)

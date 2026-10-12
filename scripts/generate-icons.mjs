@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- Build-Tooling in .mjs */
 // Rastert build/icon.svg zu allen App-Icon-Artefakten:
 //   build/icon.icns   (macOS-Bundle, via iconutil)
 //   build/icon.png    (1024px, electron-builder-Fallback)

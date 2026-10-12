@@ -13,8 +13,10 @@ export const accountSummarySchema = z.object({
   accountName: z.string(),
   displayName: z.string().nullable(),
   provider: z.enum(['gmail', 'microsoft', 'proton', 'imap']),
+  /** Wie sich das Konto anmeldet — bestimmt „Passwort neu eingeben" vs. „Erneut anmelden". */
+  credentialType: z.enum(['password', 'oauth-ms', 'oauth-google', 'bridge']).default('password'),
   color: z.string(),
-  syncState: z.enum(['idle', 'connecting', 'syncing', 'error', 'off']),
+  syncState: z.enum(['idle', 'connecting', 'syncing', 'error', 'needs-reauth', 'off']),
   lastError: z.string().nullable(),
   /** Seit wann der aktuelle Fehlerzustand besteht (Design 3b: „since 11:42"). */
   errorSince: z.number().nullable().default(null),
@@ -99,7 +101,7 @@ export const semanticSearchIndexSchema = z.object({
  */
 export const owlSourceSchema = z.object({
   index: z.number().int(),
-  threadKey: z.string(),
+  threadKey: z.string().max(512),
   subject: z.string().nullable(),
   accountName: z.string().optional(),
   mailbox: z.enum(['inbox', 'sent', 'archive', 'other']).optional(),
@@ -241,7 +243,9 @@ export const taskItemSchema = z.object({
   status: z.enum(['open', 'done', 'dismissed']),
   createdAt: z.number(),
   sourceSubject: z.string().nullable(),
-  sourceMessageId: z.number().nullable()
+  sourceMessageId: z.number().nullable(),
+  /** CalDAV-Abgleich (Phase 3.2); null/fehlend = nicht zugeordnet */
+  syncState: z.enum(['pending', 'synced', 'conflict']).nullable().optional()
 })
 
 /** Gespeicherter Antwort-Entwurf (ein Entwurf je Thread, Eulen-Leiste). */
@@ -255,6 +259,24 @@ export const draftItemSchema = z.object({
 })
 
 export type Recipient = z.infer<typeof recipientSchema>
+/** Eine Netzwerkverbindung der App (Technik-Seite, Abschnitt „Netzwerkverbindungen"). */
+export const networkConnectionSchema = z.object({
+  kind: z.enum(['mail', 'oauth', 'ai', 'updates', 'embeddings', 'calendar']),
+  /** Konto/Profil/Anbieter; leer bei updates und embeddings */
+  label: z.string().max(200),
+  /** Zielhost; null, wenn nichts verbunden wird (Update-Check aus) */
+  host: z.string().max(255).nullable(),
+  scope: z.enum(['external', 'local']),
+  status: z.enum(['active', 'blocked', 'manual-only', 'on-demand', 'cached', 'off']),
+  /** nur bei kind = ai: bediente Aufgaben */
+  tasks: z.array(z.enum(['triage', 'draft', 'stt', 'decision'])).max(4)
+})
+export const networkConnectionsSchema = z.object({
+  localOnly: z.boolean(),
+  connections: z.array(networkConnectionSchema).max(200)
+})
+
+export type NetworkConnection = z.infer<typeof networkConnectionSchema>
 export type AccountSummary = z.infer<typeof accountSummarySchema>
 export type DraftItem = z.infer<typeof draftItemSchema>
 export type ThreadListItem = z.infer<typeof threadListItemSchema>

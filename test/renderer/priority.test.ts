@@ -22,12 +22,7 @@ describe('needsYou („Braucht dich": Rang 4+)', () => {
   })
 
   it('Zähler läuft über die ungefilterte Liste', () => {
-    const rows = [
-      { aiPriority: 5 },
-      { aiPriority: 4 },
-      { aiPriority: 2 },
-      { aiPriority: null }
-    ]
+    const rows = [{ aiPriority: 5 }, { aiPriority: 4 }, { aiPriority: 2 }, { aiPriority: null }]
     expect(rows.filter(needsYou)).toHaveLength(2)
   })
 })

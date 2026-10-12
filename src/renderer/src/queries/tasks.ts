@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { invoke, onPush } from '@renderer/lib/ipc'
+import type { InvokeOutput } from '@shared/ipc-contract'
 
 export function useTaskInvalidation(): void {
   const queryClient = useQueryClient()
@@ -19,10 +20,27 @@ export function useTaskInvalidation(): void {
   }, [queryClient])
 }
 
-export function useTasks(status: 'open' | 'done') {
+export function useTasks(status: 'open' | 'done'): UseQueryResult<InvokeOutput<'tasks:list'>> {
   return useQuery({
     queryKey: ['tasks', status],
     queryFn: () => invoke('tasks:list', { status }),
+    staleTime: 5_000
+  })
+}
+
+/** Gewählte CalDAV-Aufgabenliste + wählbare Listen (Phase 3.2). */
+export function useTasksSyncSettings(): UseQueryResult<InvokeOutput<'tasks:sync:get'>> {
+  const queryClient = useQueryClient()
+  useEffect(
+    () =>
+      onPush('calendar:changed', () => {
+        void queryClient.invalidateQueries({ queryKey: ['tasks', 'sync'] })
+      }),
+    [queryClient]
+  )
+  return useQuery({
+    queryKey: ['tasks', 'sync'],
+    queryFn: () => invoke('tasks:sync:get', undefined),
     staleTime: 5_000
   })
 }

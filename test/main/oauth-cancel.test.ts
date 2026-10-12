@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { shell } from 'electron'
 import { AuthError } from '@azure/msal-node'
 import { cancelGoogleLogin, googleInteractiveLogin } from '@main/auth/google'

@@ -27,11 +27,19 @@ export function setSecret(key: string, value: string): void {
 
 export function getSecret(key: string): string | null {
   const row = getDb().prepare('SELECT ciphertext FROM secrets WHERE key = ?').get(key) as
-    | { ciphertext: Buffer }
-    | undefined
+    { ciphertext: Buffer } | undefined
   if (!row) return null
-  ensureAvailable()
-  return safeStorage.decryptString(row.ciphertext)
+  try {
+    ensureAvailable()
+    return safeStorage.decryptString(row.ciphertext)
+  } catch (error) {
+    // Z. B. Keychain-Wechsel oder beschädigter Eintrag: wie „kein Credential"
+    // behandeln, damit die Re-Auth-Pfade greifen. Kein Secret-Material loggen.
+    console.warn(
+      `[secrets] Entschlüsselung fehlgeschlagen (${key.split('.')[0]}): ${error instanceof Error ? error.message.slice(0, 80) : 'unbekannt'}`
+    )
+    return null
+  }
 }
 
 export function hasSecret(key: string): boolean {

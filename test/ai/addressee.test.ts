@@ -66,7 +66,10 @@ describe('salutationTarget (Stufe 2 — Anrede)', () => {
       kind: 'named',
       names: ['Ann-Kathrin']
     })
-    expect(salutationTarget('Guten Tag Lena Hartmann,')).toEqual({ kind: 'named', names: ['Lena Hartmann'] })
+    expect(salutationTarget('Guten Tag Lena Hartmann,')).toEqual({
+      kind: 'named',
+      names: ['Lena Hartmann']
+    })
   })
 
   it('entfernt Titel („Sehr geehrte Frau Dr. Hartmann")', () => {

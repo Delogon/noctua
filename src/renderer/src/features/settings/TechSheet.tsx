@@ -17,6 +17,7 @@ import {
   SHEET,
   Sq
 } from '@renderer/features/settings/TechFigures'
+import { NetworkConnections } from '@renderer/features/settings/NetworkConnections'
 import { chipWidth } from '@renderer/features/settings/tech-metrics'
 
 // Technik-Seite: „Wie die Eule denkt" — jede Pipeline als kleine
@@ -804,16 +805,14 @@ function FigData(): React.JSX.Element {
       {chips.map((c, i) => (
         <Chip key={c} cx={228 + chipWidth(c) / 2} cy={66 + i * 24} text={c} tone="ink" />
       ))}
-      {/* Nach draußen: nur OpenRouter und ein stiller Update-Check */}
-      <Arrow x1={346} y1={74} x2={406} y2={74} dashed />
-      <ModelBox x={408} y={46} w={136} h={56} name={t('techDataOr')} note={t('techDataOrNote')} />
-      <Arrow x1={346} y1={136} x2={406} y2={136} dashed />
-      <Box x={408} y={116} w={136} h={40} dashed />
-      <L x={420} y={132} size={7.5}>
-        {t('techDataGh')}
+      {/* Nach draußen: die ehrliche, dynamische Liste steht darunter (Abschnitt 11) */}
+      <Arrow x1={346} y1={90} x2={406} y2={90} dashed />
+      <Box x={408} y={62} w={136} h={56} dashed />
+      <L x={420} y={82} size={7.5}>
+        {t('techDataNet')}
       </L>
-      <L x={420} y={146} size={7} color={MUTED} ls={0.5}>
-        {t('techDataGhNote')}
+      <L x={420} y={96} size={7} color={MUTED} ls={0.5}>
+        {t('techDataNetNote')}
       </L>
       {/* Und was draußen bleibt: Tracking-Pixel prallen an der Wand ab */}
       <line
@@ -885,6 +884,7 @@ export function TechSheet(): React.JSX.Element {
             <FigData />
           </Fig>
         </div>
+        <NetworkConnections />
       </div>
     </div>
   )

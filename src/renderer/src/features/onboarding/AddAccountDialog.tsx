@@ -169,81 +169,79 @@ export function AddAccountDialog(): React.JSX.Element | null {
               </button>
             </div>
             {oauth.mutation.isPending && (
-              <p className="text-[11.5px] text-text-faint">
-                {t('addBrowserTabNote')}
-              </p>
+              <p className="text-[11.5px] text-text-faint">{t('addBrowserTabNote')}</p>
             )}
           </div>
         ) : (
-        <>
-        <div className="mt-4 space-y-3">
-          <input
-            type="email"
-            required
-            placeholder={t('addEmailPh')}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
-          />
-          <input
-            type="password"
-            required
-            placeholder={t('addPasswordPh')}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
-          />
-          {provider === 'imap' && (
-            <div className="grid grid-cols-[1fr_80px] gap-2">
+          <>
+            <div className="mt-4 space-y-3">
               <input
+                type="email"
                 required
-                placeholder={t('addImapHostPh')}
-                value={imapHost}
-                onChange={(e) => setImapHost(e.target.value)}
+                placeholder={t('addEmailPh')}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className={inputClass}
               />
               <input
+                type="password"
                 required
-                placeholder={t('addPortPh')}
-                value={imapPort}
-                onChange={(e) => setImapPort(e.target.value)}
+                placeholder={t('addPasswordPh')}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className={inputClass}
               />
-              <input
-                required
-                placeholder={t('addSmtpHostPh')}
-                value={smtpHost}
-                onChange={(e) => setSmtpHost(e.target.value)}
-                className={inputClass}
-              />
-              <input
-                required
-                placeholder={t('addPortPh')}
-                value={smtpPort}
-                onChange={(e) => setSmtpPort(e.target.value)}
-                className={inputClass}
-              />
+              {provider === 'imap' && (
+                <div className="grid grid-cols-[1fr_80px] gap-2">
+                  <input
+                    required
+                    placeholder={t('addImapHostPh')}
+                    value={imapHost}
+                    onChange={(e) => setImapHost(e.target.value)}
+                    className={inputClass}
+                  />
+                  <input
+                    required
+                    placeholder={t('addPortPh')}
+                    value={imapPort}
+                    onChange={(e) => setImapPort(e.target.value)}
+                    className={inputClass}
+                  />
+                  <input
+                    required
+                    placeholder={t('addSmtpHostPh')}
+                    value={smtpHost}
+                    onChange={(e) => setSmtpHost(e.target.value)}
+                    className={inputClass}
+                  />
+                  <input
+                    required
+                    placeholder={t('addPortPh')}
+                    value={smtpPort}
+                    onChange={(e) => setSmtpPort(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {addAccount.isError && (
-          <p className="anim-rise mt-3 rounded-lg border border-danger/40 bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
-            {addAccount.error instanceof Error
-              ? addAccount.error.message
-              : t('addConnectionFailed')}
-          </p>
-        )}
+            {addAccount.isError && (
+              <p className="anim-rise mt-3 rounded-lg border border-danger/40 bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
+                {addAccount.error instanceof Error
+                  ? addAccount.error.message
+                  : t('addConnectionFailed')}
+              </p>
+            )}
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={close} className="btn-ghost">
-            {t('cancel')}
-          </button>
-          <button type="submit" disabled={addAccount.isPending} className="btn-primary">
-            {addAccount.isPending ? t('addChecking') : t('addConnect')}
-          </button>
-        </div>
-        </>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={close} className="btn-ghost">
+                {t('cancel')}
+              </button>
+              <button type="submit" disabled={addAccount.isPending} className="btn-primary">
+                {addAccount.isPending ? t('addChecking') : t('addConnect')}
+              </button>
+            </div>
+          </>
         )}
       </form>
     </div>

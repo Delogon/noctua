@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@renderer/lib/ipc'
 import { useT } from '@renderer/lib/i18n'
+import { useTaskAssignments } from '@renderer/queries/intel'
 
 interface DraftedRule {
   name: string
@@ -31,6 +32,8 @@ export function RulesSection(): React.JSX.Element {
     queryFn: () => invoke('rules:list', undefined),
     select: (d) => d.rules
   })
+  // KI-Bedingungen brauchen ein Entscheidungsmodell – ohne es werden solche Regeln übersprungen
+  const decisionReady = useTaskAssignments().data?.decision.blocked === null
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<DraftedRule | null>(null)
   const [showJson, setShowJson] = useState(false)
@@ -227,6 +230,18 @@ export function RulesSection(): React.JSX.Element {
             >
               {rule.name}
             </span>
+            {rule.aiCondition && (
+              <span
+                className="mchip flex-none"
+                title={rule.aiCondition}
+                style={{
+                  border: '1px solid var(--hairline)',
+                  color: decisionReady ? 'var(--muted)' : 'var(--ac)'
+                }}
+              >
+                {t('ruleAiCondition')}
+              </span>
+            )}
             {rule.hits > 0 && (
               <span
                 className="mchip flex-none"
@@ -247,6 +262,18 @@ export function RulesSection(): React.JSX.Element {
             </button>
           </div>
         ))}
+        {!decisionReady && list.some((r) => r.aiCondition) && (
+          <p
+            style={{
+              font: '400 9.5px var(--mono)',
+              color: 'var(--ac)',
+              margin: 0,
+              padding: '6px 2px 2px'
+            }}
+          >
+            {t('ruleAiNeedsModel')}
+          </p>
+        )}
         {rules.data?.length === 0 && (
           <p
             style={{

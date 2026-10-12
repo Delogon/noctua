@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import type { SemanticSearchHit, SemanticSearchIndex, SemanticSearchSignal } from '@shared/types'
 import { embedQuery, embeddingIndexer } from '../ai/embeddings'
 import { htmlToText } from '../mail/parser'

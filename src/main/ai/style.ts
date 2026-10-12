@@ -1,7 +1,8 @@
-import type Database from 'better-sqlite3'
+import { isDev } from '../dev-mode'
+import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
 import { getSetting, setSetting } from '../db'
-import { extractUsage, getDraftModel, getOpenRouter, providerBody } from './openrouter'
+import { resolveTask } from './providers/registry'
 import { logUsage } from './budget'
 
 const STYLE_KEY = 'ai.styleProfile'
@@ -11,7 +12,12 @@ const STYLE_KEY = 'ai.styleProfile'
  * gekürzt, nie abgelehnt — Opus liefert gern 8 Anreden statt 6, und das
  * darf kein Fehler sein.
  */
-const clippedList = (maxItems: number, maxLen: number) =>
+const clippedList = (
+  maxItems: number,
+  maxLen: number
+): z.ZodCatch<
+  z.ZodPipe<z.ZodDefault<z.ZodArray<z.ZodUnknown>>, z.ZodTransform<string[], unknown[]>>
+> =>
   z
     .array(z.unknown())
     .default([])
@@ -73,8 +79,8 @@ export async function refreshStyleProfile(
   db: Database.Database,
   accountId?: number | null
 ): Promise<StyleProfile | null> {
-  const client = getOpenRouter()
-  if (!client) return null
+  const resolved = resolveTask('draft')
+  if (!resolved) return null
 
   const samples = db
     .prepare(
@@ -91,9 +97,8 @@ export async function refreshStyleProfile(
   const corpus = samples
     .map((s, i) => `--- Mail ${i + 1} ---\n${s.text_plain.slice(0, 500)}`)
     .join('\n\n')
-  const model = getDraftModel()
-  const response = await client.chat.completions.create({
-    ...providerBody(),
+  const { client, model } = resolved
+  const result = await client.complete({
     model,
     messages: [
       {
@@ -106,21 +111,23 @@ export async function refreshStyleProfile(
     // KEIN response_format: Anthropic-Modelle via OpenRouter lehnen es ab —
     // JSON kommt per Instruktion, unten wird tolerant extrahiert.
     temperature: 0.2,
-    max_tokens: 600,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...({ usage: { include: true } } as any)
+    maxTokens: 600
   })
-  const { inputTokens, outputTokens, costUsd } = extractUsage(response.usage)
+  const { inputTokens, outputTokens, costUsd } = result.usage
   logUsage(db, model, inputTokens, outputTokens, costUsd)
 
-  const raw = response.choices[0]?.message?.content ?? ''
+  const raw = result.text
   const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)
   let parsed: unknown
   try {
     parsed = JSON.parse(jsonText)
   } catch {
-    console.warn('[style] unparsebare Antwort:', raw.slice(0, 400))
-    throw new Error('Stil-Analyse lieferte kein JSON — bitte nochmal versuchen')
+    // Antwort enthält Auszüge aus gesendeten Mails — im Release nur die Länge
+    console.warn(
+      '[style] unparsebare Antwort:',
+      !isDev ? `${raw.length} Zeichen` : raw.slice(0, 400)
+    )
+    throw new Error('Die Stil-Analyse hat kein JSON geliefert – bitte versuche es noch einmal')
   }
   const profile = styleProfileSchema.parse(parsed)
   setSetting(styleKey(accountId), JSON.stringify(profile))

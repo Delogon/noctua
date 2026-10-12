@@ -75,7 +75,7 @@ export interface SentEcho {
   subject: string
   toNames: string[]
   date: number
-  state: 'pending' | 'sending' | 'sent' | 'error'
+  state: 'pending' | 'sending' | 'sent' | 'error' | 'unknown'
 }
 
 interface SendState {
@@ -84,7 +84,7 @@ interface SendState {
   begin: (send: PendingSend) => void
   cancel: (outboxId: number) => Promise<void>
   clear: (outboxId: number) => void
-  setEchoState: (outboxId: number, state: 'sending' | 'sent' | 'error') => void
+  setEchoState: (outboxId: number, state: 'sending' | 'sent' | 'error' | 'unknown') => void
   dropEcho: (outboxId: number) => void
 }
 
@@ -191,6 +191,7 @@ export const useSendState = create<SendState>((set, get) => ({
       set({ echoes: get().echoes.map((e) => (e.outboxId === outboxId ? { ...e, state } : e)) })
       if (state === 'sent') scheduleEchoDrop(outboxId, 90_000)
       else if (state === 'error') scheduleEchoDrop(outboxId, 10_000)
+      else if (state === 'unknown') scheduleEchoDrop(outboxId, 60_000)
     }
   },
   dropEcho: (outboxId) => {
@@ -251,6 +252,12 @@ export function useOutboxEchoLifecycle(): void {
                 void queryClient.invalidateQueries({ queryKey: ['threads'] })
               })
             }
+          } else if (state === 'unknown') {
+            // Ausgang ungewiss: Thread wieder zeigen, aber nichts automatisch
+            // erneut senden — der Nutzer prüft den Gesendet-Ordner.
+            unstageArchive(outboxId)
+            dropSendToast(outboxId)
+            toast.error(t('toastSendUnknown'))
           } else if (state === 'error') {
             // Mail ging nicht raus → Thread wieder zeigen; der gespeicherte
             // Entwurf bleibt erhalten und lädt beim Öffnen zurück. Der
