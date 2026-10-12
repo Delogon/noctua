@@ -1,8 +1,14 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import {
+  GENERIC_TOKENS,
+  allowedDistance,
   boundedLevenshtein,
   fuzzySenderMatches,
+  normalizeToken,
+  senderTokens,
+  type FuzzySenderMatch,
+  type SenderRow,
   fuzzySenderMessageIds,
   fuzzySenderThreadKeys
 } from '@main/search/fuzzy-sender'
@@ -152,5 +158,107 @@ describe('senderInventory (M95)', () => {
     const inventory = senderInventory(db)
     expect(inventory).toContain('Bütefisch, Jens')
     expect(inventory).not.toContain('jens.buetefisch@stadt.example')
+  })
+})
+
+// The previous implementation: every sender, every token, every term.
+function referenceMatches(db: Database.Database, terms: string[]): FuzzySenderMatch[] {
+  const candidates = terms
+    .map(normalizeToken)
+    .filter((term) => term.length >= 4 && !GENERIC_TOKENS.has(term))
+  if (candidates.length === 0) return []
+  const senders = db
+    .prepare(
+      `SELECT lower(from_addr) AS addr, max(from_name) AS name, count(*) AS weight
+       FROM messages WHERE from_addr IS NOT NULL AND from_addr <> ''
+       GROUP BY lower(from_addr)`
+    )
+    .all() as SenderRow[]
+  const matches: FuzzySenderMatch[] = []
+  for (const sender of senders) {
+    let best = Number.POSITIVE_INFINITY
+    for (const term of candidates) {
+      const budget = allowedDistance(term.length)
+      for (const token of senderTokens(sender)) {
+        if (GENERIC_TOKENS.has(token)) continue
+        const distance = boundedLevenshtein(term, token, budget)
+        if (distance <= budget) best = Math.min(best, distance)
+      }
+    }
+    if (best !== Number.POSITIVE_INFINITY) {
+      matches.push({ addr: sender.addr, distance: best, weight: sender.weight })
+    }
+  }
+  return matches.sort((a, b) => a.distance - b.distance || b.weight - a.weight).slice(0, 3)
+}
+
+describe('sender token index', () => {
+  let db: Database.Database
+  afterEach(() => closeTestDb(db))
+
+  it('matches the previous full scan on a randomized sender inventory', () => {
+    db = createTestDb()
+    const accountId = seedAccount(db, { email: 'tim@example.org' })
+    const inbox = seedFolder(db, accountId, '\\Inbox')
+    let seed = 7
+    const random = (): number => (seed = (seed * 1_103_515_245 + 12_345) % 2 ** 31) / 2 ** 31
+    const pick = <T>(list: T[]): T => list[Math.floor(random() * list.length)]
+    const first = ['Jens', 'Anna', 'Jürgen', 'Maximilian', 'Sophie', 'Lukas', 'Bärbel', 'Thomas']
+    const last = ['Bütefisch', 'Schneider', 'Müller', 'Weißmann', 'Hoffmann', 'Kowalski', 'Berger']
+    const hosts = ['stadt.example', 'firma.de', 'gmail.com', 'verein.org']
+    let uid = 0
+    for (let i = 0; i < 300; i++) {
+      const name = `${pick(last)}, ${pick(first)}`
+      const addr = `${name.split(', ')[1].toLowerCase()}.${i}@${pick(hosts)}`
+      for (let n = 0; n < 1 + Math.floor(random() * 3); n++) {
+        uid += 1
+        seedSenderMail(db, {
+          accountId,
+          folderId: inbox,
+          uid,
+          threadKey: `t${uid}`,
+          fromName: name,
+          fromAddr: addr
+        })
+      }
+    }
+    for (const query of [
+      'mail von jens buetfisch',
+      'juergen mueller rechnung',
+      'schnieder',
+      'weismann',
+      'hofman sophie',
+      'kowalsky',
+      'info team',
+      'bärbel'
+    ]) {
+      expect(fuzzySenderMatches(db, queryTerms(query)), query).toEqual(
+        referenceMatches(db, queryTerms(query))
+      )
+    }
+  })
+
+  it('picks up senders of new messages right away', () => {
+    db = createTestDb()
+    const accountId = seedAccount(db, { email: 'tim@example.org' })
+    const inbox = seedFolder(db, accountId, '\\Inbox')
+    seedSenderMail(db, {
+      accountId,
+      folderId: inbox,
+      uid: 1,
+      threadKey: 'a',
+      fromName: 'Anna Berger',
+      fromAddr: 'anna@firma.de'
+    })
+    expect(fuzzySenderMatches(db, ['schneider'])).toEqual([])
+    seedSenderMail(db, {
+      accountId,
+      folderId: inbox,
+      uid: 2,
+      threadKey: 'b',
+      fromName: 'Paula Schneider',
+      fromAddr: 'paula@firma.de'
+    })
+    expect(fuzzySenderMatches(db, ['schnieder']).map((m) => m.addr)).toEqual(['paula@firma.de'])
   })
 })
