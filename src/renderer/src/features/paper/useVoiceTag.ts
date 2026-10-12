@@ -31,9 +31,9 @@ export function useStyleProfile(accountId: number | null): Profile | null {
 }
 
 /**
- * Frische-Metadaten der Voice-Card (Design 3e): wie viele Antworten die Eule
- * kennt und wann sie zuletzt gelernt hat. Konto-Meta bevorzugt, globales als
- * Fallback (Bestandsdaten aus Trainingsläufen ohne accountId).
+ * Freshness metadata of the voice card (Design 3e): how many replies the owl
+ * knows and when it last learned. Account meta preferred, global as a
+ * fallback (legacy data from training runs without accountId).
  */
 export function useStyleMeta(accountId: number): VoiceMeta | null {
   const q = useQuery({
@@ -48,7 +48,7 @@ export function useStyleMeta(accountId: number): VoiceMeta | null {
   return q.data ?? null
 }
 
-/** Kurzer Stimm-Tag fürs Composer-/Rail-Label: „Europa — warm · knapp · DE" */
+/** Short voice tag for the composer/rail label: „Europa — warm · knapp · DE" */
 export function useVoiceTag(accountId: number | null, accountName: string | null): string {
   const profile = useStyleProfile(accountId)
   const name = accountName ?? '—'

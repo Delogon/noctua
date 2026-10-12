@@ -1,16 +1,16 @@
 import { create } from 'zustand'
 
-// Eine Toast-Warteschlange für alles (Design 1c): genau eine sichtbare Toast,
-// Priorität countdown > error > action > info. Die reine Queue-Logik
-// (pushToast/advanceQueue/dismissToast/…) rechnet mit einer hereingereichten
-// Uhr und ist damit ohne Timer unit-testbar; der Zustand-Store darunter
-// kümmert sich nur um Date.now() und die Timeouts.
+// One toast queue for everything (Design 1c): exactly one visible toast,
+// priority countdown > error > action > info. The pure queue logic
+// (pushToast/advanceQueue/dismissToast/…) works with a passed-in
+// clock and is thus unit-testable without timers; the Zustand store below
+// only takes care of Date.now() and the timeouts.
 
 export type ToastKind = 'info' | 'action' | 'countdown' | 'error'
 
 export interface ToastAction {
   label: string
-  /** Tasten-Chip im Knopf (z. B. „Z", „⌘Z") — die Taste wirkt identisch. */
+  /** Key chip in the button (e.g. "Z", "⌘Z") — the key acts identically. */
   kbd?: string
   run: () => void
 }
@@ -20,28 +20,28 @@ export interface Toast {
   kind: ToastKind
   text: string
   action?: ToastAction
-  /** Text stammt von der Eule (Modell) — die Leiste zeigt Augen statt Quadrat. */
+  /** Text comes from the owl (model) — the bar shows eyes instead of a square. */
   owl?: boolean
-  /** SCHLIESSEN-Knopf zeigen; die Toast lebt dann bis zum Klick. */
+  /** Show the CLOSE button; the toast then lives until clicked. */
   dismiss?: boolean
   createdAt: number
-  /** Anzeigedauer für Infos; wird beim Zeigen in expiresAt übersetzt. */
+  /** Display duration for infos; translated into expiresAt when shown. */
   durationMs?: number
-  /** Absoluter Ablauf: bei action das Ende des Angebots, bei info das Anzeige-Ende. */
+  /** Absolute expiry: for action the end of the offer, for info the end of display. */
   expiresAt?: number
   countdown?: {
-    /** Bis hierhin läuft das Rückgängig-Fenster (= sendAt). */
+    /** The undo window runs until here (= sendAt). */
     until: number
-    /** Live-Text mit Restsekunden (übersetzt zur Renderzeit). */
+    /** Live text with remaining seconds (translated at render time). */
     textFor: (secondsLeft: number) => string
-    /** Info-Text nach Ablauf des Countdowns (Auto-Swap, gleiche id). */
+    /** Info text after the countdown expires (auto-swap, same id). */
     doneText: string
   }
 }
 
-/** Anzeigedauer einer Info-Toast (das alte PaperToast-Timing). */
+/** Display duration of an info toast (the old PaperToast timing). */
 export const INFO_TOAST_MS = 3600
-/** Verdrängte Infos kommen nur zurück, solange sie jünger als 8 s sind. */
+/** Displaced infos only come back as long as they are younger than 8 s. */
 export const RESHOW_FRESH_MS = 8000
 
 const PRIORITY: Record<ToastKind, number> = { countdown: 3, error: 2, action: 1, info: 0 }
@@ -51,16 +51,16 @@ export interface ToastQueueState {
   queue: Toast[]
 }
 
-/** Darf eine wartende Toast (noch) gezeigt werden? */
+/** May a waiting toast (still) be shown? */
 export function toastAlive(toast: Toast, now: number): boolean {
   if (toast.kind === 'error' || toast.dismiss) return true
   if (toast.kind === 'countdown') return true
-  // action lebt exakt so lange wie ihr Angebot (absolutes Fenster)
+  // action lives exactly as long as its offer (absolute window)
   if (toast.kind === 'action') return toast.expiresAt === undefined || now < toast.expiresAt
   return now - toast.createdAt < RESHOW_FRESH_MS
 }
 
-/** Countdown → sein Done-Info-Text: gleiche id, Aktion erlischt mit dem Fenster. */
+/** Countdown → its done info text: same id, the action expires with the window. */
 export function swapToDone(toast: Toast, now: number): Toast {
   return {
     id: toast.id,
@@ -71,8 +71,8 @@ export function swapToDone(toast: Toast, now: number): Toast {
   }
 }
 
-/** Beim Anzeigen konkretisieren: Infos bekommen ihr Ablaufdatum (frisch, auch
- *  nach Verdrängung), ein bereits abgelaufener Countdown seinen Done-Text. */
+/** Concretize when showing: infos get their expiry date (fresh, even
+ *  after displacement), an already expired countdown gets its done text. */
 function materialize(toast: Toast, now: number): Toast {
   if (toast.countdown && now >= toast.countdown.until) return swapToDone(toast, now)
   if (toast.kind === 'info' && !toast.dismiss) {
@@ -81,18 +81,18 @@ function materialize(toast: Toast, now: number): Toast {
   return toast
 }
 
-/** Neue Toast: gleich- oder höherrangig verdrängt, sonst hinten anstellen. */
+/** New toast: displaces equal or lower rank, otherwise queues at the back. */
 export function pushToast(state: ToastQueueState, toast: Toast, now: number): ToastQueueState {
   const cur = state.current
   if (!cur) return { current: materialize(toast, now), queue: state.queue }
   if (PRIORITY[toast.kind] >= PRIORITY[cur.kind]) {
-    // Die Verdrängte wartet vorn und darf wiederkommen, solange sie lebt
+    // The displaced one waits at the front and may come back while it lives
     return { current: materialize(toast, now), queue: [cur, ...state.queue] }
   }
   return { current: cur, queue: [...state.queue, toast] }
 }
 
-/** Sichtbare Toast räumen und die beste noch lebende Wartende zeigen. */
+/** Clear the visible toast and show the best still-living waiting one. */
 export function advanceQueue(state: ToastQueueState, now: number): ToastQueueState {
   const candidates = state.queue.filter((t) => toastAlive(t, now))
   if (candidates.length === 0) return { current: null, queue: [] }
@@ -101,7 +101,7 @@ export function advanceQueue(state: ToastQueueState, now: number): ToastQueueSta
   return { current: materialize(best, now), queue: candidates.filter((t) => t !== best) }
 }
 
-/** Gezielt entfernen — sichtbar oder wartend (z. B. Countdown nach Cancel). */
+/** Remove specifically — visible or waiting (e.g. countdown after cancel). */
 export function dismissToast(state: ToastQueueState, id: number, now: number): ToastQueueState {
   if (state.current?.id === id) return advanceQueue(state, now)
   return { current: state.current, queue: state.queue.filter((t) => t.id !== id) }
@@ -110,18 +110,18 @@ export function dismissToast(state: ToastQueueState, id: number, now: number): T
 interface ToastStore extends ToastQueueState {
   push: (toast: Omit<Toast, 'id' | 'createdAt'>) => number
   dismiss: (id: number) => void
-  /** Aktions-Knopf (oder seine Taste) ausführen; die Toast erlischt dabei. */
+  /** Run the action button (or its key); the toast expires in the process. */
   runAction: (id: number) => void
-  /** Countdown-Ende der sichtbaren Toast: auf den Done-Text wechseln. */
+  /** Countdown end of the visible toast: switch to the done text. */
   swapDone: () => void
-  /** Sichtbare Toast abräumen und die nächste zeigen (Timer-Pfad). */
+  /** Clear the visible toast and show the next one (timer path). */
   advance: () => void
 }
 
 let nextId = 1
 let timer: ReturnType<typeof setTimeout> | null = null
 
-/** Timer auf den nächsten Stichtag der sichtbaren Toast stellen. */
+/** Set the timer to the next deadline of the visible toast. */
 function schedule(): void {
   if (timer) clearTimeout(timer)
   timer = null
@@ -173,7 +173,7 @@ export const useToast = create<ToastStore>((set, get) => ({
   }
 }))
 
-// Öffentliche API (C1): toast.info / toast.action / toast.countdown / toast.error
+// Public API (C1): toast.info / toast.action / toast.countdown / toast.error
 export const toast = {
   info(
     text: string,
@@ -181,7 +181,7 @@ export const toast = {
   ): number {
     return useToast.getState().push({ kind: 'info', text, ...opts })
   },
-  /** Lebt exakt so lange wie ihr Angebot (windowMs ab jetzt, absolut). */
+  /** Lives exactly as long as its offer (windowMs from now, absolute). */
   action(
     text: string,
     action: ToastAction,
@@ -206,7 +206,7 @@ export const toast = {
       countdown: { until: opts.until, textFor: opts.textFor, doneText: opts.doneText }
     })
   },
-  /** Bleibt bis zum Schließen stehen. */
+  /** Stays until closed. */
   error(text: string, opts: { action?: ToastAction } = {}): number {
     return useToast.getState().push({ kind: 'error', text, action: opts.action, dismiss: true })
   },

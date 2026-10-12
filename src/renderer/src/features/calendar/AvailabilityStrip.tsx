@@ -15,10 +15,10 @@ import {
 } from './free-slots'
 import type { EventForm } from './event-form'
 
-// Verfügbarkeitsstreifen (08–20) für den Tag des Termins: je Teilnehmer eine Zeile aus
-// calendar:freebusy (Server mit Scheduling-Outbox) bzw. calendar:freebusy:self (ich).
-// Dazu „Nächster gemeinsamer freier Termin": verschiebt den Termin auf das erste Fenster
-// gleicher Dauer, in dem alle mit Auskunft frei sind (nächste 10 Arbeitstage, 08–18).
+// Availability strip (08–20) for the event's day: one row per attendee from
+// calendar:freebusy (server with scheduling outbox) or calendar:freebusy:self (me).
+// Plus "Next common free slot": moves the event to the first window
+// of equal duration in which everyone with info is free (next 10 workdays, 08–18).
 
 const STRIP_FROM = 8
 const STRIP_TO = 20
@@ -28,7 +28,7 @@ const MAX_QUERY = 50
 interface Person {
   email: string
   label: string
-  /** Eigene Zeile: Belegung kommt aus den lokalen Kalendern */
+  /** Own row: busy times come from the local calendars */
   me: boolean
 }
 
@@ -62,7 +62,7 @@ async function loadBusy(
   return { me: self.busy, others: fb.results }
 }
 
-/** Erster Zeitpunkt der Dauer, an dem alle mit Auskunft frei sind (ab jetzt, nächste 10 Arbeitstage). */
+/** First time of the duration at which everyone with info is free (from now, next 10 workdays). */
 async function nextCommonSlot(args: {
   accountId: number
   emails: string[]
@@ -101,13 +101,13 @@ export function AvailabilityStrip({
   onMove
 }: {
   form: EventForm
-  /** Teilnehmer (eigene Adressen werden als „ich"-Zeile geführt) */
+  /** Attendees (own addresses are shown as the "me" row) */
   attendees: readonly CalendarAttendee[]
   mine: ReadonlySet<string>
   accountId: number
-  /** Der bearbeitete Termin zählt in „meiner" Belegung nicht mit */
+  /** The event being edited does not count toward "my" busy time */
   excludeObjectId: number | null
-  /** Neuer Beginn (lokal, ms); die Dauer behält der Editor */
+  /** New start (local, ms); the editor keeps the duration */
   onMove: (startMs: number) => void
 }): React.JSX.Element | null {
   const t = useT()

@@ -7,8 +7,8 @@ import { MonthChip } from './EventBlocks'
 import { weekdayShort } from './format'
 import { instanceKey, type QuickDraft } from '@renderer/stores/calendar'
 
-// Monatsraster: Wochen als Zeilen (Mo–So), je Tag so viele Einträge, wie die Zellhöhe
-// zulässt, dazu „+k weitere" (öffnet die Tagesansicht).
+// Month grid: weeks as rows (Mon–Sun), per day as many entries as the cell height
+// allows, plus "+k more" (opens the day view).
 
 const CHIP_H = 19
 const DAY_HEAD_H = 24
@@ -50,7 +50,7 @@ export function MonthGrid({
   const [cellW, setCellW] = useState(0)
   const nowDate = new Date(now)
 
-  // Zellhöhe beobachten → Anzahl sichtbarer Einträge
+  // Observe cell height → number of visible entries
   useEffect(() => {
     const el = bodyRef.current
     if (!el) return
@@ -80,14 +80,14 @@ export function MonthGrid({
       <div
         ref={bodyRef}
         className="cal-month-body min-h-0 flex-1"
-        // schmale Zellen (1180-px-Fenster): Uhrzeit weglassen, damit der Titel Platz hat
+        // narrow cells (1180 px window): omit the time so the title has room
         data-narrow={cellW > 0 && cellW < NARROW_CELL_PX}
         style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}
       >
         {weeks.flat().map((d) => {
           const key = dayKey(d)
           const list = byDay.get(key) ?? []
-          // „+k weitere" nimmt selbst eine Zeile ein → eine Zeile weniger anzeigen
+          // "+k more" takes up a row itself → show one row less
           const overflow = list.length > perCell
           const shown = overflow ? list.slice(0, Math.max(0, perCell - 1)) : list
           const hidden = list.length - shown.length

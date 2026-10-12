@@ -1,6 +1,6 @@
-// Kalenderfarben: kleine feste Palette im Letterpress-Ton (gedeckt, auf Papier gut
-// lesbar). Serverfarben bleiben erhalten; ohne Farbe wird reihum eine Palettenfarbe
-// vergeben.
+// Calendar colors: small fixed palette in the Letterpress tone (muted, readable
+// on paper). Server colors are kept; without a color a palette color is assigned
+// in turn.
 
 export const CALENDAR_PALETTE = [
   '#C2452C',
@@ -18,7 +18,7 @@ export function calendarColor(color: string | null, index: number): string {
   return CALENDAR_PALETTE[Math.abs(index) % CALENDAR_PALETTE.length]
 }
 
-/** Farbe je Kalender-ID (Reihenfolge der Liste bestimmt die Ersatzfarbe). */
+/** Color per calendar ID (list order determines the fallback color). */
 export function colorMapOf(
   calendars: ReadonlyArray<{ id: number; color: string | null }>
 ): Map<number, string> {

@@ -1,28 +1,28 @@
 /**
- * Adress-Klassifizierung für die Empfänger-Chips (Design 3a).
+ * Address classification for the recipient chips (Design 3a).
  *
- * „ok": sieht nach einer vollständigen Adresse aus (@ mit Punkt in der Domain)
- * „doubtful": enthält ein @ mit etwas davor und dahinter, aber der Domain
- *             fehlt der Punkt — bleibt sendbar, wird aber im Akzent markiert
- * „invalid": alles andere — wird gar nicht erst zum Chip
+ * "ok": looks like a complete address (@ with a dot in the domain)
+ * "doubtful": contains an @ with something before and after it, but the domain
+ *             lacks a dot — stays sendable, but is marked in accent
+ * "invalid": everything else — never becomes a chip at all
  */
 export type AddressQuality = 'ok' | 'doubtful' | 'invalid'
 
 export function classifyAddress(raw: string): AddressQuality {
   const value = raw.trim()
   if (!value) return 'invalid'
-  // Gleiche Heuristik wie das bisherige isAddress des Empfängerfelds
+  // Same heuristic as the recipient field's previous isAddress
   if (/\S+@\S+\.\S+/.test(value)) return 'ok'
   if (/\S@\S/.test(value)) return 'doubtful'
   return 'invalid'
 }
 
-/** Darf ein Chip werden — vollständige UND zweifelhafte Adressen. */
+/** May become a chip — complete AND doubtful addresses. */
 export function isChippableAddress(raw: string): boolean {
   return classifyAddress(raw) !== 'invalid'
 }
 
-/** Zweifelhaft: @ vorhanden, aber kein Punkt in der Domain. */
+/** Doubtful: @ present, but no dot in the domain. */
 export function isDoubtfulAddress(raw: string): boolean {
   return classifyAddress(raw) === 'doubtful'
 }

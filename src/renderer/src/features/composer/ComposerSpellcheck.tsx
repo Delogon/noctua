@@ -3,17 +3,17 @@ import { findMisspellings, ignoreWord, suggestionsFor } from '@renderer/lib/spel
 import { useT } from '@renderer/lib/i18n'
 
 /**
- * Rechtschreibprüfung für den contentEditable-Composer: falsche Wörter werden
- * über die CSS Custom Highlight API mit einer Wellenlinie markiert (kein
- * Overlay, kein DOM-Umbau — die Ranges wandern beim Tippen automatisch mit),
- * Hover öffnet Korrekturvorschläge, Klick ersetzt das Wort im Editor.
- * Geprüft wird im Main-Prozess (Hunspell DE+EN, siehe src/main/spell/).
+ * Spell checking for the contentEditable composer: misspelled words are
+ * marked with a squiggle via the CSS Custom Highlight API (no
+ * overlay, no DOM rework — the ranges move along automatically while typing),
+ * hover opens correction suggestions, click replaces the word in the editor.
+ * Checking happens in the main process (Hunspell DE+EN, see src/main/spell/).
  */
 
 const HIGHLIGHT_NAME = 'spell-miss'
 
-// Compose-Seite und Antwort-Composer können gleichzeitig gemountet sein —
-// alle Instanzen speisen ihre Ranges in das eine globale Highlight.
+// The compose page and reply composer can be mounted at the same time —
+// all instances feed their ranges into the one global highlight.
 const highlightRegistry = new Map<number, Range[]>()
 let nextInstanceId = 1
 
@@ -37,10 +37,10 @@ interface Segment {
 const BLOCK_TAGS = new Set(['DIV', 'P', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'TABLE', 'TR'])
 
 /**
- * Liest den Editor-Text als einen String und merkt sich, welcher Textknoten
- * an welchem Offset beginnt. Block-Grenzen und <br> zählen als \n, damit
- * Wörter benachbarter Zeilen nicht zusammenkleben; Inline-Formatierung
- * (b/i/u/font/a) bleibt unsichtbar — ein Wort darf über sie hinweggehen.
+ * Reads the editor text as one string and remembers which text node
+ * starts at which offset. Block boundaries and <br> count as \n so that
+ * words on adjacent lines don't stick together; inline formatting
+ * (b/i/u/font/a) stays invisible — a word may span across it.
  */
 function extractText(root: HTMLElement): { text: string; segments: Segment[] } {
   const segments: Segment[] = []
@@ -62,7 +62,7 @@ function extractText(root: HTMLElement): { text: string; segments: Segment[] } {
   return { text, segments }
 }
 
-/** Baut aus virtuellen Text-Offsets einen DOM-Range (ggf. über Inline-Tags hinweg). */
+/** Builds a DOM range from virtual text offsets (possibly across inline tags). */
 function rangeFromOffsets(segments: Segment[], start: number, end: number): Range | null {
   let startSeg: Segment | null = null
   let endSeg: Segment | null = null
@@ -78,7 +78,7 @@ function rangeFromOffsets(segments: Segment[], start: number, end: number): Rang
   return range
 }
 
-/** Virtueller Offset des (kollabierten) Cursors, sonst null. */
+/** Virtual offset of the (collapsed) cursor, otherwise null. */
 function caretOffset(root: HTMLElement, segments: Segment[]): number | null {
   const sel = window.getSelection()
   if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return null
@@ -93,16 +93,16 @@ interface Tip {
   left: number
   top: number
   below: boolean
-  /** null = Vorschläge laden noch */
+  /** null = suggestions still loading */
   suggestions: string[] | null
 }
 
 interface ComposerSpellcheckProps {
   editorRef: React.RefObject<HTMLDivElement | null>
-  /** Aktueller Composer-Text — dient als Trigger für den Prüflauf */
+  /** Current composer text — serves as the trigger for the check run */
   text: string
   disabled: boolean
-  /** Nach einer Ersetzung im DOM: Composer-State neu einlesen (emitDocument) */
+  /** After a replacement in the DOM: re-read the composer state (emitDocument) */
   onDidEdit: () => void
 }
 
@@ -144,10 +144,10 @@ export function ComposerSpellcheck({
           const { text: snapshot, segments } = extractText(editor)
           void findMisspellings(snapshot)
             .then((found) => {
-              // Verworfen, wenn inzwischen ein neuer Lauf oder anderer Text gilt
+              // Discarded if a new run or different text applies by now
               if (runId !== runIdRef.current) return
               if (extractText(editor).text !== snapshot) return
-              // Das Wort am Cursor bleibt beim Tippen unmarkiert
+              // The word at the cursor stays unmarked while typing
               const caret = document.activeElement === editor ? caretOffset(editor, segments) : null
               const marks: DomMark[] = []
               for (const m of found) {
@@ -165,7 +165,7 @@ export function ComposerSpellcheck({
     [editorRef, setMarks]
   )
 
-  // Textänderung oder Sperren: Tooltip schließen (derived state, kein Effekt)
+  // Text change or lock: close the tooltip (derived state, no effect)
   const [prevTrigger, setPrevTrigger] = useState({ text, disabled })
   if (prevTrigger.text !== text || prevTrigger.disabled !== disabled) {
     setPrevTrigger({ text, disabled })
@@ -180,7 +180,7 @@ export function ComposerSpellcheck({
     runCheck()
   }, [text, disabled, runCheck, setMarks])
 
-  // Aufräumen beim Unmount: eigene Ranges aus dem globalen Highlight nehmen
+  // Clean up on unmount: remove own ranges from the global highlight
   useEffect(
     () => () => {
       window.clearTimeout(debounceRef.current)
@@ -192,10 +192,10 @@ export function ComposerSpellcheck({
     [instanceId]
   )
 
-  // Zeiger ist gerade über dem Tooltip: dann darf KEIN nachlaufender
-  // Hit-Test oder Timer ihn schließen. Der letzte mousemove auf dem Editor
-  // vor dem Wechsel in den Tooltip trifft kein Wort mehr — sein rAF-Callback
-  // liefe sonst nach dem mouseenter des Tooltips und blendete ihn wieder aus.
+  // Pointer is currently over the tooltip: then NO trailing hit test
+  // or timer may close it. The last mousemove on the editor
+  // before moving into the tooltip no longer hits a word — its rAF callback
+  // would otherwise run after the tooltip's mouseenter and hide it again.
   const tipHoveredRef = useRef(false)
 
   const cancelHide = useCallback(() => window.clearTimeout(hideTimerRef.current), [])
@@ -207,8 +207,8 @@ export function ComposerSpellcheck({
     }, 250)
   }, [cancelHide])
 
-  // Schließt der Tooltip (Ersetzen, Ignorieren, Tippen), ohne dass der Zeiger
-  // ihn verlässt, feuert kein mouseleave mehr — Flag hier zurücksetzen.
+  // If the tooltip closes (replace, ignore, typing) without the pointer
+  // leaving it, no mouseleave fires anymore — reset the flag here.
   useEffect(() => {
     if (!tip) tipHoveredRef.current = false
   }, [tip])
@@ -237,7 +237,7 @@ export function ComposerSpellcheck({
     [cancelHide, editorRef]
   )
 
-  // Hover-Erkennung über die Range-Rechtecke (Highlights haben keine Events)
+  // Hover detection via the range rects (highlights have no events)
   useEffect(() => {
     const editor = editorRef.current
     if (!editor) return
@@ -290,7 +290,7 @@ export function ComposerSpellcheck({
     }
   }, [editorRef, showTip, scheduleHide, runCheck])
 
-  // Vorschläge lazy nachladen, sobald ein Tooltip geöffnet wurde
+  // Lazily load suggestions as soon as a tooltip has opened
   useEffect(() => {
     if (!tip || tip.suggestions !== null) return
     const word = tip.mark.word
@@ -313,7 +313,7 @@ export function ComposerSpellcheck({
       if (!cur || !editor) return
       setTip(null)
       const { range, word } = cur.mark
-      // DOM inzwischen verändert? Dann lieber neu prüfen statt falsch ersetzen.
+      // DOM changed in the meantime? Then re-check rather than replace wrongly.
       if (range.toString() !== word) {
         runCheck(true)
         return

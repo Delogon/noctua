@@ -1,10 +1,10 @@
 /**
- * Grafik-Bausteine der Technik-Seite (Letterpress-Vokabular in SVG):
- * 1px-Ink-Linien, Hairline-Raster, Accent-Quadrate, Outline-Chips —
- * keine Verläufe, keine runden Ecken, Farben nur über CSS-Variablen.
+ * Graphic building blocks of the tech page (letterpress vocabulary in SVG):
+ * 1px ink lines, hairline grid, accent squares, outline chips —
+ * no gradients, no rounded corners, colors only via CSS variables.
  *
- * Konvention: durchgezogen = läuft auf dem Gerät, gestrichelt = Cloud-Call
- * über OpenRouter (die Legende oben auf der Seite erklärt genau das).
+ * Convention: solid = runs on the device, dashed = cloud call
+ * via OpenRouter (the legend at the top of the page explains exactly that).
  */
 
 import { chipWidth } from '@renderer/features/settings/tech-metrics'
@@ -17,10 +17,10 @@ export const MUTED = 'var(--muted)'
 export const FAINT = 'var(--faint)'
 export const SECONDARY = 'var(--secondary)'
 
-/** Strichelung für Cloud-Kanten — überall dieselbe, damit die Legende stimmt. */
+/** Dash pattern for cloud edges — the same everywhere so the legend holds. */
 export const DASH = '5 3'
 
-/** Mono-Label in Grafiken — 8.5–10px, gesperrt, Versalien kommen vom Aufrufer. */
+/** Mono label in graphics — 8.5–10px, letter-spaced, caps come from the caller. */
 export function L({
   x,
   y,
@@ -56,7 +56,7 @@ export function L({
   )
 }
 
-/** Serifen-Zeile in Grafiken — für Zitate/Beispieltext, kursiv. */
+/** Serif line in graphics — for quotes/sample text, italic. */
 export function S({
   x,
   y,
@@ -87,7 +87,7 @@ export function S({
   )
 }
 
-/** 1px-Rechteck — Grundfläche fast aller Bausteine. */
+/** 1px rectangle — base shape of almost all building blocks. */
 export function Box({
   x,
   y,
@@ -119,7 +119,7 @@ export function Box({
   )
 }
 
-/** Kleines Quadrat als Marker — gefüllt (Accent/Ink) oder nur Umriss. */
+/** Small square as a marker — filled (accent/ink) or outline only. */
 export function Sq({
   x,
   y,
@@ -136,7 +136,7 @@ export function Sq({
   return <rect x={x} y={y} width={s} height={s} fill={fill} stroke={stroke} strokeWidth={1} />
 }
 
-/** Briefumschlag: Rechteck plus Falte aus zwei Linien. */
+/** Envelope: rectangle plus a fold made of two lines. */
 export function Envelope({
   x,
   y,
@@ -166,8 +166,8 @@ export function Envelope({
 }
 
 /**
- * Modell-Baustein: gestricheltes Rechteck mit ✦ — jeder ✦-Kasten ist ein
- * Cloud-Call über OpenRouter, die zweite Zeile nennt das Default-Modell.
+ * Model block: dashed rectangle with ✦ — every ✦ box is a cloud call via
+ * OpenRouter; the second line names the default model.
  */
 export function ModelBox({
   x,
@@ -201,7 +201,7 @@ export function ModelBox({
   )
 }
 
-/** Outline-Chip — mittig auf (x,y) gesetzt, Breite aus dem Text. */
+/** Outline chip — centered on (x,y), width from the text. */
 export function Chip({
   cx,
   cy,
@@ -212,7 +212,7 @@ export function Chip({
   cx: number
   cy: number
   text: string
-  /** ink = Umriss, fill = gefüllt (Ink), ac = Accent-Umriss, faint = Hairline */
+  /** ink = outline, fill = filled (ink), ac = accent outline, faint = hairline */
   tone?: 'ink' | 'fill' | 'ac' | 'faint'
   size?: number
 }): React.JSX.Element {
@@ -239,7 +239,7 @@ export function Chip({
   )
 }
 
-/** Pfeil von (x1,y1) nach (x2,y2) — gestrichelt für Cloud-Strecken. */
+/** Arrow from (x1,y1) to (x2,y2) — dashed for cloud routes. */
 export function Arrow({
   x1,
   y1,
@@ -279,7 +279,7 @@ export function Arrow({
   )
 }
 
-/** Kleines ✕ — für Aussortiertes und Blockiertes. */
+/** Small ✕ — for filtered-out and blocked items. */
 export function Cross({
   x,
   y,

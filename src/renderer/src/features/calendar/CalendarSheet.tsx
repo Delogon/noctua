@@ -32,12 +32,12 @@ import { EventEditor } from './EventEditor'
 import { QuickCreate } from './QuickCreate'
 import { DeleteDialog } from './DeleteDialog'
 
-// Kalenderansicht (Center-Sheet): Toolbar, Tages-/Wochen-/Monatsraster, Editor-Blatt,
-// Schnell-Anlegen und Löschen-Dialog. Tastenaktionen kommen aus der Keymap als
-// `paper:calendar`-Events.
+// Calendar view (center sheet): toolbar, day/week/month grid, editor sheet,
+// quick create and delete dialog. Key actions come from the keymap as
+// `paper:calendar` events.
 
 const EMPTY_CALENDARS: CalendarSummary[] = []
-/** Ab dieser Breite steht der Editor neben dem Raster, sonst darüber. */
+/** From this width the editor sits next to the grid, otherwise above it. */
 const DOCK_MIN_WIDTH = 900
 const MODES: CalView[] = ['day', 'week', 'month']
 
@@ -53,7 +53,7 @@ function useElementWidth(ref: React.RefObject<HTMLElement | null>): number {
   return width
 }
 
-/** `n`/„Neu": Editor für einen neuen Termin ab der nächsten vollen Stunde (heute) bzw. 09:00. */
+/** `n`/"New": editor for a new event from the next full hour (today) or 09:00. */
 function startNewEvent(
   writable: readonly CalendarSummary[],
   anchor: string,
@@ -139,7 +139,7 @@ export function CalendarSheet(): React.JSX.Element {
   }, [cal.mode, anchorDate])
   usePrefetchEvents(adjacent, visibleIds)
 
-  // Aktueller Stand für den Tasten-Handler (ohne ihn bei jedem Render neu zu binden)
+  // Current state for the key handler (without rebinding it on every render)
   const live = useRef({ events, writable, anchor: cal.anchor })
   useEffect(() => {
     live.current = { events, writable, anchor: cal.anchor }

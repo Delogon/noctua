@@ -18,10 +18,10 @@ import {
   type AttendeeRole
 } from './attendees'
 
-// Teilnehmer im Termin-Editor. Organisator: Liste mit Autocomplete (Adressbuch + Mail-
-// Historie über contacts:suggest), Rolle Pflicht/optional und Antwortstand je Teilnehmer.
-// Sonst: schreibgeschützte Liste und — stammt der Termin aus einer Einladung — meine
-// Antwort-Knöpfe (derselbe IPC wie die Einladungskarte in der Mail).
+// Attendees in the event editor. Organizer: list with autocomplete (address book + mail
+// history via contacts:suggest), role required/optional and response status per attendee.
+// Otherwise: read-only list and — if the event came from an invitation — my
+// response buttons (same IPC as the invitation card in the mail).
 
 const PARTSTAT_KEYS: Record<string, StringKey> = {
   ACCEPTED: 'cvPartAccepted',
@@ -110,7 +110,7 @@ function Row({
   )
 }
 
-/** Eingabefeld mit Vorschlägen aus Adressbuch und Mail-Historie (contacts:suggest). */
+/** Input field with suggestions from address book and mail history (contacts:suggest). */
 function AttendeeInput({
   onPick,
   taken
@@ -125,7 +125,7 @@ function AttendeeInput({
   const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Kurzes Debounce, damit nicht jeder Tastendruck eine IPC-Abfrage auslöst
+  // Short debounce so not every keystroke triggers an IPC query
   useEffect(() => {
     const h = setTimeout(() => setQuery(text.trim()), 120)
     return () => clearTimeout(h)
@@ -173,7 +173,7 @@ function AttendeeInput({
         autoCorrect="off"
         onChange={(e) => setText(e.target.value)}
         onBlur={() => {
-          // Eine vollständige Adresse nicht verlieren, wenn der Fokus woandershin geht
+          // Don't lose a complete address when focus moves elsewhere
           if (isValidAttendeeEmail(text)) commit(text, null)
           else setOpen(false)
         }}
@@ -186,7 +186,7 @@ function AttendeeInput({
             setActive((i) => Math.max(i - 1, 0))
           } else if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
             const pick = open ? suggestions[active] : undefined
-            // Enter im Feld darf den Editor nie abschicken
+            // Enter in the field must never submit the editor
             e.preventDefault()
             e.stopPropagation()
             if (pick) commit(pick.addr, pick.name)
@@ -209,7 +209,7 @@ function AttendeeInput({
               type="button"
               role="option"
               aria-selected={i === active}
-              // onMouseDown statt onClick: feuert vor dem Blur des Eingabefelds
+              // onMouseDown instead of onClick: fires before the input field's blur
               onMouseDown={(e) => {
                 e.preventDefault()
                 commit(s.addr, s.name)
@@ -311,14 +311,14 @@ export function AttendeesSection({
   onAnswered
 }: {
   attendees: readonly CalendarAttendee[]
-  /** Teilnehmer beim Öffnen: neu hinzugefügte zeigen „neu" statt „offen" */
+  /** Attendees at open time: newly added ones show "new" instead of "pending" */
   baseline: readonly CalendarAttendee[]
   organizer: { email: string; name: string | null } | null
   mine: ReadonlySet<string>
   editable: boolean
   onChange: (list: CalendarAttendee[]) => void
   invitation: { id: number } | null
-  /** Meine aktuelle Antwort (PARTSTAT) */
+  /** My current response (PARTSTAT) */
   myState: string | null
   onAnswered: (partstat: RsvpPartstat) => void
 }): React.JSX.Element {
@@ -349,7 +349,7 @@ export function AttendeesSection({
           </div>
         )}
         {attendees.map((a) =>
-          // Der Organisator steht oben (mit seiner Antwort), nicht noch einmal in der Liste
+          // The organizer is shown at the top (with their response), not again in the list
           organizerAtt && a === organizerAtt ? null : (
             <Row
               key={normEmail(a.email)}

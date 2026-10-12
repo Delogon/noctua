@@ -8,7 +8,7 @@ export function taskIdAfterCompletion(
   return openTasks[currentIndex + 1]?.id ?? openTasks[currentIndex - 1]?.id ?? null
 }
 
-/** Sichtbarkeit je Status — beide aus heißt bewusst: leere Liste. */
+/** Visibility per status — both off deliberately means: empty list. */
 export interface TaskStatusVisibility {
   open: boolean
   done: boolean

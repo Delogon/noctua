@@ -6,15 +6,15 @@ export interface SpellMark {
   end: number
 }
 
-// Wörter beginnen und enden mit einem Buchstaben; innen sind Apostroph
-// (geht's, don't) und Bindestrich (E-Mail-Adresse) erlaubt.
+// Words start and end with a letter; inside, apostrophe
+// (geht's, don't) and hyphen (E-Mail-Adresse) are allowed.
 const WORD_RE = /[\p{L}\p{M}](?:[\p{L}\p{M}'’-]*[\p{L}\p{M}])?/gu
 
-// URLs und Mail-Adressen werden nicht geprüft — deren Fragmente („hotmail",
-// „hartmann") wären fast immer falsch-positiv.
+// URLs and mail addresses are not checked — their fragments ("hotmail",
+// "hartmann") would almost always be false positives.
 const SKIP_RE = /(?:https?:\/\/|www\.)\S+|\S+@\S+\.\S+/gi
 
-/** Zerlegt Text in prüfbare Wort-Tokens mit Offsets. */
+/** Splits text into checkable word tokens with offsets. */
 export function tokenizeWords(text: string): SpellMark[] {
   const excluded: Array<[number, number]> = []
   for (const m of text.matchAll(SKIP_RE)) excluded.push([m.index, m.index + m[0].length])
@@ -30,8 +30,8 @@ export function tokenizeWords(text: string): SpellMark[] {
   return tokens
 }
 
-// Session-Caches: Urteile und Vorschläge pro Wortform, dazu die per
-// „Ignorieren" weggeklickten Wörter (z. B. Eigennamen).
+// Session caches: verdicts and suggestions per word form, plus the words
+// dismissed via "Ignore" (e.g. proper names).
 const verdicts = new Map<string, boolean>()
 const ignored = new Set<string>()
 const suggestionCache = new Map<string, string[]>()
@@ -40,7 +40,7 @@ export function ignoreWord(word: string): void {
   ignored.add(word)
 }
 
-/** Prüft den Text und liefert die falsch geschriebenen Tokens. */
+/** Checks the text and returns the misspelled tokens. */
 export async function findMisspellings(text: string): Promise<SpellMark[]> {
   const tokens = tokenizeWords(text)
   const unknown = [...new Set(tokens.map((t) => t.word))].filter((w) => !verdicts.has(w))

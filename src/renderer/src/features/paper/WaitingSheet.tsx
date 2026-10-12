@@ -27,12 +27,12 @@ import { useListeningAudio } from '@renderer/features/paper/useListeningAudio'
 import { useVoiceTag } from '@renderer/features/paper/useVoiceTag'
 import { buildNudgeSend, nudgedToday } from '@renderer/features/paper/nudge-send'
 
-// Waiting-Sheet: SILENCE-Callout + der Stups als echter Composer. Der
-// automatisch entworfene Nachfass streamt in dasselbe Editorfeld wie eine
-// Antwort — danach ist alles editierbar (tippen, ⌘D-Diktat, ⌘J-Formulieren,
-// Formatierung), die Signatur des sendenden Kontos hängt der Versand-Pfad an.
+// Waiting sheet: SILENCE callout + the nudge as a real composer. The
+// automatically drafted follow-up streams into the same editor field as a
+// reply — afterwards everything is editable (typing, ⌘D dictation, ⌘J rewrite,
+// formatting); the send path appends the sending account's signature.
 
-/** Entprellte Entwurfs-Persistenz — Threadwechsel/Neustart findet den Stand wieder. */
+/** Debounced draft persistence — thread switch/restart finds the state again. */
 const SAVE_DEBOUNCE_MS = 800
 
 export function WaitingSheet(): React.JSX.Element {
@@ -51,8 +51,8 @@ export function WaitingSheet(): React.JSX.Element {
   const nudge = useNudge()
   const account = accounts.data?.find((a) => a.id === sel?.accountId)
   const voiceTag = useVoiceTag(sel?.accountId ?? null, account?.accountName ?? null)
-  // Signatur des Kontos, das die ursprüngliche Mail GESENDET hat — dieselbe
-  // Anzeige (und derselbe Versand-Pfad) wie beim Antwort-Composer.
+  // Signature of the account that SENT the original mail — the same
+  // display (and the same send path) as in the reply composer.
   const signature = useAccountSignature(account)
   const composerRef = useRef<MailComposerHandle>(null)
   const transcriptionOpRef = useRef(0)
@@ -62,7 +62,7 @@ export function WaitingSheet(): React.JSX.Element {
     nudge.mode === 'listening' && nudge.messageId === sel?.messageId
   )
 
-  // ── Entwurfs-Persistenz (followups:saveNudge, entprellt) ──
+  // ── Draft persistence (followups:saveNudge, debounced) ──
   const pendingSaveRef = useRef<{ messageId: number; draft: string } | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -81,7 +81,7 @@ export function WaitingSheet(): React.JSX.Element {
 
   const scheduleSave = useCallback(
     (messageId: number, draft: string): void => {
-      // Kontrakt-Limit der Spalte respektieren (nudge_draft, max. 10 000 Zeichen)
+      // Respect the column's contract limit (nudge_draft, max. 10,000 characters)
       pendingSaveRef.current = { messageId, draft: draft.slice(0, 10_000) }
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(flushSave, SAVE_DEBOUNCE_MS)
@@ -89,10 +89,10 @@ export function WaitingSheet(): React.JSX.Element {
     [flushSave]
   )
 
-  // Unmount (Ansichtswechsel): ausstehende Speicherung noch abschicken
+  // Unmount (view switch): still send off any pending save
   useEffect(() => flushSave, [flushSave])
 
-  // ── Entwerfen (Auto-Draft und ⌘J mit dem Editortext als Grundlage) ──
+  // ── Drafting (auto-draft and ⌘J with the editor text as basis) ──
   const generate = useCallback((messageId: number, idea?: string): void => {
     const st = useNudge.getState()
     const keepOriginal = idea !== undefined && st.messageId === messageId
@@ -132,7 +132,7 @@ export function WaitingSheet(): React.JSX.Element {
       })
   }, [])
 
-  // Gecachten Stups sofort in den Composer legen; nur ohne Cache neu entwerfen
+  // Put a cached nudge into the composer immediately; only redraft without a cache
   useEffect(() => {
     if (!sel) return
     const st = useNudge.getState()
@@ -151,7 +151,7 @@ export function WaitingSheet(): React.JSX.Element {
     generate(sel.messageId)
   }, [sel, flushSave, generate])
 
-  // Draft-Streaming empfangen (gleiches Muster wie der Reply-Composer)
+  // Receive draft streaming (same pattern as the reply composer)
   useEffect(
     () =>
       onPush('ai:draftChunk', (payload) => {
@@ -213,7 +213,7 @@ export function WaitingSheet(): React.JSX.Element {
     [queryClient, t]
   )
 
-  // ── Diktat (⌘D) — überarbeitet den bestehenden Text wie im Reply-Fluss ──
+  // ── Dictation (⌘D) — revises the existing text as in the reply flow ──
   const startDictation = useCallback((): void => {
     if (!sel || nudgedToday(sel.nudgedAt)) return
     const st = useNudge.getState()
@@ -352,7 +352,7 @@ export function WaitingSheet(): React.JSX.Element {
     processRecording(recording.blob, recording.messageId, recording.seconds, operation)
   }, [processRecording, sel?.messageId])
 
-  // Uhr während des Zuhörens
+  // Clock while listening
   useEffect(() => {
     if (nudge.mode !== 'listening') return
     const iv = setInterval(() => {
@@ -362,7 +362,7 @@ export function WaitingSheet(): React.JSX.Element {
     return () => clearInterval(iv)
   }, [nudge.mode])
 
-  // ⌘J: der Editortext ist die Grundlage — die Eule formuliert den Stups neu
+  // ⌘J: the editor text is the basis — the owl rewrites the nudge
   const elaborate = useCallback((): void => {
     if (!sel || nudgedToday(sel.nudgedAt)) return
     const st = useNudge.getState()
@@ -394,8 +394,8 @@ export function WaitingSheet(): React.JSX.Element {
     }
     const senderAccount = accounts.data?.find((a) => a.id === sel.accountId)
     if (!senderAccount || sel.toAddrs.length === 0) return
-    // Signatur bewusst NICHT anhängen: sendMail ergänzt die Signatur des
-    // sendenden Kontos genau einmal — exakt derselbe Pfad wie bei Antworten.
+    // Deliberately do NOT append the signature: sendMail adds the sending
+    // account's signature exactly once — exactly the same path as for replies.
     const payload = buildNudgeSend(sel, st.text, composerHtmlForSend(st.html, st.text))
     flushSave()
     st.setNudge({ mode: 'sending', error: null, errorKind: null })
@@ -409,7 +409,7 @@ export function WaitingSheet(): React.JSX.Element {
           subject: payload.subject,
           to: payload.to
         })
-        // Persistiert — „HEUTE GESTUPST" überlebt Ansichtswechsel und Neustart
+        // Persisted — „HEUTE GESTUPST" survives view switches and restarts
         void invoke('followups:markNudged', { messageId: sel.messageId })
         toastNow(t('toastNudgeSent', { name: sel.toAddrs[0] ?? '?' }))
         const cur = useNudge.getState()
@@ -499,7 +499,7 @@ export function WaitingSheet(): React.JSX.Element {
     if (st.messageId !== sel.messageId) return
     if (st.errorKind === 'transcription') retryTranscription()
     else if (st.errorKind === 'generation') {
-      // Nach einem gescheiterten Auto-Entwurf ist der Editor leer → frisch entwerfen
+      // After a failed auto-draft the editor is empty → draft fresh
       const idea = st.text.trim()
       generate(sel.messageId, idea || undefined)
     } else if (st.errorKind === 'send') sendNudge()
@@ -515,8 +515,8 @@ export function WaitingSheet(): React.JSX.Element {
     })
   }, [sel, toastNow, t, queryClient])
 
-  // Keymap-Aktionen (Custom-Events aus keymap.ts) — ⌘↵ bleibt das einzige
-  // Send-Gate der Wartet-Ansicht (M52): ein blankes Enter erreicht uns nie.
+  // Keymap actions (custom events from keymap.ts) — ⌘↵ stays the only
+  // send gate of the Waiting view (M52): a bare Enter never reaches us.
   useEffect(() => {
     const onAction = (e: Event): void => {
       const action = (e as CustomEvent<string>).detail

@@ -6,8 +6,8 @@ const SUN =
 const MOON = 'M13.2 9.6A5.6 5.6 0 0 1 6.4 2.8a5.6 5.6 0 1 0 6.8 6.8z'
 
 /**
- * Hell/Dunkel-Schalter (Einstellung ui.theme). Zeigt das Ziel: im Hellen den
- * Mond, im Dunkeln die Sonne — wie in den meisten Apps.
+ * Light/dark toggle (setting ui.theme). Shows the target: the moon in light
+ * mode, the sun in dark mode — like in most apps.
  */
 export function ThemeToggle({ className }: { className: string }): React.JSX.Element {
   const t = useT()

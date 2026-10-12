@@ -28,7 +28,7 @@ import {
   visibleTaskRows
 } from './task-navigation'
 
-/** Badge in der Konto-Farbe (Pastell) mit kontrastierender Schrift. */
+/** Badge in the account color (pastel) with contrasting text. */
 function badgeStyle(color: string): React.CSSProperties {
   return {
     width: 13,
@@ -45,7 +45,7 @@ function badgeStyle(color: string): React.CSSProperties {
   }
 }
 
-/** 5a: Rang-Tick am Zeilenanfang — Rang 5 Akzent (klingelt), Rang 4 Ink. */
+/** 5a: rank tick at the start of the row — rank 5 accent (rings), rank 4 ink. */
 function PriorityTick({ aiPriority }: { aiPriority: number | null }): React.JSX.Element | null {
   const t = useT()
   const tone = priorityTickTone(aiPriority)
@@ -421,12 +421,12 @@ function AccountFilter({
   )
 }
 
-/** Interval-getriebene Lade-Punkte (das Theme deaktiviert CSS-Keyframes). */
+/** Interval-driven loading dots (the theme disables CSS keyframes). */
 /**
- * Manueller Refresh: gleicht alle Konten sofort mit dem Server ab. Die INBOX
- * kommt per IDLE ohnehin live — der Knopf existiert vor allem für Ordner am
- * 10-Minuten-Poll (Spam!). Der Spin ist Klick-Feedback; neue Mails treffen
- * asynchron über messages:changed ein.
+ * Manual refresh: syncs all accounts with the server immediately. The INBOX
+ * arrives live via IDLE anyway — the button exists mainly for folders on the
+ * 10-minute poll (spam!). The spin is click feedback; new mails arrive
+ * asynchronously via messages:changed.
  */
 function RefreshButton(): React.JSX.Element {
   const t = useT()
@@ -458,7 +458,7 @@ function RefreshButton(): React.JSX.Element {
   )
 }
 
-/** Schalter der Ordneransicht (Einstellung mail.showFolders) neben dem Refresh. */
+/** Toggle of the folder view (setting mail.showFolders) next to the refresh. */
 function FoldersToggle(): React.JSX.Element {
   const t = useT()
   const showFolders = usePaper((s) => s.showFolders)
@@ -507,7 +507,7 @@ function InboxList(): React.JSX.Element {
     inboxFilters
   } = usePaper()
 
-  // Klick auf eine Mail verlässt den Composer — das Getippte sichert er selbst als Entwurf
+  // Clicking a mail leaves the composer — it saves what was typed as a draft itself
   const openThread = (threadKey: string): void => {
     setSelThreadKey(threadKey)
     if (view === 'compose') setView('inbox')
@@ -530,9 +530,9 @@ function InboxList(): React.JSX.Element {
     () => (threadsQuery.data ?? []).filter((r) => !hiddenThreads.has(r.threadKey)),
     [threadsQuery.data, hiddenThreads]
   )
-  // 5c: Zähler immer über die UNGEFILTERTE Liste — ein Fetch, Filter im Renderer
+  // 5c: counters always over the UNFILTERED list — one fetch, filtering in the renderer
   const inboxFilterCounts = useMemo(() => filterCounts(allRows), [allRows])
-  // Aktive Filter wirken nur im EINGANG — in SENT/SPAM bleiben sie geparkt
+  // Active filters only apply in the INBOX — in SENT/SPAM they stay parked
   const rows = useMemo(
     () => (mbox === 'inbox' ? applyFilters(allRows, inboxFilters) : allRows),
     [allRows, inboxFilters, mbox]
@@ -559,7 +559,7 @@ function InboxList(): React.JSX.Element {
     return account ? `${account.accountName || account.email} › ${place}` : place
   }, [folderId, folders.data, filter, mbox, accounts.data, t])
 
-  // Optimistische Echos: frisch Gesendetes sofort anzeigen, bis die Server-Kopie da ist
+  // Optimistic echoes: show freshly sent mail immediately until the server copy arrives
   const echoes = useSendState((s) => s.echoes)
   const dropEcho = useSendState((s) => s.dropEcho)
   const sentEchoes = useMemo(
@@ -880,8 +880,8 @@ function TasksList(): React.JSX.Element {
   const sel = all.find((x) => x.id === selTaskId) ?? all[0]
   const listRef = useScrollToSelected(selTaskId)
   const toggle = (id: number, status: string): void => {
-    // Der Wechsel kann die Aufgabe aus der gefilterten Liste nehmen — dann
-    // rückt die Auswahl auf den sichtbaren Nachbarn weiter.
+    // The change may remove the task from the filtered list — then the
+    // selection moves on to the visible neighbor.
     const becomesDone = status !== 'done'
     const willDisappear = becomesDone ? !showCompletedTasks : !showOpenTasks
     const shouldReconcileSelection = willDisappear && sel?.id === id
@@ -1027,7 +1027,7 @@ function SettingsList(): React.JSX.Element {
   const orStatus = useOrKeyStatus()
   const models = useModels()
 
-  // Lokale Modelle (z. B. „llama3.1:8b") haben keinen „anbieter/"-Präfix
+  // Local models (e.g. „llama3.1:8b") have no „provider/" prefix
   const short = (id: string | undefined): string => (id ? (id.split('/').pop() ?? id) : '—')
   const rows: Array<{ id: SettingsSection; name: string; sub: string }> = [
     {
@@ -1090,7 +1090,7 @@ export function ListPane(): React.JSX.Element {
   const openTasks = useTasks('open')
   const doneTasks = useTasks('done')
 
-  // j/k (und Pfeile) aus der Keymap: Auswahl in der aktiven Liste bewegen
+  // j/k (and arrows) from the keymap: move the selection in the active list
   useEffect(() => {
     const onMove = (e: Event): void => {
       const dir = (e as CustomEvent<number>).detail
@@ -1163,7 +1163,7 @@ export function ListPane(): React.JSX.Element {
               type="button"
               className="owl-key-btn"
               onClick={() => {
-                // Die NEUE-FRAGE-Affordanz der Spalte: leert das Blatt, fokussiert das Feld
+                // The column's NEW-QUESTION affordance: clears the sheet, focuses the field
                 useOwl.getState().newQuestion()
                 useOwl.getState().requestFocus()
               }}

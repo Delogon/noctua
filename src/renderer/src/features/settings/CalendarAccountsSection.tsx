@@ -10,9 +10,9 @@ import { cleanIpcError } from '@renderer/features/paper/account-states'
 import { AddressBooksPanel } from './AddressBooksPanel'
 import type { InvokeOutput } from '@shared/ipc-contract'
 
-// Settings → Konten: Kalender-Konten (CalDAV). Bewusst minimal (Phase 2.1):
-// einrichten per URL oder aus einem Mail-Konto, Verbindung testen, Kalender mit
-// Sichtbarkeit auflisten, Passwort neu eingeben. Die Kalenderansicht kommt in 2.2.
+// Settings → Accounts: calendar accounts (CalDAV). Deliberately minimal (Phase 2.1):
+// set up via URL or from a mail account, test the connection, list calendars with
+// visibility, re-enter the password. The calendar view comes in 2.2.
 
 type CalendarAccount = InvokeOutput<'calendar:accounts:list'>['accounts'][number]
 type Discovered = InvokeOutput<'calendar:accounts:discover'>

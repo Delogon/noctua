@@ -14,8 +14,8 @@ import {
 } from '@shared/signature'
 import { SignatureContent } from '@renderer/components/SignatureContent'
 
-// Signatur-Baukasten (Design-Import M31): Bausteine klicken, anordnen,
-// Bild per Drag&Drop — eine Signatur pro Adresse, Vorschau live.
+// Signature builder (Design-Import M31): click blocks, arrange them,
+// image via drag & drop — one signature per address, live preview.
 
 export type SigConfig = SignatureConfig
 
@@ -30,9 +30,9 @@ const BLOCK_KEYS = [
   'rule'
 ] as const
 
-// Kuratierte Bildhintergründe (Design 3f): TRANSPARENT · PAPIER · PASTELLE ·
-// TINTE ersetzen den OS-Farbwähler. Bereits gespeicherte Fremdfarben bleiben
-// gültig und erscheinen als zusätzlicher, ausgewählter Swatch.
+// Curated image backgrounds (Design 3f): TRANSPARENT · PAPIER · PASTELLE ·
+// TINTE replace the OS color picker. Already saved foreign colors stay
+// valid and appear as an additional, selected swatch.
 const BACKGROUND_SWATCHES: ReadonlyArray<{
   value: string | null
   labelKey: 'sigImgBackgroundTransparent' | 'sigSwatchPaper' | 'sigSwatchPastel' | 'sigSwatchInk'
@@ -88,8 +88,8 @@ async function fileToSignatureImage(file: File): Promise<{
   let width = 1
   let height = 1
 
-  // settings:set ist bewusst begrenzt; große Fotos werden proportional
-  // verkleinert, ohne Logos durch JPEG-Kompression oder Crop zu beschädigen.
+  // settings:set is deliberately limited; large photos are scaled down
+  // proportionally without damaging logos through JPEG compression or cropping.
   for (;;) {
     width = Math.max(1, Math.round(bitmap.width * scale))
     height = Math.max(1, Math.round(bitmap.height * scale))
@@ -121,14 +121,14 @@ export function SigSheet(): React.JSX.Element {
   const fileRef = useRef<HTMLInputElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Beim Wechsel der Adresse die alte Konfiguration verwerfen (Render-Anpassung)
+  // Discard the old configuration when the address changes (render adjustment)
   const [cfgAccountId, setCfgAccountId] = useState(account?.id)
   if (cfgAccountId !== account?.id) {
     setCfgAccountId(account?.id)
     setCfg(null)
   }
 
-  // Konfiguration der gewählten Adresse laden
+  // Load the configuration of the selected address
   useEffect(() => {
     if (!account) return
     void invoke('settings:get', { key: `sig.${account.id}` }).then((r) => {
@@ -137,31 +137,31 @@ export function SigSheet(): React.JSX.Element {
           setCfg(JSON.parse(r.value) as SigConfig)
           return
         } catch {
-          // fällt auf Default zurück
+          // falls back to the default
         }
       }
       const base = defaultConfig(account.email, account.displayName)
-      // Bestehende Plaintext-Signatur als Startwert übernehmen
+      // Adopt the existing plaintext signature as the starting value
       if (account.signature?.trim() && base.blocks.length === 1) {
         base.values.claim = account.signature.trim().split('\n').slice(-1)[0]
       }
       setCfg(base)
     })
-    // Bewusst nur an die Konto-ID gebunden: ein neues Konto-Objekt nach jedem
-    // Refetch darf die Konfiguration nicht neu laden.
+    // Deliberately bound only to the account ID: a new account object after every
+    // refetch must not reload the configuration.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.id])
 
-  // Nur in Event-Handlern genutzt — der React Compiler memoisiert selbst
+  // Only used in event handlers — the React Compiler memoizes on its own
   const persist = (next: SigConfig): void => {
     if (accountId === undefined) return
     setCfg(next)
     if (saveTimer.current) clearTimeout(saveTimer.current)
     const serialized = JSON.stringify(next)
     queryClient.setQueryData(['signature', accountId], { value: serialized })
-    // Die vollständige Konfiguration sofort sichern: Der Composer kann direkt
-    // danach geöffnet oder eine Mail versendet werden. Nur die abgeleitete
-    // Plaintext-Signatur und die Kontenabfrage werden gebündelt aktualisiert.
+    // Save the full configuration immediately: the composer may be opened or a
+    // mail sent right afterwards. Only the derived plaintext signature and the
+    // accounts query are updated in a batch.
     void invoke('settings:set', { key: `sig.${accountId}`, value: serialized })
     saveTimer.current = setTimeout(() => {
       void invoke('accounts:update', {
@@ -221,7 +221,7 @@ export function SigSheet(): React.JSX.Element {
   const imagePadding = cfg.imgPadding ?? 0
   const imageBackground = signatureImageBackground(cfg.imgBackground)
   const hasImageBackground = imageBackground !== 'transparent'
-  // Vor dem Swatch-Umbau gespeicherte Farbe außerhalb der kuratierten Reihe
+  // Color saved before the swatch rework, outside the curated row
   const customBackground =
     hasImageBackground &&
     !BACKGROUND_SWATCHES.some(

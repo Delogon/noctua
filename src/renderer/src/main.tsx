@@ -1,4 +1,4 @@
-// Lokale Fonts (CSP-safe, gebundlet): Editorial-Serif + Grotesk + Mono
+// Local fonts (CSP-safe, bundled): editorial serif + grotesque + mono
 import '@fontsource/newsreader/400.css'
 import '@fontsource/newsreader/500.css'
 import '@fontsource/newsreader/600.css'

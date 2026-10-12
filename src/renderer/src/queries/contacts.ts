@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-q
 import { invoke, onPush } from '@renderer/lib/ipc'
 import type { InvokeOutput } from '@shared/ipc-contract'
 
-// CardDAV-Kontakte eines Kalender-Kontos (Phase 3.1): Status + Adressbücher.
+// CardDAV contacts of a calendar account (Phase 3.1): status + address books.
 
 export function useDavContacts(
   accountId: number

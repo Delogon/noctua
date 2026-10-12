@@ -7,10 +7,10 @@ import { BannerBar, TimedBlock } from './EventBlocks'
 import { weekdayShort } from './format'
 import { instanceKey, type QuickDraft } from '@renderer/stores/calendar'
 
-// Tages-/Wochenraster: Ganztagszeile oben (Bänder), darunter das Zeitraster mit
-// Überlappungs-Spalten, Arbeitszeit-Hinterlegung (08–18), Jetzt-Linie. Kopf und
-// Ganztagszeile kleben (sticky) im selben Scroll-Container wie das Raster, damit
-// Spalten bei Scrollbalken exakt fluchten.
+// Day/week grid: all-day row on top (bands), below it the time grid with
+// overlap columns, working-hours shading (08–18), now line. Header and
+// all-day row stick (sticky) in the same scroll container as the grid so
+// columns line up exactly when scrollbars are present.
 
 export const HOUR_H = 44
 const GUTTER = 48
@@ -65,11 +65,11 @@ export function TimeGrid({
   const lang = useI18n((s) => s.lang)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
-  // Breite einer Tagesspalte (px): bestimmt, ob Überlappungen nebeneinander oder gestaffelt laufen
+  // Width of a day column (px): determines whether overlaps run side by side or cascaded
   const [colWidth, setColWidth] = useState(0)
   const nowDate = new Date(now)
 
-  // Beim Öffnen auf 07:00 scrollen (Sticky-Kopf liegt im Fluss darüber → scrollTop = 7 h)
+  // Scroll to 07:00 on open (sticky header sits above it in the flow → scrollTop = 7 h)
   useLayoutEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = INITIAL_SCROLL_HOUR * HOUR_H - 8
   }, [])
@@ -117,7 +117,7 @@ export function TimeGrid({
     <div
       ref={scrollRef}
       className="cal-scroll min-h-0 flex-1 overflow-y-auto"
-      // Schmale Spalten (1180-px-Fenster, Wochenansicht): kleinere Schrift, damit Titel lesbar bleiben
+      // Narrow columns (1180 px window, week view): smaller font so titles stay readable
       data-narrow={colWidth > 0 && colWidth < NARROW_COL_PX}
     >
       <div className="cal-sticky">
@@ -260,7 +260,7 @@ export function TimeGrid({
                       height: Math.max(14, ((p.bottom - p.top) / 60) * HOUR_H - 1),
                       left: `calc(${span.left}% + 1px)`,
                       width: `calc(${span.width}% - 3px)`,
-                      // Gestaffelt: spätere Blöcke über den früheren
+                      // Cascaded: later blocks above the earlier ones
                       ...(span.cascade ? { zIndex: p.col + 1 } : {})
                     }}
                   />

@@ -1,8 +1,8 @@
 import type { CalendarAlarm } from '@shared/calendar-types'
 
-// Erinnerungs-Voreinstellungen des Editors. Genau ein Alarm relativ zum Start ist
-// darstellbar; alles andere („custom": mehrere, absolut, relativ zum Ende, …) bleibt
-// unverändert erhalten, solange der Nutzer die Auswahl nicht anfasst.
+// Reminder presets of the editor. Exactly one alarm relative to the start can
+// be represented; everything else ("custom": several, absolute, relative to the end, …) is
+// kept unchanged as long as the user does not touch the selection.
 
 export const ALARM_PRESETS = [
   { id: 'none', minutes: null },
@@ -18,7 +18,7 @@ export const ALARM_PRESETS = [
 export type AlarmPresetId = (typeof ALARM_PRESETS)[number]['id']
 export type AlarmChoice = AlarmPresetId | 'custom'
 
-/** Welche Voreinstellung beschreibt diese Alarme? 'custom' = nicht darstellbar. */
+/** Which preset describes these alarms? 'custom' = not representable. */
 export function alarmChoiceOf(alarms: readonly CalendarAlarm[]): AlarmChoice {
   if (alarms.length === 0) return 'none'
   if (alarms.length > 1) return 'custom'
@@ -30,7 +30,7 @@ export function alarmChoiceOf(alarms: readonly CalendarAlarm[]): AlarmChoice {
   return preset ? preset.id : 'custom'
 }
 
-/** Alarme für die Auswahl; 'custom' gibt die Originale unverändert zurück. */
+/** Alarms for the selection; 'custom' returns the originals unchanged. */
 export function alarmsFromChoice(
   choice: AlarmChoice,
   original: readonly CalendarAlarm[]

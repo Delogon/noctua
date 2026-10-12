@@ -13,20 +13,20 @@ interface PendingSend {
   outboxId: number
   sendAt: number
   accountId: number
-  /** Absender-Adresse — für Countdown-Toast und Versandbestätigung. */
+  /** Sender address — for the countdown toast and send confirmation. */
   fromAddr: string
   subject: string
   to: string[]
-  /** Antwort-Kontext: Thread erst nach echtem Versand archivieren. */
+  /** Reply context: archive the thread only after the actual send. */
   archive?: { threadKey: string; messageIds: number[] }
 }
 
-// Aufgeschobene Archivierungen je Outbox-Eintrag: beim Einreihen wird der
-// Thread nur versteckt; archiviert wird erst, wenn der Versand wirklich
-// draußen ist — Rückgängig holt Thread und Entwurf unversehrt zurück.
+// Deferred archivings per outbox entry: when queued, the thread is
+// only hidden; it is archived only once the send has really
+// gone out — undo brings back thread and draft intact.
 const stagedArchives = new Map<number, { threadKey: string; messageIds: number[] }>()
 
-/** Staging auflösen, ohne zu archivieren (Rückgängig oder Versandfehler). */
+/** Resolve staging without archiving (undo or send error). */
 function unstageArchive(outboxId: number): { threadKey: string } | null {
   const staged = stagedArchives.get(outboxId)
   if (!staged) return null
@@ -35,9 +35,9 @@ function unstageArchive(outboxId: number): { threadKey: string } | null {
   return { threadKey: staged.threadKey }
 }
 
-// Countdown-Toast je Outbox-Eintrag: begin() legt ihn an, der Lebenszyklus
-// (sent/canceled/error) räumt ihn wieder ab und liefert dabei die Adresse
-// für die Bestätigung zurück.
+// Countdown toast per outbox entry: begin() creates it, the lifecycle
+// (sent/canceled/error) clears it again and returns the address
+// for the confirmation.
 const sendToasts = new Map<number, { toastId: number; fromAddr: string }>()
 
 function dropSendToast(outboxId: number): { fromAddr: string } | null {
@@ -48,17 +48,17 @@ function dropSendToast(outboxId: number): { fromAddr: string } | null {
   return { fromAddr: entry.fromAddr }
 }
 
-/** Fehlversand einer Antwort: zurück zum Thread, den gesicherten Entwurf
- *  (M37) wieder in den Antwort-Composer legen. Der Lade-Effekt im EmailSheet
- *  greift nur beim Threadwechsel — steht der Nutzer schon auf dem Thread,
- *  wird der Entwurf hier explizit geladen. */
+/** Failed reply send: back to the thread, put the saved draft
+ *  (M37) back into the reply composer. The load effect in EmailSheet
+ *  only fires on thread change — if the user is already on the thread,
+ *  the draft is loaded explicitly here. */
 async function openFailedDraft(threadKey: string): Promise<void> {
   const paper = usePaper.getState()
   paper.setMbox('inbox')
   paper.setView('inbox')
   paper.setSelThreadKey(threadKey)
   const c = usePaper.getState().comp
-  // Einen bereits beladenen oder aktiven Composer nie überschreiben
+  // Never overwrite an already loaded or active composer
   if (c.threadKey === threadKey && c.text.trim()) return
   if (c.mode !== 'idle' && c.mode !== 'ready') return
   const { drafts } = await invoke('drafts:list', undefined)
@@ -68,7 +68,7 @@ async function openFailedDraft(threadKey: string): Promise<void> {
   paper.setComp({ mode: 'ready', threadKey, text: saved.text, html: saved.html, manual: true })
 }
 
-/** Optimistischer Platzhalter in der Gesendet-Liste, bis die Server-Kopie gesynct ist. */
+/** Optimistic placeholder in the Sent list until the server copy is synced. */
 export interface SentEcho {
   outboxId: number
   accountId: number
@@ -88,7 +88,7 @@ interface SendState {
   dropEcho: (outboxId: number) => void
 }
 
-// Fallback-Timer: kein Echo bleibt ewig stehen, falls die Server-Kopie nie eintrifft
+// Fallback timer: no echo stays forever in case the server copy never arrives
 const echoTimers = new Map<number, ReturnType<typeof setTimeout>>()
 function scheduleEchoDrop(outboxId: number, ms: number): void {
   const prev = echoTimers.get(outboxId)
@@ -107,8 +107,8 @@ export const useSendState = create<SendState>((set, get) => ({
       stagedArchives.set(send.outboxId, send.archive)
       usePaper.getState().setThreadHidden(send.archive.threadKey, true)
     }
-    // Undo-Send als Countdown-Toast: UNDO/⌘Z stornieren; nach Ablauf des
-    // Fensters wechselt die Toast selbst auf „Geht gerade raus…".
+    // Undo send as countdown toast: UNDO/⌘Z cancel; after the window
+    // expires the toast itself switches to "Going out…".
     const toastId = toast.countdown({
       until: send.sendAt,
       textFor: (n) => t('toastSendingIn', { addr: send.fromAddr, n }),
@@ -136,18 +136,18 @@ export const useSendState = create<SendState>((set, get) => ({
     })
   },
   cancel: async (outboxId) => {
-    // Vor dem Cancel merken: läuft für diesen Versand eine aufgeschobene
-    // Archivierung (= Antwort auf einen Thread)?
+    // Remember before cancel: is a deferred archiving running for this
+    // send (= reply to a thread)?
     const staged = stagedArchives.get(outboxId) ?? null
     const result = await invoke('outbox:cancel', { outboxId })
     if (result.ok) {
       get().dropEcho(outboxId)
-      // Countdown-Toast still abräumen — die Composer-Rückkehr ist das Feedback
+      // Silently clear the countdown toast — the composer's return is the feedback
       dropSendToast(outboxId)
     }
     if (result.ok && staged) {
-      // Antwort: Thread wieder zeigen, auswählen und den Entwurf zurück in
-      // den Antwort-Composer legen — nicht in die leere Compose-Ansicht.
+      // Reply: show the thread again, select it and put the draft back into
+      // the reply composer — not into the empty compose view.
       unstageArchive(outboxId)
       const paper = usePaper.getState()
       if (result.draft) {
@@ -164,8 +164,8 @@ export const useSendState = create<SendState>((set, get) => ({
       paper.setView('inbox')
       paper.setSelThreadKey(staged.threadKey)
     } else if (result.ok && result.draft && result.accountId !== null) {
-      // Neue Mail (ComposeSheet): Entwurf zurück in den Composer — außer der
-      // Composer ist gerade mit einer anderen Mail belegt
+      // New mail (ComposeSheet): draft back into the composer — unless the
+      // composer is currently occupied by another mail
       if (usePaper.getState().view !== 'compose') {
         await saveComposeDraft({
           accountId: result.accountId,
@@ -205,9 +205,9 @@ export const useSendState = create<SendState>((set, get) => ({
 }))
 
 /**
- * Erkennt die vom Server zurückgesyncte Kopie eines Echos in der Gesendet-Liste:
- * gleiches Konto, Datum nicht vor dem Absenden, Betreff gleich (Re:/Aw:-Präfixe
- * ignoriert, damit Antworten auf den aggregierten Thread-Betreff passen).
+ * Detects the server-synced copy of an echo in the Sent list:
+ * same account, date not before sending, same subject (Re:/Aw: prefixes
+ * ignored so replies match the aggregated thread subject).
  */
 export function echoConfirmedBy(echo: SentEcho, item: ThreadListItem): boolean {
   if (echo.state !== 'sent') return false
@@ -220,7 +220,7 @@ export function echoConfirmedBy(echo: SentEcho, item: ThreadListItem): boolean {
   return norm(item.subject) === norm(echo.subject)
 }
 
-/** Spiegelt Outbox-Zustandswechsel aus dem Main-Prozess in die Echos (einmal app-weit mounten). */
+/** Mirrors outbox state changes from the main process into the echoes (mount once app-wide). */
 export function useOutboxEchoLifecycle(): void {
   const queryClient = useQueryClient()
   useEffect(
@@ -229,17 +229,17 @@ export function useOutboxEchoLifecycle(): void {
         const st = useSendState.getState()
         if (state === 'canceled') {
           st.dropEcho(outboxId)
-          // cancel() übernimmt die Entwurf-Wiederherstellung; hier nur
-          // sicherstellen, dass Thread und Countdown-Toast nicht hängen bleiben.
+          // cancel() handles the draft restoration; here only
+          // make sure that thread and countdown toast don't get stuck.
           unstageArchive(outboxId)
           dropSendToast(outboxId)
         } else if (state !== 'pending') {
           st.setEchoState(outboxId, state)
           if (state === 'sent') {
-            // Bestätigung als Info-Toast (der Countdown ist längst umgeschwenkt)
+            // Confirmation as info toast (the countdown has long since switched over)
             const sent = dropSendToast(outboxId)
             if (sent) toast.info(t('toastSentAs', { addr: sent.fromAddr }))
-            // Versand ist wirklich draußen → Archivierung jetzt ausführen
+            // Send has really gone out → perform the archiving now
             const staged = stagedArchives.get(outboxId)
             if (staged) {
               stagedArchives.delete(outboxId)
@@ -253,16 +253,16 @@ export function useOutboxEchoLifecycle(): void {
               })
             }
           } else if (state === 'unknown') {
-            // Ausgang ungewiss: Thread wieder zeigen, aber nichts automatisch
-            // erneut senden — der Nutzer prüft den Gesendet-Ordner.
+            // Outcome uncertain: show the thread again, but don't automatically
+            // resend anything — the user checks the Sent folder.
             unstageArchive(outboxId)
             dropSendToast(outboxId)
             toast.error(t('toastSendUnknown'))
           } else if (state === 'error') {
-            // Mail ging nicht raus → Thread wieder zeigen; der gespeicherte
-            // Entwurf bleibt erhalten und lädt beim Öffnen zurück. Der
-            // Fehler-Toast bietet bei Antworten den Sprung dorthin an —
-            // ehrlicher als ein RETRY, das es als IPC nicht gibt.
+            // Mail did not go out → show the thread again; the saved
+            // draft is kept and loads back on open. For replies, the
+            // error toast offers to jump there —
+            // more honest than a RETRY that does not exist as IPC.
             const restored = unstageArchive(outboxId)
             dropSendToast(outboxId)
             toast.error(

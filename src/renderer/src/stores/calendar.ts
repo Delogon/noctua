@@ -3,8 +3,8 @@ import { dayKey, parseDayKey, shiftAnchor, type CalView } from '@renderer/featur
 import type { EventForm } from '@renderer/features/calendar/event-form'
 import { usePaper } from './paper'
 
-// UI-Zustand der Kalenderansicht: Ansicht, Ankertag, Auswahl und Editor. Der Ankertag
-// ist ein lokaler Kalendertag ('YYYY-MM-DD'); die Ansicht leitet daraus Woche/Monat ab.
+// UI state of the calendar view: view, anchor day, selection and editor. The anchor day
+// is a local calendar day ('YYYY-MM-DD'); the view derives week/month from it.
 
 export type EditorTarget =
   | { kind: 'existing'; objectId: number; recurrenceId: string | null }
@@ -12,11 +12,11 @@ export type EditorTarget =
       kind: 'new'
       form: EventForm
       rev: number
-      /** Läuft erst nach erfolgreichem Speichern (nicht bei Abbrechen/Schließen) */
+      /** Runs only after a successful save (not on cancel/close) */
       onSaved?: () => void
     }
 
-/** Schnell-Anlegen-Popover: Zeitfenster plus Bildschirmposition des Slots. */
+/** Quick-create popover: time window plus the slot's screen position. */
 export interface QuickDraft {
   startMs: number
   endMs: number
@@ -44,20 +44,20 @@ interface CalendarState {
   deleteTarget: DeleteTarget | null
   setMode: (mode: CalView) => void
   setAnchor: (key: string) => void
-  /** Anker auf `day` setzen und in die Tagesansicht wechseln (Monats-„+k mehr", Tageszahl) */
+  /** Set the anchor to `day` and switch to the day view (month "+k more", day number) */
   showDay: (key: string) => void
   goToday: () => void
   shift: (dir: number) => void
   select: (key: string | null) => void
   openExisting: (objectId: number, recurrenceId: string | null) => void
   openNew: (form: EventForm, opts?: { onSaved?: () => void }) => void
-  /** Abbrechen/Schließen: onSaved des Neu-Editors verfällt */
+  /** Cancel/close: the new editor's onSaved lapses */
   closeEditor: () => void
-  /** Der Editor hat erfolgreich gespeichert: schließen und onSaved des Neu-Editors auslösen */
+  /** The editor saved successfully: close and fire the new editor's onSaved */
   finishEditor: () => void
   setQuick: (quick: QuickDraft | null) => void
   setDeleteTarget: (target: DeleteTarget | null) => void
-  /** Zu einem Termin springen (Agenda, Erinnerungs-Klick): Ansicht öffnen, Tag wählen, Editor auf */
+  /** Jump to an event (agenda, reminder click): open the view, select the day, open the editor */
   focusEvent: (objectId: number, recurrenceId: string | null, startMs: number) => void
 }
 

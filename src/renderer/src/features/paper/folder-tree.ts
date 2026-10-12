@@ -1,10 +1,10 @@
 import type { FolderListItem } from '@shared/types'
 
 /**
- * Reihenfolge und Einrückung des Ordnerbaums eines Kontos (wie in Outlook):
- * Posteingang mit seinen Unterordnern, Gesendet, Archiv, dann die eigenen
- * Ordner alphabetisch nach Pfad — Spam immer zuletzt. Entwürfe/Papierkorb
- * sind nicht voll synchronisiert und fehlen bewusst.
+ * Order and indentation of an account's folder tree (as in Outlook):
+ * Inbox with its subfolders, Sent, Archive, then the user's own folders
+ * alphabetically by path — Spam always last. Drafts/Trash are not fully
+ * synced and are deliberately missing.
  */
 export function folderTreeEntries(
   folders: FolderListItem[]

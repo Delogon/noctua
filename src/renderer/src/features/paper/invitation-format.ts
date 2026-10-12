@@ -1,9 +1,9 @@
 import type { InvitationView } from '@shared/invitation-types'
 
 /**
- * Darstellung von Einladungen: Zeitangabe in der Ortszeit des Betrachters
- * (ganztägig = Kalendertage, nie zeitzonenverschoben) und Kurzfassung der
- * Wiederholungsregel. Reine Funktionen, ohne React.
+ * Invitation display: time in the viewer's local time (all-day = calendar
+ * days, never shifted across time zones) and a short summary of the
+ * recurrence rule. Pure functions, no React.
  */
 
 export type InviteLang = 'de' | 'en'
@@ -71,7 +71,7 @@ const UNITS: Record<string, { every: [string, string]; many: [string, string] }>
   YEARLY: { every: ['Jedes Jahr', 'Every year'], many: ['Jahre', 'years'] }
 }
 
-/** „Jede Woche (Dienstag)" aus einer RRULE; unbekannte Muster als „Wiederkehrend". */
+/** „Jede Woche (Dienstag)" from an RRULE; unknown patterns as „Wiederkehrend". */
 export function recurrenceSummary(rrule: string | null, lang: InviteLang): string | null {
   if (!rrule) return null
   const parts: Record<string, string | undefined> = {}

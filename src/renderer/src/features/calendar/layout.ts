@@ -1,28 +1,28 @@
 import type { CalendarInstance } from '@shared/calendar-types'
 import { addDays, dayKey, parseDayKey, wallMinutes, DAY_MIN } from './dates'
 
-// Reine Layout-Algorithmen der Kalenderansicht: Tageszuordnung, Überlappungs-
-// Spalten im Zeitraster, Bänder (ganztägig/mehrtägig) in Wochenzeilen.
+// Pure layout algorithms of the calendar view: day assignment, overlap
+// columns in the time grid, bands (all-day/multi-day) in week rows.
 
-/** Minimale Anzeigehöhe eines Termins im Raster (Minuten). */
+/** Minimum display height of an event in the grid (minutes). */
 export const MIN_BLOCK_MIN = 20
 
-/** Termine ab dieser Länge laufen als Band (Ganztagszeile) statt im Zeitraster. */
+/** Events of this length or longer run as a band (all-day row) instead of in the time grid. */
 const BANNER_MS = 24 * 3_600_000
 
-/** Ganztägig oder ≥ 24 h → Band in der Ganztagszeile. */
+/** All-day or ≥ 24 h → band in the all-day row. */
 export function isBanner(e: CalendarInstance): boolean {
   return e.allDay || e.endUtc - e.startUtc >= BANNER_MS
 }
 
-/** Belegte Kalendertage [startDay, endDay) (endDay exklusiv, 'YYYY-MM-DD'). */
+/** Occupied calendar days [startDay, endDay) (endDay exclusive, 'YYYY-MM-DD'). */
 export function dayRange(e: CalendarInstance): { startDay: string; endDay: string } {
   if (e.allDay && e.startDay) {
     const endDay =
       e.endDay && e.endDay > e.startDay ? e.endDay : dayKey(addDays(parseDayKey(e.startDay), 1))
     return { startDay: e.startDay, endDay }
   }
-  // Ende exklusiv: ein Termin bis exakt 00:00 belegt den Folgetag nicht mehr
+  // End exclusive: an event until exactly 00:00 no longer occupies the following day
   const lastMs = Math.max(e.startUtc, e.endUtc - 1)
   return { startDay: dayKey(new Date(e.startUtc)), endDay: dayKey(addDays(new Date(lastMs), 1)) }
 }
@@ -35,7 +35,7 @@ export function compareEvents(a: CalendarInstance, b: CalendarInstance): number 
   return b.endUtc - a.endUtc || a.key.localeCompare(b.key)
 }
 
-/** Gruppiert Termine nach Kalendertag (nur Tage aus `days`); innerhalb: Bänder zuerst, dann Start. */
+/** Groups events by calendar day (only days from `days`); within a day: bands first, then by start. */
 export function eventsByDay(
   events: readonly CalendarInstance[],
   days: readonly Date[]
@@ -54,18 +54,18 @@ export function eventsByDay(
 
 export interface Placed<T> {
   item: T
-  /** Minuten seit Tagesbeginn (Wandzeit) */
+  /** Minutes since start of day (wall time) */
   top: number
   bottom: number
-  /** Spalte innerhalb des Überlappungs-Clusters und Spaltenzahl des Clusters */
+  /** Column within the overlap cluster and the cluster's column count */
   col: number
   cols: number
 }
 
 /**
- * Zeitraster eines Tages: schneidet Termine auf den Tag zu, vergibt Überlappungs-
- * Spalten (Cluster = zusammenhängende Überlappungskette; jede Spalte erhält die
- * Breite 1/cols des Clusters).
+ * Time grid of a day: clips events to the day, assigns overlap
+ * columns (cluster = connected overlap chain; each column gets
+ * width 1/cols of the cluster).
  */
 export function layoutDay(
   events: readonly CalendarInstance[],
@@ -107,16 +107,16 @@ export function layoutDay(
   return placed
 }
 
-/** Unter dieser Breite (px) je Überlappungs-Spalte ist ein Termintitel nicht mehr lesbar. */
+/** Below this width (px) per overlap column an event title is no longer readable. */
 const MIN_COL_PX = 64
-/** Anteil der Spaltenbreite, den ein überlappender Termin im Kaskaden-Layout behält. */
+/** Fraction of the column width that an overlapping event keeps in the cascade layout. */
 const CASCADE_MAX_PCT = 85
 
 /**
- * Horizontale Lage eines Blocks in Prozent der Tagesspalte. Normalfall: gleich
- * breite Spalten. Wird dabei jede Spalte schmaler als MIN_COL_PX (Wochenansicht,
- * 3 Überlappungen), staffeln sich die Blöcke stattdessen versetzt (jeder spätere
- * liegt über dem vorigen) — so bleibt jeder Titel lesbar.
+ * Horizontal position of a block in percent of the day column. Normal case: equally
+ * wide columns. If each column would become narrower than MIN_COL_PX (week view,
+ * 3 overlaps), the blocks are cascaded with an offset instead (each later one
+ * lies above the previous one) — so every title stays readable.
  */
 export function blockSpan(
   col: number,
@@ -133,18 +133,18 @@ export function blockSpan(
 
 export interface Span<T> {
   item: T
-  /** Erste Spalte (0-basiert) und Ende (exklusiv) innerhalb der Zeile */
+  /** First column (0-based) and end (exclusive) within the row */
   startCol: number
   endCol: number
   lane: number
-  /** Beginnt/endet außerhalb des sichtbaren Bereichs */
+  /** Starts/ends outside the visible range */
   clippedStart: boolean
   clippedEnd: boolean
 }
 
 /**
- * Bänder über `days` ('YYYY-MM-DD'-Spalten): Spalten-Position und Spur. Eine Spur
- * wird nur von überlappungsfreien Spannen geteilt.
+ * Bands across `days` ('YYYY-MM-DD' columns): column position and lane. A lane
+ * is only shared by non-overlapping spans.
  */
 export function layoutSpans(
   events: readonly CalendarInstance[],

@@ -10,9 +10,9 @@ import { FolderTree } from '@renderer/features/paper/FolderTree'
 import { ThemeToggle } from './ThemeToggle'
 
 /**
- * „Classic"-Rahmen (Einstellung ui.layout): Outlook-nahe Muster — Titelleiste
- * mit Suchfeld, App-Leiste links, Ordnerleiste mit „Neue E-Mail". Inhalt,
- * Liste, Blatt und Eulen-Leiste sind dieselben Komponenten wie im Letterpress.
+ * "Classic" frame (setting ui.layout): Outlook-like patterns — title bar
+ * with search field, app bar on the left, folder bar with "New email". Content,
+ * list, sheet and owl rail are the same components as in Letterpress.
  */
 
 const ICONS: Record<'mail' | 'waiting' | 'tasks' | 'calendar' | 'owl' | 'settings', string> = {
@@ -21,7 +21,7 @@ const ICONS: Record<'mail' | 'waiting' | 'tasks' | 'calendar' | 'owl' | 'setting
   tasks: 'M2.5 2.5h11v11h-11z M5 8l2 2 4-4',
   calendar: 'M2.5 3.5h11v10h-11z M2.5 6.5h11 M5.5 2v3 M10.5 2v3',
   owl: 'M3 5.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0z M8 5.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0z M3 5.5v5.5l5 3 5-3V5.5',
-  // Zahnrad (nicht Sonne — die Sonne ist der Hell/Dunkel-Schalter)
+  // Gear (not sun — the sun is the light/dark toggle)
   settings:
     'M6.9 1.5h2.2l.4 1.7 1.2.5 1.5-.9 1.6 1.6-.9 1.5.5 1.2 1.7.4v2.2l-1.7.4-.5 1.2.9 1.5-1.6 1.6-1.5-.9-1.2.5-.4 1.7H6.9l-.4-1.7-1.2-.5-1.5.9-1.6-1.6.9-1.5-.5-1.2-1.7-.4V6.9l1.7-.4.5-1.2-.9-1.5 1.6-1.6 1.5.9 1.2-.5z M8 5.9a2.1 2.1 0 1 0 0 4.2a2.1 2.1 0 1 0 0-4.2z'
 }
@@ -42,7 +42,7 @@ export function ClassicTopBar(): React.JSX.Element {
   return (
     <div className="classic-topbar titlebar-drag">
       <div className="classic-topbar__brand">Noctua</div>
-      {/* Suchen wohnt in der Eulen-Ansicht — das Feld ist ihr Einstieg (wie ⌘F) */}
+      {/* Search lives in the owl view — this field is its entry point (like ⌘F) */}
       <button
         type="button"
         className="classic-search titlebar-no-drag"
@@ -180,9 +180,9 @@ const CMD_ICONS = {
 type CmdAction = 'reply' | 'replyAll' | 'dictate' | 'file' | 'delete' | 'spam' | 'notSpam'
 
 /**
- * Befehlsleiste über der geöffneten E-Mail (nur Classic) — Outlooks
- * Menüband in klein. Löst dieselben paper:mail-Aktionen aus wie die Tasten,
- * damit EmailSheet die einzige Stelle bleibt, die Threads verändert.
+ * Command bar above the opened email (Classic only) — Outlook's
+ * ribbon in miniature. Fires the same paper:mail actions as the keys,
+ * so EmailSheet stays the only place that modifies threads.
  */
 export function ClassicCommandBar(): React.JSX.Element {
   const t = useT()

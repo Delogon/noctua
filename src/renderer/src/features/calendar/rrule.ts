@@ -1,9 +1,9 @@
 import { parseDayKey, pad2, utcToWall, wallToUtc, systemTz } from './dates'
 
-// RRULE-Baukasten für die darstellbare Teilmenge (Editor): FREQ (täglich/wöchentlich/
-// monatlich/jährlich), INTERVAL, BYDAY (nur wöchentlich, reine Wochentage), Ende per
-// UNTIL oder COUNT. Alles andere gilt als „benutzerdefiniert" und wird nur als
-// Text angezeigt — der Editor schreibt es nie um.
+// RRULE builder for the representable subset (editor): FREQ (daily/weekly/
+// monthly/yearly), INTERVAL, BYDAY (weekly only, plain weekdays), end via
+// UNTIL or COUNT. Everything else counts as "custom" and is only shown as
+// text — the editor never rewrites it.
 
 export const WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const
 export type Weekday = (typeof WEEKDAYS)[number]
@@ -28,7 +28,7 @@ export const NO_RECURRENCE: RecurrenceSpec = {
 
 export interface RruleContext {
   allDay: boolean
-  /** Zone des Termins (null = floating → Systemzone) */
+  /** Zone of the event (null = floating → system zone) */
   tzid: string | null
 }
 
@@ -36,7 +36,7 @@ export type ParsedRrule = { kind: 'spec'; spec: RecurrenceSpec } | { kind: 'cust
 
 export const MAX_INTERVAL = 999
 
-/** Wochentag-Kürzel eines Datums ('YYYY-MM-DD'). */
+/** Weekday abbreviation of a date ('YYYY-MM-DD'). */
 export function weekdayOf(dateKey: string): Weekday {
   return WEEKDAYS[(parseDayKey(dateKey).getDay() + 6) % 7]
 }
@@ -44,7 +44,7 @@ export function weekdayOf(dateKey: string): Weekday {
 function untilValue(date: string, ctx: RruleContext): string {
   const compact = date.replaceAll('-', '')
   if (ctx.allDay) return compact
-  // Bei Zeitterminen: UTC-Zeitpunkt „Ende des Tages" in der Zone des Termins
+  // For timed events: UTC instant "end of day" in the event's zone
   const utc = wallToUtc(`${date}T23:59:59`, ctx.tzid ?? systemTz())
   const d = new Date(utc)
   return (
@@ -53,7 +53,7 @@ function untilValue(date: string, ctx: RruleContext): string {
   )
 }
 
-/** RRULE-Wert (ohne 'RRULE:'-Präfix) aus der Auswahl; null = keine Wiederholung. */
+/** RRULE value (without 'RRULE:' prefix) from the selection; null = no recurrence. */
 export function buildRrule(spec: RecurrenceSpec, ctx: RruleContext): string | null {
   if (spec.freq === 'NONE') return null
   const parts = [`FREQ=${spec.freq}`]
@@ -75,14 +75,14 @@ function untilToDate(raw: string, ctx: RruleContext): string | null {
   if (!m) return null
   const date = `${m[1]}-${m[2]}-${m[3]}`
   if (m[7] !== 'Z') return date
-  // UTC-Zeitpunkt → Kalendertag in der Zone des Termins
+  // UTC instant → calendar day in the event's zone
   const ms = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])
   return utcToWall(ms, ctx.allDay ? 'UTC' : (ctx.tzid ?? systemTz())).slice(0, 10)
 }
 
 /**
- * RRULE → Auswahl. Alles außerhalb der Teilmenge (BYSETPOS, BYMONTHDAY, BYMONTH,
- * BYDAY mit Ordnungszahl, WKST ≠ MO, UNTIL+COUNT, …) → 'custom' mit dem Originaltext.
+ * RRULE → selection. Everything outside the subset (BYSETPOS, BYMONTHDAY, BYMONTH,
+ * BYDAY with ordinal, WKST ≠ MO, UNTIL+COUNT, …) → 'custom' with the original text.
  */
 export function parseRrule(rule: string | null, ctx: RruleContext): ParsedRrule {
   if (!rule || !rule.trim()) return { kind: 'spec', spec: NO_RECURRENCE }

@@ -3,9 +3,9 @@ import type { OwlSource } from '@shared/types'
 import { parseOwlMarkdown, type OwlInline } from './owl-markdown'
 
 /**
- * Rendert eine Eulen-Antwort als React-Elemente (kein innerHTML). [n]-Verweise
- * werden klickbar, sobald die zugehörige Quelle existiert — gleiche Sprunglogik
- * wie die SOURCES-Karte, vom Aufrufer hereingereicht.
+ * Renders an owl answer as React elements (no innerHTML). [n] references
+ * become clickable as soon as the corresponding source exists — same jump logic
+ * as the SOURCES card, passed in by the caller.
  */
 export function OwlAnswerMarkdown({
   text,

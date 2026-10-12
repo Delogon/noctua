@@ -8,17 +8,17 @@ interface RecipientInputProps {
   label: string
   chips: string[]
   onChipsChange: (chips: string[]) => void
-  /** Roher, noch nicht bestätigter Eingabetext — der Composer parst ihn beim Senden mit. */
+  /** Raw, not yet confirmed input text — the composer parses it too when sending. */
   onTextChange: (text: string) => void
   placeholder?: string
   autoFocus?: boolean
 }
 
 /**
- * Empfängerfeld mit Chips und Autocomplete aus der eigenen Mail-Historie
- * (contact_stats: angeschriebene und empfangene Adressen). Zweifelhafte
- * Adressen (@ ohne Punkt in der Domain) behalten ihren Chip — im Akzent,
- * mit erklärendem title (Design 3a).
+ * Recipient field with chips and autocomplete from the own mail history
+ * (contact_stats: addresses written to and received from). Doubtful
+ * addresses (@ without a dot in the domain) keep their chip — in accent,
+ * with an explanatory title (Design 3a).
  */
 export function RecipientInput({
   label,
@@ -35,7 +35,7 @@ export function RecipientInput({
   const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Kurzes Debounce, damit nicht jeder Tastendruck eine IPC-Query auslöst.
+  // Short debounce so not every keystroke triggers an IPC query.
   useEffect(() => {
     const t = setTimeout(() => setQuery(text.trim()), 120)
     return () => clearTimeout(t)
@@ -55,8 +55,8 @@ export function RecipientInput({
     return list.filter((s) => !taken.has(s.addr.toLowerCase()))
   }, [suggestQuery.data, chips])
 
-  // Auswahl und Popup bei neuer Anfrage bzw. neuer Trefferzahl zurücksetzen
-  // (Render-Anpassung statt Effect, damit kein Zusatz-Render nötig ist)
+  // Reset selection and popup on a new query or new hit count
+  // (render adjustment instead of an effect, so no extra render is needed)
   const suggestSignature = `${query}\u0000${suggestions.length}`
   const [prevSuggestSignature, setPrevSuggestSignature] = useState(suggestSignature)
   if (prevSuggestSignature !== suggestSignature) {
@@ -114,7 +114,7 @@ export function RecipientInput({
       event.preventDefault()
       removeChip(chips[chips.length - 1])
     } else if (event.key === 'Escape' && open) {
-      // Nur das Dropdown schließen — nicht den Composer.
+      // Only close the dropdown — not the composer.
       event.preventDefault()
       event.stopPropagation()
       setOpen(false)
@@ -175,7 +175,7 @@ export function RecipientInput({
             <button
               key={s.addr}
               type="button"
-              // onMouseDown statt onClick: feuert vor dem Blur des Inputs.
+              // onMouseDown instead of onClick: fires before the input's blur.
               onMouseDown={(e) => {
                 e.preventDefault()
                 addChip(s.addr)

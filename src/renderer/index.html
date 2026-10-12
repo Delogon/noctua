@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <title>Noctua</title>
-    <!-- img-src https: bleibt nötig: Mail-iframes (srcdoc) erben diese CSP; sie selbst
-         erlauben https-Bilder nur nach Freigabe (siehe mailFrameCsp). -->
+    <!-- img-src https: is still needed: mail iframes (srcdoc) inherit this CSP; they themselves
+         allow https images only after approval (see mailFrameCsp). -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws:"

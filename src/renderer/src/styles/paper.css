@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 
 /* ============================================================================
- * Noctua „Letterpress" — Design-Handoff design_handoff_noctua_mail (M19).
- * Papier, Tinte, Mono-Meta, radius 0, Offset-Schatten. Ersetzt theme.css.
+ * Noctua "Letterpress" — design handoff design_handoff_noctua_mail (M19).
+ * Paper, ink, mono meta, radius 0, offset shadows. Replaces theme.css.
  * ========================================================================== */
 
 :root {
@@ -20,7 +20,7 @@
   --highlight: #f0e7d8;
   --ac: #c2452c;
   --on-ink-muted: #b5afa3;
-  /* Text auf Tinten-Flächen (Toasts, Banner) und gedämpfte Listen-Metazeile */
+  /* Text on ink surfaces (toasts, banners) and muted list meta line */
   --on-ink: #f4f1ea;
   --meta: #8a8272;
 
@@ -74,13 +74,13 @@ input::placeholder {
   border-radius: 0 !important;
 }
 
-/* Die einzigen erlaubten Kreise: Rec-Punkt, Toggle-Punkte, Eulen-Augen. */
+/* The only allowed circles: rec dot, toggle dots, owl eyes. */
 .dot,
 .dot::before {
   border-radius: 50% !important;
 }
 
-/* Die Signatur-Vorschau darf die globale eckige Letterpress-Regel gezielt überschreiben. */
+/* The signature preview may deliberately override the global square Letterpress rule. */
 .signature-image {
   transition: border-radius 160ms ease;
 }
@@ -165,22 +165,22 @@ input::placeholder {
   transform: translateY(1px);
 }
 
-/* ── Typo-Bausteine ──────────────────────────────────────────────────── */
+/* ── Type building blocks ────────────────────────────────────────────── */
 
-/* Mono-Sektionslabel: 8.5px, letter-spacing 1.5, uppercase */
+/* Mono section label: 8.5px, letter-spacing 1.5, uppercase */
 .mlabel {
   font: 500 8.5px var(--mono);
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }
 
-/* Mono-Meta: 9.5px */
+/* Mono meta: 9.5px */
 .mmeta {
   font: 400 9.5px var(--mono);
   color: var(--muted);
 }
 
-/* Mono-Chip (gefüllt/umrandet via Utility-Klassen) */
+/* Mono chip (filled/outlined via utility classes) */
 .mchip {
   font: 500 8.5px var(--mono);
   letter-spacing: 1px;
@@ -197,7 +197,7 @@ kbd,
   background: transparent;
 }
 
-/* ── Flächen ─────────────────────────────────────────────────────────── */
+/* ── Surfaces ────────────────────────────────────────────────────────── */
 
 .sheet-card {
   background: var(--sheet);
@@ -318,8 +318,8 @@ kbd,
   color: var(--ink);
 }
 
-/* Hover ist nur Affordanz — die ↑↓-Selektion (data-active) fasst er nicht an,
-   sonst kapert der ruhende Mauszeiger die Enter-Taste der Owl-Suche. */
+/* Hover is only an affordance — it doesn't touch the ↑↓ selection (data-active),
+   otherwise the resting mouse pointer hijacks the Enter key of the Owl search. */
 .owl-hit-row:hover,
 .owl-ask-row:hover {
   background: var(--paper);
@@ -490,9 +490,9 @@ kbd,
   }
 }
 
-/* ── Owl-View: Suchen + Fragen in einem Eingabefeld (2a) ─────────────── */
-/* Trefferzeilen erben .palette-mail-row; .owl-hit-row passt Innenabstand
- * und Auswahlfarbe an (Tinte statt Akzent — der Akzent gehört der Frage-Zeile). */
+/* ── Owl view: search + ask in one input field (2a) ──────────────────── */
+/* Hit rows inherit .palette-mail-row; .owl-hit-row adjusts padding
+ * and selection color (ink instead of accent — the accent belongs to the question row). */
 
 .owl-input-row {
   display: flex;
@@ -658,7 +658,7 @@ kbd,
   font: 400 14.5px/1.7 var(--serif);
 }
 
-/* Markdown-Teilmenge der Eulen-Antwort (OwlAnswerMarkdown) */
+/* Markdown subset of the owl answer (OwlAnswerMarkdown) */
 .owl-answer .owl-md-paragraph {
   margin: 0 0 10px;
 }
@@ -831,8 +831,8 @@ kbd,
   outline-offset: 2px;
 }
 
-/* Kleiner Neue-Frage-Knopf in der GESPRÄCHE-Kopfzeile — bewusst als stille
-   Mono-Marke im Letterpress-Stil, kein Kasten wie die großen Ink-Buttons. */
+/* Small new-question button in the CONVERSATIONS header — deliberately a quiet
+   mono mark in Letterpress style, no box like the big ink buttons. */
 .owl-new-btn {
   appearance: none;
   flex: none;
@@ -901,7 +901,7 @@ kbd,
   z-index: 40;
 }
 
-/* Doppellinie zwischen Mail und Composer */
+/* Double line between mail and composer */
 .double-rule {
   border-top: 1px solid var(--ink);
 }
@@ -955,7 +955,7 @@ kbd,
   user-select: none;
 }
 
-/* ── Ausklappbare Mail-Kopfdaten ───────────────────────────────────── */
+/* ── Collapsible mail header ───────────────────────────────────────── */
 
 .message-box {
   container-name: message-box;
@@ -1326,7 +1326,7 @@ kbd,
   }
 }
 
-/* ── Nachrichten-Anhänge ────────────────────────────────────────────── */
+/* ── Message attachments ────────────────────────────────────────────── */
 
 .message-attachments {
   container-type: inline-size;
@@ -1555,7 +1555,7 @@ kbd,
   }
 }
 
-/* Wartet-Aktionen: bewusst größer als die übrigen Letterpress-Meta-Aktionen. */
+/* Waiting actions: deliberately larger than the other Letterpress meta actions. */
 .waiting-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1635,7 +1635,7 @@ kbd,
   font-size: 11px;
 }
 
-/* ── Listen ──────────────────────────────────────────────────────────── */
+/* ── Lists ───────────────────────────────────────────────────────────── */
 
 .inbox-controls {
   position: relative;
@@ -1653,13 +1653,13 @@ kbd,
 }
 
 .account-filter-control {
-  /* Anker für das absolut positionierte Menü (usePopoverPlacement, M83) —
-     in der Liste kommt das über .list-filter-control, im Composer nur hier. */
+  /* Anchor for the absolutely positioned menu (usePopoverPlacement, M83) —
+     in the list this comes via .list-filter-control, in the composer only here. */
   position: relative;
   min-width: 0;
 }
 
-/* Basis des Trigger-Dropdowns — genutzt vom FROM-Picker im Composer */
+/* Base of the trigger dropdown — used by the FROM picker in the composer */
 .account-filter-trigger {
   appearance: none;
   display: grid;
@@ -1890,8 +1890,8 @@ kbd,
   text-align: center;
 }
 
-/* VON-Wahl im Composer (Design 3a) — gleiche Menü-Vokabel wie der
-   Postfach-Filter, aber als kompakter Trigger mit Tinte-Rahmen. */
+/* FROM picker in the composer (Design 3a) — same menu vocabulary as the
+   mailbox filter, but as a compact trigger with an ink frame. */
 .compose-from.account-filter-control {
   width: max-content;
   max-width: 340px;
@@ -1932,7 +1932,7 @@ kbd,
   border-left: 0;
 }
 
-/* Manueller Refresh rechts neben den Ordner-Tabs */
+/* Manual refresh to the right of the folder tabs */
 .mailbox-refresh {
   appearance: none;
   flex: none;
@@ -2021,7 +2021,7 @@ kbd,
   white-space: nowrap;
 }
 
-/* Filterzeilen außerhalb des Headers (Postfach / Braucht dich) */
+/* Filter rows outside the header (mailbox / needs you) */
 .list-filter-row {
   display: flex;
   align-items: center;
@@ -2092,7 +2092,7 @@ kbd,
   top: calc(100% + 8px);
   right: 0;
   width: 212px;
-  /* Klemmen (Design 7b/6b): nie über die Pane-Kante, nie höher als der Schirm */
+  /* Clamping (Design 7b/6b): never past the pane edge, never taller than the screen */
   max-width: min(280px, calc(100vw - 16px));
   max-height: 60vh;
   overflow-y: auto;
@@ -2103,7 +2103,7 @@ kbd,
   text-align: left;
 }
 
-/* Inbox-Variante: Trigger sitzt links → links verankern, Breite an der Zeile klemmen */
+/* Inbox variant: trigger sits on the left → anchor left, clamp width to the row */
 .inbox-filter-popover {
   left: 0;
   right: auto;
@@ -2148,7 +2148,7 @@ kbd,
   box-shadow: 1px 1px 0 color-mix(in srgb, var(--ink) 14%, transparent);
 }
 
-/* ── Antwort-Empfänger als streichbare Chips (M97) ─────────────────── */
+/* ── Reply recipients as strikable chips (M97) ─────────────────────── */
 .reply-chips {
   display: flex;
   flex-wrap: wrap;
@@ -2197,7 +2197,7 @@ kbd,
   color: var(--muted);
 }
 
-/* ── Filter-Zeile des Posteingangs (Design 7a) ─────────────────────── */
+/* ── Inbox filter row (Design 7a) ──────────────────────────────────── */
 .inbox-filter-row {
   position: relative;
   display: flex;
@@ -2424,7 +2424,7 @@ kbd,
   overflow: hidden;
 }
 
-/* ── Eingaben ────────────────────────────────────────────────────────── */
+/* ── Inputs ──────────────────────────────────────────────────────────── */
 
 .paper-input {
   border: 1px solid var(--hairline);
@@ -2450,7 +2450,7 @@ kbd,
   resize: vertical;
 }
 
-/* Versteckte Diktat-Textarea im Listening-Strip: Mono auf Tinte */
+/* Hidden dictation textarea in the listening strip: mono on ink */
 .dict-input {
   width: 100%;
   box-sizing: border-box;
@@ -2464,7 +2464,7 @@ kbd,
   min-height: 34px;
 }
 
-/* ── Sonstiges ───────────────────────────────────────────────────────── */
+/* ── Miscellaneous ───────────────────────────────────────────────────── */
 
 .mark-underline {
   border-bottom: 2px solid var(--ac);
@@ -2500,7 +2500,7 @@ kbd,
   justify-content: center;
 }
 
-/* Nackter Button: interaktive Spans werden echte Buttons, Optik unverändert */
+/* Bare button: interactive spans become real buttons, look unchanged */
 .btn-bare {
   appearance: none;
   border: 0;
@@ -2512,13 +2512,13 @@ kbd,
   cursor: pointer;
 }
 
-/* Trefferfläche auf ≥24px vergrößern, ohne das Layout zu verschieben */
+/* Enlarge the hit area to ≥24px without shifting the layout */
 .hit-target {
   padding: 8px;
   margin: -8px;
 }
 
-/* Fokus sichtbar, aber papiernah */
+/* Focus visible, but paper-like */
 :focus-visible {
   outline: 1px solid var(--ac);
   outline-offset: 1px;
@@ -2545,7 +2545,7 @@ kbd,
   }
 }
 
-/* ── Legacy-Brücke: Klassen der verbliebenen Alt-Dialoge, papierfarben ──── */
+/* ── Legacy bridge: classes of the remaining old dialogs, paper-colored ─── */
 
 .overlay {
   position: fixed;
@@ -2623,7 +2623,7 @@ kbd,
   animation: none;
 }
 
-/* Farb-Aliase alter Tailwind-Tokens (border-border, text-text, bg-surface…) */
+/* Color aliases of old Tailwind tokens (border-border, text-text, bg-surface…) */
 @theme inline {
   --color-border: var(--hairline);
   --color-border-strong: var(--ink);
@@ -2643,7 +2643,7 @@ kbd,
   --color-bg: var(--paper);
 }
 
-/* Empfänger-Chips (RecipientInput) im Letterpress-Stil */
+/* Recipient chips (RecipientInput) in Letterpress style */
 .composer-field {
   padding: 0;
   border: none;
@@ -2752,7 +2752,7 @@ kbd,
   border-color: var(--ac);
 }
 
-/* Gemeinsame Schreibfläche für neue Nachrichten und Antworten. */
+/* Shared writing surface for new messages and replies. */
 .mail-composer {
   display: flex;
   width: 100%;
@@ -3246,8 +3246,8 @@ kbd,
   text-underline-offset: 3px;
 }
 
-/* Erst-Sync-Indikator im Onboarding: pulsierender Akzent-Punkt neben dem
-   live hochzählenden Mail-Zähler (Puls-Keyframe der Aufnahme wiederverwendet). */
+/* First-sync indicator in onboarding: pulsing accent dot next to the
+   live-counting mail counter (reuses the recording's pulse keyframe). */
 .ob-sync-dot {
   display: inline-block;
   width: 7px;
@@ -3257,9 +3257,9 @@ kbd,
   animation: mail-composer-recording-pulse 1.15s ease-in-out infinite;
 }
 
-/* Antwort-Umfang als Toggle in der Empfängerzeile (Turn 9, Rules-Muster):
-   Label + Track (26×14, eckiger Knopf) + ⌘⇧A-Chip, die ganze Gruppe ist
-   die Klickfläche. An = Track ink-gefüllt, Knopf rechts, Zähler in Akzent. */
+/* Reply scope as a toggle in the recipient row (Turn 9, rules pattern):
+   label + track (26×14, square knob) + ⌘⇧A chip, the whole group is
+   the click area. On = track ink-filled, knob right, counter in accent. */
 .reply-scope-toggle {
   display: inline-flex;
   align-items: center;
@@ -3330,8 +3330,8 @@ kbd,
   background: var(--paper);
 }
 
-/* Fußzeile der Send-Aktionen: NO-SUBJECT-Hinweis links, Verwerfen rechts
-   (Design 3a — der Hinweis steht nur, solange der Betreff leer ist). */
+/* Footer of the send actions: NO-SUBJECT hint left, discard right
+   (Design 3a — the hint only shows while the subject is empty). */
 .mail-composer__actions-foot {
   display: flex;
   min-width: 0;
@@ -3456,8 +3456,8 @@ kbd,
   color: var(--ac);
 }
 
-/* Zweifelhafte Adresse (@ ohne Punkt in der Domain) — Chip bleibt, aber im
-   Akzent und mit erklärendem title (Design 3a). */
+/* Doubtful address (@ without a dot in the domain) — chip stays, but in
+   accent and with an explanatory title (Design 3a). */
 .recipient-chip[data-doubtful='true'] {
   border-color: var(--ac);
   color: var(--ac);
@@ -3475,10 +3475,10 @@ kbd,
   animation: none;
 }
 
-/* ── Rechtschreibprüfung (ComposerSpellcheck) ────────────────────────── */
+/* ── Spell checking (ComposerSpellcheck) ─────────────────────────────── */
 
-/* Wellenlinien über die CSS Custom Highlight API — die Ranges kommen aus
-   ComposerSpellcheck und wandern beim Tippen im contentEditable mit. */
+/* Squiggles via the CSS Custom Highlight API — the ranges come from
+   ComposerSpellcheck and move along while typing in the contentEditable. */
 ::highlight(spell-miss) {
   text-decoration: underline wavy var(--ac);
   text-decoration-thickness: 1px;
@@ -3533,7 +3533,7 @@ kbd,
   color: var(--ac);
 }
 
-/* ── Die eine Toast-Leiste (Design 1c) — vier Varianten, eine Position ── */
+/* ── The one toast bar (Design 1c) — four variants, one position ──────── */
 
 .toast-host {
   position: fixed;
@@ -3565,7 +3565,7 @@ kbd,
   padding: 10px 16px;
 }
 
-/* Mit Knöpfen rückt der rechte Rand enger an sie heran (Mock 1c) */
+/* With buttons the right edge moves closer to them (mock 1c) */
 .toast-bar__row[data-buttons] {
   padding: 8px 10px 8px 16px;
 }
@@ -3577,15 +3577,15 @@ kbd,
   background: var(--ac);
 }
 
-/* Countdown: runder Rec-Punkt, pulsiert wie das Diktat im Composer */
+/* Countdown: round rec dot, pulses like the dictation in the composer */
 .toast-bar__dot[data-rec] {
   border-radius: 50%;
   animation: mail-composer-recording-pulse 1.15s ease-in-out infinite;
 }
 
-/* Die Eule (OwlGlyph): Blinzeln + Augenlauf; Prozente aus dem Design-Handoff.
-   Reduced motion friert auf den statischen Frame — Pupillen sichtbar,
-   Lider (inline opacity 0) unsichtbar. */
+/* The owl (OwlGlyph): blinking + eye sweep; percentages from the design handoff.
+   Reduced motion freezes on the static frame — pupils visible,
+   lids (inline opacity 0) invisible. */
 @keyframes owl-pupil {
   0%,
   94.4% {
@@ -3637,7 +3637,7 @@ kbd,
   }
 }
 
-/* Eulen-Toast: zwei Augen statt Quadrat — Text stammt vom Modell */
+/* Owl toast: two eyes instead of a square — text comes from the model */
 .toast-bar__eyes {
   display: inline-flex;
   gap: 3px;
@@ -3675,7 +3675,7 @@ kbd,
   cursor: pointer;
 }
 
-/* Hover invertiert: Papier auf Tinte */
+/* Hover inverted: paper on ink */
 .toast-btn:hover {
   background: var(--paper);
   color: var(--ink);
@@ -3713,7 +3713,7 @@ kbd,
   color: var(--on-ink);
 }
 
-/* Countdown-Schiene: Restzeit läuft als Akzent-Füllung von rechts leer */
+/* Countdown rail: remaining time drains as an accent fill from the right */
 .toast-bar__rail {
   height: 2px;
   background: rgba(244, 241, 234, 0.18);
@@ -3726,7 +3726,7 @@ kbd,
   transition: width 0.2s linear;
 }
 
-/* Stepper des Follow-up-Radars (Einstellungen -> Intelligenz) */
+/* Stepper of the follow-up radar (Settings -> Intelligence) */
 .followup-step {
   appearance: none;
   width: 26px;
@@ -3750,7 +3750,7 @@ kbd,
   cursor: default;
 }
 
-/* ── „Nur lokal"-Anzeige im Masthead ───────────────────────────────── */
+/* ── "Local only" indicator in the masthead ────────────────────────── */
 
 .localonly-badge {
   display: inline-flex;
@@ -3771,16 +3771,16 @@ kbd,
   background: var(--ac);
 }
 
-/* ── Kalenderansicht (Phase 2.2) ─────────────────────────────────────── */
-/* Bewusst ohne Animationen/Übergänge: nichts davon bewegt sich, also gilt
-   prefers-reduced-motion automatisch. Kalenderfarbe kommt als --cal-c. */
+/* ── Calendar view (Phase 2.2) ───────────────────────────────────────── */
+/* Deliberately without animations/transitions: none of it moves, so
+   prefers-reduced-motion applies automatically. Calendar color comes as --cal-c. */
 
 .cal-scroll {
   position: relative;
   scrollbar-gutter: stable;
 }
 
-/* Kopf + Ganztagszeile kleben oben im selben Scroll-Container wie das Raster */
+/* Header + all-day row stick to the top in the same scroll container as the grid */
 .cal-sticky {
   position: sticky;
   top: 0;
@@ -3862,7 +3862,7 @@ kbd,
   background-color: color-mix(in srgb, var(--highlight) 45%, transparent);
 }
 
-/* Raster */
+/* Grid */
 
 .cal-body {
   display: grid;
@@ -3893,7 +3893,7 @@ kbd,
   cursor: cell;
 }
 
-/* Arbeitszeit 08–18 */
+/* Working hours 08–18 */
 .cal-work {
   position: absolute;
   left: 0;
@@ -3921,7 +3921,7 @@ kbd,
 }
 
 .cal-event[data-glyphs='true'] {
-  /* Platz für ↻/● oben rechts — nur wenn der Termin ein Glyph trägt (schmale Blöcke) */
+  /* Room for ↻/● at the top right — only if the event carries a glyph (narrow blocks) */
   padding-right: 16px;
 }
 
@@ -3955,7 +3955,7 @@ kbd,
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* nie mitten im Wort umbrechen: zwei Zeilen an Wortgrenzen, sonst Ellipse */
+  /* never break mid-word: two lines at word boundaries, otherwise ellipsis */
   overflow-wrap: normal;
   word-break: normal;
   display: -webkit-box;
@@ -3992,7 +3992,7 @@ kbd,
   color: var(--muted);
 }
 
-/* Auswahl, „noch nicht übertragen" (feine Schraffur), abgesagt */
+/* Selection, "not yet synced" (fine hatching), cancelled */
 .cal-event[data-selected='true'],
 .cal-bar[data-selected='true'],
 .cal-chip[data-selected='true'] {
@@ -4018,7 +4018,7 @@ kbd,
   text-decoration: line-through;
 }
 
-/* Bänder (ganztägig / mehrtägig) */
+/* Bands (all-day / multi-day) */
 .cal-bar {
   position: relative;
   box-sizing: border-box;
@@ -4069,7 +4069,7 @@ kbd,
   display: none;
 }
 
-/* Ziehen zum Anlegen und Jetzt-Linie */
+/* Drag to create and now line */
 .cal-ghost {
   position: absolute;
   left: 2px;
@@ -4099,7 +4099,7 @@ kbd,
   background: var(--ac);
 }
 
-/* Monat */
+/* Month */
 
 .cal-month-head {
   display: grid;
@@ -4295,7 +4295,7 @@ kbd,
   color: var(--paper);
 }
 
-/* Editor-Blatt, Schnell-Anlegen, Dialog */
+/* Editor sheet, quick create, dialog */
 
 .cal-editor-slot {
   display: flex;
@@ -4305,7 +4305,7 @@ kbd,
   max-width: 100%;
 }
 
-/* Zu schmal zum Danebenstellen: Editor legt sich über die rechte Seite des Rasters */
+/* Too narrow to sit beside: the editor overlays the right side of the grid */
 .cal-editor-slot[data-docked='false'] {
   position: absolute;
   top: 0;
@@ -4435,7 +4435,7 @@ kbd,
   padding: 16px 18px 14px;
 }
 
-/* Seitenleiste: Mini-Monat und Kalender-Legende */
+/* Sidebar: mini month and calendar legend */
 
 .cal-mini {
   display: grid;
@@ -4524,7 +4524,7 @@ kbd,
   outline-offset: 1px;
 }
 
-/* Agenda in der Owl-Rail */
+/* Agenda in the Owl rail */
 
 .cal-rail-row {
   text-align: left;
@@ -4549,7 +4549,7 @@ kbd,
   color: var(--muted);
 }
 
-/* Verfügbarkeitsstreifen im Termin-Editor (08–20 Uhr je Teilnehmer) */
+/* Availability strip in the event editor (08–20 per attendee) */
 
 .cal-fb-row {
   display: flex;
@@ -4578,7 +4578,7 @@ kbd,
   height: 14px;
   background: var(--sheet);
   border: 1px solid var(--hairline);
-  /* Stundenraster: vier 3-h-Felder */
+  /* Hour grid: four 3-h fields */
   background-image: linear-gradient(to right, var(--hairline) 1px, transparent 1px);
   background-size: 25% 100%;
 }
@@ -4653,7 +4653,7 @@ kbd,
   transform: translateX(-100%);
 }
 
-/* ── Ordneransicht (mail.showFolders) ────────────────────────────────── */
+/* ── Folder view (mail.showFolders) ──────────────────────────────────── */
 
 .mailbox-refresh[data-active='true'] {
   background: var(--ink);
@@ -4772,7 +4772,7 @@ kbd,
   font-style: italic;
 }
 
-/* ── Einstellungen › Darstellung ─────────────────────────────────────── */
+/* ── Settings › Appearance ───────────────────────────────────────────── */
 
 .layout-options {
   display: grid;
@@ -4930,7 +4930,7 @@ kbd,
   font: 400 13px/1.5 var(--serif);
 }
 
-/* ── Classic-Layout (ui.layout = classic): Outlook-nahe Muster ───────── */
+/* ── Classic layout (ui.layout = classic): Outlook-like patterns ─────── */
 
 [data-layout='classic'] {
   --paper: #f3f4f6;
@@ -4960,7 +4960,7 @@ kbd,
   --mono: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
-/* Harte Tintenkanten des Letterpress werden zu ruhigen Haarlinien */
+/* Hard ink edges of Letterpress become quiet hairlines */
 [data-layout='classic'] .border-ink {
   border-color: var(--hairline);
 }
@@ -5140,7 +5140,7 @@ kbd,
   stroke-linejoin: round;
 }
 
-/* Letterpress: Schalter neben den Spalten-Knöpfen der Kopfzeile */
+/* Letterpress: toggle next to the header's column buttons */
 .masthead-theme-toggle {
   appearance: none;
   display: flex;
@@ -5332,7 +5332,7 @@ kbd,
   font: 600 15px var(--serif);
 }
 
-/* Classic-Befehlsleiste über der E-Mail */
+/* Classic command bar above the email */
 .classic-cmdbar {
   display: flex;
   flex: none;
@@ -5383,7 +5383,7 @@ kbd,
   outline-offset: 1px;
 }
 
-/* ── Dunkles Farbschema (ui.theme = dark) ────────────────────────────── */
+/* ── Dark color scheme (ui.theme = dark) ─────────────────────────────── */
 
 [data-theme='dark'] {
   color-scheme: dark;
@@ -5431,7 +5431,7 @@ kbd,
   --topbar: #16304d;
 }
 
-/* Akzent-Flächen mit weißer Schrift bleiben im Dunkeln lesbar */
+/* Accent surfaces with white text stay readable in the dark */
 [data-layout='classic'][data-theme='dark'] .classic-newmail,
 [data-layout='classic'][data-theme='dark'] .classic-rail__badge {
   background: #2f74c0;
@@ -5451,13 +5451,13 @@ kbd,
   box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.35);
 }
 
-/* E-Mail-Inhalte bringen eigene (meist helle) Farben mit: auf hellem Blatt lassen */
+/* Email content brings its own (mostly light) colors: leave it on a light sheet */
 [data-theme='dark'] .mail-html {
   background: #ffffff;
   color-scheme: light;
 }
 
-/* ── Spalten: ziehbare Breite, einklappbar ───────────────────────────── */
+/* ── Columns: draggable width, collapsible ───────────────────────────── */
 
 .pane {
   position: relative;
@@ -5509,7 +5509,7 @@ kbd,
   background: var(--ac);
 }
 
-/* Während des Ziehens: keine Textauswahl, iframes (Mail-Body) fangen keine Zeiger ab */
+/* While dragging: no text selection, iframes (mail body) don't catch pointers */
 body.pane-resizing {
   cursor: col-resize;
   user-select: none;
@@ -5649,7 +5649,7 @@ body.pane-resizing iframe {
   box-shadow: 0 0 0 1px var(--classic-accent);
 }
 
-/* Einklapp-Knopf: kleine Lasche mittig auf der Spaltenkante */
+/* Collapse button: small tab centered on the column edge */
 .pane-collapse {
   appearance: none;
   position: absolute;
@@ -5706,7 +5706,7 @@ body.pane-resizing iframe {
   box-shadow: 0 1px 2px rgba(31, 35, 40, 0.12);
 }
 
-/* „Nur lokal" auf der blauen Classic-Titelleiste: Akzentfarbe wäre dort unsichtbar */
+/* "Local only" on the blue Classic title bar: the accent color would be invisible there */
 .classic-topbar .localonly-badge {
   min-height: 24px;
   border-color: rgba(255, 255, 255, 0.75);

@@ -6,10 +6,10 @@ import { clearRendererDiagnostics, rendererDiagnostics } from '@renderer/lib/dia
 import { toast } from '@renderer/stores/toast'
 import type { InvokeOutput } from '@shared/ipc-contract'
 
-// Technik-Seite, Abschnitt „Leistungsdiagnose": misst lokal, wo Zeit und CPU
-// hingehen (Operationen, SQL, Event-Loop), startet auf Wunsch einen Benchmark
-// gegen die eigene Datenbank und exportiert alles als ZIP — nur auf Klick, nie
-// automatisch. Inhalte von E-Mails sind nie Teil der Messwerte.
+// Tech page, section „Leistungsdiagnose": measures locally where time and CPU
+// go (operations, SQL, event loop), runs a benchmark against the user's own
+// database on request and exports everything as a ZIP — only on click, never
+// automatically. Email contents are never part of the measurements.
 
 type Status = InvokeOutput<'diagnostics:status'>
 type Benchmark = InvokeOutput<'diagnostics:benchmark'>

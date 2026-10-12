@@ -1,29 +1,29 @@
-// Reine Zustandslogik der Konten- und Voice-Karten (Design 3b/3e):
-// Zweitklick-Bestätigung beim Trennen, Frische-Ableitung der Voice-Card und
-// die inline gezeigte Sync-Fehlerzeile. Vom Rendering getrennt, damit
-// Zeitfenster und Text-Ableitung testbar sind.
+// Pure state logic of the account and voice cards (Design 3b/3e):
+// second-click confirmation on disconnect, freshness derivation of the voice
+// card and the inline sync error line. Separate from rendering so that
+// time windows and text derivation are testable.
 
-/** Fenster der Zweitklick-Bestätigung: danach fällt der Knopf zurück. */
+/** Window of the second-click confirmation: afterwards the button falls back. */
 export const DISCONNECT_CONFIRM_WINDOW_MS = 5000
 
 export type ConfirmEvent = 'arm' | 'esc' | 'blur' | 'timeout' | 'keep' | 'confirm'
 
 /**
- * Übergang der Trennen-Bestätigung: nur 'arm' spannt sie; Esc, Blur, Ablauf
- * des 5-s-Fensters, KEEP und das Bestätigen selbst entspannen sie wieder —
- * unabhängig vom vorherigen Zustand.
+ * Transition of the disconnect confirmation: only 'arm' arms it; Esc, blur,
+ * expiry of the 5 s window, KEEP and confirming itself disarm it again —
+ * regardless of the previous state.
  */
 export function confirmAfter(event: ConfirmEvent): boolean {
   return event === 'arm'
 }
 
-/** Frische-Metadaten eines Stil-Profils (ai.styleMeta.{accountId}). */
+/** Freshness metadata of a style profile (ai.styleMeta.{accountId}). */
 export interface VoiceMeta {
   replies: number
   updatedAt: number
 }
 
-/** Toleranter Parser — kaputtes JSON oder fehlende Felder ergeben null. */
+/** Tolerant parser — broken JSON or missing fields yield null. */
 export function parseVoiceMeta(raw: string | null): VoiceMeta | null {
   if (!raw) return null
   try {
@@ -41,8 +41,8 @@ export function parseVoiceMeta(raw: string | null): VoiceMeta | null {
 export type Freshness = { kind: 'today' } | { kind: 'yesterday' } | { kind: 'days'; days: number }
 
 /**
- * Kalendertag-genaue Frische: „heute" endet um Mitternacht, nicht nach 24 h.
- * Zeitstempel aus der Zukunft (Uhr verstellt) gelten als heute.
+ * Freshness accurate to the calendar day: "today" ends at midnight, not after
+ * 24 h. Timestamps from the future (clock off) count as today.
  */
 export function freshnessOf(updatedAt: number, now: number): Freshness {
   const startOfDay = (ts: number): number => {
@@ -57,18 +57,18 @@ export function freshnessOf(updatedAt: number, now: number): Freshness {
 }
 
 /**
- * Electron verpackt Handler-Fehler in „Error invoking remote method '…':
- * Error: <echte Meldung>" — inline zählt nur die echte Meldung (Design 3e:
- * „FAILED — the model refused the request", kein Transport-Rauschen).
+ * Electron wraps handler errors in „Error invoking remote method '…':
+ * Error: <real message>" — inline only the real message counts (Design 3e:
+ * „FAILED — the model refused the request", no transport noise).
  */
 export function cleanIpcError(message: string): string {
   return message.replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, '')
 }
 
 /**
- * Inline-Fehlerzeile eines Kontos: der GESPEICHERTE Fehlertext plus „seit
- * 11:42" — ein Accent-Wort allein ist keine Diagnose (Design 3b). Ohne
- * Fehlertext null, der Aufrufer fällt dann auf das generische Label zurück.
+ * Inline error line of an account: the SAVED error text plus „seit
+ * 11:42" — an accent word alone is no diagnosis (Design 3b). Without
+ * error text null; the caller then falls back to the generic label.
  */
 export function syncErrorLine(detail: string | null, since: string | null): string | null {
   const text = detail?.trim()

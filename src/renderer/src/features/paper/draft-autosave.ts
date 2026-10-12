@@ -2,13 +2,13 @@ import { invoke } from '@renderer/lib/ipc'
 import { usePaper } from '@renderer/stores/paper'
 
 /**
- * Persistiert den Composer-Puffer als Entwurf je Thread (M37).
+ * Persists the composer buffer as a draft per thread (M37).
  *
- * Der Composer (`comp` im paper-Store) hält immer nur EINEN Entwurf im
- * Speicher; jeder Threadwechsel oder resetComp() hat ihn bisher verworfen.
- * Dieses Modul lauscht zentral auf den Store: Tippen und Diktat werden
- * entprellt in die drafts-Tabelle geschrieben, und beim Wegwechseln wird der
- * letzte Stand sofort gesichert — egal, welcher Code-Pfad den Reset auslöst.
+ * The composer (`comp` in the paper store) only ever holds ONE draft in
+ * memory; every thread switch or resetComp() used to discard it. This
+ * module listens centrally on the store: typing and dictation are written
+ * debounced to the drafts table, and when switching away the latest state is
+ * saved immediately — regardless of which code path triggers the reset.
  */
 
 const DEBOUNCE_MS = 700
@@ -35,9 +35,8 @@ function schedule(threadKey: string, text: string, html: string): void {
 }
 
 /**
- * Entfernt den gespeicherten Entwurf eines Threads und verwirft eine noch
- * ausstehende Speicherung, damit sie ihn nicht wiederbelebt (Senden, Verwerfen,
- * Löschen aus der Eulen-Leiste).
+ * Removes a thread's saved draft and discards any still pending save so it
+ * does not revive it (send, discard, delete from the owl rail).
  */
 export function removeDraft(threadKey: string): void {
   if (pending?.threadKey === threadKey) {
@@ -51,8 +50,8 @@ export function removeDraft(threadKey: string): void {
 }
 
 /**
- * Beim App-Start verdrahten; onChanged invalidiert die drafts-Query.
- * Gibt die Abmeldefunktion zurück (StrictMode ruft Effekte doppelt auf).
+ * Wire up at app start; onChanged invalidates the drafts query.
+ * Returns the unsubscribe function (StrictMode runs effects twice).
  */
 export function initDraftAutosave(onChanged: () => void): () => void {
   notifyChanged = onChanged
@@ -61,8 +60,8 @@ export function initDraftAutosave(onChanged: () => void): () => void {
     const p = prev.comp
     if (c === p) return
 
-    // Threadwechsel oder Reset: letzten Stand des vorherigen Threads sofort
-    // sichern — außer beim Senden, dort löscht der Send-Pfad den Entwurf.
+    // Thread switch or reset: save the previous thread's latest state right
+    // away — except when sending, where the send path deletes the draft.
     if (p.threadKey && p.threadKey !== c.threadKey && p.mode !== 'sending') {
       if (p.text.trim()) schedule(p.threadKey, p.text, p.html)
       flush()
@@ -74,7 +73,7 @@ export function initDraftAutosave(onChanged: () => void): () => void {
     if (c.text.trim()) {
       schedule(c.threadKey, c.text, c.html)
     } else if (c.threadKey === p.threadKey && p.text.trim()) {
-      // Der Text wurde bewusst geleert → gespeicherten Entwurf mit entfernen.
+      // The text was deliberately cleared → remove the saved draft as well.
       removeDraft(c.threadKey)
     }
   })

@@ -21,9 +21,9 @@ import { OwlAnswerMarkdown } from './OwlAnswerMarkdown'
 import { citedSourceIndices } from './owl-markdown'
 import { OwlGlyph } from '@renderer/components/paper/OwlGlyph'
 
-// Die Owl-View: Suchen und Fragen teilen sich EIN Eingabefeld am Blattkopf.
-// Tippen liefert freie, lokale Live-Treffer (useSemanticSearch); erst ↵ auf
-// der Frage-Zeile gibt Tokens aus (ai:chat-Streaming). Ersetzt ChatView.
+// The Owl view: search and ask share ONE input field at the sheet header.
+// Typing yields free, local live hits (useSemanticSearch); only ↵ on
+// the question row spends tokens (ai:chat streaming). Replaces ChatView.
 
 const MAILBOX_LABEL = {
   inbox: 'palMailboxInbox',
@@ -39,7 +39,7 @@ function coveragePercent(coverage: number): number {
   return Math.max(0, Math.min(100, Math.round(percent)))
 }
 
-/** Blinkender Block-Cursor der streamenden Antwort (8×15, Akzent). */
+/** Blinking block cursor of the streaming answer (8×15, accent). */
 function StreamCaret(): React.JSX.Element {
   return <span className="owl-caret" aria-hidden="true" />
 }
@@ -68,7 +68,7 @@ export function OwlView(): React.JSX.Element {
     manual: false
   })
 
-  // Kein Schlüssel → Frage-Zeile schläft (nur bei explizitem false, nie beim Laden)
+  // No key → question row sleeps (only on explicit false, never while loading)
   const noKey = orStatus.data?.hasKey === false
   const phase = owlPhase(owl)
 
@@ -80,12 +80,12 @@ export function OwlView(): React.JSX.Element {
     searchable && queryIsCurrent && search.data ? search.data.hits.slice(0, 8) : []
   const searchPending = searchable && (!queryIsCurrent || search.isFetching)
 
-  // Auswahl läuft über [Frage-Zeile, …Treffer] — die Frage-Zeile ist Index 0
+  // Selection runs over [question row, …hits] — the question row is index 0
   const entryIds = phase === 'typing' ? ['ask', ...hits.map((h) => `hit:${h.messageId}`)] : []
   const visibleSelection = reconcilePaletteSelection(selection, entryIds)
   const activeId = visibleSelection.id
 
-  // Fokus-Anforderungen (/, ⌘F, Masthead SEARCH, n) einlösen, sobald die View steht
+  // Fulfill focus requests (/, ⌘F, Masthead SEARCH, n) once the view is up
   const pendingFocus = useOwl((s) => s.pendingFocus)
   useEffect(() => {
     if (!pendingFocus) return
@@ -93,9 +93,9 @@ export function OwlView(): React.JSX.Element {
     useOwl.getState().clearFocusRequest()
   }, [pendingFocus])
 
-  // Neueste Frage steht oben — bei jeder neuen Frage/Antwort nach oben springen.
-  // Streaming-Chunks (gleiche Anzahl Nachrichten) scrollen bewusst nicht:
-  // wer gerade in älteren Antworten liest, wird nicht hochgerissen.
+  // Newest question is on top — jump to the top on every new question/answer.
+  // Streaming chunks (same number of messages) deliberately don't scroll:
+  // whoever is reading older answers is not yanked up.
   const messageCountRef = useRef(0)
   useEffect(() => {
     if (owl.messages.length === messageCountRef.current) return
@@ -103,7 +103,7 @@ export function OwlView(): React.JSX.Element {
     scrollRef.current?.scrollTo({ top: 0 })
   }, [owl.messages])
 
-  // n aus der Keymap: neue Frage
+  // n from the keymap: new question
   useEffect(() => {
     const onOwl = (e: Event): void => {
       if ((e as CustomEvent<string>).detail !== 'new') return
@@ -114,8 +114,8 @@ export function OwlView(): React.JSX.Element {
     return () => window.removeEventListener('paper:owl', onOwl)
   }, [])
 
-  // Antwort-Streaming: Chunks anwenden, nach vollständiger Antwort persistieren.
-  // Leere oder abgebrochene Fragen werden nie gespeichert (failAsk räumt auf).
+  // Answer streaming: apply chunks, persist after the answer is complete.
+  // Empty or aborted questions are never saved (failAsk cleans up).
   useEffect(
     () =>
       onPush('ai:chatChunk', (payload) => {
@@ -134,7 +134,7 @@ export function OwlView(): React.JSX.Element {
             id: after.selConversationId ?? undefined,
             title: title.slice(0, 500),
             messages: finished.map((message) => {
-              // pending ist reiner View-Zustand — nie mit persistieren
+              // pending is pure view state — never persist it
               const persisted = { ...message }
               delete persisted.pending
               return persisted
@@ -142,7 +142,7 @@ export function OwlView(): React.JSX.Element {
           },
           {
             onSuccess: ({ id }) => {
-              // n könnte inzwischen gedrückt worden sein — dann nichts anheften
+              // n may have been pressed in the meantime — then attach nothing
               if (useOwl.getState().messages.length > 0) useOwl.getState().setSaved(id)
             }
           }
@@ -151,22 +151,22 @@ export function OwlView(): React.JSX.Element {
     [saveMutate]
   )
 
-  /** Exakte Sprung-Logik der alten Palette: Ansicht, sichtbare Mailbox, Thread. */
+  /** Exact jump logic of the old palette: view, visible mailbox, thread. */
   const jumpToThread = (threadKey: string, mailbox?: SemanticSearchHit['mailbox']): void => {
     paper.setView('inbox')
-    // Archiv-/Custom-Ordner haben keinen eigenen Tab: neutral in den Eingang
-    // wechseln; setMbox löscht die Auswahl, deshalb danach den Thread setzen.
+    // Archive/custom folders have no tab of their own: switch neutrally to the inbox;
+    // setMbox clears the selection, so set the thread afterwards.
     paper.setMbox((mailbox ? visibleMailboxForSearchHit(mailbox) : null) ?? 'inbox')
     paper.setSelThreadKey(threadKey)
   }
 
-  /** Deep-Link der schlafenden Eule: Einstellungen → Intelligenz. */
+  /** Deep link of the sleeping owl: Settings → Intelligence. */
   const openIntelSettings = (): void => {
     paper.setView('settings')
     paper.setSetSel('intel')
   }
 
-  /** Frage stellen — darf ohne Schlüssel weder werfen noch still verpuffen. */
+  /** Ask a question — without a key it must neither throw nor silently fizzle. */
   const ask = (question: string): void => {
     if (noKey) {
       openIntelSettings()
@@ -197,7 +197,7 @@ export function OwlView(): React.JSX.Element {
   }
 
   const onInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-    // Einsprechen: ⌘D startet/beendet, Enter beendet, Esc verwirft
+    // Dictation: ⌘D starts/stops, Enter stops, Esc discards
     if ((e.metaKey || e.ctrlKey) && (e.key === 'd' || e.key === 'D')) {
       e.preventDefault()
       e.stopPropagation()
@@ -225,7 +225,7 @@ export function OwlView(): React.JSX.Element {
       if (phase === 'typing') runActiveEntry()
       else ask(owl.query)
     } else if (e.key === 'Escape' && owl.query) {
-      // Esc-Kaskade, Stufe 1: nur das Feld leeren — sonst normal durchreichen
+      // Esc cascade, step 1: only clear the field — otherwise pass through as usual
       e.preventDefault()
       e.stopPropagation()
       owl.setQuery('')
@@ -373,10 +373,10 @@ export function OwlView(): React.JSX.Element {
         </div>
       )
     }
-    // Die QUELLEN-Karte zeigt die Belege der Antwort, nicht den ganzen
-    // Suchkorb: auf die im Text zitierten [n] gefiltert, der Rest erscheint
-    // nur als Zähler. Ohne Zitate (ältere Gespräche, freie Antworten) bleibt
-    // der volle Korb samt der alten Thread-Formulierung sichtbar.
+    // The SOURCES card shows the evidence for the answer, not the whole
+    // search basket: filtered to the [n] cited in the text, the rest appears
+    // only as a counter. Without citations (older conversations, free answers) the
+    // full basket stays visible along with the old thread wording.
     const retrieved = message.sources ?? []
     const citedIdx = message.pending ? [] : citedSourceIndices(message.content)
     const cited = retrieved.filter((source) => citedIdx.includes(source.index))
@@ -422,9 +422,9 @@ export function OwlView(): React.JSX.Element {
   }
 
   const renderConversation = (): React.JSX.Element => {
-    // Neueste Frage samt Antwort zuoberst: Nachrichten in Frage+Antwort-Blöcke
-    // gruppieren und rückwärts rendern — in jedem Block bleibt die Frage über
-    // ihrer Antwort, ältere Blöcke rutschen nach unten.
+    // Newest question with its answer on top: group messages into question+answer blocks
+    // and render them in reverse — within each block the question stays above
+    // its answer, older blocks slide down.
     const exchanges: Array<{ start: number; messages: OwlDraftMessage[] }> = []
     owl.messages.forEach((message, index) => {
       if (message.role === 'user' || exchanges.length === 0) {
@@ -482,8 +482,8 @@ export function OwlView(): React.JSX.Element {
             key={key}
             className="owl-chip"
             onClick={() => {
-              // Füllt das Feld und fragt — ohne Schlüssel bleibt es beim
-              // Befüllen: die Treffer sind lokal, die Frage-Zeile schläft.
+              // Fills the field and asks — without a key it stops at
+              // filling: the hits are local, the question row sleeps.
               owl.setQuery(t(key))
               useOwl.getState().requestFocus()
               if (!noKey) ask(t(key))

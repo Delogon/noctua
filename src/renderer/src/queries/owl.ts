@@ -9,9 +9,9 @@ import { invoke } from '@renderer/lib/ipc'
 import type { InvokeInput, InvokeOutput } from '@shared/ipc-contract'
 import type { OwlConversationListItem } from '@shared/types'
 
-// Persistierte Eulen-Gespräche (Owl-View). Invalidierung läuft wie überall
-// im Codebase über react-query — die Liste aktualisiert sich nach jedem
-// Speichern/Löschen von selbst.
+// Persisted owl conversations (Owl view). Invalidation runs, as everywhere
+// in the codebase, via react-query — the list updates itself after every
+// save/delete.
 
 export function useOwlConversations(): UseQueryResult<OwlConversationListItem[]> {
   return useQuery({

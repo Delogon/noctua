@@ -15,31 +15,31 @@ import {
   type CloudKind
 } from '@renderer/features/paper/onboarding-steps'
 
-// Zustand und Aktionen des KI-Schritts im Onboarding („Wo soll die KI laufen?").
-// Nutzt dieselben IPC-Kanäle wie Einstellungen → Intelligenz (ai:profiles:*,
-// ai:tasks:*, ai:profileModels, privacy:setLocalOnly). Eingerichtet wird erst
-// beim Weiter-Klick (commit) — bis dahin entstehen keine Profile außer durch
-// den ausdrücklichen „Testen"-Knopf (der Test läuft gegen ein gespeichertes Profil).
+// State and actions of the AI step in onboarding („Wo soll die KI laufen?").
+// Uses the same IPC channels as Settings → Intelligence (ai:profiles:*,
+// ai:tasks:*, ai:profileModels, privacy:setLocalOnly). Setup only happens
+// on the next click (commit) — until then no profiles are created except via
+// the explicit „Testen" button (the test runs against a saved profile).
 
 type ApiStyle = 'chat' | 'responses'
 
-/** Ein OpenAI-kompatibler Endpunkt (lokaler Server oder eigener Cloud-Endpunkt). */
+/** An OpenAI-compatible endpoint (local server or custom cloud endpoint). */
 export interface Endpoint {
   url: string
   key: string
   style: ApiStyle
-  /** Server erreichbar und Modellliste bekannt (erkannt oder getestet) */
+  /** Server reachable and model list known (detected or tested) */
   verified: boolean
   models: string[]
   triage: string
   draft: string
-  /** Entscheidungsmodelle (Ollama, Fähigkeit `decision`) des Servers; getrennt von `models` */
+  /** The server's decision models (Ollama, capability `decision`); separate from `models` */
   decisionModels: string[]
-  /** gewähltes Entscheidungsmodell, leer = nicht nutzen */
+  /** chosen decision model, empty = don't use */
   decision: string
   testing: boolean
   error: string | null
-  /** Anzeigename des erkannten Servers (z. B. „Ollama") */
+  /** Display name of the detected server (e.g. „Ollama") */
   label: string
 }
 
@@ -77,7 +77,7 @@ function useEndpoint(profileName: string, autoPick: boolean): EndpointApi {
   const profileId = useRef<string | null>(null)
 
   const patch = (p: Partial<Endpoint>): void => setEp((e) => ({ ...e, ...p }))
-  /** Eingaben geändert: Verifikation und Fehler verfallen. */
+  /** Inputs changed: verification and errors expire. */
   const edit = (p: Partial<Pick<Endpoint, 'url' | 'key' | 'style'>>): void =>
     setEp((e) => ({
       ...e,
@@ -96,7 +96,7 @@ function useEndpoint(profileName: string, autoPick: boolean): EndpointApi {
       triage: picked.triage,
       draft: picked.draft,
       decisionModels,
-      // clef-flash zuerst, sonst das erste gefundene Entscheidungsmodell
+      // clef-flash first, otherwise the first decision model found
       decision:
         autoPick && decisionModels.length > 0
           ? (decisionModels.find((m) => m.startsWith('clef-flash')) ?? decisionModels[0])
@@ -107,13 +107,13 @@ function useEndpoint(profileName: string, autoPick: boolean): EndpointApi {
     })
   }
 
-  /** Profil anlegen bzw. aktualisieren (Name, URL, Stil, Key); liefert die Profil-ID. */
+  /** Create or update a profile (name, URL, style, key); returns the profile ID. */
   const ensureProfile = async (): Promise<string> => {
     const fields = {
       name: ep.label || profileName,
       baseUrl: ep.url.trim(),
       apiStyle: ep.style,
-      // Bestehende Heuristik wie in Einstellungen → Intelligenz
+      // Existing heuristic as in Settings → Intelligence
       isLocal: suggestIsLocal(ep.url.trim())
     }
     const { profile } = profileId.current
@@ -125,7 +125,7 @@ function useEndpoint(profileName: string, autoPick: boolean): EndpointApi {
     return profile.id
   }
 
-  /** „Testen": Profil sichern, Verbindung prüfen, Modelle holen. */
+  /** „Testen": save the profile, check the connection, fetch models. */
   const test = async (): Promise<void> => {
     if (!ep.url.trim() || ep.testing) return
     patch({ testing: true, error: null })
@@ -170,7 +170,7 @@ export interface OnboardingAi {
   custom: EndpointApi
   detect: UseQueryResult<{ found: DetectedServer[] }>
   found: DetectedServer[]
-  /** baseUrl des gewählten erkannten Servers, 'manual' bei eigener Adresse */
+  /** baseUrl of the chosen detected server, 'manual' for a custom address */
   selectedServer: string | null
   setSelectedServer: (v: string | null) => void
   pickServer: (url: string, models: string[], label: string, decisionModels?: string[]) => void
@@ -211,10 +211,10 @@ export function useOnboardingAi(active: boolean): OnboardingAi {
 
   const local = useEndpoint('Local server', true)
   const custom = useEndpoint('Cloud endpoint', false)
-  // Erkannter Server, der gerade gewählt ist (baseUrl) — sonst manuelle Eingabe
+  // Detected server that is currently chosen (baseUrl) — otherwise manual input
   const [selectedServer, setSelectedServer] = useState<string | null>(null)
 
-  // Diktat (optional, nur bei lokalem Server)
+  // Dictation (optional, local server only)
   const [dictation, setDictation] = useState<DictationMode | null>(null)
   const [whisperUrl, setWhisperUrl] = useState('')
   const [whisperKey, setWhisperKey] = useState('')
@@ -222,13 +222,13 @@ export function useOnboardingAi(active: boolean): OnboardingAi {
   const whisperProfileId = useRef<string | null>(null)
   const dictMode: DictationMode = dictation ?? (appleAvailable ? 'apple' : 'none')
 
-  // OpenRouter-Schlüssel
+  // OpenRouter key
   const [key, setKey] = useState('')
   const [keyErr, setKeyErr] = useState<string | null>(null)
   const [keyBusy, setKeyBusy] = useState(false)
   const [keySaved, setKeySaved] = useState(false)
 
-  // Lokale Server erkennen (nur Loopback, Main-Prozess), einmal beim Betreten des Schritts
+  // Detect local servers (loopback only, main process), once on entering the step
   const detect = useQuery({
     queryKey: ['detectLocal'],
     queryFn: () => invoke('ai:detectLocal', undefined),
@@ -259,8 +259,8 @@ export function useOnboardingAi(active: boolean): OnboardingAi {
     local.setModels(models, label, decisionModels)
   }
 
-  // Erster Treffer ist vorgewählt, solange der Nutzer noch nichts anderes gewählt hat
-  // (State-Anpassung beim Rendern statt im Effect, wie React es empfiehlt.)
+  // The first hit is preselected as long as the user hasn't chosen anything else
+  // (state adjustment during render instead of in an effect, as React recommends.)
   const first = found[0]
   if (first && selectedServer === null && !local.ep.url) {
     pickServer(first.baseUrl, first.models, kindLabel(first.kind), first.decisionModels)
@@ -275,7 +275,7 @@ export function useOnboardingAi(active: boolean): OnboardingAi {
       .catch(() => {})
   }
 
-  // Beim Betreten gilt der Standard der vorgewählten Option
+  // On entering, the default of the preselected option applies
   const appliedDefault = useRef(false)
   useEffect(() => {
     if (!active || appliedDefault.current) return
@@ -299,7 +299,7 @@ export function useOnboardingAi(active: boolean): OnboardingAi {
 
   const saveKey = (onSaved?: () => void): void => {
     const k = key.trim()
-    // Gleiche Prüfung wie im Intelligenz-Sheet — Fehler inline, kein Toast (Design 1b)
+    // Same check as in the Intelligence sheet — errors inline, no toast (Design 1b)
     if (!k.startsWith('sk-or-') || k.length <= 14) {
       setKeyErr(t('toastKeyInvalid'))
       return
@@ -331,7 +331,7 @@ export function useOnboardingAi(active: boolean): OnboardingAi {
   }
   const cta = aiStepCta(choice, state)
 
-  /** Zuordnung schreiben — erst beim Weiter-Klick. Liefert false bei Fehler. */
+  /** Write the assignment — only on the next click. Returns false on error. */
   const commit = async (): Promise<boolean> => {
     setCommitError(null)
     try {
@@ -343,7 +343,7 @@ export function useOnboardingAi(active: boolean): OnboardingAi {
           model: state.localTriageModel
         })
         await invoke('ai:tasks:set', { task: 'draft', profileId: id, model: state.localDraftModel })
-        // Entscheidungsmodell (optional): sortiert, priorisiert und prüft ohne Text zu erzeugen
+        // Decision model (optional): sorts, prioritizes and checks without generating text
         if (local.ep.decision.trim()) {
           await invoke('ai:tasks:set', {
             task: 'decision',

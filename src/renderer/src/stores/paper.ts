@@ -4,12 +4,12 @@ import { PANE_LIMITS, clampPaneWidth, type PaneId } from '@renderer/features/pap
 import { invoke } from '@renderer/lib/ipc'
 import { toast } from './toast'
 
-// Zentraler UI-Zustand des Letterpress-Frames (M19). Der Composer-Automat
-// lebt hier, damit Owl-Rail und Listen-Chips („DRAFT READY") ihn sehen.
+// Central UI state of the Letterpress frame (M19). The composer state machine
+// lives here so the Owl rail and list chips ("DRAFT READY") can see it.
 
 export type PaperView = 'inbox' | 'waiting' | 'tasks' | 'calendar' | 'settings' | 'chat' | 'compose'
 export type SettingsSection = 'accounts' | 'appearance' | 'style' | 'sig' | 'intel' | 'tech'
-/** Darstellung (Einstellung ui.layout): Letterpress-Original oder Outlook-nahes Classic. */
+/** Layout (setting ui.layout): Letterpress original or Outlook-like Classic. */
 export type PaperLayout = 'letterpress' | 'classic'
 export type Mbox = 'inbox' | 'sent' | 'spam'
 export type PaperTheme = 'light' | 'dark'
@@ -37,9 +37,9 @@ export interface CompState {
   manual: boolean
   elaborated: boolean
   draftId: string | null
-  /** Allen antworten (M80): CC an die übrigen ursprünglichen Empfänger. */
+  /** Reply all (M80): CC to the other original recipients. */
   replyAll: boolean
-  /** Kompatibilitaetsfeld fuer aeltere Reply-Entwuerfe. */
+  /** Compatibility field for older reply drafts. */
   reviseBase: string | null
 }
 
@@ -69,7 +69,7 @@ const COMP_IDLE: CompState = {
 interface PaperState {
   view: PaperView
   setView: (view: PaperView) => void
-  // Auswahl je Liste
+  // Selection per list
   selThreadKey: string | null
   setSelThreadKey: (key: string | null) => void
   selWaitingId: number | null
@@ -82,43 +82,43 @@ interface PaperState {
   setShowOpenTasks: (show: boolean) => void
   setSel: SettingsSection
   setSetSel: (s: SettingsSection) => void
-  // Ordner (EINGANG/GESENDET/SPAM)
+  // Folder (EINGANG/GESENDET/SPAM)
   mbox: Mbox
   setMbox: (m: Mbox) => void
-  // Konto-Filter (1/2/3, Chips)
+  // Account filter (1/2/3, chips)
   filter: number | null
   setFilter: (accountId: number | null) => void
-  /** Ordneransicht: gewählter Einzelordner (null = vereinheitlichte Sicht über mbox). */
+  /** Folder view: selected single folder (null = unified view across mbox). */
   folderId: number | null
-  /** Ordner wählen: Konto + Sicht in einem Schritt; folderId nur für eigene Ordner/Archiv. */
+  /** Pick a folder: account + view in one step; folderId only for own folders/archive. */
   openFolder: (target: { accountId: number | null; mbox: Mbox; folderId: number | null }) => void
-  // Darstellung (persistiert in settings ui.layout / mail.showFolders)
+  // Layout (persisted in settings ui.layout / mail.showFolders)
   layout: PaperLayout
   setLayout: (layout: PaperLayout) => void
   showFolders: boolean
   setShowFolders: (show: boolean) => void
   theme: PaperTheme
   setTheme: (theme: PaperTheme) => void
-  // Spalten: Breite (gezogen) und Ordnerleiste ein/aus (Classic)
+  // Columns: width (dragged) and folder bar on/off (Classic)
   paneWidths: Record<PaneId, number>
-  /** persist=false während des Ziehens, true beim Loslassen (settings ui.paneWidths). */
+  /** persist=false while dragging, true on release (settings ui.paneWidths). */
   setPaneWidth: (id: PaneId, width: number, persist?: boolean) => void
   showFolderPane: boolean
   toggleFolderPane: () => void
-  /** Spalten, die trotz Platzmangel offen bleiben sollen (Sitzung, nicht persistiert). */
+  /** Columns that should stay open despite lack of space (session, not persisted). */
   pinnedPanes: ReadonlySet<PaneId>
-  /** Klick auf eine Leiste: aufklappen bzw. bei Platzmangel anheften. */
+  /** Click on a bar: expand it, or pin it when space is short. */
   expandPane: (id: PaneId, autoCollapsed: boolean) => void
   collapsePane: (id: PaneId) => void
-  // Listen-Filter (Design Turn 7): Sitzungszustand, nicht persistiert
+  // List filters (Design Turn 7): session state, not persisted
   inboxFilters: Set<InboxFilterId>
   toggleInboxFilter: (id: InboxFilterId) => void
   clearInboxFilters: () => void
-  // Composer-Automat
+  // Composer state machine
   comp: CompState
   setComp: (patch: Partial<CompState>) => void
   resetComp: () => void
-  // Seitenleisten (persistiert in settings ui.showList/ui.showRail)
+  // Sidebars (persisted in settings ui.showList/ui.showRail)
   showList: boolean
   showRail: boolean
   toggleList: () => void
@@ -130,17 +130,17 @@ interface PaperState {
   setHelpOpen: (v: boolean) => void
   onboarding: boolean
   setOnboarding: (v: boolean) => void
-  /** Shim auf die zentrale Toast-Queue (Design 1c) — Call-Sites unverändert. */
+  /** Shim onto the central toast queue (Design 1c) — call sites unchanged. */
   toastNow: (msg: string, durationMs?: number) => void
-  // Ablegen mit Undo-Fenster (z)
+  // Filing with undo window (z)
   hiddenThreads: Set<string>
   stageArchive: (threadKey: string, messageIds: number[]) => void
   undoArchive: () => boolean
-  /** Thread ohne Timer verstecken/zeigen (Rückgängig-Fenster beim Senden). */
+  /** Hide/show a thread without a timer (undo window when sending). */
   setThreadHidden: (threadKey: string, hidden: boolean) => void
 }
 
-/** Undo-Fenster fürs Ablegen — eine Quelle für stageArchive UND den Action-Toast. */
+/** Undo window for filing — one source for stageArchive AND the action toast. */
 export const ARCHIVE_UNDO_WINDOW_MS = 5000
 
 let pendingArchive: {
@@ -231,7 +231,7 @@ export const usePaper = create<PaperState>((set) => ({
   },
   showFolders: false,
   setShowFolders: (showFolders) => {
-    // Main liest mail.showFolders beim Ordner-Listing; der Refresh holt die Ordner sofort
+    // Main reads mail.showFolders when listing folders; the refresh fetches the folders immediately
     void invoke('settings:set', { key: 'mail.showFolders', value: showFolders ? '1' : '0' }).then(
       () => invoke('sync:trigger', undefined).catch(() => {})
     )
@@ -278,7 +278,7 @@ export const usePaper = create<PaperState>((set) => ({
   },
   hiddenThreads: new Set<string>(),
   stageArchive: (threadKey, messageIds) => {
-    // Nur ein Undo-Level: vorherigen Kandidaten endgültig ablegen
+    // Only one undo level: file the previous candidate for good
     commitArchive()
     const timer = setTimeout(() => {
       commitArchive()
@@ -308,7 +308,7 @@ export const usePaper = create<PaperState>((set) => ({
     })
 }))
 
-/** Beim Start gemerkte Leisten-Zustände laden. */
+/** Load the sidebar states remembered at startup. */
 export function initPanelPrefs(): void {
   void invoke('settings:get', { key: 'ui.showList' }).then((r) => {
     if (r.value === '0') usePaper.setState({ showList: false })
@@ -338,7 +338,7 @@ export function initPanelPrefs(): void {
       }
       usePaper.setState({ paneWidths: widths })
     } catch {
-      // kaputter Wert: Standardbreiten behalten
+      // broken value: keep default widths
     }
   })
 }

@@ -1,8 +1,8 @@
 import { useT } from '@renderer/lib/i18n'
 import type { TaskItem } from '@shared/types'
 
-// Kleine Sync-Glyphe der CalDAV-Aufgabenliste: ○ wartet, ● synchron, ! Konflikt.
-// Nicht zugeordnete Aufgaben (Abgleich aus) zeigen nichts.
+// Small sync glyph of the CalDAV task list: ○ pending, ● in sync, ! conflict.
+// Unassigned tasks (sync off) show nothing.
 
 const GLYPH = { pending: '○', synced: '●', conflict: '!' } as const
 

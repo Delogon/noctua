@@ -93,7 +93,7 @@ export function Masthead(): React.JSX.Element {
       <div className="mmeta" style={{ letterSpacing: '1px' }}>
         {mastheadDate(lang)}
       </div>
-      {/* „Nur lokal" ist an: klar sichtbar, Klick führt zum Schalter */}
+      {/* "Local only" is on: clearly visible, click leads to the toggle */}
       {localOnly && (
         <button
           type="button"
@@ -117,14 +117,14 @@ export function Masthead(): React.JSX.Element {
           kbd="/"
           active={view === 'chat'}
           onClick={() => {
-            // SUCHEN ist der einzige Einstieg in die Owl-View (Tims Entscheid:
-            // kein separates EULE-Item, kein ⌘5) — Feld direkt fokussieren
+            // SEARCH is the only entry point to the Owl view (Tim's decision:
+            // no separate OWL item, no ⌘5) — focus the field directly
             setView('chat')
             useOwl.getState().requestFocus()
           }}
         />
-        {/* Ruhiger Zeiger-Eintrag für den Composer (Design 3f) — dieselbe
-            Aktion wie ⌘N im Ablage-Menü, kein eigener Button-Kasten */}
+        {/* Quiet pointer entry for the composer (Design 3f) — the same
+            action as ⌘N in the filing menu, no button box of its own */}
         <NavItem
           label={t('navCompose')}
           kbd="⌘N"

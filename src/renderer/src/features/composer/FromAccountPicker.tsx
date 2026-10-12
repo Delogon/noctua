@@ -5,9 +5,9 @@ import { usePopoverPlacement } from '@renderer/lib/popover-placement'
 import { accountHotkeyForIndex } from '@renderer/keyboard/account-hotkeys'
 
 /**
- * VON-Wahl des Composers (Design 3a): dasselbe Menü-Vokabular wie der
- * Postfach-Filter der Liste — Swatch · Kontoname · E-Mail · Hotkey-Chip,
- * ✓ am aktiven Eintrag. Ersetzt das nackte <select>.
+ * FROM picker of the composer (Design 3a): the same menu vocabulary as the
+ * list's mailbox filter — swatch · account name · email · hotkey chip,
+ * ✓ on the active entry. Replaces the bare <select>.
  */
 export function FromAccountPicker({
   accounts,
@@ -15,7 +15,7 @@ export function FromAccountPicker({
   onSelect
 }: {
   accounts: AccountSummary[]
-  /** Effektiv gewähltes Konto (explizit oder erstes) — undefined: keine Konten. */
+  /** Effectively selected account (explicit or first) — undefined: no accounts. */
   account?: AccountSummary
   onSelect: (accountId: number) => void
 }): React.JSX.Element {
@@ -36,7 +36,7 @@ export function FromAccountPicker({
     }
     const closeOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
-      // Esc gehört hier dem Menü — nicht dem Composer (der legt sonst den Entwurf ab)
+      // Esc belongs to the menu here — not the composer (it would otherwise file the draft)
       event.stopPropagation()
       setOpen(false)
       triggerRef.current?.focus()

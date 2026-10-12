@@ -40,10 +40,10 @@ function commandScore(command: PaletteCommandDescriptor, query: string): number 
 }
 
 /**
- * Filtert die Befehlspalette ohne UI-Zustand. Seit die Mailsuche in der
- * Owl-View lebt (/), gibt es hier kein Mode-Routing mehr — die Palette
- * kennt nur noch Befehle. Ein fuehrendes `>` bleibt als bewusster
- * Nur-Befehle-Modus erhalten (alte Muskelerinnerung tut nicht weh).
+ * Filters the command palette without UI state. Since mail search lives in the
+ * Owl view (/), there is no mode routing here anymore — the palette
+ * only knows commands. A leading `>` is kept as a deliberate
+ * commands-only mode (old muscle memory does no harm).
  */
 export function routePaletteQuery(
   rawQuery: string,
@@ -78,7 +78,7 @@ export function routePaletteQuery(
   }
 }
 
-/** Nur echte sichtbare Mailboxen werden beim Oeffnen umgeschaltet. */
+/** Only real visible mailboxes are switched to on open. */
 export function visibleMailboxForSearchHit(
   mailbox: 'inbox' | 'sent' | 'archive' | 'other'
 ): 'inbox' | 'sent' | null {
@@ -86,8 +86,8 @@ export function visibleMailboxForSearchHit(
 }
 
 /**
- * Automatische Auswahl folgt dem jeweils ersten priorisierten Ergebnis.
- * Sobald der Nutzer navigiert hat, bleibt seine Auswahl bei asynchronen Updates stabil.
+ * Automatic selection follows the first prioritized result at any time.
+ * Once the user has navigated, their selection stays stable across async updates.
  */
 export function reconcilePaletteSelection(
   current: PaletteSelection,

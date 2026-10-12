@@ -10,7 +10,7 @@ import { invoke, onPush } from '@renderer/lib/ipc'
 import type { InvokeOutput } from '@shared/ipc-contract'
 import type { AiCategory } from '@shared/types'
 
-/** Invalidiert Thread-Listen und offene Threads bei Push-Events vom Sync/AI. */
+/** Invalidates thread lists and open threads on push events from sync/AI. */
 export function useThreadInvalidation(): void {
   const queryClient = useQueryClient()
   useEffect(
@@ -89,7 +89,7 @@ export function useMboxCounts(
   })
 }
 
-/** Ordnerbaum aller Konten (nur voll synchronisierte Ordner). */
+/** Folder tree of all accounts (fully synced folders only). */
 export function useFolders(
   enabled = true
 ): UseQueryResult<InvokeOutput<'folders:list'>['folders']> {

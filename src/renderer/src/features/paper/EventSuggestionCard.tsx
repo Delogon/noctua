@@ -12,9 +12,9 @@ import {
 } from '@renderer/features/paper/event-suggestion-form'
 
 /**
- * „In den Kalender?"-Karte: kompakter Terminvorschlag aus der Mail-Analyse
- * (nach dem Muster der Aufgaben-Vorschläge). Inhalt kommt aus Mails und ist
- * unvertrauenswürdig → nur Klartext; nichts wird ohne Klick angelegt.
+ * „In den Kalender?" card: compact event suggestion from the mail analysis
+ * (modeled on the task suggestions). Content comes from mails and is
+ * untrusted → plain text only; nothing is created without a click.
  */
 
 const labelStyle: React.CSSProperties = {
@@ -71,8 +71,8 @@ function Card({ s }: { s: EventSuggestionView }): React.JSX.Element {
 
   const edit = (): void => {
     if (busy) return
-    // Der Vorschlag gilt erst als erledigt, wenn der Editor erfolgreich gespeichert hat;
-    // Abbrechen lässt ihn unverändert „neu".
+    // The suggestion only counts as done once the editor has saved successfully;
+    // cancel leaves it unchanged as „neu".
     usePaper.getState().setView('calendar')
     useCalendar.getState().openNew(formFromSuggestion(s, s.calendarId), {
       onSaved: () => {
@@ -172,7 +172,7 @@ export function EventSuggestionCards({
     staleTime: 10_000,
     retry: false
   })
-  // Die Extraktion läuft im Hintergrund und meldet sich über ai:annotated
+  // Extraction runs in the background and reports back via ai:annotated
   useEffect(
     () =>
       onPush('ai:annotated', ({ messageIds }) => {

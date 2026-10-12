@@ -18,9 +18,9 @@ import {
   type RecurrenceSpec
 } from './rrule'
 
-// Formularzustand des Termin-Editors und seine Umwandlung von/zu den Backend-Feldern.
-// Ganztägige Termine zeigen das Enddatum INKLUSIV (Nutzersicht); gespeichert wird
-// exklusiv (wie das Backend es erwartet).
+// Form state of the event editor and its conversion from/to the backend fields.
+// All-day events show the end date INCLUSIVE (user's view); it is stored
+// exclusive (as the backend expects).
 
 export interface EventForm {
   summary: string
@@ -29,16 +29,16 @@ export interface EventForm {
   allDay: boolean
   /** 'YYYY-MM-DD' */
   startDate: string
-  /** 'HH:mm' (bei allDay unbenutzt) */
+  /** 'HH:mm' (unused for allDay) */
   startTime: string
-  /** Bei allDay inklusiv */
+  /** Inclusive for allDay */
   endDate: string
   endTime: string
-  /** IANA-Zone; null = floating */
+  /** IANA zone; null = floating */
   tzid: string | null
   calendarId: number | null
   rec: RecurrenceSpec
-  /** Nicht darstellbare Regel: Originaltext, wird unverändert beibehalten */
+  /** Non-representable rule: original text, kept unchanged */
   recCustom: string | null
   alarm: AlarmChoice
   transparency: 'OPAQUE' | 'TRANSPARENT'
@@ -46,7 +46,7 @@ export interface EventForm {
 
 export type FormError = 'endBeforeStart' | 'invalidTime' | 'invalidUntil'
 
-/** Dauer neuer Termine (Minuten). */
+/** Duration of new events (minutes). */
 export const DEFAULT_DURATION_MIN = 60
 
 function wallParts(wall: string): { date: string; time: string } {
@@ -59,7 +59,7 @@ export function formFromFields(fields: CalendarEventFields, calendarId: number):
   const e = wallParts(t.end)
   let endDate = e.date
   if (t.allDay) {
-    // exklusiv → inklusiv, nie vor dem Start
+    // exclusive → inclusive, never before the start
     const incl = dayKey(addDays(parseDayKey(e.date), -1))
     endDate = incl < s.date ? s.date : incl
   }
@@ -83,7 +83,7 @@ export function formFromFields(fields: CalendarEventFields, calendarId: number):
   }
 }
 
-/** Neuer Termin im Zeitfenster [startMs, endMs) (lokale Zeit). */
+/** New event in the time window [startMs, endMs) (local time). */
 export function formFromSlot(
   startMs: number,
   endMs: number,
@@ -99,7 +99,7 @@ export function formFromSlot(
     allDay,
     startDate: s.date,
     startTime: s.time,
-    // allDay: Fenster ist [Tag, Tag+1) → inklusives Ende = letzter Tag
+    // allDay: window is [day, day+1) → inclusive end = last day
     endDate: allDay ? dayKey(addDays(parseDayKey(e.date), e.time === '00:00' ? -1 : 0)) : e.date,
     endTime: e.time,
     tzid: systemTz(),
@@ -111,7 +111,7 @@ export function formFromSlot(
   }
 }
 
-/** Standardfenster für einen Klick/`n`: ab `startMs` eine Stunde. */
+/** Default window for a click/`n`: one hour from `startMs`. */
 export function defaultSlot(startMs: number): { startMs: number; endMs: number } {
   const d = new Date(startMs)
   return {
@@ -161,13 +161,13 @@ function sameTimeAtMinute(a: CalendarEventFields['time'], b: CalendarEventFields
 }
 
 /**
- * Backend-Felder aus dem Formular. `base` (bestehender Termin) liefert alles, was der
- * Editor nicht ändert: Status, Organisator (das Backend setzt ihn bei Teilnehmern ohne Organisator), nicht darstellbare Alarme/Regeln.
+ * Backend fields from the form. `base` (existing event) supplies everything the
+ * editor does not change: status, organizer (the backend sets it for attendees without an organizer), non-representable alarms/rules.
  */
 export function fieldsFromForm(
   form: EventForm,
   base: CalendarEventFields | null,
-  /** Bearbeitete Teilnehmerliste (nur Organisator); sonst bleibt die des Termins */
+  /** Edited attendee list (organizer only); otherwise the event's list is kept */
   attendees?: readonly CalendarAttendee[]
 ): CalendarEventFields {
   let time: CalendarEventFields['time'] = form.allDay
@@ -178,8 +178,8 @@ export function fieldsFromForm(
         tzid: null
       }
     : { allDay: false, start: startWall(form), end: endWall(form), tzid: form.tzid }
-  // Unverändert gebliebenes (Sekunden fallen im Formular weg) exakt wie geladen zurückgeben,
-  // damit der Diff nichts Ungewolltes meldet — ein Zeit-Patch auf eine Serie wäre folgenreich.
+  // Return unchanged values (seconds are dropped in the form) exactly as loaded,
+  // so the diff reports nothing unintended — a time patch on a series would be consequential.
   if (base && sameTimeAtMinute(base.time, time)) time = base.time
   const ctx = { allDay: form.allDay, tzid: form.tzid }
   let rrule: string | null
@@ -199,7 +199,7 @@ export function fieldsFromForm(
     time,
     rrule,
     status: base?.status ?? null,
-    // Kein ausdrücklicher Wert + „beschäftigt" = unverändert (RFC-Standard OPAQUE)
+    // No explicit value + "busy" = unchanged (RFC default OPAQUE)
     transparency:
       baseTransparency === null && form.transparency === 'OPAQUE' ? null : form.transparency,
     alarms:
@@ -211,7 +211,7 @@ export function fieldsFromForm(
   }
 }
 
-/** Startdatum/-zeit ändern; die Dauer bleibt erhalten (Ende wandert mit). */
+/** Change start date/time; the duration is kept (the end moves along). */
 export function withStart(form: EventForm, date: string, time: string): EventForm {
   if (form.allDay) {
     const span = parseDayKey(form.endDate).getTime() - parseDayKey(form.startDate).getTime()
@@ -225,7 +225,7 @@ export function withStart(form: EventForm, date: string, time: string): EventFor
   return { ...next, endDate: end.slice(0, 10), endTime: end.slice(11, 16) }
 }
 
-/** Ganztägig umschalten mit sinnvollen Standardzeiten. */
+/** Toggle all-day with sensible default times. */
 export function withAllDay(form: EventForm, allDay: boolean): EventForm {
   if (allDay === form.allDay) return form
   if (allDay) {
@@ -245,7 +245,7 @@ export function withAllDay(form: EventForm, allDay: boolean): EventForm {
   }
 }
 
-/** Wiederholung wechseln; wöchentlich ohne Tage bekommt den Wochentag des Starts. */
+/** Change recurrence; weekly without days gets the start's weekday. */
 export function withFreq(form: EventForm, freq: RecurrenceFreq): EventForm {
   const rec: RecurrenceSpec = { ...form.rec, freq }
   if (freq === 'WEEKLY' && rec.byday.length === 0) rec.byday = [weekdayOf(form.startDate)]
