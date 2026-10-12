@@ -11,10 +11,10 @@ interface DraftRow {
 }
 
 /**
- * Speichert den Entwurf zu einem Thread (Upsert). Anzeigename und Betreff
- * werden aus der jüngsten Nachricht des Threads übernommen, damit die
- * Eulen-Leiste den Entwurf auch dann beschriften kann, wenn der Thread
- * nicht mehr in der geladenen Liste steht (z. B. nach dem Archivieren).
+ * Saves the draft for a thread (upsert). Display name and subject
+ * are taken from the thread's newest message so that the
+ * owl bar can label the draft even when the thread is
+ * no longer in the loaded list (e.g. after archiving).
  */
 export function saveDraft(
   db: Database.Database,
@@ -43,7 +43,7 @@ export function saveDraft(
   ).run(threadKey, name?.from_name ?? null, subject?.subject ?? null, text, html, Date.now())
 }
 
-/** Alle gespeicherten Entwürfe, jüngste zuerst. */
+/** All saved drafts, newest first. */
 export function listDrafts(db: Database.Database): DraftItem[] {
   const rows = db.prepare('SELECT * FROM drafts ORDER BY updated_at DESC').all() as DraftRow[]
   return rows.map((row) => ({
@@ -56,7 +56,7 @@ export function listDrafts(db: Database.Database): DraftItem[] {
   }))
 }
 
-/** Löscht den Entwurf eines Threads; true, wenn einer existierte. */
+/** Deletes a thread's draft; true if one existed. */
 export function deleteDraft(db: Database.Database, threadKey: string): boolean {
   return db.prepare('DELETE FROM drafts WHERE thread_key = ?').run(threadKey).changes > 0
 }

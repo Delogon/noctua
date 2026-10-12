@@ -17,9 +17,9 @@ import { DB_KEY_FILENAME, loadOrCreateDbKey } from './key'
 let db: Database.Database | null = null
 
 /**
- * Öffnet die SQLCipher-verschlüsselte Datenbank (Schlüssel aus safeStorage) und
- * migriert dabei eine vorhandene Klartext-DB. Fehlt safeStorage oder der
- * Schlüssel, wirft die Funktion — es gibt keinen Klartext-Fallback.
+ * Opens the SQLCipher-encrypted database (key from safeStorage) and
+ * migrates an existing plaintext DB along the way. If safeStorage or the
+ * key is missing, the function throws — there is no plaintext fallback.
  */
 export function openDb(): Database.Database {
   if (db) return db
@@ -28,14 +28,14 @@ export function openDb(): Database.Database {
   const dbPath = join(userData, 'noctua.sqlite')
   const keyPath = join(userData, DB_KEY_FILENAME)
 
-  // Neue Dateien (DB, -wal, -shm, Schlüssel, Backups) nur für den Besitzer lesbar.
-  // SQLite legt -wal/-shm mit den Rechten der Hauptdatei an. Umask nur
-  // während des Öffnens, damit z. B. gespeicherte Anhänge unberührt bleiben.
+  // New files (DB, -wal, -shm, key, backups) readable by the owner only.
+  // SQLite creates -wal/-shm with the permissions of the main file. Umask only
+  // while opening, so that e.g. saved attachments stay unaffected.
   const previousUmask = process.umask(0o077)
   try {
     const exists = existsSync(dbPath) && statSync(dbPath).size > 0
     const plaintext = exists && isPlaintextSqlite(dbPath)
-    // Nur ohne DB oder bei Klartext-DB darf ein neuer Schlüssel entstehen.
+    // A new key may only be created without a DB or with a plaintext DB.
     const keyHex = loadOrCreateDbKey(keyPath, !exists || plaintext)
 
     if (plaintext) {
@@ -45,21 +45,21 @@ export function openDb(): Database.Database {
     }
 
     const opened = openEncrypted(dbPath, keyHex)
-    // Alte Klartext-Pre-Migration-Backups (.bak-v*) sofort verwerfen — die
-    // Rotation in migrate.ts legt gleich verschlüsselte an.
+    // Discard old plaintext pre-migration backups (.bak-v*) right away — the
+    // rotation in migrate.ts creates encrypted ones from now on.
     discardPlainBackups(dbPath)
     let from: number
     let to: number
     try {
-      // Vektor-Extension VOR den Migrationen laden (vec0-Tabellen brauchen sie).
+      // Load the vector extension BEFORE the migrations (vec0 tables need it).
       loadVecExtension(opened)
       opened.pragma('journal_mode = WAL')
       opened.pragma('synchronous = NORMAL')
       opened.pragma('foreign_keys = ON')
       ;({ from, to } = runMigrations(opened))
     } catch (error) {
-      // Downgrade-Guard/Migrationsfehler: Handle freigeben, damit die DB-Datei
-      // unberührt bleibt; main/index.ts zeigt den Fehler per Dialog und beendet.
+      // Downgrade guard/migration error: release the handle so the DB file
+      // stays untouched; main/index.ts shows the error in a dialog and quits.
       opened.close()
       throw error
     }
@@ -68,8 +68,8 @@ export function openDb(): Database.Database {
     }
     db = opened
 
-    // Die verschlüsselte DB lief einmal durch → Klartext-Backup der Migration
-    // verwerfen. unlink genügt; Überschreiben bringt auf APFS/SSD nichts.
+    // The encrypted DB ran through once → discard the migration's plaintext
+    // backup. unlink is enough; overwriting achieves nothing on APFS/SSD.
     discardPlainMigrationBackup(dbPath)
   } finally {
     process.umask(previousUmask)
@@ -84,9 +84,9 @@ export function getDb(): Database.Database {
 }
 
 /**
- * Test-Naht: setzt die Singleton-Instanz auf eine vorbereitete (In-Memory-)DB,
- * damit Module, die getSetting/getDb intern nutzen, gegen dieselbe DB laufen.
- * Ausschließlich für Tests gedacht.
+ * Test seam: sets the singleton instance to a prepared (in-memory) DB,
+ * so that modules using getSetting/getDb internally run against the same DB.
+ * Intended for tests only.
  */
 export function __setTestDb(instance: Database.Database | null): void {
   db = instance

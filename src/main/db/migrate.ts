@@ -5,7 +5,7 @@ import { migrations } from './migrations'
 
 const BACKUPS_TO_KEEP = 2
 
-/** DB stammt von einer neueren App-Version — Weiterarbeiten würde sie beschädigen. */
+/** DB comes from a newer app version — continuing would damage it. */
 export class DatabaseTooNewError extends Error {
   constructor(
     readonly dbVersion: number,
@@ -20,9 +20,9 @@ export class DatabaseTooNewError extends Error {
 }
 
 /**
- * Sichert eine bestehende DB vor ausstehenden Migrationen nach
- * `<db>.bak-v<version>` (VACUUM INTO: konsistent, auch bei offenem WAL) und
- * behält nur die neuesten Backups. In-Memory-DBs (Tests) werden übersprungen.
+ * Backs up an existing DB before pending migrations to
+ * `<db>.bak-v<version>` (VACUUM INTO: consistent, even with an open WAL) and
+ * keeps only the newest backups. In-memory DBs (tests) are skipped.
  */
 export function backupBeforeMigration(db: Database.Database, version: number): string | null {
   const dbPath = db.name
@@ -42,28 +42,28 @@ export function backupBeforeMigration(db: Database.Database, version: number): s
 }
 
 /**
- * Führt alle ausstehenden Migrationen aus. Versionsstand via PRAGMA user_version;
- * jede Migration läuft in einer eigenen Transaktion.
+ * Runs all pending migrations. Version state via PRAGMA user_version;
+ * each migration runs in its own transaction.
  *
- * Foreign Keys sind währenddessen aus (SQLite-Standardverfahren für
- * Tabellen-Neubauten): Mit aktiven FKs würde z. B. ein DROP TABLE accounts
- * über ON DELETE CASCADE sämtliche Ordner und Nachrichten mitreißen. Ein
- * foreign_key_check je Migration stellt sicher, dass die Integrität am Ende
- * trotzdem stimmt — Verstöße lassen die Transaktion platzen.
+ * Foreign keys are off meanwhile (standard SQLite procedure for
+ * table rebuilds): with active FKs, e.g. a DROP TABLE accounts would
+ * drag along all folders and messages via ON DELETE CASCADE. A
+ * foreign_key_check per migration ensures that integrity still holds
+ * in the end — violations make the transaction fail.
  */
 export function runMigrations(db: Database.Database): { from: number; to: number } {
   const from = db.pragma('user_version', { simple: true }) as number
   let current = from
 
-  // Downgrade-Guard: eine DB aus einer neueren Version nie anfassen
+  // Downgrade guard: never touch a DB from a newer version
   const latest = migrations.reduce((max, m) => Math.max(max, m.version), 0)
   if (from > latest) throw new DatabaseTooNewError(from, latest)
 
-  // Backup nur bei bestehender (nicht leerer) DB mit ausstehenden Migrationen
+  // Backup only for an existing (non-empty) DB with pending migrations
   if (from > 0 && migrations.some((m) => m.version > from)) backupBeforeMigration(db, from)
 
   const fkWasOn = (db.pragma('foreign_keys', { simple: true }) as number) === 1
-  // PRAGMA foreign_keys wirkt nur außerhalb von Transaktionen
+  // PRAGMA foreign_keys only takes effect outside transactions
   db.pragma('foreign_keys = OFF')
   try {
     for (const migration of migrations) {

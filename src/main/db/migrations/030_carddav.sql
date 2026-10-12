@@ -1,7 +1,7 @@
--- Phase 3.1: CardDAV-Kontakte (nur lesend). Adressbücher hängen am Kalender-
--- Konto (gleicher Server/Principal, gleiches Vault-Passwort `cal:<id>:password`).
--- contacts_accounts schaltet die Kontakt-Synchronisation je Konto ein (eigene
--- Tabelle statt Spalten an cal_accounts: die Migration bleibt wiederholbar).
+-- Phase 3.1: CardDAV contacts (read-only). Address books belong to the calendar
+-- account (same server/principal, same vault password `cal:<id>:password`).
+-- contacts_accounts enables contact sync per account (separate
+-- table instead of columns on cal_accounts: the migration stays repeatable).
 CREATE TABLE IF NOT EXISTS contacts_accounts (
   account_id INTEGER PRIMARY KEY REFERENCES cal_accounts(id) ON DELETE CASCADE,
   enabled    INTEGER NOT NULL DEFAULT 0,
@@ -34,19 +34,19 @@ CREATE TABLE IF NOT EXISTS dav_contacts (
   given_name     TEXT,
   family_name    TEXT,
   org            TEXT,
-  -- [{value,type,pref}] bzw. Telefonnummern; Fotos werden nie gespeichert
+  -- [{value,type,pref}] or phone numbers; photos are never stored
   emails         TEXT NOT NULL DEFAULT '[]',
   phones         TEXT NOT NULL DEFAULT '[]',
-  -- kleingeschriebener Suchtext (Name, Organisation) für Präfix-/Teilstring-Suche
+  -- lowercased search text (name, organization) for prefix/substring search
   search_text    TEXT NOT NULL DEFAULT '',
-  -- vCard ohne PHOTO/LOGO/SOUND/KEY, nur bis zu einer Größengrenze
+  -- vCard without PHOTO/LOGO/SOUND/KEY, only up to a size limit
   raw_vcard      TEXT,
   updated_at     INTEGER NOT NULL,
   UNIQUE (addressbook_id, href)
 );
 CREATE INDEX IF NOT EXISTS idx_dav_contacts_book ON dav_contacts(addressbook_id);
 
--- Normalisierter E-Mail-Index (lower(trim)) für schnellen Lookup/Autocomplete
+-- Normalized email index (lower(trim)) for fast lookup/autocomplete
 CREATE TABLE IF NOT EXISTS dav_contact_emails (
   contact_id INTEGER NOT NULL REFERENCES dav_contacts(id) ON DELETE CASCADE,
   email      TEXT NOT NULL,

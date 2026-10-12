@@ -17,36 +17,36 @@ import Database from 'better-sqlite3-multiple-ciphers'
 import * as sqliteVec from 'sqlite-vec'
 
 /**
- * SQLCipher-Verschlüsselung der Mail-Datenbank (PRV-5).
+ * SQLCipher encryption of the mail database (PRV-5).
  *
- * Treiber: better-sqlite3-multiple-ciphers (SQLite3MultipleCiphers). Der Cipher
- * `sqlcipher` mit `legacy=4` entspricht dem SQLCipher-4-Format (AES-256-CBC,
- * HMAC-SHA512, 4096er Seiten, 256000 KDF-Iterationen — beim Raw-Key ohne KDF) und
- * ist damit mit dem sqlcipher-CLI lesbar.
+ * Driver: better-sqlite3-multiple-ciphers (SQLite3MultipleCiphers). The cipher
+ * `sqlcipher` with `legacy=4` matches the SQLCipher 4 format (AES-256-CBC,
+ * HMAC-SHA512, 4096-byte pages, 256000 KDF iterations — no KDF with a raw key) and
+ * is therefore readable with the sqlcipher CLI.
  *
- * Dieses Modul kennt weder Electron noch safeStorage: der Schlüssel kommt als
- * 64-stelliger Hex-String herein (siehe key.ts). So bleibt alles gegen
- * Temp-Dateien testbar.
+ * This module knows neither Electron nor safeStorage: the key comes in as a
+ * 64-character hex string (see key.ts). That keeps everything testable against
+ * temp files.
  */
 
 const SQLITE_MAGIC = 'SQLite format 3\0'
 const KEY_HEX = /^[0-9a-f]{64}$/
 
-/** Dateiendungen, die SQLite neben der Hauptdatei anlegt. */
+/** File extensions SQLite creates next to the main file. */
 const SIDECARS = ['-wal', '-shm', '-journal'] as const
 
-/** Dateiname des Klartext-Backups während der Migration (siehe migratePlaintextToEncrypted). */
+/** File name of the plaintext backup during migration (see migratePlaintextToEncrypted). */
 export const PLAIN_BACKUP_SUFFIX = '.plain-backup'
 const MIGRATION_TMP_SUFFIX = '.encrypting'
 
 export class DbKeyError extends Error {}
 
-/** true, wenn die Datei mit dem SQLite-Klartext-Header beginnt. */
+/** true if the file starts with the SQLite plaintext header. */
 export function isPlaintextSqlite(file: string): boolean {
   return readHeader(file) === SQLITE_MAGIC
 }
 
-/** Existiert, ist nicht leer und hat KEINEN Klartext-Header → verschlüsselt (oder fremd). */
+/** Exists, is not empty and has NO plaintext header → encrypted (or foreign). */
 export function isEncryptedFile(file: string): boolean {
   if (!existsSync(file) || statSync(file).size === 0) return false
   return !isPlaintextSqlite(file)
@@ -65,10 +65,10 @@ function readHeader(file: string): string | null {
 }
 
 /**
- * Cipher-Konfiguration + Schlüssel — MUSS die allererste Anweisung nach dem
- * Öffnen sein (vor jedem anderen PRAGMA/Query). Reihenfolge laut
- * SQLite3MultipleCiphers: erst cipher + Parameter, dann key. Der Schlüssel wird
- * als Raw-Key (`x'…'`, 32 Byte) übergeben und braucht keine KDF.
+ * Cipher configuration + key — MUST be the very first statement after
+ * opening (before any other PRAGMA/query). Order per
+ * SQLite3MultipleCiphers: first cipher + parameters, then key. The key is
+ * passed as a raw key (`x'…'`, 32 bytes) and needs no KDF.
  */
 export function applyKey(db: Database.Database, keyHex: string): void {
   if (!KEY_HEX.test(keyHex)) throw new DbKeyError('Ungültiger Datenbank-Schlüssel')
@@ -77,7 +77,7 @@ export function applyKey(db: Database.Database, keyHex: string): void {
   db.pragma(`key = "x'${keyHex}'"`)
 }
 
-/** Wie applyKey, aber für `rekey` (Verschlüsseln einer Klartext-DB bzw. Schlüsselwechsel). */
+/** Like applyKey, but for `rekey` (encrypting a plaintext DB or changing the key). */
 function applyRekey(db: Database.Database, keyHex: string): void {
   if (!KEY_HEX.test(keyHex)) throw new DbKeyError('Ungültiger Datenbank-Schlüssel')
   db.pragma("cipher = 'sqlcipher'")
@@ -86,17 +86,17 @@ function applyRekey(db: Database.Database, keyHex: string): void {
 }
 
 /**
- * Lädt sqlite-vec. In der verpackten App liegt die dylib in app.asar.unpacked —
- * SQLites natives dlopen kennt Electrons asar-Umleitung nicht.
+ * Loads sqlite-vec. In the packaged app the dylib lives in app.asar.unpacked —
+ * SQLite's native dlopen doesn't know Electron's asar redirection.
  */
 export function loadVecExtension(db: Database.Database): void {
   db.loadExtension(sqliteVec.getLoadablePath().replace('app.asar', 'app.asar.unpacked'))
 }
 
 /**
- * Öffnet eine verschlüsselte DB und prüft den Schlüssel sofort. Ein falscher
- * Schlüssel fällt sonst erst bei der ersten echten Abfrage mit „file is not a
- * database" auf.
+ * Opens an encrypted DB and checks the key immediately. Otherwise a wrong
+ * key only surfaces on the first real query with "file is not a
+ * database".
  */
 export function openEncrypted(file: string, keyHex: string): Database.Database {
   const db = new Database(file)
@@ -111,8 +111,8 @@ export function openEncrypted(file: string, keyHex: string): Database.Database {
       }`
     )
   }
-  // Temp-Dateien (große Sorts, temporäre Indizes) verschlüsselt der Codec
-  // nicht — im RAM halten, sonst landen Mailinhalte im Klartext in $TMPDIR
+  // The codec does not encrypt temp files (large sorts, temporary indexes)
+  // — keep them in RAM, otherwise mail content lands in plaintext in $TMPDIR
   // (SEC, vuln-0014).
   db.pragma('temp_store = MEMORY')
   return db
@@ -122,7 +122,7 @@ function unlinkQuiet(file: string): void {
   try {
     unlinkSync(file)
   } catch {
-    // nicht vorhanden — gewollt
+    // not present — intended
   }
 }
 
@@ -130,7 +130,7 @@ function removeSidecars(file: string): void {
   for (const s of SIDECARS) unlinkQuiet(file + s)
 }
 
-/** Kopie, die auf APFS/btrfs per Clone fast nichts kostet, sonst normal kopiert. */
+/** Copy that costs almost nothing on APFS/btrfs via clone, otherwise a normal copy. */
 function copyPrivate(src: string, dest: string): void {
   unlinkQuiet(dest)
   copyFileSync(src, dest, fsConstants.COPYFILE_FICLONE)
@@ -155,34 +155,34 @@ function fsyncDir(dir: string): void {
       closeSync(fd)
     }
   } catch {
-    // Verzeichnis-fsync ist auf manchen Plattformen nicht möglich — best effort
+    // Directory fsync is not possible on some platforms — best effort
   }
 }
 
 export interface MigrationHooks {
-  /** Test-Naht: wird unmittelbar vor dem atomaren Umbenennen aufgerufen (darf werfen). */
+  /** Test seam: called right before the atomic rename (may throw). */
   beforeSwap?: () => void
 }
 
 /**
- * Verschlüsselt eine vorhandene Klartext-DB. Ablauf (crash-sicher):
+ * Encrypts an existing plaintext DB. Procedure (crash-safe):
  *
- *  1. Klartext-DB öffnen, WAL per `wal_checkpoint(TRUNCATE)` einarbeiten,
- *     auf `journal_mode=DELETE` stellen, schließen → eine einzige, vollständige
- *     Datei ohne -wal/-shm. Quelle bleibt bis Schritt 6 unangetastet.
- *  2. Backup `<db>.plain-backup` (Klartext) anlegen.
- *  3. Arbeitskopie `<db>.encrypting` aus der Quelle ziehen und DORT per `rekey`
- *     in-place verschlüsseln. Ein Absturz hier hinterlässt nur die Arbeitskopie.
- *  4. Arbeitskopie mit Schlüssel öffnen: integrity_check = ok, user_version
- *     identisch, und OHNE Schlüssel nicht lesbar. fsync.
- *  5. Verwaiste -wal/-shm der Quelle entfernen (nach dem Checkpoint leer).
- *  6. `rename(<db>.encrypting, <db>)` — atomar (POSIX). Davor ist die Klartext-DB
- *     vollständig, danach die verschlüsselte; es gibt keinen Zwischenzustand.
+ *  1. Open the plaintext DB, fold in the WAL via `wal_checkpoint(TRUNCATE)`,
+ *     switch to `journal_mode=DELETE`, close → one single, complete
+ *     file without -wal/-shm. The source stays untouched until step 6.
+ *  2. Create the backup `<db>.plain-backup` (plaintext).
+ *  3. Make a working copy `<db>.encrypting` from the source and encrypt it THERE
+ *     in place via `rekey`. A crash here only leaves the working copy behind.
+ *  4. Open the working copy with the key: integrity_check = ok, user_version
+ *     identical, and NOT readable without the key. fsync.
+ *  5. Remove orphaned -wal/-shm of the source (empty after the checkpoint).
+ *  6. `rename(<db>.encrypting, <db>)` — atomic (POSIX). Before it the plaintext DB
+ *     is complete, after it the encrypted one; there is no intermediate state.
  *
- * Das Klartext-Backup bleibt liegen, bis die verschlüsselte DB einmal
- * erfolgreich geöffnet wurde (siehe discardPlainLeftovers). Löschen = unlink; auf
- * APFS/SSD ist Überschreiben wirkungslos (Copy-on-Write, Wear-Leveling), die
- * Restdaten schützt nur FileVault.
+ * The plaintext backup stays until the encrypted DB has been opened
+ * successfully once (see discardPlainLeftovers). Deleting = unlink; on
+ * APFS/SSD overwriting is ineffective (copy-on-write, wear leveling), the
+ * remaining data is only protected by FileVault.
  */
 export function migratePlaintextToEncrypted(
   dbPath: string,
@@ -192,11 +192,11 @@ export function migratePlaintextToEncrypted(
   const backup = dbPath + PLAIN_BACKUP_SUFFIX
   const tmp = dbPath + MIGRATION_TMP_SUFFIX
 
-  // Reste eines früheren, abgebrochenen Versuchs — die Quelle ist maßgeblich.
+  // Leftovers of an earlier, aborted attempt — the source is authoritative.
   unlinkQuiet(tmp)
   removeSidecars(tmp)
 
-  // 1. WAL einarbeiten
+  // 1. Fold in the WAL
   const src = new Database(dbPath)
   let userVersion: number
   try {
@@ -208,7 +208,7 @@ export function migratePlaintextToEncrypted(
   }
   removeSidecars(dbPath)
 
-  // 2. + 3. Backup und Arbeitskopie
+  // 2. + 3. Backup and working copy
   copyPrivate(dbPath, backup)
   copyPrivate(backup, tmp)
 
@@ -221,7 +221,7 @@ export function migratePlaintextToEncrypted(
     }
     fsyncFile(tmp)
 
-    // 4. Verifikation
+    // 4. Verification
     if (isPlaintextSqlite(tmp)) {
       throw new Error('Verschlüsselung fehlgeschlagen: Arbeitskopie ist noch Klartext')
     }
@@ -253,13 +253,13 @@ export function migratePlaintextToEncrypted(
 
     hooks.beforeSwap?.()
 
-    // 5. + 6. Austausch
+    // 5. + 6. Swap
     removeSidecars(dbPath)
     renameSync(tmp, dbPath)
     chmodSync(dbPath, 0o600)
     fsyncDir(dirname(dbPath))
   } catch (error) {
-    // Quelle ist unverändert und bleibt maßgeblich; Arbeitskopie wegwerfen.
+    // Source is unchanged and stays authoritative; discard the working copy.
     unlinkQuiet(tmp)
     removeSidecars(tmp)
     throw error
@@ -267,16 +267,16 @@ export function migratePlaintextToEncrypted(
 }
 
 /**
- * Verwirft das Klartext-Backup der Migration, nachdem die verschlüsselte DB
- * erfolgreich geöffnet (und migriert) wurde.
+ * Discards the migration's plaintext backup after the encrypted DB
+ * has been opened (and migrated) successfully.
  */
 export function discardPlainMigrationBackup(dbPath: string): void {
   unlinkQuiet(dbPath + PLAIN_BACKUP_SUFFIX)
 }
 
 /**
- * Löscht alte Klartext-Pre-Migration-Backups (`<db>.bak-v<N>`, vor der
- * Verschlüsselung per VACUUM INTO entstanden). Verschlüsselte bleiben erhalten.
+ * Deletes old plaintext pre-migration backups (`<db>.bak-v<N>`, created
+ * via VACUUM INTO before encryption). Encrypted ones are kept.
  */
 export function discardPlainBackups(dbPath: string): number {
   let removed = 0
@@ -293,7 +293,7 @@ export function discardPlainBackups(dbPath: string): number {
   return removed
 }
 
-/** Setzt 0600 auf DB, Sidecars, Backups (best effort — Fehler sind nicht fatal). */
+/** Sets 0600 on DB, sidecars, backups (best effort — errors are not fatal). */
 export function restrictPermissions(dbPath: string): void {
   const dir = dirname(dbPath)
   const base = basename(dbPath)
@@ -303,11 +303,11 @@ export function restrictPermissions(dbPath: string): void {
         try {
           chmodSync(join(dir, name), 0o600)
         } catch {
-          // ignorieren
+          // ignore
         }
       }
     }
   } catch {
-    // Verzeichnis nicht lesbar — nichts zu tun
+    // Directory not readable — nothing to do
   }
 }
