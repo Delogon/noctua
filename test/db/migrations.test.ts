@@ -17,7 +17,7 @@ describe('migrations', () => {
 
   it('wenden alle Migrationen sauber an und setzen user_version', () => {
     db = createTestDb()
-    expect(db.pragma('user_version', { simple: true })).toBe(34)
+    expect(db.pragma('user_version', { simple: true })).toBe(35)
   })
 
   it('erzwingt eindeutige Postfachnamen unabhängig von Großschreibung', () => {
@@ -225,7 +225,7 @@ describe('migrations', () => {
     db = createTestDb()
     const { runMigrations } = await import('@main/db/migrate')
     const result = runMigrations(db)
-    expect(result).toEqual({ from: 34, to: 34 })
+    expect(result).toEqual({ from: 35, to: 35 })
   })
 
   it('bereinigt Aufgaben aus kontenuebergreifenden Selbst-Sends', async () => {
@@ -279,10 +279,12 @@ describe('migrations', () => {
       ALTER TABLE folders DROP COLUMN envelope_backfill_since;
       ALTER TABLE folders DROP COLUMN body_backfill_since;
       ALTER TABLE folders DROP COLUMN delimiter;
+      ALTER TABLE ai_decisions DROP COLUMN spam;
+      DROP TABLE mail_threat_checks;
     `)
     db.pragma('user_version = 11')
     const { runMigrations } = await import('@main/db/migrate')
-    expect(runMigrations(db)).toEqual({ from: 11, to: 34 })
+    expect(runMigrations(db)).toEqual({ from: 11, to: 35 })
     expect(db.prepare('SELECT count(*) count FROM tasks').get()).toEqual({ count: 0 })
     expect(
       db
@@ -328,9 +330,11 @@ describe('migrations', () => {
       conn.exec(`ALTER TABLE op_queue DROP COLUMN status`)
       conn.exec(`ALTER TABLE op_queue DROP COLUMN last_error`)
       conn.exec(`ALTER TABLE folders DROP COLUMN delimiter`)
+      conn.exec(`ALTER TABLE ai_decisions DROP COLUMN spam`)
+      conn.exec(`DROP TABLE mail_threat_checks`)
       conn.pragma('user_version = 22')
 
-      expect(runMigrations(conn)).toEqual({ from: 22, to: 34 })
+      expect(runMigrations(conn)).toEqual({ from: 22, to: 35 })
       const backup = `${path}.bak-v22`
       expect(existsSync(backup)).toBe(true)
       const bak = new Database(backup)

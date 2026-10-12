@@ -34,7 +34,7 @@ import {
 } from '@renderer/features/composer/composer-state'
 import { MessageAttachments } from '@renderer/features/paper/MessageAttachments'
 import { InvitationCards } from '@renderer/features/paper/InvitationCard'
-import { PhishingBanner } from '@renderer/features/paper/PhishingBanner'
+import { MailSecurityBanner } from '@renderer/features/paper/MailSecurityBanner'
 import { EventSuggestionCards } from '@renderer/features/paper/EventSuggestionCard'
 import { OverrideMenu } from '@renderer/features/inbox/OverrideMenu'
 import { useUiStore } from '@renderer/stores/ui'
@@ -523,7 +523,7 @@ function MessageBox({
         )}
       </div>
       <div style={{ padding: '4px 14px 12px' }}>
-        <PhishingBanner messageId={message.id} />
+        <MailSecurityBanner messageId={message.id} />
         <InvitationCards messageId={message.id} />
         <EventSuggestionCards messageId={message.id} />
         {message.bodyHtml ? (

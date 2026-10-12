@@ -4,6 +4,7 @@ import {
   HAS_REQUEST_THRESHOLD,
   NEEDS_REPLY_THRESHOLD,
   PHISHING_SCORE_MAX,
+  SPAM_SCORE_MAX,
   SUMMARY_MIN_PRIORITY,
   mapPriorityScore
 } from '@shared/decision-thresholds'
@@ -105,7 +106,23 @@ export const TRIAGE_QUESTIONS: Questions = {
       'Verdächtig: einzelne Warnzeichen, aber nicht eindeutig',
       'Wahrscheinlich Phishing: Täuschung mit Druck, Zugangs- oder Zahlungsdaten, abweichende Absender oder Links'
     ]
+  },
+  spam: {
+    type: 'score',
+    instructions:
+      'Ist diese E-Mail unerwünschter Spam: unaufgeforderte Massenwerbung, Betrugsmasche, Gewinnversprechen, dubiose Angebote? Abonnierte Newsletter und Werbung bekannter Dienste, bei denen der Empfänger Kunde ist, sind KEIN Spam. Beachte die genannten Warnzeichen (verschleierte Zeichen, Spam-Formulierungen, Markierung durch den Mailserver).',
+    criteria: [
+      'Kein Spam: persönliche, geschäftliche oder abonnierte E-Mail',
+      'Grauzone: unaufgeforderte Werbung oder unbekannter Massenversender',
+      'Spam: unerwünschte Massenmail, Scam, Gewinnversprechen, dubiose Angebote'
+    ]
   }
+}
+
+/** Nur die Sicherheitsfragen – für die eigenständige Prüfung ohne Hybrid-Triage. */
+export const THREAT_QUESTIONS: Questions = {
+  phishing: TRIAGE_QUESTIONS.phishing,
+  spam: TRIAGE_QUESTIONS.spam
 }
 
 export interface TriageDecision {
@@ -122,6 +139,8 @@ export interface TriageDecision {
   proposesMeeting: number
   /** 0..2 */
   phishing: number
+  /** 0..2 */
+  spam: number
 }
 
 const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n))
@@ -134,6 +153,7 @@ export function interpretTriageAnswers(answers: Record<string, Answer>): TriageD
     : 'other'
   const priority = scoreOf(answers, 'priority')
   const phishing = scoreOf(answers, 'phishing')
+  const spam = scoreOf(answers, 'spam')
   const priorityScore = clamp(priority?.score ?? 2, 0, 4)
   return {
     category,
@@ -144,7 +164,8 @@ export function interpretTriageAnswers(answers: Record<string, Answer>): TriageD
     addressedToMe: noulOf(answers, 'addressed_to_me'),
     hasRequest: noulOf(answers, 'has_request'),
     proposesMeeting: noulOf(answers, 'proposes_meeting'),
-    phishing: clamp(phishing?.score ?? 0, 0, PHISHING_SCORE_MAX)
+    phishing: clamp(phishing?.score ?? 0, 0, PHISHING_SCORE_MAX),
+    spam: clamp(spam?.score ?? 0, 0, SPAM_SCORE_MAX)
   }
 }
 

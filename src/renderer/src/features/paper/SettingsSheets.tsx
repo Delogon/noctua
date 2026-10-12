@@ -396,6 +396,7 @@ export function AccountsSheet(): React.JSX.Element {
       <TasksSyncSection />
       <div className="double-rule" style={{ marginTop: 18 }} />
       <RemoteImagesPrivacy />
+      <SecuritySettings />
     </SheetShell>
   )
 }
@@ -1013,6 +1014,38 @@ function RemoteImagesPrivacy(): React.JSX.Element {
         onToggle={toggleNotify}
         label={t('notifyHideToggle')}
         note={t('notifyHideNote')}
+      />
+    </div>
+  )
+}
+
+/**
+ * Spam & Phishing: Warnungen laufen immer (lokale Regeln, ggf. Entscheidungsmodell);
+ * automatisch verschoben wird nur nach ausdrücklichem Einschalten.
+ */
+function SecuritySettings(): React.JSX.Element {
+  const t = useT()
+  const [autoJunk, setAutoJunk] = useState(false)
+  useEffect(() => {
+    void invoke('settings:get', { key: 'security.autoJunk' }).then((r) =>
+      setAutoJunk(r.value === '1')
+    )
+  }, [])
+  const toggle = (): void => {
+    const next = !autoJunk
+    setAutoJunk(next)
+    void invoke('settings:set', { key: 'security.autoJunk', value: next ? '1' : '0' })
+  }
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div className="mlabel" style={{ color: 'var(--muted)' }}>
+        {t('securityHead')}
+      </div>
+      <PrivacyToggle
+        on={autoJunk}
+        onToggle={toggle}
+        label={t('securityAutoJunkToggle')}
+        note={t('securityAutoJunkNote')}
       />
     </div>
   )

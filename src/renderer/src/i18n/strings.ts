@@ -2211,10 +2211,129 @@ const table = {
     en: 'This email looks like phishing — do not click links or enter credentials.',
     de: 'Diese E-Mail sieht nach Phishing aus – klicke keine Links, gib keine Zugangsdaten ein.'
   },
+  phishingSuspiciousBanner: {
+    en: 'Some warning signs — check the sender and links before you click.',
+    de: 'Einige Warnzeichen – prüfe Absender und Links, bevor du klickst.'
+  },
+  spamBanner: { en: 'This email looks like spam.', de: 'Diese E-Mail sieht nach Spam aus.' },
+  spamSuspiciousBanner: {
+    en: 'This email may be unwanted bulk advertising.',
+    de: 'Diese E-Mail könnte unerwünschte Massenwerbung sein.'
+  },
   phishingSignals: { en: 'Warning signs', de: 'Warnzeichen' },
   phishingNote: {
-    en: 'Local assessment by your decision model — it can be wrong.',
-    de: 'Lokale Einschätzung deines Entscheidungsmodells – kann irren.'
+    en: 'Local assessment by rules and your decision model — it can be wrong.',
+    de: 'Lokale Einschätzung aus Regeln und deinem Entscheidungsmodell – kann irren.'
+  },
+  securityRulesNote: {
+    en: 'Local check by rules, no AI involved — it can be wrong.',
+    de: 'Lokale Prüfung durch Regeln, ohne KI – kann irren.'
+  },
+  securityMoveToJunk: { en: 'Move to junk', de: 'In den Spam-Ordner' },
+  securityHead: { en: 'Spam & phishing', de: 'Spam & Phishing' },
+  securityAutoJunkToggle: {
+    en: 'Move likely spam to junk automatically',
+    de: 'Wahrscheinlichen Spam automatisch aussortieren'
+  },
+  securityAutoJunkNote: {
+    en: 'only when the decision model confirms it; never for known contacts',
+    de: 'nur mit Bestätigung durch das Entscheidungsmodell; nie bei bekannten Kontakten'
+  },
+  threatReasonHomoglyphSender: {
+    en: 'The sender domain uses look-alike letters from another alphabet (e.g. Cyrillic)',
+    de: 'Die Absenderdomain nutzt Ersatzzeichen aus einem anderen Alphabet (z. B. kyrillisch)'
+  },
+  threatReasonLookalikeSender: {
+    en: 'The sender domain imitates a well-known brand with swapped characters',
+    de: 'Die Absenderdomain imitiert eine bekannte Marke mit vertauschten Zeichen'
+  },
+  threatReasonBrandFreemail: {
+    en: 'The name claims to be a company, but it was sent from a free email address',
+    de: 'Der Name gibt sich als Firma aus, die E-Mail kommt aber von einer Freemail-Adresse'
+  },
+  threatReasonDmarcFail: {
+    en: 'DMARC check failed — the sender domain did not authorize this email',
+    de: 'DMARC-Prüfung fehlgeschlagen – die Absenderdomain hat die E-Mail nicht autorisiert'
+  },
+  threatReasonAuthFail: {
+    en: 'SPF or DKIM check of the sender failed',
+    de: 'SPF- oder DKIM-Prüfung des Absenders fehlgeschlagen'
+  },
+  threatReasonServerSpam: {
+    en: 'Your mail server marked this email as spam',
+    de: 'Dein Mailserver hat die E-Mail als Spam markiert'
+  },
+  threatReasonMixedScript: {
+    en: 'Words mix Latin with Cyrillic/Greek look-alike letters ({n})',
+    de: 'Wörter mischen lateinische mit kyrillischen/griechischen Ersatzzeichen ({n})'
+  },
+  threatReasonInvisible: {
+    en: 'Invisible characters hidden between letters',
+    de: 'Unsichtbare Zeichen zwischen den Buchstaben versteckt'
+  },
+  threatReasonBidi: {
+    en: 'Text-direction control characters disguise the subject, name or a file name',
+    de: 'Steuerzeichen für die Schreibrichtung tarnen Betreff, Name oder Dateinamen'
+  },
+  threatReasonHomoglyphLink: {
+    en: 'Links lead to a domain with look-alike letters ({n})',
+    de: 'Links führen auf eine Domain mit Ersatzzeichen ({n})'
+  },
+  threatReasonLookalikeLink: {
+    en: 'Links lead to a domain imitating a well-known brand ({n})',
+    de: 'Links führen auf eine Domain, die eine bekannte Marke imitiert ({n})'
+  },
+  threatReasonUserinfoLink: {
+    en: 'Links hide the real target behind an “@” ({n})',
+    de: 'Links verstecken das echte Ziel hinter einem „@“ ({n})'
+  },
+  threatReasonScriptLink: {
+    en: 'Links contain script or data URLs ({n})',
+    de: 'Links enthalten Skript- oder Daten-URLs ({n})'
+  },
+  threatReasonShortener: {
+    en: 'Links use a URL shortener that hides the target ({n})',
+    de: 'Links nutzen einen URL-Kürzer, der das Ziel verbirgt ({n})'
+  },
+  threatReasonForm: {
+    en: 'The email contains an input form',
+    de: 'Die E-Mail enthält ein Eingabeformular'
+  },
+  threatReasonUrgency: {
+    en: 'Pressure phrases (account locked, confirm your data) together with links',
+    de: 'Druck-Formulierungen (Konto gesperrt, Daten bestätigen) zusammen mit Links'
+  },
+  threatReasonDangerousAttachment: {
+    en: 'Executable attachment — program, script or disk image ({n})',
+    de: 'Ausführbarer Anhang – Programm, Skript oder Disk-Image ({n})'
+  },
+  threatReasonMacroAttachment: {
+    en: 'Attachment with Office macros ({n})',
+    de: 'Anhang mit Office-Makros ({n})'
+  },
+  threatReasonHtmlAttachment: {
+    en: 'HTML/SVG attachment — a common way to deliver fake login pages ({n})',
+    de: 'HTML-/SVG-Anhang – beliebter Weg für gefälschte Login-Seiten ({n})'
+  },
+  threatReasonDoubleExtension: {
+    en: 'Attachment disguised with a double extension, e.g. “invoice.pdf.exe” ({n})',
+    de: 'Anhang mit doppelter Dateiendung getarnt, z. B. „rechnung.pdf.exe“ ({n})'
+  },
+  threatReasonSpamPhrases: {
+    en: 'Typical spam phrases — prizes, crypto returns, inheritance ({n})',
+    de: 'Typische Spam-Formulierungen – Gewinne, Krypto-Rendite, Erbschaft ({n})'
+  },
+  threatReasonShouting: {
+    en: 'Subject in capitals or with piled-up !!!/$$$',
+    de: 'Betreff in Großbuchstaben oder mit gehäuften !!!/$$$'
+  },
+  threatReasonImageOnly: {
+    en: 'The email consists almost entirely of images',
+    de: 'Die E-Mail besteht fast nur aus Bildern'
+  },
+  threatReasonHiddenText: {
+    en: 'Lots of hidden text in the HTML',
+    de: 'Viel versteckter Text im HTML'
   },
   phishReasonDisplayName: {
     en: 'The display name shows a different domain than the real sender address',

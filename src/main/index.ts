@@ -18,6 +18,7 @@ import { initCalendar, stopCalendar } from './calendar'
 import { setItipMailer } from './calendar/mailer'
 import { calendarSync } from './calendar/sync'
 import { setRuleActionExecutor } from './ai/rules'
+import { setJunkExecutor } from './ai/threat-check'
 import { startUpdateChecks, stopUpdateChecks } from './updates'
 import { appId, packagedAppName, productName } from './org-config'
 import { applyOrgConfig } from './org-defaults'
@@ -262,6 +263,7 @@ app
       )
     })
     setRuleActionExecutor((ids, action) => syncEngine.applyAction(ids, action))
+    setJunkExecutor((ids) => syncEngine.applyAction(ids, 'spam'))
     if (!demo) startUpdateChecks(push)
 
     if (isDev && process.env.NOCTUA_TEST_SELF_SEND === '1') {

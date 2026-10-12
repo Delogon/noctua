@@ -79,7 +79,8 @@ import { cancelGoogleLogin, googleInteractiveLogin } from '../auth/google'
 import { startChat } from '../ai/chat'
 import { refreshStyleProfile } from '../ai/style'
 import { runModelTest, testProfileConnection } from '../ai/model-test'
-import { getPhishing, listProfileModels, runDecisionTest } from '../ai/decision-service'
+import { listProfileModels, runDecisionTest } from '../ai/decision-service'
+import { getMailSecurity, runThreatCheck } from '../ai/threat-check'
 import {
   clearProfileKey,
   createProfile,
@@ -665,7 +666,11 @@ export const handlers: IpcHandlers = {
     return { models: await listProfileModels(profile, kind), skipped: false }
   },
   'ai:decisions:test': ({ profileId, model }) => runDecisionTest(profileId, model),
-  'ai:decisions:get': ({ messageId }) => ({ phishing: getPhishing(getDb(), messageId) }),
+  'security:get': ({ messageId }) => ({ security: getMailSecurity(getDb(), messageId) }),
+  'security:check': async ({ messageId }) => {
+    await runThreatCheck(getDb(), messageId)
+    return { security: getMailSecurity(getDb(), messageId) }
+  },
 
   'ai:detectLocal': () => detectLocalServers(),
   'ai:profiles:list': () => ({ profiles: listProfiles() }),

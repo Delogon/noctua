@@ -125,6 +125,24 @@ const calendarCredentialsSchema = z.object({
 /** Sync-Zeitraum in Tagen: 0 = alles, null = Standard (90 Tage Liste / 183 Suche). */
 const syncDaysSchema = z.union([z.literal(0), z.number().int().min(7).max(3650)]).nullable()
 
+const threatLevelSchema = z.enum(['none', 'suspicious', 'high'])
+const threatVerdictSchema = z.object({
+  level: threatLevelSchema,
+  /** Modell-Score 0 (unauffällig) … 2, null ohne Entscheidungsmodell */
+  ai: z.number().nullable(),
+  /** Summe der lokalen Signalgewichte */
+  heuristic: z.number()
+})
+const mailSecuritySchema = z.object({
+  phishing: threatVerdictSchema,
+  spam: threatVerdictSchema,
+  /** lokale Signale, z. B. "reply_to_differs", "link_mismatch:2", "homoglyph_sender" */
+  signals: z.array(z.string().max(60)).max(30),
+  model: z.string().max(200).nullable(),
+  canCheck: z.boolean(),
+  inJunk: z.boolean()
+})
+
 export const invokeContract = {
   'app:version': {
     input: z.void(),
@@ -477,20 +495,15 @@ export const invokeContract = {
       answers: z.array(z.object({ name: z.string(), text: z.string() })).max(8)
     })
   },
-  // Phishing-Einschätzung einer Mail (nur mit Entscheidungsmodell berechnet)
-  'ai:decisions:get': {
+  // Spam-/Phishing-Einschätzung einer Mail: lokale Regeln (immer) + Entscheidungsmodell (falls vorhanden)
+  'security:get': {
     input: z.object({ messageId: z.number().int() }),
-    output: z.object({
-      phishing: z
-        .object({
-          /** 0 (unauffällig) … 2 (wahrscheinlich Phishing) */
-          score: z.number(),
-          high: z.boolean(),
-          /** lokale Signale, z. B. "reply_to_differs", "link_mismatch:2" */
-          signals: z.array(z.string().max(60)).max(10)
-        })
-        .nullable()
-    })
+    output: z.object({ security: mailSecuritySchema.nullable() })
+  },
+  // Eigenständige Prüfung mit dem Entscheidungsmodell (nur lokal, nur mit Entscheidungsmodell)
+  'security:check': {
+    input: z.object({ messageId: z.number().int() }),
+    output: z.object({ security: mailSecuritySchema.nullable() })
   },
   // Lokale KI-Server erkennen (Onboarding): Main sondiert nur fest verdrahtete
   // Loopback-Adressen (Ollama, LM Studio, llama.cpp, LocalAI/vLLM) — erlaubt auch

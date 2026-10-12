@@ -40,13 +40,13 @@ transient). Usage is logged with cost 0.
 
 ## Which features use it
 
-| Feature           | Question(s)                                                                                                                                                                       | What it saves                                                                  |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Hybrid triage     | `category` (choice), `priority` (score 5 levels), `needs_reply`, `addressed_to_me`, `has_request`, `proposes_meeting` (noul), `phishing` (score 3 levels) — **one call per mail** | the generative triage call; the text model runs only when a gate opens (below) |
-| Follow-up radar   | `expects_reply` (noul) for sent mails                                                                                                                                             | the generative "does this expect a reply" call                                 |
-| Event suggestions | `proposes_meeting` from the triage decision (stored)                                                                                                                              | the generative event extraction for every mail that proposes no meeting        |
-| Phishing warning  | `phishing` + local signals (below)                                                                                                                                                | nothing to generate; adds a warning banner in the mail view                    |
-| Rules             | one `noul` question per rule with an **AI condition**, batched into one call per mail                                                                                             | n/a (new capability)                                                           |
+| Feature           | Question(s)                                                                                                                                                                               | What it saves                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Hybrid triage     | `category` (choice), `priority` (score 5 levels), `needs_reply`, `addressed_to_me`, `has_request`, `proposes_meeting` (noul), `phishing`, `spam` (score 3 levels) — **one call per mail** | the generative triage call; the text model runs only when a gate opens (below) |
+| Follow-up radar   | `expects_reply` (noul) for sent mails                                                                                                                                                     | the generative "does this expect a reply" call                                 |
+| Event suggestions | `proposes_meeting` from the triage decision (stored)                                                                                                                                      | the generative event extraction for every mail that proposes no meeting        |
+| Phishing warning  | `phishing` + local signals (below)                                                                                                                                                        | nothing to generate; adds a warning banner in the mail view                    |
+| Rules             | one `noul` question per rule with an **AI condition**, batched into one call per mail                                                                                                     | n/a (new capability)                                                           |
 
 ### Hybrid triage: decide first, write only if needed
 
@@ -85,21 +85,48 @@ All in `src/shared/decision-thresholds.ts`:
 | `PROPOSES_MEETING_THRESHOLD`       | 0.5      | event job runs the generative extraction  |
 | `FOLLOWUP_EXPECTS_REPLY_THRESHOLD` | 0.5      | sent mail expects a reply                 |
 | `RULE_AI_CONDITION_THRESHOLD`      | 0.6      | rule AI condition holds                   |
-| `PHISHING_SCORE_HIGH`              | 1.4 of 2 | warning banner (≈ 70 %)                   |
+| `PHISHING_SCORE_HIGH`              | 1.4 of 2 | phishing warning (≈ 70 %)                 |
+| `SPAM_SCORE_HIGH`                  | 1.4 of 2 | spam warning / auto-junk candidate        |
+| `THREAT_SCORE_SUSPICIOUS`          | 0.8 of 2 | "suspicious" hint, confirms rule signals  |
 | `SUMMARY_MIN_PRIORITY`             | 3        | text model writes the summary             |
 
 Priority: the `priority` score (0..4) is rounded and shifted to 1..5.
 
-### Phishing warning
+### Spam and phishing detection
 
-The phishing question is asked in the same triage call. Cheap local signals are added to the
-`state` text so the model judges with context: a domain in the display name that differs from the
-real sender domain, a `Reply-To` on another domain, links whose visible text names a different
-host than the target (`src/shared/link-check.ts`), links to raw IP addresses and punycode hosts.
-The raw score and the signal codes are stored in `ai_decisions` (migration 033). At score ≥ 1.4 the
-mail view shows a banner: "Diese E-Mail sieht nach Phishing aus – klicke keine Links, gib keine
-Zugangsdaten ein." with the warning signs that were found. Noctua **never moves, blocks or deletes**
-mail because of it. It only runs with a decision model.
+Two layers, combined per mail (`src/main/ai/threat-check.ts`):
+
+1. **Local rules, always on, no AI** (`src/main/mail/threat-signals.ts`, homoglyph helpers in
+   `src/shared/confusables.ts`). Each signal carries a phishing weight and a spam weight; the sums
+   are the rule scores. Signals: display name names another domain, `Reply-To` on another domain,
+   sender domain with look-alike letters from another alphabet (Cyrillic/Greek, also decoded from
+   punycode), brand look-alike domain (`paypa1`, `rnicrosoft`, `g00gle`; only real obfuscation
+   counts), brand in the display name sent from a freemail address, DMARC fail / SPF or DKIM fail
+   (only when the headers were stored), the server's own `X-Spam-Flag`, words mixing Latin with
+   Cyrillic/Greek letters, invisible zero-width characters between letters, text-direction
+   controls, link text naming another host than the target, links to IPs, homoglyph or look-alike
+   hosts, punycode hosts, `user@host` tricks, `javascript:`/`data:` URLs and URL shorteners, input
+   forms, pressure phrases together with links, executable / macro / HTML-SVG attachments and
+   double extensions, spam phrases, shouting subjects, image-only mails and hidden text. Mails from
+   known contacts get a spam discount. Signals are recomputed on demand and never stored, so better
+   rules apply to old mail too.
+2. **Decision model** (optional): the hybrid triage asks `phishing` and `spam` (each a score 0..2)
+   with the signal lines in the `state`. Mails that never went through hybrid triage (older than
+   the triage window, other folders, triaged before the model was enabled) get a separate
+   two-question call (`THREAT_QUESTIONS`) when the rules flag them and the mail is opened; the
+   result goes to `mail_threat_checks` (migration 035).
+
+Levels (`combineThreatLevel` in `src/shared/decision-thresholds.ts`): model score ≥ 1.4 → high;
+model ≥ 0.8 plus rules ≥ the "suspicious" rule threshold → high; model ≥ 0.8 or rules ≥ the
+"suspicious" threshold → suspicious; rules ≥ the "high" threshold → high on their own. Rule thresholds:
+phishing 3 / 6, spam 3 / 5.
+
+The email view shows a banner for phishing (high: "Diese E-Mail sieht nach Phishing aus – klicke
+keine Links, gib keine Zugangsdaten ein.", suspicious: a quieter hint) or spam, lists the warning
+signs and offers "Move to junk" in the inbox. Noctua moves mail on its own **only** if the user turns
+on Settings → Privacy → "Move likely spam to junk automatically" (`security.autoJunk`): then a
+freshly triaged inbox mail goes to Junk when spam or phishing is high **and** the model itself says
+at least 0.8 **and** the sender is not a known contact. Rules alone never move mail.
 
 ### Rules with an AI condition
 
@@ -128,7 +155,8 @@ targets profiles marked local, except for the explicit decision-model picker.
   classic triage takes over).
 - Priority and categories are only as good as the model; thresholds are conservative defaults,
   not tuned on real data yet.
-- Phishing is a hint, not a filter; false positives and negatives are expected.
+- Phishing and spam are hints, not filters (unless auto-junk is switched on); false positives and
+  negatives are expected. The brand list for look-alike checks is small and hand-picked.
 - Mails triaged before decision mode was enabled have no stored decision: the event job keeps
   running the generative extraction for them.
 - Image input (Clef) is not used yet.

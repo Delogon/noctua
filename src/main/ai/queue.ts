@@ -4,6 +4,7 @@ import { triageBudgetBlocked } from './providers/registry'
 import { runTriage, PROMPT_VERSION } from './triage'
 import { EVENT_CATEGORIES, runEventExtraction } from './events'
 import { applyRulesPostTriage } from './rules'
+import { maybeAutoJunk } from './threat-check'
 import { maybeNotify, updateBadge } from '../notifications'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
@@ -275,7 +276,8 @@ export class AiQueue {
       db.prepare(`UPDATE ai_jobs SET status = 'done', last_error = NULL WHERE id = ?`).run(job.id)
       try {
         await applyRulesPostTriage(db, job.message_id)
-        maybeNotify(job.message_id)
+        // Aussortierter Spam löst keine Benachrichtigung aus
+        if (!maybeAutoJunk(db, job.message_id)) maybeNotify(job.message_id)
         updateBadge()
       } catch (error) {
         console.warn('[ai] post-triage hooks:', error)
