@@ -1,18 +1,18 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type -- Eval-Tooling in .mjs */
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- eval tooling in .mjs */
 import { spawn } from 'node:child_process'
 import { MAILS, OWNER } from './dataset.mjs'
 
-// Eval-Harness für die On-Device-Triage (M88): misst Prompt-/Pipeline-
-// Varianten gegen die Gold-Labels in dataset.mjs. Nutzung:
+// Eval harness for on-device triage (M88): measures prompt/pipeline
+// variants against the gold labels in dataset.mjs. Usage:
 //   pnpm run build:fm && node scripts/apple-triage-eval/run.mjs [v0|v5|alle]
-// Die Prompts V0/GATE sind Kopien aus src/main/ai/triage.ts — bei Änderungen
-// dort hier nachziehen und NEU MESSEN (drei Läufe, das Modell streut).
-// EVAL_PROMPT_LANG=de misst die früheren deutschen Prompts zum Vergleich.
-// V5 (Gate + Prod-Prompt) ist die produktive Pipeline: P100/R90 auf diesem Set.
+// The V0/GATE prompts are copies from src/main/ai/triage.ts — when they change
+// there, update them here and RE-MEASURE (three runs, the model varies).
+// EVAL_PROMPT_LANG=de measures the earlier German prompts for comparison.
+// V5 (gate + prod prompt) is the production pipeline: P100/R90 on this set.
 
 const HELPER = new URL('../../native/fm-helper/bin/noctua-fm', import.meta.url).pathname
 
-// V0 = exakter Produktions-Prompt aus src/main/ai/triage.ts
+// V0 = exact production prompt from src/main/ai/triage.ts
 const PROMPT_V0_DE = `Du bist der Triage-Klassifikator eines persönlichen E-Mail-Clients.
 Analysiere die E-Mail und antworte AUSSCHLIESSLICH mit einem JSON-Objekt, exakt in dieser Form:
 {
@@ -59,7 +59,7 @@ Sicherheitsvorfall), 4 = Dienst-Warnungen, die bei Ignorieren zu Einschränkunge
 needs_reply nur bei echten Menschen mit Antworterwartung.
 summary nennt den Kern (wer will was), keine Floskeln.`
 
-// Gate-Prompt für die zweistufige Variante V2
+// Gate prompt for the two-stage variant V2
 const PROMPT_GATE_DE = `Du prüfst für einen E-Mail-Client GENAU EINE Frage:
 Bittet in dieser Mail ein einzelner Mensch den im EMPFÄNGER-Block genannten
 Kontoinhaber PERSÖNLICH um etwas, existiert eine echte Frist für IHN
@@ -72,8 +72,8 @@ automatischen Erinnerungen, Rundmails mit Gruppenanrede, Mails deren Anrede
 eine andere Person nennt, reinen Infos ohne Bitte.
 Im Zweifel: NEIN.`
 
-// Englische Prompts (aktuelle Produktion, src/main/ai/triage.ts; Ausgabe Deutsch).
-// EVAL_PROMPT_LANG=de misst zum Vergleich die früheren deutschen Prompts.
+// English prompts (current production, src/main/ai/triage.ts; output German).
+// EVAL_PROMPT_LANG=de measures the earlier German prompts for comparison.
 const PROMPT_V0_EN = `You are the triage classifier of a personal email client.
 Analyse the email and reply ONLY with a JSON object, exactly in this form:
 {
@@ -183,7 +183,7 @@ function userPromptDe(mail) {
     .join('\n')
 }
 
-// Prod-Code-Gates (createTasksFromTriage) nachgebildet
+// Replicates the prod code gates (createTasksFromTriage)
 const TASK_CATEGORIES = new Set(['personal', 'work', 'transactional'])
 const SECURITY_RE =
   /anmeldung|sicherheit|verifizierung|bestätigungscode|passwort|security|verification/i
@@ -341,8 +341,8 @@ if (variant === 'alle' || variant === 'v5') {
   })
 }
 
-// DeepSeek-Vergleich (Cloud-Pfad wie in prod: ein Aufruf, kein Gate).
-// Braucht OPENROUTER_API_KEY in der Umgebung; kostet ~1–2 Cent pro Lauf.
+// DeepSeek comparison (cloud path as in prod: one call, no gate).
+// Needs OPENROUTER_API_KEY in the environment; costs ~1–2 cents per run.
 async function askDeepseek(systemPrompt, prompt) {
   const started = Date.now()
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -359,7 +359,7 @@ async function askDeepseek(systemPrompt, prompt) {
       ],
       response_format: { type: 'json_object' },
       temperature: 0.1,
-      // Hybrid-Reasoner: Denk-Tokens zählen mit — 500 schneidet Antworten ab
+      // Hybrid reasoner: thinking tokens count too — 500 truncates answers
       max_tokens: 1200,
       usage: { include: true }
     })

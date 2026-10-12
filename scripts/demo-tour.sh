@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
-# Dev-only: Demo-Daten + Screenshot-Tour unter Xvfb (Linux, headless).
+# Dev-only: demo data + screenshot tour under Xvfb (Linux, headless).
 #
-#   scripts/demo-tour.sh [ausgabeordner]
+#   scripts/demo-tour.sh [output-dir]
 #
-# Umgebung (optional): DEMO_LOCAL_ONLY=1  Local only einschalten
-#                      DEMO_LANG=de|en    UI-Sprache (Standard en)
-#                      DEMO_PASS=main|local|small|onboarding|decision   Tour-Durchlauf (Standard main)
-#                        decision zeigt Entscheidungsmodelle (Fake-Ollama mit clef-flash): Karte in
-#                        Einstellungen → KI, Regel mit KI-Bedingung, Phishing-Warnung. Mit
-#                        DEMO_NO_DECISION=1 zeigt onboarding stattdessen den Tipp ohne Modell.
-#                        onboarding zeigt die KI-Wahl (Fake-Ollama auf 127.0.0.1:11434); mit einem
-#                        Build mit Org-Konfiguration stattdessen die Org-Profile:
+# Environment (opt.):  DEMO_LOCAL_ONLY=1  turn on Local only
+#                      DEMO_LANG=de|en    UI language (default en)
+#                      DEMO_PASS=main|local|small|onboarding|decision   tour pass (default main)
+#                        decision shows decision models (fake Ollama with clef-flash): card in
+#                        Settings → AI, rule with AI condition, phishing warning. With
+#                        DEMO_NO_DECISION=1, onboarding shows the no-model tip instead.
+#                        onboarding shows the AI choice (fake Ollama on 127.0.0.1:11434); with a
+#                        build with org config, the org profiles instead:
 #                        NOCTUA_ORG_CONFIG=build/org-config.example.json pnpm exec electron-vite build
-#                      DEMO_TIMEOUT=240   Abbruch in Sekunden
+#                      DEMO_TIMEOUT=240   abort after seconds
 #
-# Voraussetzungen: gebauter Main/Renderer (`pnpm exec electron-vite build`),
-# xvfb, dbus-run-session und gnome-keyring (safeStorage braucht unter Linux ein
-# Secret-Backend; der Schlüsselcode schlägt ohne bewusst fehl und bleibt
-# unverändert — das Keyring läuft nur in dieser Wegwerf-Session).
-# Nichts davon wirkt auf einem Produktions-Build: NOCTUA_DEV/NOCTUA_DEMO_SEED
-# greifen nur außerhalb eines app.asar (siehe src/main/security.ts).
+# Requirements: built main/renderer (`pnpm exec electron-vite build`),
+# xvfb, dbus-run-session and gnome-keyring (on Linux safeStorage needs a
+# secret backend; the key code deliberately fails without one and stays
+# unchanged — the keyring only runs in this throwaway session).
+# None of this affects a production build: NOCTUA_DEV/NOCTUA_DEMO_SEED
+# only apply outside an app.asar (see src/main/security.ts).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${1:-${TMPDIR:-/tmp}/noctua-demo-shots}"

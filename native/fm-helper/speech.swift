@@ -2,14 +2,14 @@ import AVFoundation
 import Foundation
 import Speech
 
-// Spracherkennung für Noctua — vollständig on-device, nie Server-Erkennung.
-// Aufruf (Einmal-Prozesse, kein serve-Modus: Diktate sind selten und lang,
-// ein Kindprozess je Diktat lässt sich hart per Timeout beenden und braucht
-// keinen Zustand; außerdem ist Sprache unabhängig von Apple Intelligence):
-//   noctua-fm stt-check <locale>          → Verfügbarkeit, lädt nichts
-//   noctua-fm stt-install <locale>        → lädt das Sprachpaket (System-Download)
-//   noctua-fm transcribe <wav> <locale>   → Transkript einer lokalen Datei
-// Antwort ist immer genau eine JSON-Zeile:
+// Speech recognition for Noctua — fully on-device, never server recognition.
+// Usage (one-shot processes, no serve mode: dictations are rare and long,
+// a child process per dictation can be hard-killed by timeout and needs
+// no state; also, speech is independent of Apple Intelligence):
+//   noctua-fm stt-check <locale>          → availability, downloads nothing
+//   noctua-fm stt-install <locale>        → downloads the language pack (system download)
+//   noctua-fm transcribe <wav> <locale>   → transcript of a local file
+// The response is always exactly one JSON line:
 //   {"ok":true,"text":"…","engine":"speech-analyzer"|"sf-speech"}
 //   {"ok":true,"state":"available"|"assets-missing"|"permission-denied"|"unavailable"}
 //   {"ok":false,"error":"unavailable|assets-missing|permission-denied|failed","detail":"…"}
@@ -23,7 +23,7 @@ struct SpeechFailure: Error {
   }
 }
 
-/// Lokale Datei → Transkript. Wählt SpeechAnalyzer (macOS 26), sonst SFSpeechRecognizer.
+/// Local file → transcript. Picks SpeechAnalyzer (macOS 26), otherwise SFSpeechRecognizer.
 func speechTranscribe(path: String, localeId: String) async throws -> [String: Any] {
   let url = URL(fileURLWithPath: path)
   guard FileManager.default.isReadableFile(atPath: path) else {
@@ -40,7 +40,7 @@ func speechTranscribe(path: String, localeId: String) async throws -> [String: A
       let text = try await analyzerTranscribe(url, transcriber)
       return ["ok": true, "text": text, "engine": "speech-analyzer"]
     case .supported, .downloading:
-      // Download nur ausdrücklich über stt-install — transcribe bleibt offline.
+      // Download only explicitly via stt-install — transcribe stays offline.
       throw SpeechFailure("assets-missing", "Sprachpaket für \(supported.identifier) fehlt")
     case .unsupported:
       break  // → Fallback
@@ -54,7 +54,7 @@ func speechTranscribe(path: String, localeId: String) async throws -> [String: A
 
 @available(macOS 26.0, *)
 func makeTranscriber(_ locale: Locale) -> SpeechTranscriber {
-  // Nur finale Ergebnisse, keine Zeitstempel/Attribute nötig.
+  // Only final results, no timestamps/attributes needed.
   SpeechTranscriber(
     locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
 }
@@ -63,7 +63,7 @@ func makeTranscriber(_ locale: Locale) -> SpeechTranscriber {
 func analyzerTranscribe(_ url: URL, _ transcriber: SpeechTranscriber) async throws -> String {
   let file = try AVAudioFile(forReading: url)
   let analyzer = SpeechAnalyzer(modules: [transcriber])
-  // Ergebnisse parallel einsammeln, während die Datei analysiert wird.
+  // Collect results in parallel while the file is analyzed.
   let collector = Task { () throws -> String in
     var text = ""
     for try await result in transcriber.results {
@@ -84,7 +84,7 @@ func analyzerTranscribe(_ url: URL, _ transcriber: SpeechTranscriber) async thro
   }
 }
 
-/// Fallback: klassische Erkennung, aber ausschließlich on-device.
+/// Fallback: classic recognition, but strictly on-device.
 func sfTranscribe(_ url: URL, _ locale: Locale) async throws -> String {
   guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable,
     recognizer.supportsOnDeviceRecognition
@@ -98,7 +98,7 @@ func sfTranscribe(_ url: URL, _ locale: Locale) async throws -> String {
   request.shouldReportPartialResults = false
 
   return try await withCheckedThrowingContinuation { continuation in
-    var finished = false  // Guard gegen doppeltes Resume
+    var finished = false  // Guard against double resume
     recognizer.recognitionTask(with: request) { result, error in
       if finished { return }
       if let result = result, result.isFinal {
@@ -114,8 +114,8 @@ func sfTranscribe(_ url: URL, _ locale: Locale) async throws -> String {
   }
 }
 
-/// TCC-Abfrage: beim ersten Mal erscheint der System-Dialog (Text aus der
-/// Info.plist der App bzw. dem eingebetteten Helper-Plist).
+/// TCC prompt: the first time, the system dialog appears (text from the app's
+/// Info.plist or the embedded helper plist).
 func ensureSpeechAuthorization() async throws {
   var status = SFSpeechRecognizer.authorizationStatus()
   if status == .notDetermined {
@@ -129,7 +129,7 @@ func ensureSpeechAuthorization() async throws {
   }
 }
 
-/// Verfügbarkeit ohne Seiteneffekte (kein Download, kein Dialog).
+/// Availability without side effects (no download, no dialog).
 func speechCheck(localeId: String) async -> [String: Any] {
   let locale = Locale(identifier: localeId)
   if #available(macOS 26.0, *), SpeechTranscriber.isAvailable,
@@ -157,8 +157,8 @@ func speechCheck(localeId: String) async -> [String: Any] {
   return ["ok": true, "state": "unavailable"]
 }
 
-/// Lädt das Sprachpaket (einziger Pfad mit Netzzugriff — vom System verwaltet,
-/// nur auf ausdrücklichen Wunsch des Nutzers).
+/// Downloads the language pack (the only path with network access — managed by the
+/// system, only at the user's explicit request).
 func speechInstall(localeId: String) async throws -> [String: Any] {
   guard #available(macOS 26.0, *),
     let supported = await SpeechTranscriber.supportedLocale(

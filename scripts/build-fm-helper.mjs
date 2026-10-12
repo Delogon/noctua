@@ -3,21 +3,21 @@ import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Baut den Apple-Foundation-Models-Helper (native/fm-helper). Best effort:
-// ohne Swift-Toolchain oder macOS-26-SDK wird still übersprungen — die App
-// meldet den fehlenden Helper dann sauber in den Einstellungen.
+// Builds the Apple Foundation Models helper (native/fm-helper). Best effort:
+// without a Swift toolchain or macOS 26 SDK it is silently skipped — the app
+// then reports the missing helper cleanly in the settings.
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const srcDir = join(root, 'native', 'fm-helper')
 const sources = ['main.swift', 'speech.swift'].map((file) => join(srcDir, file))
-// Info.plist wird ins Binary eingebettet: TCC liest daraus den Speech-
-// Nutzungstext, auch wenn der Helper als Kindprozess der App läuft.
+// Info.plist is embedded into the binary: TCC reads the speech usage
+// text from it, even when the helper runs as a child process of the app.
 const infoPlist = join(srcDir, 'Info.plist')
 const binDir = join(root, 'native', 'fm-helper', 'bin')
 const binary = join(binDir, 'noctua-fm')
 
-/** @returns {boolean} true, wenn der Helper vorhanden/gebaut ist */
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- .mjs ohne TS-Syntax
+/** @returns {boolean} true if the helper exists/was built */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- .mjs without TS syntax
 export function buildFmHelper({ log = console.log } = {}) {
   if (process.platform !== 'darwin') return false
   if (![...sources, infoPlist].every((file) => existsSync(file))) return false
@@ -31,7 +31,7 @@ export function buildFmHelper({ log = console.log } = {}) {
       return false
     }
     mkdirSync(binDir, { recursive: true })
-    // Frameworks (FoundationModels, Speech, AVFoundation) löst `import` auf.
+    // Frameworks (FoundationModels, Speech, AVFoundation) are resolved by `import`.
     const sectcreate = ['__TEXT', '__info_plist', infoPlist].flatMap((arg, i) =>
       i === 0 ? ['-Xlinker', '-sectcreate', '-Xlinker', arg] : ['-Xlinker', arg]
     )

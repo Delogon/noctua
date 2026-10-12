@@ -15,11 +15,11 @@ const electronViteCli = join(
   electronVitePackage.bin['electron-vite']
 )
 /**
- * esbuild ist ein natives Binary. Liegt im node_modules eines für eine andere
- * Plattform (z. B. aus einem Linux-Container in den Mac-Checkout kopiert),
- * scheitert der Start sonst nur mit `[vite:esbuild] spawn ENOEXEC`.
+ * esbuild is a native binary. If node_modules holds one for another platform
+ * (e.g. copied from a Linux container into the Mac checkout), startup would
+ * otherwise just fail with `[vite:esbuild] spawn ENOEXEC`.
  */
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- .mjs ohne TS-Syntax
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- .mjs without TS syntax
 function assertNativeEsbuild() {
   for (const owner of ['vite', 'electron-vite']) {
     let esbuild
@@ -51,14 +51,14 @@ const forwardedArgs = requestedCommand === 'preview' ? process.argv.slice(3) : p
 if (process.platform === 'darwin') {
   env.ELECTRON_EXEC_PATH = prepareNoctuaDevApp()
   console.log('[dev] Starte die gebrandete Noctua-Dev-App')
-  // Apple-Intelligence-Helper mitbauen (überspringt still ohne Swift/SDK 26)
+  // Also build the Apple Intelligence helper (silently skipped without Swift/SDK 26)
   buildFmHelper()
 }
 
-// Die gebrandete Binary lässt app.isPackaged fälschlich true melden — ohne
-// dieses Signal würde der Main-Prozess die Prod-Datenbank sperren und den
-// gebauten Renderer statt des Vite-Dev-Servers laden. `preview` bleibt
-// bewusst prod-nah (gebauter Renderer, Prod-userData).
+// The branded binary makes app.isPackaged wrongly report true — without
+// this signal the main process would lock the prod database and load the
+// built renderer instead of the Vite dev server. `preview` deliberately
+// stays close to prod (built renderer, prod userData).
 if (command === 'dev') env.NOCTUA_DEV = '1'
 
 const child = spawn(process.execPath, [electronViteCli, command, ...forwardedArgs], {
