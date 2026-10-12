@@ -8,6 +8,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Fixed
 
+- **Slow thread list**: building the list ran about eight database queries per thread (≈2,350 for 300 threads) on every refresh. A page is now built with eight set-based queries in total, and small folders such as Junk no longer scan the whole mailbox (inbox list at 5,000 messages: 389 ms → 30 ms).
 - **Refresh storms while syncing**: change events from backfill chunks, sync passes and the AI queue are now coalesced. The main process kicks the AI queue, search indexer and badge once per burst, and the list, counts and folders refetch at most about once per second instead of once per event.
 - **Constant refreshes during sync**: every IDLE event, watchdog tick and folder poll re-applied the flags of the newest 500 messages one write at a time and reported all of them as changed, so the list, counts, AI queue and search index refreshed even when nothing had changed. The flags are now applied in one transaction and only real changes are reported.
 - **Slow sync of large mailboxes**: storing each incoming reply looked up its thread by walking the whole account, so ingest got slower as the mailbox grew (≈66 ms per message at 20,000 messages). A new index (migration 036) makes it a direct lookup (≈3 ms per message, flat).
