@@ -4,7 +4,7 @@ import { isTlsPinMismatch } from '../auth/loopback-tls'
 import { imapConnectOptions, type AccountRow, type MailCredentials } from '../auth/providers'
 import { parseMail } from '../mail/parser'
 import {
-  applyFlagUpdate,
+  applyFlagUpdates,
   deleteByUids,
   storeBody,
   upsertEnvelope,
@@ -628,29 +628,26 @@ export class AccountSyncer {
     const minUid = known[known.length - 1].uid
     const endFlags = metrics.span('sync.incremental.flags')
     const serverUids = new Set<number>()
-    const changedThreads = new Set<string>()
+    const updates: Array<{ uid: number; flags: Set<string> }> = []
     for await (const msg of this.cmd!.fetch(
       `${minUid}:*`,
       { uid: true, flags: true },
       { uid: true }
     )) {
       serverUids.add(msg.uid)
-      const id = applyFlagUpdate(this.db, folder.id, msg.uid, msg.flags ?? new Set())
-      if (id !== null) {
-        const row = this.db.prepare('SELECT thread_key FROM messages WHERE id = ?').get(id) as
-          { thread_key: string } | undefined
-        if (row) changedThreads.add(row.thread_key)
-      }
+      updates.push({ uid: msg.uid, flags: msg.flags ?? new Set() })
     }
+    // Only real changes count: an unchanged window must not refresh ~500 threads
+    const changedThreads = applyFlagUpdates(this.db, folder.id, updates)
     const vanished = known.filter((k) => !serverUids.has(k.uid)).map((k) => k.uid)
     if (vanished.length > 0) deleteByUids(this.db, folder.id, vanished)
     endFlags({
       uids: serverUids.size,
-      changedThreads: changedThreads.size,
+      changedThreads: changedThreads.length,
       vanished: vanished.length
     })
-    if (vanished.length > 0 || changedThreads.size > 0) {
-      this.events.onMessagesChanged(folder.id, [...changedThreads])
+    if (vanished.length > 0 || changedThreads.length > 0) {
+      this.events.onMessagesChanged(folder.id, changedThreads)
     }
   }
 
