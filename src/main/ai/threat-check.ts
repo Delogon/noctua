@@ -11,8 +11,14 @@ import { htmlToText } from '../mail/parser'
 import { computeMailSignals, type MailSignalInput, type MailSignals } from '../mail/threat-signals'
 import { getMessageHeaderDetails } from '../db/repos/message-headers'
 import { resolveDecision } from './providers/registry'
-import { decide, isDecisionConfigError, scoreOf } from './providers/systemone'
-import { DECISION_STATE_NOTE, THREAT_QUESTIONS } from './decision-triage'
+import { decide, decideEach, isDecisionConfigError, scoreOf } from './providers/systemone'
+import {
+  THREAT_QUESTIONS,
+  decisionMode,
+  fullState,
+  questionState,
+  type StateBlocks
+} from './decision-triage'
 import { logUsage } from './budget'
 import { sanitizeUntrusted, sanitizeUntrustedLine, wrapUntrusted } from './untrusted'
 
@@ -195,34 +201,45 @@ export async function runThreatCheck(
   const input = loadThreatInput(db, messageId, row)!
   const signals = computeMailSignals(input)
   const body = sanitizeUntrusted(input.text ?? '', 6000)
-  const state = [
-    DECISION_STATE_NOTE,
-    '',
-    `From: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unknown', 200)}>`,
-    `Subject: ${sanitizeUntrustedLine(row.subject, 300) || '(no subject)'}`,
-    input.knownSender
+  let replyTo: string | null = null
+  try {
+    const addresses = (JSON.parse(row.reply_to ?? '[]') as Array<{ address?: string }>)
+      .map((r) => r.address)
+      .filter((a): a is string => !!a)
+    if (addresses.length > 0)
+      replyTo = `Reply-To: ${sanitizeUntrustedLine(addresses.join(', '), 300)}`
+  } catch {
+    // broken JSON: no Reply-To line
+  }
+  const security = signalStateBlock(signals).trim()
+  const blocks: StateBlocks = {
+    header: [
+      `From: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unknown', 200)}>`,
+      `Subject: ${sanitizeUntrustedLine(row.subject, 300) || '(no subject)'}`
+    ].join('\n'),
+    replyTo,
+    recipient: null,
+    signals: input.knownSender
       ? 'Signals: The recipient has written to this sender before (known contact)'
       : null,
-    '',
-    'Content:',
-    wrapUntrusted('MAIL', body || '(no text content)'),
-    signalStateBlock(signals)
-  ]
-    .filter((line) => line !== null)
-    .join('\n')
+    security: security || null,
+    body: `Content:\n${wrapUntrusted('MAIL', body || '(no text content)')}`,
+    bodyShort: `Content (excerpt):\n${wrapUntrusted('MAIL', body.slice(0, 2000) || '(no text content)')}`
+  }
+  const params = { baseUrl: cfg.profile.baseUrl, apiKey: cfg.apiKey, model: cfg.model }
 
-  let result: Awaited<ReturnType<typeof decide>>
+  let result: {
+    answers: Awaited<ReturnType<typeof decide>>['answers']
+    usage: { inputTokens: number; outputTokens: number }
+  }
   try {
-    result = await decide({
-      baseUrl: cfg.profile.baseUrl,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
-      state,
-      questions: THREAT_QUESTIONS
-    })
+    result =
+      decisionMode() === 'single'
+        ? await decide({ ...params, state: fullState(blocks), questions: THREAT_QUESTIONS })
+        : await decideEach(params, THREAT_QUESTIONS, (name) => questionState(name, blocks))
   } catch (error) {
     if (isDecisionConfigError(error)) {
-      console.warn('[security] Entscheidungsmodell unbrauchbar:', error)
+      console.warn('[security] decision model unusable:', error)
       return null
     }
     throw error

@@ -40,18 +40,20 @@ transient). Usage is logged with cost 0.
 
 ## Which features use it
 
-| Feature           | Question(s)                                                                                                                                                                               | What it saves                                                                  |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Hybrid triage     | `category` (choice), `priority` (score 5 levels), `needs_reply`, `addressed_to_me`, `has_request`, `proposes_meeting` (noul), `phishing`, `spam` (score 3 levels) — **one call per mail** | the generative triage call; the text model runs only when a gate opens (below) |
-| Follow-up radar   | `expects_reply` (noul) for sent mails                                                                                                                                                     | the generative "does this expect a reply" call                                 |
-| Event suggestions | `proposes_meeting` from the triage decision (stored)                                                                                                                                      | the generative event extraction for every mail that proposes no meeting        |
-| Phishing warning  | `phishing` + local signals (below)                                                                                                                                                        | nothing to generate; adds a warning banner in the mail view                    |
-| Rules             | one `noul` question per rule with an **AI condition**, batched into one call per mail                                                                                                     | n/a (new capability)                                                           |
+| Feature           | Question(s)                                                                                                                                                                                   | What it saves                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Hybrid triage     | `category` (choice), `priority` (score 5 levels), `needs_reply`, `addressed_to_me`, `has_request`, `proposes_meeting` (noul), `phishing`, `spam` (score 3 levels) — **one call per question** | the generative triage call; the text model runs only when a gate opens (below) |
+| Follow-up radar   | `expects_reply` (noul) for sent mails                                                                                                                                                         | the generative "does this expect a reply" call                                 |
+| Event suggestions | `proposes_meeting` from the triage decision (stored)                                                                                                                                          | the generative event extraction for every mail that proposes no meeting        |
+| Phishing warning  | `phishing` + local signals (below)                                                                                                                                                            | nothing to generate; adds a warning banner in the mail view                    |
+| Rules             | one `noul` question per rule with an **AI condition**, one call per rule                                                                                                                      | n/a (new capability)                                                           |
 
 ### Hybrid triage: decide first, write only if needed
 
-1. One System One call yields category, priority, `needs_reply`, `addressed_to_me`, `has_request`,
-   `proposes_meeting` and the phishing score.
+1. System One answers category, priority, `needs_reply`, `addressed_to_me`, `has_request`,
+   `proposes_meeting`, `phishing` and `spam`. Each question is its own call (sent in parallel) with
+   a short, explicit definition of what counts as "yes" and only the context it needs (see
+   [One call per question](#one-call-per-question)).
 2. The text model (existing triage profile/model) runs **only** if a gate opens:
    - **task titles**: `has_request ≥ 0.5` and `addressed_to_me ≥ 0.5`, and the mail is not
      self-authored / a forward without a request (the existing rules still apply);
@@ -72,6 +74,36 @@ small) Noctua falls back to the classic triage for that mail. Transient errors (
 follow the AI queue's retry/circuit-breaker rules. If no text model is usable (e.g. Local only with
 an external triage profile) the decision part still runs; summaries are extractive and no task
 titles are generated.
+
+### One call per question
+
+Decision calls are cheap, so every question gets its own call instead of one long `state` with all
+questions at once. Each question (`TRIAGE_QUESTIONS` in `src/main/ai/decision-triage.ts`) states
+precisely what counts, e.g. `has_request` only for a concrete action the sender asks of the
+recipient, not for newsletters' calls to action. The `state` of each call holds the mail header plus
+only the blocks that question needs (`QUESTION_CONTEXT`):
+
+| Question                         | Context besides the header                     |
+| -------------------------------- | ---------------------------------------------- |
+| `category`                       | sender signals, body                           |
+| `priority`, `needs_reply`        | recipient, sender signals, body                |
+| `addressed_to_me`, `has_request` | recipient, body                                |
+| `proposes_meeting`               | body                                           |
+| `phishing`                       | Reply-To, sender signals, security, short body |
+| `spam`                           | sender signals, security, body                 |
+
+The separate security check and rules with an AI condition work the same way. The setting
+`ai.decisionMode = single` switches back to one combined call per mail (for comparison or slow
+servers).
+
+**Eval**: `pnpm test:decision-eval` runs the real triage against a labelled set of 32 German and
+English mails (`test/local/decision-eval.dataset.ts`) in both modes and reports accuracy,
+precision/recall and latency per mail to `test/local/out/`. It needs a reachable Ollama with a
+decision model:
+
+```sh
+NOCTUA_OLLAMA_URL=http://127.0.0.1:11434 NOCTUA_DECISION_MODEL=clef-flash pnpm test:decision-eval
+```
 
 ### Thresholds
 
@@ -113,7 +145,7 @@ Two layers, combined per mail (`src/main/ai/threat-check.ts`):
 2. **Decision model** (optional): the hybrid triage asks `phishing` and `spam` (each a score 0..2)
    with the signal lines in the `state`. Mails that never went through hybrid triage (older than
    the triage window, other folders, triaged before the model was enabled) get a separate
-   two-question call (`THREAT_QUESTIONS`) when the rules flag them and the mail is opened; the
+   check (`THREAT_QUESTIONS`, one call per question) when the rules flag them and the mail is opened; the
    result goes to `mail_threat_checks` (migration 035).
 
 Levels (`combineThreatLevel` in `src/shared/decision-thresholds.ts`): model score ≥ 1.4 → high;
@@ -132,7 +164,8 @@ at least 0.8 **and** the sender is not a known contact. Rules alone never move m
 
 A rule may carry `aiCondition` (natural-language yes/no question, ≤ 200 characters, e.g. "Ist das
 eine Rechnung?"). After triage Noctua asks the decision model all AI conditions of all enabled rules
-whose other criteria already match, in **one call** (one `noul` question per rule, at most 64). A
+whose other criteria already match, one `noul` call per rule (at most 16 per mail; 64 in one
+combined call with `ai.decisionMode = single`). A
 rule fires if its probability is ≥ 0.6 and all other conditions match. Without a decision model
 (or when the call fails) rules with an AI condition are skipped; the rules list shows a hint. The
 condition text is authored by the user (trusted); the mail content is passed as untrusted data

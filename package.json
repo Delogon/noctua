@@ -18,6 +18,7 @@
     "build:fm": "node scripts/build-fm-helper.mjs --strict",
     "test": "vitest run",
     "test:semantic-eval": "NOCTUA_SEMANTIC_EVAL=1 vitest run test/local/semantic-search-eval.local.test.ts --reporter=verbose",
+    "test:decision-eval": "NOCTUA_DECISION_EVAL=1 vitest run test/local/decision-eval.local.test.ts --reporter=verbose",
     "test:perf": "NOCTUA_PERF_BENCH=1 vitest run test/local/large-mailbox.bench.local.test.ts --reporter=verbose",
     "test:watch": "vitest",
     "test:ci": "vitest run",

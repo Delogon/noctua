@@ -324,6 +324,39 @@ export async function decide(params: DecideParams): Promise<DecideResult> {
   }
 }
 
+export interface DecideEachResult extends DecideResult {
+  /** Number of System One requests made */
+  calls: number
+}
+
+/**
+ * One request per question, run concurrently, each with its own state. Answers
+ * are merged and usage summed. Throws the first error (a config error on any
+ * call means the model is unusable; a transient one fails the whole decision).
+ */
+export async function decideEach(
+  params: Omit<DecideParams, 'questions' | 'state'>,
+  questions: Questions,
+  stateFor: (name: string) => string
+): Promise<DecideEachResult> {
+  const names = Object.keys(questions)
+  const results = await Promise.all(
+    names.map((name) =>
+      decide({ ...params, questions: { [name]: questions[name] }, state: stateFor(name) })
+    )
+  )
+  return {
+    answers: Object.assign({}, ...results.map((r) => r.answers)),
+    usage: {
+      inputTokens: results.reduce((sum, r) => sum + r.usage.inputTokens, 0),
+      outputTokens: results.reduce((sum, r) => sum + r.usage.outputTokens, 0)
+    },
+    truncated: results.some((r) => r.truncated),
+    model: results[0]?.model ?? params.model,
+    calls: results.length
+  }
+}
+
 // --- Response helpers -------------------------------------------------------------------------
 
 export function noulOf(answers: Record<string, Answer>, name: string): number {
