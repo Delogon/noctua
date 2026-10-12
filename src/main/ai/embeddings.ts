@@ -14,6 +14,8 @@ const SCAN_LIMIT = 48
 const POLL_INTERVAL_MS = 60_000
 /** Pause between batches on battery: the index is not worth draining it. */
 const BATTERY_PAUSE_MS = 2_000
+/** Startup maintenance (orphans, legacy states) after the window is up. */
+const MAINTENANCE_DELAY_MS = 5_000
 /** The orphan reconciliation scans FTS and vector tables completely. */
 const ORPHAN_CLEANUP_INTERVAL_MS = 6 * 60 * 60_000
 
@@ -191,6 +193,7 @@ export class EmbeddingIndexer {
   private db: Database.Database | null = null
   private timer: NodeJS.Timeout | null = null
   private startupTimer: NodeJS.Timeout | null = null
+  private maintenanceTimer: NodeJS.Timeout | null = null
   private running = false
   private reconciled = false
   private modelState: EmbeddingModelState = 'not_loaded'
@@ -199,14 +202,22 @@ export class EmbeddingIndexer {
 
   init(db: Database.Database): void {
     this.db = db
-    const cleaned = cleanupSearchOrphans(db)
+  }
+
+  /**
+   * Orphan cleanup and the legacy state backfill: full scans, so they run
+   * shortly after startup (start) instead of before the window is usable.
+   */
+  maintain(): void {
+    if (!this.db) return
+    const cleaned = metrics.time('ai.embed.cleanupOrphans', () => cleanupSearchOrphans(this.db!))
     this.lastOrphanCleanup = Date.now()
     if (cleaned.fts + cleaned.vectors + cleaned.states > 0) {
       console.log(
         `[embeddings] Orphans entfernt: ${cleaned.fts} FTS, ${cleaned.vectors} Vektoren, ${cleaned.states} Staende`
       )
     }
-    this.ensureSearchStates()
+    metrics.time('ai.embed.ensureStates', () => this.ensureSearchStates())
   }
 
   start(): void {
@@ -225,6 +236,10 @@ export class EmbeddingIndexer {
         console.warn('[embeddings] reindex:', error)
       }
     }
+    this.maintenanceTimer = setTimeout(() => {
+      this.maintenanceTimer = null
+      this.maintain()
+    }, MAINTENANCE_DELAY_MS)
     this.startupTimer = setTimeout(() => this.kick(), 30_000)
     this.timer = setInterval(() => this.kick(), POLL_INTERVAL_MS)
   }
@@ -232,8 +247,10 @@ export class EmbeddingIndexer {
   stop(): void {
     if (this.timer) clearInterval(this.timer)
     if (this.startupTimer) clearTimeout(this.startupTimer)
+    if (this.maintenanceTimer) clearTimeout(this.maintenanceTimer)
     this.timer = null
     this.startupTimer = null
+    this.maintenanceTimer = null
     void backend?.then((current) => current.stop?.())
   }
 

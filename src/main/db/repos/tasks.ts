@@ -245,6 +245,27 @@ export function countOpenTasks(db: Database.Database): number {
   ).length
 }
 
+/** Settings flag: the forward cleanup below already ran on this database. */
+export const FORWARD_TASK_CLEANUP_FLAG = 'tasks.forwardCleanupDone'
+
+/**
+ * Startup: runs the forward cleanup once per database. Triage has suppressed
+ * these tasks since, so later launches have nothing to repair (and must not
+ * remove a task the user created by hand from a forward).
+ */
+export function cleanupForwardTasksOnce(db: Database.Database): number {
+  const done = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get(FORWARD_TASK_CLEANUP_FLAG) as { value: string } | undefined
+  if (done?.value === '1') return 0
+  const removed = cleanupForwardTasksWithoutRequest(db)
+  db.prepare(
+    `INSERT INTO settings (key, value) VALUES (?, '1')
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+  ).run(FORWARD_TASK_CLEANUP_FLAG)
+  return removed
+}
+
 /** Removes old automatic tasks that only stem from FYI forwards. */
 export function cleanupForwardTasksWithoutRequest(db: Database.Database): number {
   const rows = db

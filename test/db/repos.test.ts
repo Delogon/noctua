@@ -4,6 +4,7 @@ import { upsertEnvelope, storeBody } from '@main/mail/ingest'
 import { listThreads, getThreadMessages } from '@main/db/repos/threads'
 import {
   createTasksFromTriage,
+  cleanupForwardTasksOnce,
   cleanupForwardTasksWithoutRequest,
   listTasks,
   countOpenTasks,
@@ -602,6 +603,31 @@ describe('tasks-repo', () => {
 
     expect(cleanupForwardTasksWithoutRequest(db)).toBe(1)
     expect(countOpenTasks(db)).toBe(0)
+  })
+
+  it('runs the forward cleanup at startup only once per database', () => {
+    db = createTestDb()
+    const accountId = seedAccount(db)
+    const inbox = seedFolder(db, accountId, '\\Inbox')
+    const messageId = insertWithBody(
+      db,
+      accountId,
+      inbox,
+      { uid: 54, messageId: '<fyi-once@test>', subject: 'Fwd: Nur zur Information' },
+      { text: 'FYI\n\nAnfang der weitergeleiteten Nachricht:\nVon: Alice\nBitte antworten.' }
+    )
+    const addTask = (): void => {
+      db.prepare(
+        `INSERT INTO tasks (source_kind, source_id, account_id, title, status, created_at)
+         VALUES ('mail', ?, ?, 'Aufgabe', 'open', 1)`
+      ).run(messageId, accountId)
+    }
+    addTask()
+    expect(cleanupForwardTasksOnce(db)).toBe(1)
+    // A task the user creates later from the same forward stays
+    addTask()
+    expect(cleanupForwardTasksOnce(db)).toBe(0)
+    expect(db.prepare('SELECT count(*) FROM tasks').pluck().get()).toBe(1)
   })
 
   it('updateTaskStatus erledigt und entfernt aus der offenen Liste', () => {
