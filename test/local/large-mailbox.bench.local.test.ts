@@ -13,6 +13,7 @@ import { listFolders, listThreads, mboxCounts } from '@main/db/repos/threads'
 import { metrics } from '@main/diagnostics/metrics'
 import { instrumentDb } from '@main/diagnostics/db-profiler'
 import { runBenchmark } from '@main/diagnostics/benchmark'
+import { configureCache, optimizeDb } from '@main/db/optimize'
 import { collectDatasetStats } from '@main/diagnostics/dataset'
 import { makeEnvelope } from '../helpers/db'
 
@@ -145,12 +146,19 @@ localDescribe('Großpostfach-Benchmark (synthetisch, lokal)', () => {
         db.pragma('journal_mode = WAL')
         db.pragma('synchronous = NORMAL')
         db.pragma('foreign_keys = ON')
+        configureCache(db)
         runMigrations(db)
         __setTestDb(db)
 
         const seedStart = performance.now()
         seed(db, TOTAL)
         const seedMs = Math.round(performance.now() - seedStart)
+        // Like the app a minute after startup: planner statistics in place.
+        // Checkpoint the seed's WAL first so only the analysis is timed.
+        db.pragma('wal_checkpoint(TRUNCATE)')
+        const optimizeStart = performance.now()
+        optimizeDb(db, true)
+        const optimizeMs = Math.round(performance.now() - optimizeStart)
         metrics.reset()
         metrics.enabled = true
         instrumentDb(db)
@@ -183,6 +191,7 @@ localDescribe('Großpostfach-Benchmark (synthetisch, lokal)', () => {
         const result = {
           messages: TOTAL,
           seedMs,
+          optimizeMs,
           cases: benchmark.cases,
           extra: {
             'sync.flagPass(500 uids)': flagPass,
@@ -205,7 +214,7 @@ localDescribe('Großpostfach-Benchmark (synthetisch, lokal)', () => {
         writeFileSync(out, JSON.stringify(result, null, 2))
         console.log(
           [
-            `\nGroßpostfach-Benchmark: ${TOTAL} Nachrichten (Seed ${seedMs} ms)`,
+            `\nGroßpostfach-Benchmark: ${TOTAL} Nachrichten (Seed ${seedMs} ms, optimize ${optimizeMs} ms)`,
             ...benchmark.cases.map(
               (c) =>
                 `  ${c.name.padEnd(40)} ${String(c.medianMs).padStart(9)} ms  ${String(c.statements).padStart(6)} SQL`

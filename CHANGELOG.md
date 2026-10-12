@@ -8,6 +8,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Fixed
 
+- **Query planning with statistics**: Noctua now keeps SQLite's planner statistics up to date (a minute after startup, every six hours and on quit; only tables that grew a lot are re-analysed) and uses a 32 MB page cache, so fewer pages have to be read and decrypted. AI triage discovery now reads only the last 30 days of each inbox instead of every message (migration 037). Search results stay on direct lookups regardless of the statistics.
 - **Slow thread list**: building the list ran about eight database queries per thread (≈2,350 for 300 threads) on every refresh. A page is now built with eight set-based queries in total, and small folders such as Junk no longer scan the whole mailbox (inbox list at 5,000 messages: 389 ms → 30 ms).
 - **Refresh storms while syncing**: change events from backfill chunks, sync passes and the AI queue are now coalesced. The main process kicks the AI queue, search indexer and badge once per burst, and the list, counts and folders refetch at most about once per second instead of once per event.
 - **Constant refreshes during sync**: every IDLE event, watchdog tick and folder poll re-applied the flags of the newest 500 messages one write at a time and reported all of them as changed, so the list, counts, AI queue and search index refreshed even when nothing had changed. The flags are now applied in one transaction and only real changes are reported.

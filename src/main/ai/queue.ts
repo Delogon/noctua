@@ -28,16 +28,21 @@ const EVENTS_SINCE_SETTING = 'ai.eventsSince'
 /**
  * Enqueue triage candidates (parameters: since, PROMPT_VERSION). Exported
  * so the diagnostic benchmark measures the same query.
+ *
+ * Starts from the Inbox folders (CROSS JOIN fixes the loop order, with or
+ * without planner statistics) and seeks the date window in
+ * idx_msg_folder_date (the date expression must match the index), so a pass
+ * reads only the last 30 days instead of every message.
  */
 export const TRIAGE_DISCOVERY_SQL = `INSERT OR IGNORE INTO ai_jobs (message_id, kind, status)
   SELECT m.id, 'triage', 'pending'
-  FROM messages m
-  JOIN folders f ON f.id = m.folder_id
+  FROM folders f
+  CROSS JOIN messages m ON m.folder_id = f.id
   JOIN accounts a ON a.id = m.account_id
   WHERE f.special_use = '\\Inbox'
+    AND coalesce(m.date, m.internal_date) >= ?
     AND m.body_state = 'full'
     AND a.ai_enabled = 1
-    AND coalesce(m.date, m.internal_date, 0) >= ?
     AND NOT EXISTS (
       SELECT 1 FROM ai_annotations an
       WHERE an.message_id = m.id AND an.prompt_version = ?
