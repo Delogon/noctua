@@ -35,6 +35,10 @@ vi.mock('electron', () => {
       getAppPath: () => process.cwd(),
       on: vi.fn()
     },
+    powerMonitor: {
+      isOnBatteryPower: () => false,
+      on: vi.fn()
+    },
     safeStorage: {
       isEncryptionAvailable: () => true,
       // Reversible „encryption" for vault behavior in tests
