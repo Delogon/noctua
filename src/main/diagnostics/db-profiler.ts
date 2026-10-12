@@ -9,9 +9,9 @@ type StatementMethod = 'run' | 'get' | 'all'
 type SqlCapture = (sql: string, args: unknown[]) => void
 let capture: SqlCapture | null = null
 /**
- * Nur für den Benchmark: meldet ausgeführtes SQL samt Parametern, damit
- * EXPLAIN QUERY PLAN mit denselben Werten laufen kann. Die Werte verlassen
- * den Prozess nie; exportiert wird nur der Plan.
+ * Benchmark only: reports executed SQL including parameters so that
+ * EXPLAIN QUERY PLAN can run with the same values. The values never leave
+ * the process; only the plan is exported.
  */
 export function setSqlCapture(fn: SqlCapture | null): void {
   capture = fn
@@ -24,10 +24,10 @@ function rowsOf(method: StatementMethod, result: unknown): number {
 }
 
 /**
- * Misst jede SQL-Anweisung der Verbindung: Kompilieren (prepare) und Ausführen
- * (run/get/all) je normalisiertem SQL-Text. Damit sieht der Export, welche
- * Abfragen bei großen Postfächern Zeit kosten — ohne Parameterwerte. iterate()
- * bleibt ungemessen (Laufzeit hängt am Aufrufer). Idempotent.
+ * Measures every SQL statement of the connection: compiling (prepare) and executing
+ * (run/get/all) per normalized SQL text. This lets the export show which
+ * queries cost time with large mailboxes — without parameter values. iterate()
+ * stays unmeasured (its runtime depends on the caller). Idempotent.
  */
 export function instrumentDb(db: Database.Database, target: Metrics = metrics): void {
   const marked = db as unknown as Record<symbol, boolean>

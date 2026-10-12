@@ -5,8 +5,8 @@ import { startDraftNew, startDraftReply } from '../ai/drafts'
 import { startChat } from '../ai/chat'
 
 /**
- * Dev-only Draft-Streaming-Test (NOCTUA_TEST_DRAFT=1): startet einen
- * AI-Antwortentwurf auf den neuesten Thread und loggt die Chunks.
+ * Dev-only draft streaming test (NOCTUA_TEST_DRAFT=1): starts an
+ * AI reply draft on the newest thread and logs the chunks.
  */
 export function runDraftTest(db: Database.Database): void {
   setTimeout(() => {
@@ -40,8 +40,8 @@ export function runDraftTest(db: Database.Database): void {
 }
 
 /**
- * Dev-only Idee→Mail-Test (NOCTUA_TEST_DRAFT_NEW=1): verfasst aus einer
- * Diktat-Idee eine neue Mail und prüft das BETREFF-Protokoll live.
+ * Dev-only idea→mail test (NOCTUA_TEST_DRAFT_NEW=1): composes a new mail from a
+ * dictated idea and checks the SUBJECT protocol live.
  */
 export function runDraftNewTest(db: Database.Database): void {
   setTimeout(() => {
@@ -83,10 +83,10 @@ export function runDraftNewTest(db: Database.Database): void {
 }
 
 /**
- * Dev-only E2E-Roundtrip (NOCTUA_TEST_SELF_SEND=1): sendet eine Mail an das
- * eigene Konto, wartet auf die IDLE-Zustellung in der INBOX, antwortet darauf
- * (In-Reply-To/References) und loggt die gemessene Latenz. Verifiziert SMTP,
- * Sent-Ablage, IDLE-Push und Threading gegen den echten Server.
+ * Dev-only E2E round trip (NOCTUA_TEST_SELF_SEND=1): sends a mail to the
+ * own account, waits for IDLE delivery in the INBOX, replies to it
+ * (In-Reply-To/References) and logs the measured latency. Verifies SMTP,
+ * Sent filing, IDLE push and threading against the real server.
  */
 export function runSelfSendTest(db: Database.Database): void {
   setTimeout(() => {
@@ -161,7 +161,7 @@ export function runSelfSendTest(db: Database.Database): void {
   }, 10_000)
 }
 
-/** Dev-only Chat-Test (NOCTUA_TEST_CHAT="Frage"): loggt Antwort + Quellen. */
+/** Dev-only chat test (NOCTUA_TEST_CHAT="Frage"): logs answer + sources. */
 export function runChatTest(db: Database.Database, question: string): void {
   setTimeout(() => {
     console.log(`[chattest] Frage: ${question}`)
@@ -185,7 +185,7 @@ export function runChatTest(db: Database.Database, question: string): void {
   }, 15_000)
 }
 
-/** Dev-only M10-Test (NOCTUA_TEST_M10=1). */
+/** Dev-only M10 test (NOCTUA_TEST_M10=1). */
 export function runM10Test(db: Database.Database): void {
   setTimeout(() => {
     void (async () => {
@@ -194,7 +194,7 @@ export function runM10Test(db: Database.Database): void {
         { id: number; email: string } | undefined
       if (!account) return console.log('[m10test] kein Konto')
 
-      // 1. Undo Send: einreihen, sofort abbrechen
+      // 1. Undo Send: enqueue, cancel immediately
       const { outboxId } = outboxWorker.enqueue(account.id, {
         to: [account.email],
         cc: [],
@@ -210,7 +210,7 @@ export function runM10Test(db: Database.Database): void {
       ).state
       console.log(`[m10test] Outbox-Status nach Cancel: ${state} (erwartet: canceled)`)
 
-      // 2. NL-Regel übersetzen
+      // 2. Translate NL rule
       try {
         const { draftRule } = await import('../ai/rules')
         const drafted = await draftRule(

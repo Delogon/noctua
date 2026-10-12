@@ -120,7 +120,7 @@ import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 let pushFn: PushFn = () => {}
 
-/** Vom Bootstrap gesetzt — Handler, die streamen, pushen darüber. */
+/** Set by bootstrap — handlers that stream push through it. */
 export function setHandlerPush(fn: PushFn): void {
   pushFn = fn
 }
@@ -131,7 +131,7 @@ async function testImapLogin(
   host: string,
   port: number
 ): Promise<void> {
-  // imapConnectOptions kennt die Sonderfälle (STARTTLS-Ports, Loopback-Bridge)
+  // imapConnectOptions knows the special cases (STARTTLS ports, loopback Bridge)
   const client = new ImapFlow(
     await imapConnectOptions(
       { email, provider: 'imap', imap_host: host, imap_port: port },
@@ -149,10 +149,10 @@ function getAccountRow(accountId: number): AccountRow {
   return row
 }
 
-/** Syncer mit neuen Zugangsdaten (neu) starten — auch wenn er gar nicht lief (z. B. Passwort fehlte). */
+/** (Re)start the syncer with new credentials — even if it was not running (e.g. no password). */
 async function restartSyncer(row: AccountRow, secretKey: string): Promise<void> {
   await syncEngine.credentialsChanged(secretKey)
-  syncEngine.startAccount(row) // no-op, falls credentialsChanged ihn schon gestartet hat
+  syncEngine.startAccount(row) // no-op if credentialsChanged has already started it
 }
 
 function toSummary(row: AccountRow): AccountSummary {
@@ -226,8 +226,8 @@ export const handlers: IpcHandlers = {
     return { ok: true }
   },
 
-  // Allowlist hier nochmals erzwungen (nicht nur im zod-Schema): OAuth-Client-
-  // Konfiguration und fremde Secrets bleiben für den Renderer unerreichbar.
+  // Allowlist enforced again here (not only in the zod schema): OAuth client
+  // configuration and other secrets stay out of the renderer's reach.
   'settings:get': ({ key }) => {
     assertSettingReadable(key)
     return { value: getSetting(key) }
@@ -242,7 +242,7 @@ export const handlers: IpcHandlers = {
   'secrets:set': ({ key, value }) => {
     assertSecretKey(key)
     setSecret(key, value)
-    // Geänderte Konto-Zugangsdaten beenden needs-reauth (Syncer liest neu)
+    // Changed account credentials end needs-reauth (syncer re-reads)
     void syncEngine
       .credentialsChanged(key)
       .catch((error) => console.warn('[sync] credentialsChanged:', error))
@@ -264,7 +264,7 @@ export const handlers: IpcHandlers = {
     const smtpPort = input.smtpPort ?? gmail?.smtpPort ?? 465
     if (!imapHost || !smtpHost) throw new Error('IMAP- oder SMTP-Host fehlt')
 
-    // App-Passwörter kommen oft mit Leerzeichen formatiert
+    // App passwords often come formatted with spaces
     const password = input.password.replace(/\s+/g, '')
     await testImapLogin(input.email, password, imapHost, imapPort)
 
@@ -297,14 +297,14 @@ export const handlers: IpcHandlers = {
 
   'accounts:addMicrosoft': async ({ accountName, syncDays }) => {
     assertAccountNameAvailable(accountName)
-    // Browser-Login zuerst — die Adresse kommt aus dem Microsoft-Konto selbst
+    // Browser login first — the address comes from the Microsoft account itself
     const { email } = await msInteractiveLogin()
     const db = getDb()
     const existing = db
       .prepare('SELECT id, account_name FROM accounts WHERE email = ?')
       .get(email) as { id: number; account_name: string } | undefined
     if (existing) {
-      // Doppelt verbinden ist praktisch immer ein Versehen — klar blocken
+      // Connecting twice is practically always a mistake — block clearly
       throw new Error(`${email} ist bereits als „${existing.account_name}“ verbunden`)
     }
 
@@ -334,7 +334,7 @@ export const handlers: IpcHandlers = {
 
   'accounts:addGoogle': async ({ accountName, syncDays }) => {
     assertAccountNameAvailable(accountName)
-    // Browser-Login zuerst — die Adresse kommt aus dem Google-Konto selbst
+    // Browser login first — the address comes from the Google account itself
     const { email } = await googleInteractiveLogin()
     const db = getDb()
     const existing = db
@@ -343,10 +343,10 @@ export const handlers: IpcHandlers = {
       | { id: number; account_name: string; credential_type: AccountRow['credential_type'] }
       | undefined
     if (existing) {
-      // Eine bereits verbundene Adresse nochmal hinzuzufügen ist praktisch immer
-      // ein Versehen — klar blocken statt still „erfolgreich" zu melden. Das eben
-      // gespeicherte Refresh-Token wird nur behalten, wenn das Konto ohnehin per
-      // Google-OAuth läuft (dann ist es schlicht das frischeste).
+      // Adding an already connected address again is practically always a
+      // mistake — block clearly instead of silently reporting "success". The
+      // just-stored refresh token is only kept if the account runs via Google
+      // OAuth anyway (then it is simply the freshest one).
       if (existing.credential_type !== 'oauth-google') {
         deleteSecret(`google:refresh:${email}`)
       }
@@ -406,8 +406,8 @@ export const handlers: IpcHandlers = {
       const before = db.prepare('SELECT sync_days FROM accounts WHERE id = ?').get(accountId) as
         { sync_days: number | null } | undefined
       db.prepare('UPDATE accounts SET sync_days = ? WHERE id = ?').run(syncDays, accountId)
-      // Neustart des Syncers, damit das neue Fenster sofort gilt — ein größeres
-      // lädt beim Reconnect nach (Backfill-Guard vergleicht die Grenze).
+      // Restart the syncer so the new window applies immediately — a larger one
+      // loads on reconnect (the backfill guard compares the boundary).
       if (before && before.sync_days !== syncDays) {
         await syncEngine.stopAccount(accountId)
         const row = db.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId) as
@@ -425,12 +425,12 @@ export const handlers: IpcHandlers = {
         'Dieses Konto meldet sich über den Browser an – bitte „Erneut anmelden“ verwenden'
       )
     }
-    // App-Passwörter kommen oft mit Leerzeichen formatiert (wie bei accounts:add)
+    // App passwords often come formatted with spaces (as with accounts:add)
     const password = rawPassword.replace(/\s+/g, '')
-    // Erst prüfen, dann speichern: ein falsches Passwort überschreibt nichts
+    // Verify first, then store: a wrong password overwrites nothing
     await testImapLogin(row.email, password, row.imap_host, row.imap_port)
-    // Neu eingegebene Zugangsdaten = Zustimmung zum aktuellen Bridge-Zertifikat
-    // (z. B. nach Neuinstallation); der Syncer pinnt es beim nächsten Verbinden.
+    // Newly entered credentials = consent to the current Bridge certificate
+    // (e.g. after reinstalling); the syncer pins it on the next connection.
     clearTlsPins(accountId)
     const key = accountSecretKey(accountId)
     setSecret(key, password)
@@ -446,8 +446,8 @@ export const handlers: IpcHandlers = {
     const google = row.credential_type === 'oauth-google'
     const { email } = google ? await googleInteractiveLogin() : await msInteractiveLogin()
     if (email.toLowerCase() !== row.email.toLowerCase()) {
-      // Falsches Konto im Browser gewählt: dessen Token nicht behalten, sofern
-      // es nicht ohnehin zu einem anderen verbundenen Postfach gehört.
+      // Wrong account chosen in the browser: do not keep its token unless
+      // it belongs to another connected mailbox anyway.
       const other = getDb()
         .prepare('SELECT 1 FROM accounts WHERE lower(email) = lower(?)')
         .get(email)
@@ -459,7 +459,7 @@ export const handlers: IpcHandlers = {
         `Angemeldet als ${email}, erwartet war ${row.email} — bitte mit dem richtigen Konto anmelden`
       )
     }
-    // Token/Cache hat der Login bereits ersetzt; Syncer verlässt needs-reauth
+    // The login already replaced token/cache; syncer leaves needs-reauth
     await restartSyncer(row, accountSecretKey(accountId))
     return { ok: true, email: row.email }
   },
@@ -470,24 +470,24 @@ export const handlers: IpcHandlers = {
     await syncEngine.stopAccount(accountId)
     getDb().prepare('DELETE FROM accounts WHERE id = ?').run(accountId)
     deleteSecret(accountSecretKey(accountId))
-    // Google-Refresh-Token hängt an der Adresse, nicht an der Konto-ID
+    // Google refresh token is tied to the address, not the account ID
     if (row?.credential_type === 'oauth-google') {
       deleteSecret(`google:refresh:${row.email.toLowerCase()}`)
     } else if (row?.credential_type === 'oauth-ms') {
-      // MSAL serialisiert alle Konten in einen Cache-Blob (ms.tokenCache) —
-      // das Refresh-Token überlebt sonst die Kontolöschung im Vault.
+      // MSAL serializes all accounts into one cache blob (ms.tokenCache) —
+      // otherwise the refresh token survives the account deletion in the vault.
       await msForgetAccount(row.email).catch(() => {})
     }
     return { ok: true }
   },
 
   'accounts:cancelOAuth': ({ provider }) => ({
-    // Bricht den wartenden Browser-Login ab — das zugehörige addGoogle/
-    // addMicrosoft-invoke verwirft dadurch, der Renderer räumt still auf.
+    // Aborts the waiting browser login — the matching addGoogle/
+    // addMicrosoft invoke thereby rejects, the renderer cleans up silently.
     canceled: provider === 'gmail' ? cancelGoogleLogin() : cancelMsLogin()
   }),
 
-  // --- Kalender (CalDAV) ------------------------------------------------------------
+  // --- Calendar (CalDAV) ------------------------------------------------------------
   'calendar:accounts:list': () => ({ accounts: listCalendarAccounts() }),
 
   'calendar:accounts:suggest': ({ mailAccountId }) =>
@@ -643,9 +643,9 @@ export const handlers: IpcHandlers = {
   'search:semantic': ({ q, limit, accountId }) => searchSemantic(getDb(), { q, limit, accountId }),
 
   'sync:trigger': (input) => {
-    // Weckt getrennte Verbindungen UND zieht verbundene Konten sofort nach —
-    // wichtig für Ordner ohne IDLE (v. a. Spam), die sonst am 10-Minuten-Poll
-    // hängen. Mit accountId nur ein Konto (RETRY am Fehlerzustand, Design 3b).
+    // Wakes disconnected connections AND immediately syncs connected accounts —
+    // important for folders without IDLE (esp. spam), which otherwise wait for
+    // the 10-minute poll. With accountId only one account (RETRY on error state, Design 3b).
     syncEngine.syncNow(input?.accountId)
     return { ok: true }
   },
@@ -663,7 +663,7 @@ export const handlers: IpcHandlers = {
   'ai:profileModels': async ({ profileId, manual, kind }) => {
     const profile = getProfile(profileId)
     if (!profile) throw new Error('Anbieter nicht gefunden')
-    // Local only: externe Kataloge nie automatisch holen
+    // Local only: never fetch external catalogs automatically
     if (isLocalOnly() && !profile.isLocal && !manual) return { models: [], skipped: true }
     return { models: await listProfileModels(profile, kind), skipped: false }
   },
@@ -720,7 +720,7 @@ export const handlers: IpcHandlers = {
       return {
         profileId,
         model: profile ? (getTaskModel(task, profile) ?? '') : '',
-        // Apple On-Device (Pseudo-Profil) zählt als lokal und ist nie blockiert
+        // Apple on-device (pseudo profile) counts as local and is never blocked
         blocked: profileId === 'apple' ? null : taskBlockReason(task)
       }
     }
@@ -733,7 +733,7 @@ export const handlers: IpcHandlers = {
   },
   'ai:tasks:set': ({ task, profileId, model }) => {
     setTaskAssignment(task, profileId, model)
-    // Neue Zuordnung kann pausierte Triage wieder freigeben
+    // A new assignment can release paused triage
     aiQueue.kick()
     return { ok: true }
   },
@@ -742,7 +742,7 @@ export const handlers: IpcHandlers = {
   'privacy:setLocalOnly': ({ localOnly }) => {
     setLocalOnly(localOnly)
     if (!localOnly) {
-      // Pausiertes wieder anstoßen: Triage und Embedding-Indexierung
+      // Restart what was paused: triage and embedding indexing
       aiQueue.kick()
       embeddingIndexer.kick()
     }
@@ -825,9 +825,9 @@ export const handlers: IpcHandlers = {
   }),
 
   'ai:usage': () => ({
-    // „Kann die AI arbeiten?" — Entwürfe/Chat sind für den Nutzer das Maß der Dinge
+    // "Can the AI work?" — drafts/chat are what matters to the user
     hasApiKey: taskBlockReason('draft') === null,
-    // Grund statt nur ja/nein: „Local only" ist kein fehlender Schlüssel
+    // A reason instead of just yes/no: "Local only" is not a missing key
     draftBlock: taskBlockReason('draft'),
     openrouterKey: getProfile('openrouter')?.hasKey ?? false,
     triageModel: getTriageModel(),

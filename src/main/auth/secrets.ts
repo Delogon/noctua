@@ -2,10 +2,10 @@ import { safeStorage } from 'electron'
 import { getDb } from '../db'
 
 /**
- * Vault für alle Credentials (App-Passwörter, OAuth-Token-Cache, Bridge-Passwort,
- * OpenRouter-Key). Werte werden mit Electron safeStorage verschlüsselt (auf macOS
- * Keychain-gestützt) und als BLOB in der secrets-Tabelle abgelegt.
- * Entschlüsselte Werte verlassen den Main-Prozess nie.
+ * Vault for all credentials (app passwords, OAuth token cache, Bridge password,
+ * OpenRouter key). Values are encrypted with Electron safeStorage (Keychain-backed
+ * on macOS) and stored as a BLOB in the secrets table.
+ * Decrypted values never leave the main process.
  */
 
 function ensureAvailable(): void {
@@ -33,8 +33,8 @@ export function getSecret(key: string): string | null {
     ensureAvailable()
     return safeStorage.decryptString(row.ciphertext)
   } catch (error) {
-    // Z. B. Keychain-Wechsel oder beschädigter Eintrag: wie „kein Credential"
-    // behandeln, damit die Re-Auth-Pfade greifen. Kein Secret-Material loggen.
+    // E.g. Keychain change or corrupted entry: treat as "no credential"
+    // so the re-auth paths kick in. Do not log any secret material.
     console.warn(
       `[secrets] Entschlüsselung fehlgeschlagen (${key.split('.')[0]}): ${error instanceof Error ? error.message.slice(0, 80) : 'unbekannt'}`
     )

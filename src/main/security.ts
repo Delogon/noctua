@@ -4,27 +4,27 @@ import { ZodError } from 'zod'
 import { ForbiddenKeyError } from '@shared/settings-keys'
 
 /**
- * Reine Sicherheits-Helfer des Main-Prozesses (ohne Electron-Import, damit
- * sie unter Vitest direkt testbar sind): Dev-Erkennung, Sender-Prüfung für
- * IPC, Berechtigungs-Entscheidungen, CSP und Fehler-Bereinigung.
+ * Pure security helpers of the main process (no Electron import, so they are
+ * directly testable under Vitest): dev detection, sender checks for
+ * IPC, permission decisions, CSP and error sanitizing.
  */
 
 // ---------------------------------------------------------------------------
-// Dev-Erkennung (SEC-10)
+// Dev detection (SEC-10)
 // ---------------------------------------------------------------------------
 
-/** Liegt die App in einem app.asar? Dann ist es ein Produktions-Bundle. */
+/** Is the app inside an app.asar? Then it is a production bundle. */
 export function isAsarAppPath(appPath: string): boolean {
   return /\.asar([\\/]|$)/i.test(appPath)
 }
 
 /**
- * NOCTUA_DEV wirkt nur, wenn die App NICHT als asar-Bundle läuft. Der gebrandete
- * Dev-Wrapper (scripts/prepare-dev-app.mjs) meldet zwar app.isPackaged=true,
- * lädt aber den Projektordner (appPath = Repo-Verzeichnis, kein .asar). Ein
- * installiertes Produktions-Build (electron-builder, asar) hat immer einen
- * .asar-Pfad — die Umgebungsvariable kann es also nicht in den Dev-Modus
- * kippen (kein Credential-Seeding, kein Remote-Renderer, kein DevTools-Menü).
+ * NOCTUA_DEV only takes effect if the app is NOT running as an asar bundle. The
+ * branded dev wrapper (scripts/prepare-dev-app.mjs) does report app.isPackaged=true,
+ * but loads the project folder (appPath = repo directory, no .asar). An
+ * installed production build (electron-builder, asar) always has an
+ * .asar path — so the environment variable cannot flip it into dev mode
+ * (no credential seeding, no remote renderer, no DevTools menu).
  */
 export function resolveIsDev(opts: {
   isPackaged: boolean
@@ -35,7 +35,7 @@ export function resolveIsDev(opts: {
   return opts.devEnv === '1' && !isAsarAppPath(opts.appPath)
 }
 
-/** Dev-Renderer-URL nur für Loopback-Hosts — nie ein entfernter Server. */
+/** Dev renderer URL only for loopback hosts — never a remote server. */
 export function safeDevRendererUrl(raw: string | undefined): string | null {
   if (!raw) return null
   try {
@@ -43,23 +43,23 @@ export function safeDevRendererUrl(raw: string | undefined): string | null {
     const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname)
     if ((u.protocol === 'http:' || u.protocol === 'https:') && loopback) return u.toString()
   } catch {
-    // ungültige URL
+    // invalid URL
   }
   return null
 }
 
 // ---------------------------------------------------------------------------
-// Vertrauenswürdige App-Seiten (SEC-7, SEC-5)
+// Trusted app pages (SEC-7, SEC-5)
 // ---------------------------------------------------------------------------
 
 export interface TrustedAppPages {
-  /** Absoluter Pfad der gebauten index.html (Produktion) */
+  /** Absolute path of the built index.html (production) */
   indexPath: string
-  /** Vite-Dev-Server-URL — nur im Dev-Modus gesetzt */
+  /** Vite dev server URL — only set in dev mode */
   devUrl: string | null
 }
 
-/** Exakte App-Seite: die gebaute index.html (file://) oder der Dev-Server-Origin. */
+/** Exact app page: the built index.html (file://) or the dev server origin. */
 export function isTrustedAppUrl(url: string | undefined | null, pages: TrustedAppPages): boolean {
   if (!url) return false
   try {
@@ -69,7 +69,7 @@ export function isTrustedAppUrl(url: string | undefined | null, pages: TrustedAp
     }
     if (pages.devUrl) return u.origin === new URL(pages.devUrl).origin
   } catch {
-    // ungültige URL
+    // invalid URL
   }
   return false
 }
@@ -77,24 +77,24 @@ export function isTrustedAppUrl(url: string | undefined | null, pages: TrustedAp
 export interface SenderInfo {
   /** event.senderFrame === mainWindow.webContents.mainFrame */
   isMainWindowTopFrame: boolean
-  /** senderFrame.url (leer, wenn der Frame bereits zerstört ist) */
+  /** senderFrame.url (empty if the frame is already destroyed) */
   frameUrl: string | undefined | null
 }
 
-/** IPC-Sender-Prüfung: nur der Top-Frame des Hauptfensters auf der App-Seite. */
+/** IPC sender check: only the top frame of the main window on the app page. */
 export function isTrustedIpcSender(sender: SenderInfo, pages: TrustedAppPages): boolean {
   return sender.isMainWindowTopFrame && isTrustedAppUrl(sender.frameUrl, pages)
 }
 
 /**
- * Berechtigungen: standardmäßig verboten. Erlaubt ist nur das Mikrofon (Diktat,
- * useListeningAudio) für die eigene App-Seite — keine Kamera. Zwischenablage
- * (clipboard-sanitized-write) nutzt der Renderer nicht (nur paste-Events,
- * die keine Berechtigung brauchen) und bleibt deshalb ebenfalls verboten.
+ * Permissions: denied by default. Only the microphone (dictation,
+ * useListeningAudio) is allowed, for our own app page — no camera. Clipboard
+ * (clipboard-sanitized-write) is not used by the renderer (only paste events,
+ * which need no permission) and therefore stays denied as well.
  */
 export function isPermissionAllowed(opts: {
   permission: string
-  /** 'audio' | 'video' | 'unknown' bzw. die mediaTypes des Requests */
+  /** 'audio' | 'video' | 'unknown' or the request's mediaTypes */
   mediaTypes?: readonly string[]
   fromMainWindow: boolean
   requestingUrl: string | undefined | null
@@ -108,18 +108,18 @@ export function isPermissionAllowed(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// CSP-Header (SEC-5)
+// CSP header (SEC-5)
 // ---------------------------------------------------------------------------
 
 /**
- * Spiegelt die Meta-CSP aus src/renderer/index.html (test/main/security.test.ts
- * prüft die Übereinstimmung) und ergänzt die Direktiven, die per <meta> nicht
- * wirken (frame-ancestors) bzw. nur als Header sinnvoll sind.
+ * Mirrors the meta CSP from src/renderer/index.html (test/main/security.test.ts
+ * checks they match) and adds the directives that have no effect via <meta>
+ * (frame-ancestors) or only make sense as a header.
  *
- * Sandbox-iframe mit srcdoc (Mail-Renderer): srcdoc-Dokumente erben die CSP des
- * Eltern-Dokuments und werden nicht über frame-src geladen — dafür ist keine
- * zusätzliche Quelle nötig. frame-ancestors greift nur bei Netzwerk-Navigation
- * eines Frames, nicht bei srcdoc.
+ * Sandbox iframe with srcdoc (mail renderer): srcdoc documents inherit the parent
+ * document's CSP and are not loaded via frame-src — so no additional source is
+ * needed for them. frame-ancestors only applies to network navigation
+ * of a frame, not to srcdoc.
  */
 export const APP_CSP_BASE =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws:"
@@ -130,14 +130,14 @@ export const APP_CSP_EXTRA =
 export const APP_CSP = `${APP_CSP_BASE}; ${APP_CSP_EXTRA}`
 
 // ---------------------------------------------------------------------------
-// Fehler-Bereinigung (SEC-8)
+// Error sanitizing (SEC-8)
 // ---------------------------------------------------------------------------
 
 /**
- * Was der Renderer von einem IPC-Fehler sieht. Zod-Issues (Pfade, erwartete
- * Typen, Eingabewerte) bleiben im Main-Log; handlerseitige Fehlermeldungen
- * (bewusst nutzerlesbar, z. B. „Postfachname bereits vergeben") laufen durch,
- * werden aber gekürzt.
+ * What the renderer sees of an IPC error. Zod issues (paths, expected
+ * types, input values) stay in the main log; handler-side error messages
+ * (deliberately user-readable, e.g. "Postfachname bereits vergeben") pass through,
+ * but are truncated.
  */
 export function sanitizeIpcError(error: unknown, phase: 'input' | 'output' | 'handler'): Error {
   if (error instanceof ZodError) {

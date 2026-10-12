@@ -8,10 +8,10 @@ import { collectDatasetStats } from './dataset'
 import { runBenchmark, type BenchmarkResult } from './benchmark'
 import { createZip, type ZipEntry } from './zip'
 
-// Diagnose-Dienst: verbindet Messung (metrics + SQL-Profiler), Zeitreihe,
-// Postfach-Statistik und Benchmark. Daten bleiben auf dem Gerät: im Speicher
-// und als Sitzungsdateien im App-Datenordner (`diagnostics/`), bis der Nutzer
-// selbst ein ZIP exportiert. Es gibt keinen Upload.
+// Diagnostics service: ties together measurement (metrics + SQL profiler), time series,
+// mailbox statistics and benchmark. Data stays on the device: in memory
+// and as session files in the app data folder (`diagnostics/`), until the user
+// exports a ZIP themselves. There is no upload.
 
 export const DIAGNOSTICS_SETTING = 'diagnostics.enabled'
 const PERSIST_INTERVAL_MS = 5 * 60_000
@@ -31,7 +31,7 @@ export interface RendererDiagnostics {
 export interface DiagnosticsDeps {
   db: Database.Database
   dbPath: string | null
-  /** Ordner für Sitzungsdateien (userData/diagnostics) */
+  /** Folder for session files (userData/diagnostics) */
   dir: string
   appInfo: () => Record<string, string | number | boolean | null>
   getAppMetrics?: () => AppProcessMetric[]
@@ -123,7 +123,7 @@ export class DiagnosticsService {
     else this.stop()
   }
 
-  /** Sitzungsdatei schreiben (alle 5 min und beim Beenden). */
+  /** Write the session file (every 5 min and on quit). */
   persist(): void {
     if (!this.deps || !metrics.enabled) return
     try {
@@ -188,7 +188,7 @@ export class DiagnosticsService {
     return this.lastBenchmark
   }
 
-  /** Inhalt des Export-ZIPs (ohne Schreiben – testbar). */
+  /** Contents of the export ZIP (without writing – testable). */
   async bundle(renderer: RendererDiagnostics | null, withBenchmark: boolean): Promise<ZipEntry[]> {
     if (!this.deps) throw new Error('Diagnose nicht initialisiert')
     if (withBenchmark) await this.benchmark()
@@ -217,7 +217,7 @@ export class DiagnosticsService {
       try {
         entries.push({ name: `sessions/${f}`, data: readFileSync(join(this.deps.dir, f)) })
       } catch {
-        // unlesbar: auslassen
+        // unreadable: skip
       }
     }
     return entries
@@ -242,7 +242,7 @@ export class DiagnosticsService {
     }
   }
 
-  /** Alles verwerfen: Messwerte, Zeitreihe, Benchmark, Sitzungsdateien. */
+  /** Discard everything: measurements, time series, benchmark, session files. */
   clear(): void {
     metrics.reset()
     this.sampler?.clear()

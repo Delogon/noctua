@@ -7,7 +7,7 @@ import { SpellEngine } from './engine'
 
 let enginePromise: Promise<SpellEngine> | null = null
 
-/** Lazy-Singleton: Wörterbücher (~1.7 MB) erst beim ersten spell:check laden. */
+/** Lazy singleton: load dictionaries (~1.7 MB) only on the first spell:check. */
 export function getSpellEngine(): Promise<SpellEngine> {
   enginePromise ??= SpellEngine.create([
     { aff: readFileSync(deAff), dic: readFileSync(deDic) },

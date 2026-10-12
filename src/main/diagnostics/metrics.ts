@@ -9,17 +9,17 @@ import {
 
 export { BUCKETS_MS, percentile, type TimingSummary } from '@shared/histogram'
 
-// Lokale Leistungs-Messung (Diagnose für große Postfächer). Erfasst werden
-// ausschließlich Namen von Operationen (Code-Bezeichner, normalisiertes SQL ohne
-// Werte) und Zahlen — nie Betreffs, Adressen, Inhalte oder Pfade. Alles bleibt im
-// Speicher bzw. im App-Datenordner, bis der Nutzer selbst ein ZIP exportiert.
+// Local performance measurement (diagnostics for large mailboxes). Only names of
+// operations (code identifiers, normalized SQL without values) and numbers are
+// recorded — never subjects, addresses, content or paths. Everything stays in
+// memory or in the app data folder until the user exports a ZIP themselves.
 
 const MAX_NAMES = 2000
 const MAX_SQL = 1000
 const MAX_SLOW = 100
 const OTHER = '(other)'
 
-/** Zusatzdaten nur als Zahlen/Wahrheitswerte — so kann kein Mail-Text hineinrutschen. */
+/** Extra data only as numbers/booleans — so no mail text can slip in. */
 export type Meta = Record<string, number | boolean>
 
 interface SqlStat extends Histogram {
@@ -67,9 +67,9 @@ function cleanMeta(meta: Meta | undefined): Meta | undefined {
 const fingerprints = new Map<string, string>()
 
 /**
- * Normalisiertes SQL als Schlüssel: Whitespace zusammengefasst, Literale und
- * Platzhalterlisten durch „?" ersetzt (keine Werte im Export, keine Explosion
- * der Schlüssel durch IN (?, ?, …) unterschiedlicher Länge).
+ * Normalized SQL as the key: whitespace collapsed, literals and
+ * placeholder lists replaced with "?" (no values in the export, no explosion
+ * of keys from IN (?, ?, …) of varying length).
  */
 export function sqlFingerprint(sql: string): string {
   const cached = fingerprints.get(sql)
@@ -89,7 +89,7 @@ export function sqlFingerprint(sql: string): string {
 
 export class Metrics {
   enabled = true
-  /** Ereignisse ab dieser Dauer landen im Slow-Log */
+  /** Events of at least this duration go into the slow log */
   slowThresholdMs = 100
   startedAt = Date.now()
   private timings = new Map<string, Histogram>()
@@ -122,7 +122,7 @@ export class Metrics {
     this.gauges.set(name, value)
   }
 
-  /** Synchron messen; Fehler werden weitergereicht und trotzdem gemessen. */
+  /** Measure synchronously; errors are passed on and still measured. */
   time<T>(name: string, fn: () => T, meta?: Meta): T {
     if (!this.enabled) return fn()
     const start = performance.now()
@@ -143,7 +143,7 @@ export class Metrics {
     }
   }
 
-  /** Für Messungen über mehrere Stellen: end(meta) schließt die Spanne. */
+  /** For measurements across several places: end(meta) closes the span. */
   span(name: string): (meta?: Meta) => void {
     const start = performance.now()
     return (meta) => this.record(name, performance.now() - start, meta)
@@ -180,13 +180,13 @@ export class Metrics {
     if (clean && Object.keys(clean).length > 0) event.meta = clean
     this.slow.push(event)
     if (this.slow.length > MAX_SLOW * 2) {
-      // die langsamsten behalten, bei Gleichstand die jüngeren
+      // keep the slowest, on ties the more recent ones
       this.slow.sort((a, b) => b.ms - a.ms || b.at - a.at)
       this.slow.length = MAX_SLOW
     }
   }
 
-  /** Summen für die Zeitreihe (Deltas pro Messintervall). */
+  /** Totals for the time series (deltas per sampling interval). */
   totals(): { sqlCalls: number; sqlMs: number; ipcCalls: number; ipcMs: number } {
     let sqlCalls = 0
     let sqlMs = 0

@@ -15,7 +15,7 @@ export interface AccountRow {
   ai_enabled: number
   color: string
   signature?: string | null
-  /** Sync-Zeitraum in Tagen: null = Standard (90/183), 0 = alles. */
+  /** Sync range in days: null = default (90/183), 0 = everything. */
   sync_days: number | null
 }
 
@@ -47,7 +47,7 @@ export function accountSecretKey(accountId: number): string {
   return `account:${accountId}:password`
 }
 
-/** Entweder Passwort (Gmail/IMAP/Bridge) oder frisches OAuth-Token (Microsoft). */
+/** Either a password (Gmail/IMAP/Bridge) or a fresh OAuth token (Microsoft). */
 export interface MailCredentials {
   user: string
   pass?: string
@@ -55,10 +55,10 @@ export interface MailCredentials {
 }
 
 /**
- * Loopback-Verbindungen (Proton Bridge & Co.) präsentieren selbstsignierte
- * Zertifikate — die CA-Prüfung würde sie immer ablehnen. Statt der CA prüft
- * Noctua dort einen gepinnten Fingerabdruck (Trust-on-first-use, siehe
- * loopback-tls.ts); überall sonst bleibt die CA-Prüfung strikt an.
+ * Loopback connections (Proton Bridge & co.) present self-signed
+ * certificates — the CA check would always reject them. Instead of the CA,
+ * Noctua checks a pinned fingerprint there (trust-on-first-use, see
+ * loopback-tls.ts); everywhere else the CA check stays strictly on.
  */
 export function isLoopbackHost(host: string): boolean {
   const normalized = host.trim().toLowerCase()
@@ -70,8 +70,8 @@ export function isLoopbackHost(host: string): boolean {
 }
 
 /**
- * IMAP-Verbindungsoptionen pro Provider. OAuth-Konten liefern ein Access-Token
- * (imapflow spricht damit SASL XOAUTH2), Passwort-Konten ein pass.
+ * IMAP connection options per provider. OAuth accounts provide an access token
+ * (imapflow uses it for SASL XOAUTH2), password accounts a pass.
  */
 export function buildImapOptions(
   account: Pick<AccountRow, 'email' | 'provider' | 'imap_host' | 'imap_port'>,
@@ -97,13 +97,13 @@ export function buildImapOptions(
   return {
     host: account.imap_host,
     port: account.imap_port,
-    // Port 993 = implizites TLS; sonst STARTTLS
+    // Port 993 = implicit TLS; otherwise STARTTLS
     secure: implicitTls,
-    // STARTTLS ist Pflicht — auch auf Loopback (Proton Bridge): kein stilles
-    // Downgrade auf Klartext gegenüber einem Prozess, der den Port belegt.
+    // STARTTLS is mandatory — also on loopback (Proton Bridge): no silent
+    // downgrade to plaintext towards a process that has grabbed the port.
     ...(!implicitTls ? { doSTARTTLS: true } : {}),
-    // socketTimeout 5 min: imapflow fängt Timeouts im IDLE selbst ab (NOOP +
-    // erneutes IDLE), ein kürzerer Wert würde dort unnötig Recovery auslösen.
+    // socketTimeout 5 min: imapflow handles timeouts in IDLE itself (NOOP +
+    // re-IDLE); a shorter value would trigger needless recovery there.
     connectionTimeout: 30_000,
     greetingTimeout: 20_000,
     socketTimeout: 5 * 60_000,
@@ -115,7 +115,7 @@ export function buildImapOptions(
   }
 }
 
-/** Wie buildImapOptions, holt auf Loopback aber vorher das gepinnte Zertifikat. */
+/** Like buildImapOptions, but first fetches the pinned certificate on loopback. */
 export async function imapConnectOptions(
   account: Pick<AccountRow, 'email' | 'provider' | 'imap_host' | 'imap_port'> & {
     id?: number

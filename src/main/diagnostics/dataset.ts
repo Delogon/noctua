@@ -1,8 +1,8 @@
 import { existsSync, statSync } from 'node:fs'
 import type Database from 'better-sqlite3-multiple-ciphers'
 
-// Größe und Form des Postfachs — nur Zählwerte. Konten erscheinen als
-// „Konto 1, 2, …" mit Anbieter-Typ, ohne Adresse oder Namen.
+// Size and shape of the mailbox — counts only. Accounts appear as
+// "Account 1, 2, …" with provider type, without address or name.
 
 export interface DatasetStats {
   accounts: Array<{
@@ -52,7 +52,7 @@ function fileSize(path: string | null): number | null {
   }
 }
 
-/** Einstellungen, die Last beeinflussen — nur diese, keine Inhalte/Schlüssel. */
+/** Settings that affect load — only these, no content/keys. */
 const PERF_SETTINGS = [
   'mail.showFolders',
   'ai.triageProvider',
@@ -107,7 +107,7 @@ export function collectDatasetStats(db: Database.Database, dbPath: string | null
       foldersByRole[`${row.role.replace(/^\\/, '').toLowerCase()}:${row.mode}`] = row.n
     }
   } catch {
-    // ältere Schemas
+    // older schemas
   }
 
   let aiJobs: DatasetStats['aiJobs'] = []
@@ -116,7 +116,7 @@ export function collectDatasetStats(db: Database.Database, dbPath: string | null
       .prepare('SELECT kind, status, count(*) count FROM ai_jobs GROUP BY kind, status')
       .all() as DatasetStats['aiJobs']
   } catch {
-    // keine Jobs-Tabelle
+    // no jobs table
   }
 
   let indexes: DatasetStats['indexes'] = []
@@ -127,7 +127,7 @@ export function collectDatasetStats(db: Database.Database, dbPath: string | null
       )
       .all() as DatasetStats['indexes']
   } catch {
-    // ignorieren
+    // ignore
   }
 
   const settings: Record<string, string> = {}
@@ -137,7 +137,7 @@ export function collectDatasetStats(db: Database.Database, dbPath: string | null
         { value: string } | undefined
       if (row) settings[key] = row.value.slice(0, 40)
     } catch {
-      // ignorieren
+      // ignore
     }
   }
 

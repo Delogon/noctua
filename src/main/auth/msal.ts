@@ -13,27 +13,27 @@ import { CancelableLoopbackClient } from './loopback'
 import { mapMsalError, ReauthRequiredError } from './reauth'
 
 /**
- * Microsoft-OAuth für persönliche Konten (Hotmail/Outlook.com).
+ * Microsoft OAuth for personal accounts (Hotmail/Outlook.com).
  *
- * Client-ID: Microsoft erlaubt persönlichen Konten keine eigenen
- * App-Registrierungen mehr. Default ist deshalb Thunderbirds öffentlich
- * dokumentierte Public-Client-ID (gängige Praxis bei OSS-Mail-Tools; kein
- * Secret, Tokens bleiben lokal im Vault). Über das Setting `ms.clientId`
- * jederzeit durch eine eigene Registrierung ersetzbar.
+ * Client ID: Microsoft no longer allows personal accounts their own
+ * app registrations. The default is therefore Thunderbird's publicly
+ * documented public client ID (common practice among OSS mail tools; no
+ * secret, tokens stay local in the vault). Can be replaced at any time with
+ * your own registration via the setting `ms.clientId`.
  */
 const THUNDERBIRD_CLIENT_ID = '9e5f94bc-e8a4-4e73-b8be-63364c29d753'
 const CACHE_SECRET_KEY = 'ms.tokenCache'
 
-// Resource outlook.office.com (nicht office365.com): Thunderbirds
-// App-Registrierung ist für diese Resource konfiguriert — andere Resources
-// lehnt Microsoft mit invalid_scope ab. Die Tokens gelten trotzdem für den
-// IMAP-/SMTP-Server outlook.office365.com.
+// Resource outlook.office.com (not office365.com): Thunderbird's
+// app registration is configured for this resource — Microsoft rejects other
+// resources with invalid_scope. The tokens still work for the
+// IMAP/SMTP server outlook.office365.com.
 export const MS_MAIL_SCOPES = [
   'https://outlook.office.com/IMAP.AccessAsUser.All',
   'https://outlook.office.com/SMTP.Send'
 ]
 
-/** Client-ID: explizites Main-Setting > Org-Konfiguration > Thunderbird-Default. */
+/** Client ID: explicit main setting > org configuration > Thunderbird default. */
 export function resolveMicrosoftClientId(setting: string | null, org: OrgConfig | null): string {
   return setting?.trim() || org?.oauth?.microsoft?.clientId || THUNDERBIRD_CLIENT_ID
 }
@@ -42,7 +42,7 @@ function clientId(): string {
   return resolveMicrosoftClientId(getSetting('ms.clientId'), getOrgConfig())
 }
 
-/** Persistiert den MSAL-Token-Cache verschlüsselt im safeStorage-Vault. */
+/** Persists the MSAL token cache encrypted in the safeStorage vault. */
 const vaultCachePlugin: ICachePlugin = {
   async beforeCacheAccess(context: TokenCacheContext): Promise<void> {
     const cached = getSecret(CACHE_SECRET_KEY)
@@ -76,19 +76,19 @@ function getPca(): PublicClientApplication {
 async function findAccount(email: string): Promise<AccountInfo | null> {
   const accounts = await getPca().getTokenCache().getAllAccounts()
   const lower = email.toLowerCase()
-  // Kein Fallback auf accounts[0]: ein Token für ein ANDERES Konto wäre am
-  // IMAP/SMTP-Server (user ≠ Token-Konto) ohnehin ungültig — sauber
-  // weiterreichen, damit der Syncer in needs-reauth läuft statt in Fehlversuchen.
+  // No fallback to accounts[0]: a token for a DIFFERENT account would be invalid
+  // at the IMAP/SMTP server anyway (user ≠ token account) — pass it on
+  // cleanly so the syncer goes to needs-reauth instead of failed attempts.
   return accounts.find((a) => a.username.toLowerCase() === lower) ?? null
 }
 
-/** Der gerade wartende Loopback-Client — Ziel des CANCEL-Knopfs (Design 3b). */
+/** The currently waiting loopback client — target of the CANCEL button (Design 3b). */
 let activeLoopback: CancelableLoopbackClient | null = null
 
 /**
- * Interaktiver Login: öffnet den System-Browser; den Loopback-Redirect nimmt
- * unser abbrechbarer Client entgegen, damit CANCEL den Roundtrip wirklich
- * beendet. Gibt die tatsächlich angemeldete Adresse zurück.
+ * Interactive login: opens the system browser; the loopback redirect is received
+ * by our abortable client so CANCEL really ends the round trip.
+ * Returns the address actually signed in.
  */
 export async function msInteractiveLogin(): Promise<{ email: string }> {
   const loopback = new CancelableLoopbackClient()
@@ -112,7 +112,7 @@ export async function msInteractiveLogin(): Promise<{ email: string }> {
   }
 }
 
-/** Bricht einen wartenden Microsoft-Login ab; false, wenn keiner läuft. */
+/** Aborts a waiting Microsoft login; false if none is running. */
 export function cancelMsLogin(): boolean {
   if (!activeLoopback) return false
   activeLoopback.cancel('Microsoft-Anmeldung abgebrochen')
@@ -120,7 +120,7 @@ export function cancelMsLogin(): boolean {
   return true
 }
 
-/** Entfernt ein Konto aus dem MSAL-Cache (z. B. nach einer Anmeldung mit falscher Adresse). */
+/** Removes an account from the MSAL cache (e.g. after signing in with the wrong address). */
 export async function msForgetAccount(email: string): Promise<void> {
   const lower = email.toLowerCase()
   const accounts = await getPca().getTokenCache().getAllAccounts()
@@ -132,9 +132,9 @@ export async function msForgetAccount(email: string): Promise<void> {
 }
 
 /**
- * Frisches Access-Token (silent, mit Refresh). Ist ein Re-Login nötig
- * (Refresh-Token abgelaufen/widerrufen, kein Konto im Cache), wirft die
- * Funktion einen ReauthRequiredError → needs-reauth statt Backoff-Loop.
+ * Fresh access token (silent, with refresh). If a re-login is needed
+ * (refresh token expired/revoked, no account in the cache), the function
+ * throws a ReauthRequiredError → needs-reauth instead of a backoff loop.
  */
 export async function msAccessToken(email: string): Promise<string> {
   const account = await findAccount(email)

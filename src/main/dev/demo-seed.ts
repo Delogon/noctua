@@ -15,20 +15,20 @@ import { buildTodoIcs, fieldsHash, taskUid } from '../tasks/todo'
 import { createProfile, setProfileKey, setTaskAssignment } from '../ai/providers/registry'
 
 /**
- * Dev-only Demo-Daten (NOCTUA_DEMO_SEED=1) für Screenshots und visuelles QA.
- * Läuft ausschließlich im Dev-Modus (isDev) und nur auf einer leeren DB; nichts
- * hiervon ist über das Produktions-Bundle erreichbar (Aufruf in index.ts hinter
- * `isDev`, dort per dynamischem import). Es werden keine Server kontaktiert:
- * der Aufrufer startet für Demo-Konten weder IMAP- noch CalDAV-Sync.
+ * Dev-only demo data (NOCTUA_DEMO_SEED=1) for screenshots and visual QA.
+ * Runs exclusively in dev mode (isDev) and only on an empty DB; none of this
+ * is reachable from the production bundle (called in index.ts behind
+ * `isDev`, via dynamic import there). No servers are contacted:
+ * the caller starts neither IMAP nor CalDAV sync for demo accounts.
  *
- *   NOCTUA_DEMO_SEED=1        Daten anlegen (idempotent)
- *   NOCTUA_DEMO_LOCAL_ONLY=1  zusätzlich „Local only" einschalten (sonst aus)
- *   NOCTUA_DEMO_LANG=de|en    UI-Sprache (Standard en)
- *   NOCTUA_DEMO_ONBOARDING=1  Onboarding offen lassen (für die Org-Profile-Aufnahme)
+ *   NOCTUA_DEMO_SEED=1        create data (idempotent)
+ *   NOCTUA_DEMO_LOCAL_ONLY=1  additionally turn on "Local only" (off otherwise)
+ *   NOCTUA_DEMO_LANG=de|en    UI language (default en)
+ *   NOCTUA_DEMO_ONBOARDING=1  leave onboarding open (for the org profiles shot)
  *
- * Möglichst über die echten Pfade (parseMail → upsertEnvelope → storeBody →
- * storeInvitations, createEventIcs/updateIcs → upsertObject, Profil-Registry),
- * damit die Daten so konsistent sind wie die echter Konten.
+ * Uses the real paths where possible (parseMail → upsertEnvelope → storeBody →
+ * storeInvitations, createEventIcs/updateIcs → upsertObject, profile registry),
+ * so the data is as consistent as that of real accounts.
  */
 
 export const DEMO_EMAIL = 'nora.brandt@acme-corp.example'
@@ -42,14 +42,14 @@ const DAY = 24 * HOUR
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
-/** Lokale Wandzeit (Prozess-TZ; der Launcher setzt TZ=Europe/Berlin). */
+/** Local wall-clock time (process TZ; the launcher sets TZ=Europe/Berlin). */
 function wallOf(ms: number): string {
   const d = new Date(ms)
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`
 }
 const dayOf = (ms: number): string => wallOf(ms).slice(0, 10)
 
-/** Montag 00:00 der aktuellen Woche. */
+/** Monday 00:00 of the current week. */
 function weekStart(now: number): number {
   const d = new Date(now)
   d.setHours(0, 0, 0, 0)
@@ -63,7 +63,7 @@ const TZ = 'Europe/Berlin'
 
 interface DemoMail {
   folder: 'inbox' | 'sent' | 'spam'
-  /** Alter in Minuten (Datum = jetzt − ageMin) */
+  /** Age in minutes (date = now − ageMin) */
   ageMin: number
   from: [string, string]
   to?: string
@@ -73,7 +73,7 @@ interface DemoMail {
   text?: string
   html?: string
   extraHeaders?: string[]
-  /** komplette MIME-Teile (z. B. text/calendar) statt text/html */
+  /** complete MIME parts (e.g. text/calendar) instead of text/html */
   calendar?: string
   attachment?: { name: string; type: string; size: number }
   seen?: boolean
@@ -89,7 +89,7 @@ interface DemoMail {
 
 const rfcDate = (ms: number): string => new Date(ms).toUTCString().replace('GMT', '+0000')
 
-/** Baut eine RFC-822-Nachricht; die Struktur entscheidet parseMail genauso wie beim echten Abruf. */
+/** Builds an RFC 822 message; parseMail resolves the structure just as on a real fetch. */
 function buildMime(m: DemoMail, to: string, now: number): string {
   const head = [
     `From: "${m.from[0]}" <${m.from[1]}>`,
@@ -202,7 +202,7 @@ const SHIPPING_HTML = `<div style="font-family:'Helvetica Neue',Arial,sans-serif
 
 function inviteIcs(now: number): string {
   const ws = weekStart(now)
-  const start = ws + 3 * DAY + 15 * HOUR // Do 15:00
+  const start = ws + 3 * DAY + 15 * HOUR // Thu 15:00
   const end = start + HOUR
   const f = (ms: number): string => wallOf(ms).replace(/[-:]/g, '')
   return [
@@ -446,7 +446,7 @@ async function seedMail(db: Database.Database, now: number): Promise<number> {
     }
     const res = upsertEnvelope(db, acc, folderIds[m.folder], env)
     if (!res) continue
-    // storeBody legt auch die Einladung an (storeInvitations) — echter Ingest-Pfad
+    // storeBody also creates the invitation (storeInvitations) — real ingest path
     storeBody(db, res.messageId, parsed)
     if (m.ai) {
       insAnn.run(
@@ -463,15 +463,15 @@ async function seedMail(db: Database.Database, now: number): Promise<number> {
   return acc
 }
 
-// --- Kalender --------------------------------------------------------------------------------
+// --- Calendar --------------------------------------------------------------------------------
 
 interface Ev {
   summary: string
-  /** Tag relativ zum Wochenstart (0 = Montag) */
+  /** Day relative to the start of the week (0 = Monday) */
   day: number
   from?: string
   to?: string
-  /** ganztägig: Anzahl Tage (end exklusiv) */
+  /** all-day: number of days (end exclusive) */
   allDayDays?: number
   endDay?: number
   location?: string
@@ -593,7 +593,7 @@ function seedCalendar(
     return { objectId, ics, href }
   }
 
-  // Wiederkehrend wöchentlich (Mo) mit Override in der Folgewoche
+  // Recurring weekly (Mon) with an override in the following week
   const sync = add(work, {
     summary: 'Team sync',
     day: 0,
@@ -631,7 +631,7 @@ function seedCalendar(
     upsertObject(db, { calendarId: work, href: sync.href, etag: '"demo-sync"', ics: out.ics })
   }
 
-  // Heute: nächste Termine (für die Rail-Agenda), relativ zu „jetzt"
+  // Today: upcoming events (for the rail agenda), relative to "now"
   const today = (new Date(now).getDay() + 6) % 7
   const nextHour = new Date(now)
   nextHour.setMinutes(0, 0, 0)
@@ -652,7 +652,7 @@ function seedCalendar(
     location: 'Dr. Albrecht, Hafenstr. 12'
   })
 
-  // Dienstag: drei überlappende Termine
+  // Tuesday: three overlapping events
   add(work, { summary: 'Design review', day: 1, from: '10:00', to: '11:30', location: 'Room 2.04' })
   add(work, {
     summary: 'Customer call: Nordwind',
@@ -671,7 +671,7 @@ function seedCalendar(
   })
   add(work, { summary: '1:1 Anna', day: 1, from: '11:00', to: '11:45' })
 
-  // Mittwoch: Teilnehmer, ganztägig
+  // Wednesday: attendees, all-day
   add(work, {
     summary: 'Quarterly planning',
     day: 2,
@@ -691,7 +691,7 @@ function seedCalendar(
   })
   add(personal, { summary: "Anna's birthday", day: 2, allDayDays: 1 })
 
-  // Donnerstag bis Samstag: mehrtägig ganztägig + Konflikt mit der Einladung (Do 15:00)
+  // Thursday to Saturday: multi-day all-day + conflict with the invitation (Thu 15:00)
   add(work, { summary: 'Team offsite', day: 3, allDayDays: 3, location: 'Lakeside Lodge' })
   add(work, {
     summary: 'Workshop: onboarding flow',
@@ -700,7 +700,7 @@ function seedCalendar(
     to: '16:00',
     location: 'Room 3.01'
   })
-  // Freitag Nacht über Mitternacht
+  // Friday night across midnight
   add(work, {
     summary: 'Release night',
     day: 4,
@@ -710,7 +710,7 @@ function seedCalendar(
     location: 'On call'
   })
   add(team, { summary: 'Public holiday (Berlin)', day: 7 + 4, allDayDays: 1 })
-  // Nächste Wochen für die Monatsansicht
+  // Coming weeks for the month view
   add(work, { summary: 'Board meeting', day: 9, from: '09:00', to: '12:00', location: 'HQ' })
   add(personal, { summary: 'Train to Hamburg', day: 12, from: '08:12', to: '11:40' })
   add(work, { summary: 'Product demo', day: 15, from: '16:00', to: '17:00' })
@@ -721,7 +721,7 @@ function seedCalendar(
   return { tasksCal }
 }
 
-// --- Aufgaben --------------------------------------------------------------------------------
+// --- Tasks -----------------------------------------------------------------------------------
 
 function seedTasks(db: Database.Database, now: number, accountId: number, tasksCal: number): void {
   const budget = db.prepare("SELECT id FROM messages WHERE subject LIKE 'Q4 budget%'").get() as
@@ -782,7 +782,7 @@ function seedTasks(db: Database.Database, now: number, accountId: number, tasksC
   add('manual', null, 'Order notebooks for the team', null, null)
   add('manual', null, 'Reply to Sven about climbing', null, null, 'done')
 
-  // Zweiweg-Abgleich: gewählte Liste + Zuordnungen (synced / pending / conflict)
+  // Two-way sync: selected list + mappings (synced / pending / conflict)
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('tasks.caldavCalendar', ?)").run(
     String(tasksCal)
   )
@@ -804,7 +804,7 @@ function seedTasks(db: Database.Database, now: number, accountId: number, tasksC
       ics
     })
     if (mode === 'pending') {
-      // lokal geändert, Server-Stand älter → Hash weicht ab
+      // changed locally, server state older → hash differs
       map.run(
         r.id,
         tasksCal,
@@ -830,7 +830,7 @@ function seedTasks(db: Database.Database, now: number, accountId: number, tasksC
   link(6, 'synced')
 }
 
-// --- Kontakte --------------------------------------------------------------------------------
+// --- Contacts --------------------------------------------------------------------------------
 
 function seedContacts(db: Database.Database, now: number): void {
   const acc = (db.prepare('SELECT id FROM cal_accounts LIMIT 1').get() as { id: number }).id
@@ -879,7 +879,7 @@ function seedContacts(db: Database.Database, now: number): void {
   })
 }
 
-// --- AI-Profile ------------------------------------------------------------------------------
+// --- AI profiles -----------------------------------------------------------------------------
 
 function seedAi(): void {
   setProfileKey('openrouter', 'sk-or-demo-0000')
@@ -893,7 +893,7 @@ function seedAi(): void {
   setTaskAssignment('draft', 'openrouter', 'anthropic/claude-sonnet-4.6')
 }
 
-// --- Einstieg --------------------------------------------------------------------------------
+// --- Entry point -----------------------------------------------------------------------------
 
 export async function seedDemoData(db: Database.Database): Promise<void> {
   if (!isDev) return
@@ -910,7 +910,7 @@ export async function seedDemoData(db: Database.Database): Promise<void> {
     seedContacts(db, now)
     seedAi()
     if (process.env.NOCTUA_DEMO_ONBOARDING === '1') {
-      // Onboarding-Pass: Flow „läuft bereits" (Konto vorhanden, nicht abgeschlossen) → Schritt 2
+      // Onboarding pass: flow "already running" (account present, not completed) → step 2
       set.run('noctua.onboardingStarted', '1')
     } else {
       set.run('noctua.onboarded', '1')
@@ -918,19 +918,19 @@ export async function seedDemoData(db: Database.Database): Promise<void> {
     console.log('[demo] Demo-Daten angelegt')
   }
   set.run('ui.language', lang)
-  // Local only: pro Lauf wählbar (Zustand ändert sich auch auf bestehender DB)
+  // Local only: selectable per run (state changes even on an existing DB)
   setLocalOnly(process.env.NOCTUA_DEMO_LOCAL_ONLY === '1')
 }
 
 // --- Demo-Free/Busy -----------------------------------------------------------------------------
 
 /**
- * Der Demo-Server (kein Netz) beantwortet Free/Busy-Anfragen an die Scheduling-Outbox mit
- * festen Mustern je Teilnehmer, damit der Verfügbarkeitsstreifen im Editor etwas zeigt.
- * Marta (Partnerfirma) liefert bewusst keine Auskunft.
+ * The demo server (no network) answers free/busy requests to the scheduling outbox with
+ * fixed patterns per attendee, so the availability strip in the editor shows something.
+ * Marta (partner company) deliberately provides no information.
  */
 const DEMO_BUSY: Record<string, Array<[number, number, number[]?]>> = {
-  // [von, bis, Wochentage (0=So) — leer = alle Arbeitstage]
+  // [from, to, weekdays (0=Sun) — empty = all working days]
   'jonas.weber@acme-corp.example': [
     [9, 10.5],
     [13, 14, [1, 3, 5]]

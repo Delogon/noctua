@@ -1,8 +1,8 @@
 import { getSetting, setSetting } from './db'
 
-// „Local only" (privacy.localOnly): weicher Schalter. Wenn an, nutzt die AI nur
-// lokale Profile, und es gibt KEINE automatischen externen Requests (Update-
-// Check, Modellkatalog, Embedding-Download). Mail-Server/OAuth bleiben unberührt.
+// "Local only" (privacy.localOnly): soft switch. When on, the AI uses only
+// local profiles, and there are NO automatic external requests (update
+// check, model catalog, embedding download). Mail servers/OAuth stay unaffected.
 
 export const LOCAL_ONLY_KEY = 'privacy.localOnly'
 

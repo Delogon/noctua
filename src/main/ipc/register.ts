@@ -10,10 +10,10 @@ import { isTrustedIpcSender, sanitizeIpcError, type TrustedAppPages } from '../s
 import { metrics } from '../diagnostics/metrics'
 
 /**
- * Bindet den IPC-Vertrag an konkrete Handler. Input und Output jedes Aufrufs
- * werden gegen das zod-Schema des Kanals validiert. Jeder Aufruf muss vom
- * Top-Frame des Hauptfensters auf der App-Seite kommen (SEC-7); Fehler gehen
- * bereinigt an den Renderer, Details nur ins Main-Log (SEC-8).
+ * Binds the IPC contract to concrete handlers. Input and output of every call
+ * are validated against the channel's zod schema. Every call must come from the
+ * top frame of the main window on the app page (SEC-7); errors go to the
+ * renderer sanitized, details only to the main log (SEC-8).
  */
 export function registerIpcHandlers(
   handlers: IpcHandlers,
@@ -43,8 +43,8 @@ export function registerIpcHandlers(
         const input = spec.input.parse(rawInput)
         phase = 'handler'
         const endCall = metrics.span(`ipc.${channel}`)
-        // TS kann die Korrelation Kanal↔Handler-Signatur über die Map-Iteration
-        // nicht verfolgen; der Contract-Typ IpcHandlers stellt sie sicher.
+        // TS cannot track the channel↔handler signature correlation through the
+        // map iteration; the contract type IpcHandlers guarantees it.
         let result: unknown
         try {
           result = await (handlers[channel] as (i: unknown) => unknown)(input)

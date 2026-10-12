@@ -3,9 +3,9 @@ import type { NetworkConnection } from '@shared/types'
 import type { AiProfile, AiTask } from './ai/providers/types'
 import type { UpdateFeed } from './org-config'
 
-// Ehrliche Liste aller Netzwerkverbindungen der App für die Technik-Seite.
-// Rein berechnet aus Konten, Profilen, Aufgaben-Zuordnung, Update-Quelle und
-// Local only — damit sie nicht von Hand-gepflegten Texten abweichen kann.
+// Honest list of all network connections of the app for the technical page.
+// Purely computed from accounts, profiles, task assignment, update source and
+// Local only — so it cannot drift from hand-maintained texts.
 
 export interface NetworkConnectionsInput {
   accounts: Array<{
@@ -15,9 +15,9 @@ export interface NetworkConnectionsInput {
     smtpHost: string
   }>
   profiles: AiProfile[]
-  /** Aufgabe → Profil-ID ('apple' = On-Device, kein Netz) */
+  /** Task → profile ID ('apple' = on-device, no network) */
   taskProfiles: Record<AiTask, string>
-  /** CalDAV-Konten: wie Mail-Server immer erlaubt (Local only betrifft nur KI/Updates) */
+  /** CalDAV accounts: always allowed like mail servers (Local only affects only AI/updates) */
   calendarAccounts?: Array<{ name: string; serverUrl: string }>
   localOnly: boolean
   feed: UpdateFeed
@@ -77,11 +77,11 @@ export function buildNetworkConnections(input: NetworkConnectionsInput): Network
     }
   }
 
-  // AI-Profile, die mindestens eine Aufgabe bedienen (Apple On-Device: kein Netz)
+  // AI profiles that serve at least one task (Apple on-device: no network)
   const tasksByProfile = new Map<string, AiTask[]>()
   for (const task of ['triage', 'draft', 'stt', 'decision'] as AiTask[]) {
     const id = input.taskProfiles[task]
-    // Entscheidungen sind optional: leer = nicht eingerichtet
+    // Decisions are optional: empty = not set up
     if (id === 'apple' || !id) continue
     tasksByProfile.set(id, [...(tasksByProfile.get(id) ?? []), task])
   }

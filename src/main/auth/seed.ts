@@ -6,15 +6,15 @@ import { ACCOUNT_COLORS } from '@shared/types'
 import { isDev } from '../dev-mode'
 
 /**
- * Dev-Seeding über Umgebungsvariablen — Credentials landen direkt im
- * safeStorage-Vault, nie auf der Platte. Läuft nur, wenn die Variablen
- * gesetzt sind, und ist idempotent.
+ * Dev seeding via environment variables — credentials go directly into the
+ * safeStorage vault, never onto disk. Runs only when the variables are
+ * set, and is idempotent.
  *
  *   NOCTUA_SEED_GMAIL_USER / NOCTUA_SEED_GMAIL_PASS
  *   NOCTUA_SEED_OPENROUTER_KEY
  */
 export function seedFromEnv(db: Database.Database): void {
-  // Zweite Absicherung neben dem Aufrufer: im Produktions-Bundle nie aus der Umgebung seeden
+  // Second safeguard besides the caller: never seed from the environment in a production bundle
   if (!isDev) return
   const gmailUser = process.env.NOCTUA_SEED_GMAIL_USER?.trim().toLowerCase()
   const gmailPass = process.env.NOCTUA_SEED_GMAIL_PASS?.replace(/\s+/g, '')

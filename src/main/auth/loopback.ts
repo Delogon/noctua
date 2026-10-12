@@ -3,17 +3,17 @@ import { AuthError } from '@azure/msal-node'
 import type { AuthorizeResponse, ILoopbackClient } from '@azure/msal-node'
 
 /**
- * Abbrechbarer Loopback-Server für den Microsoft-OAuth (Design 3b).
+ * Abortable loopback server for Microsoft OAuth (Design 3b).
  *
- * msal-node bringt zwar einen eigenen LoopbackClient mit, bietet aber keinen
- * Weg, einen laufenden Login abzubrechen — der CANCEL-Knopf im Konten-Sheet
- * braucht genau das. Diese Implementierung spiegelt msals Verhalten
- * (Loopback auf 127.0.0.1, Redirect-URI http://localhost:{port}, Success-/
- * Error-Template) und ergänzt cancel(): Server zu, wartendes
- * listenForAuthCode-Promise verwirft — acquireTokenInteractive bricht damit
- * sauber ab.
+ * msal-node ships its own LoopbackClient, but offers no way to abort a
+ * running login — the CANCEL button in the accounts sheet needs exactly
+ * that. This implementation mirrors msal's behavior
+ * (loopback on 127.0.0.1, redirect URI http://localhost:{port}, success/
+ * error template) and adds cancel(): closes the server, rejects the pending
+ * listenForAuthCode promise — acquireTokenInteractive thus aborts
+ * cleanly.
  */
-/** Wie google.ts: nach 5 Minuten ohne Redirect gibt der Login auf. */
+/** Like google.ts: after 5 minutes without a redirect the login gives up. */
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000
 
 export class CancelableLoopbackClient implements ILoopbackClient {
@@ -37,9 +37,9 @@ export class CancelableLoopbackClient implements ILoopbackClient {
       this.server = createServer((req, res) => {
         const url = req.url ?? ''
         if (url === '/') {
-          // msal leitet nach erfolgreichem Code-Empfang auf "/" um, damit der
-          // Auth-Code nicht in der Browser-History landet — hier kommt die
-          // Erfolgsseite.
+          // After receiving the code, msal redirects to "/" so the auth code
+          // does not end up in the browser history — this is where the
+          // success page comes.
           res.end(successTemplate ?? 'Angemeldet. Dieses Fenster kann geschlossen werden.')
           return
         }
@@ -56,8 +56,8 @@ export class CancelableLoopbackClient implements ILoopbackClient {
         }
         this.rejectListener = null
         resolve(response)
-        // Der Redirect auf "/" (Erfolgsseite) braucht den Server noch kurz —
-        // danach zu, damit kein Port offen bleibt. state prüft msal selbst
+        // The redirect to "/" (success page) still needs the server briefly —
+        // then close it so no port stays open. msal checks state itself
         // (validateState in acquireTokenByCode → state_mismatch).
         setTimeout(() => this.closeServer(), 5000).unref?.()
       })
@@ -67,13 +67,13 @@ export class CancelableLoopbackClient implements ILoopbackClient {
 
   getRedirectUri(): string {
     if (this.canceled) {
-      // Kein NodeAuthError „noLoopbackServerExists": msals Redirect-URI-Polling
-      // würde damit weiterwarten — ein generischer Fehler bricht sofort ab.
+      // No NodeAuthError "noLoopbackServerExists": msal's redirect URI polling
+      // would keep waiting on it — a generic error aborts immediately.
       throw new Error('Anmeldung abgebrochen')
     }
     if (!this.server || !this.server.listening) {
-      // Exakt msals Fehlertyp + -code, damit waitForRedirectUri weiter pollt,
-      // bis der Server lauscht (Race zwischen listen() und getRedirectUri()).
+      // Exactly msal's error type + code, so waitForRedirectUri keeps polling
+      // until the server listens (race between listen() and getRedirectUri()).
       throw new AuthError('no_loopback_server_exists', 'Loopback-Server lauscht noch nicht')
     }
     const address = this.server.address()
@@ -91,7 +91,7 @@ export class CancelableLoopbackClient implements ILoopbackClient {
     this.server = null
   }
 
-  /** Bricht den wartenden Login ab — der Aufrufer bekommt `message` als Fehler. */
+  /** Aborts the waiting login — the caller gets `message` as the error. */
   cancel(message: string): void {
     this.canceled = true
     const reject = this.rejectListener
