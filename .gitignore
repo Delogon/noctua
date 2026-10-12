@@ -20,3 +20,4 @@ native/fm-helper/bin/*
 
 # Firmenspezifische Org-Konfiguration (Vorlage: build/org-config.example.json)
 build/org-config.json
+test/local/out/

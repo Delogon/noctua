@@ -100,11 +100,11 @@ export function useDecisionModels(profileId: string | null): UseQueryResult<Prof
   })
 }
 
-/** Phishing-Einschätzung einer Mail (nur mit Entscheidungsmodell berechnet). */
-export function usePhishing(messageId: number): UseQueryResult<InvokeOutput<'ai:decisions:get'>> {
+/** Spam-/Phishing-Einschätzung einer Mail (lokale Regeln + ggf. Entscheidungsmodell). */
+export function useMailSecurity(messageId: number): UseQueryResult<InvokeOutput<'security:get'>> {
   return useQuery({
-    queryKey: ['ai', 'decisions', messageId],
-    queryFn: () => invoke('ai:decisions:get', { messageId }),
+    queryKey: ['security', messageId],
+    queryFn: () => invoke('security:get', { messageId }),
     staleTime: 60_000
   })
 }

@@ -1,5 +1,3 @@
-import type Database from 'better-sqlite3-multiple-ciphers'
-import { PHISHING_SCORE_HIGH } from '@shared/decision-thresholds'
 import { isLocalOnly } from '../privacy'
 import { getSecret } from '../auth/secrets'
 import { getClient, getProfile, profileSecretKey } from './providers/registry'
@@ -106,25 +104,4 @@ export async function runDecisionTest(
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error), Date.now() - started)
   }
-}
-
-/** Phishing-Einschätzung einer Mail aus ai_decisions (null ohne Entscheidungsmodell-Triage). */
-export function getPhishing(
-  db: Database.Database,
-  messageId: number
-): { score: number; high: boolean; signals: string[] } | null {
-  const row = db
-    .prepare('SELECT phishing, phishing_signals_json FROM ai_decisions WHERE message_id = ?')
-    .get(messageId) as { phishing: number | null; phishing_signals_json: string | null } | undefined
-  if (!row || row.phishing === null) return null
-  let signals: string[] = []
-  try {
-    const parsed = JSON.parse(row.phishing_signals_json ?? '[]') as unknown
-    if (Array.isArray(parsed)) {
-      signals = parsed.filter((s): s is string => typeof s === 'string').slice(0, 10)
-    }
-  } catch {
-    // keine Signale
-  }
-  return { score: row.phishing, high: row.phishing >= PHISHING_SCORE_HIGH, signals }
 }

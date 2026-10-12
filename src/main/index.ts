@@ -18,6 +18,7 @@ import { initCalendar, stopCalendar } from './calendar'
 import { setItipMailer } from './calendar/mailer'
 import { calendarSync } from './calendar/sync'
 import { setRuleActionExecutor } from './ai/rules'
+import { setJunkExecutor } from './ai/threat-check'
 import { startUpdateChecks, stopUpdateChecks } from './updates'
 import { appId, packagedAppName, productName } from './org-config'
 import { applyOrgConfig } from './org-defaults'
@@ -27,6 +28,9 @@ import { installAppMenu } from './menu'
 import { cleanupForwardTasksWithoutRequest } from './db/repos/tasks'
 import { reindexHtmlOnlyMessages } from './mail/ingest'
 import { isDev } from './dev-mode'
+import { diagnostics } from './diagnostics/service'
+import { diagnosticsAppInfo } from './diagnostics/app-info'
+import { metrics } from './diagnostics/metrics'
 import { trafficLightPosition } from './window-chrome'
 import {
   APP_CSP,
@@ -203,10 +207,18 @@ app
     electronApp.setAppUserModelId(appId())
 
     const db = openDb()
+    // Lokale Leistungsdiagnose (nur auf dem Gerät; Export als ZIP auf Wunsch)
+    diagnostics.init({
+      db,
+      dbPath: join(app.getPath('userData'), 'noctua.sqlite'),
+      dir: join(app.getPath('userData'), 'diagnostics'),
+      appInfo: diagnosticsAppInfo,
+      getAppMetrics: () => app.getAppMetrics()
+    })
     // Org-Defaults + bereitgestellte AI-Profile (No-op ohne Org-Konfiguration)
     applyOrgConfig(db, app.getLocale())
-    cleanupForwardTasksWithoutRequest(db)
-    reindexHtmlOnlyMessages(db)
+    metrics.time('startup.cleanupForwardTasks', () => cleanupForwardTasksWithoutRequest(db))
+    metrics.time('startup.reindexHtmlOnly', () => reindexHtmlOnlyMessages(db))
     if (isDev) seedFromEnv(db)
     // Dev-only Demo-Daten (NOCTUA_DEMO_SEED=1): kein IMAP-/CalDAV-Sync für Demo-Konten
     const demo = isDev && process.env.NOCTUA_DEMO_SEED === '1'
@@ -221,6 +233,11 @@ app
       push(channel, payload)
       // Neue/aktualisierte Nachrichten können triage-/index-fähig geworden sein.
       if (channel === 'messages:changed') {
+        metrics.count('events.messagesChanged')
+        metrics.count(
+          'events.messagesChanged.threadKeys',
+          (payload as { threadKeys?: string[] }).threadKeys?.length ?? 0
+        )
         aiQueue.kick()
         embeddingIndexer.kick()
         updateBadge()
@@ -262,6 +279,7 @@ app
       )
     })
     setRuleActionExecutor((ids, action) => syncEngine.applyAction(ids, action))
+    setJunkExecutor((ids) => syncEngine.applyAction(ids, 'spam'))
     if (!demo) startUpdateChecks(push)
 
     if (isDev && process.env.NOCTUA_TEST_SELF_SEND === '1') {
@@ -395,6 +413,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('quit', () => {
+  diagnostics.persist()
+  diagnostics.stop()
   aiQueue.stop()
   followupRadar.stop()
   embeddingIndexer.stop()

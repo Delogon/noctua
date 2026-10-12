@@ -41,7 +41,9 @@ const WRITABLE_EXACT = new Set([
   'ai.draftUseCalendar',
   'compose.draft',
   // Benachrichtigungen ohne Absender/Betreff/Kurzfassung; Schwellen bleiben intern
-  'notifications.hideContent'
+  'notifications.hideContent',
+  // Spam/Phishing mit Modell-Bestätigung automatisch in den Spam-Ordner; '1' = an
+  'security.autoJunk'
 ])
 
 const WRITABLE_PATTERNS = [

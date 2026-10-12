@@ -12,6 +12,7 @@ import { folderLeaf, folderRole } from '@shared/folder-roles'
 import { htmlToText } from '../../mail/parser'
 import { isForwardWithoutRequest, textBeforeForwardedMessage } from '../../mail/forwarded'
 import { isVisibleMailAttachment } from '../../mail/attachment-visibility'
+import { metrics } from '../../diagnostics/metrics'
 
 interface ThreadAggRow {
   thread_key: string
@@ -244,7 +245,11 @@ export function listThreads(
       `${THREAD_AGG_SELECT} ${where}${accountFilter} GROUP BY m.thread_key ORDER BY max_date DESC LIMIT ?`
     )
     .all(...params) as ThreadAggRow[]
-  return rows.map((agg) => buildThreadItem(db, agg))
+  // Aggregat und Zeilenaufbau getrennt messen: buildThreadItem macht pro Thread
+  // weitere Abfragen (Diagnose großer Postfächer)
+  return metrics.time('db.threads.buildItems', () => rows.map((agg) => buildThreadItem(db, agg)), {
+    rows: rows.length
+  })
 }
 
 /**

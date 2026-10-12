@@ -7,6 +7,7 @@ import {
   type PushPayload
 } from '@shared/ipc-contract'
 import { isTrustedIpcSender, sanitizeIpcError, type TrustedAppPages } from '../security'
+import { metrics } from '../diagnostics/metrics'
 
 /**
  * Bindet den IPC-Vertrag an konkrete Handler. Input und Output jedes Aufrufs
@@ -41,13 +42,20 @@ export function registerIpcHandlers(
       try {
         const input = spec.input.parse(rawInput)
         phase = 'handler'
+        const endCall = metrics.span(`ipc.${channel}`)
         // TS kann die Korrelation Kanal↔Handler-Signatur über die Map-Iteration
         // nicht verfolgen; der Contract-Typ IpcHandlers stellt sie sicher.
-        const result = await (handlers[channel] as (i: unknown) => unknown)(input)
+        let result: unknown
+        try {
+          result = await (handlers[channel] as (i: unknown) => unknown)(input)
+        } finally {
+          endCall()
+        }
         phase = 'output'
         return spec.output.parse(result)
       } catch (error) {
         console.error(`[ipc] ${channel} (${phase}) fehlgeschlagen:`, error)
+        metrics.count(`ipc.errors.${channel}`)
         throw sanitizeIpcError(error, phase)
       }
     })
@@ -60,5 +68,6 @@ export function pushToWindow<C extends PushChannel>(
   payload: PushPayload<C>
 ): void {
   if (window.isDestroyed()) return
+  metrics.count(`push.${channel}`)
   window.webContents.send(channel, payload)
 }

@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { runTriage } from '@main/ai/triage'
 import { classifyAiError } from '@main/ai/queue'
-import { getPhishing } from '@main/ai/decision-service'
+import {
+  getMailSecurity,
+  runThreatCheck,
+  maybeAutoJunk,
+  setJunkExecutor
+} from '@main/ai/threat-check'
 import { createProfile, setTaskAssignment } from '@main/ai/providers/registry'
 import { setLocalOnly } from '@main/privacy'
 import { upsertEnvelope, storeBody } from '@main/mail/ingest'
@@ -16,7 +21,7 @@ import {
 } from '@shared/decision-thresholds'
 import { writeGates, interpretTriageAnswers, TRIAGE_QUESTIONS } from '@main/ai/decision-triage'
 import { extractiveSummary } from '@main/ai/extractive-summary'
-import { computePhishingSignals } from '@main/ai/phishing-signals'
+import { computeMailSignals } from '@main/mail/threat-signals'
 import { createAiTestDb, closeTestDb, seedAccount, seedFolder, makeEnvelope } from '../helpers/db'
 
 const { fakeCreate } = vi.hoisted(() => ({ fakeCreate: vi.fn() }))
@@ -34,6 +39,8 @@ interface Plan {
   proposes_meeting?: number
   /** score 0..2 */
   phishing?: number
+  /** score 0..2 */
+  spam?: number
 }
 
 function systemOneBody(plan: Plan): unknown {
@@ -67,6 +74,13 @@ function systemOneBody(plan: Plan): unknown {
         score: plan.phishing ?? 0,
         legend: {},
         probabilities: probs(3, Math.round(plan.phishing ?? 0)),
+        confidence: 0.6
+      },
+      spam: {
+        type: 'score',
+        score: plan.spam ?? 0,
+        legend: {},
+        probabilities: probs(3, Math.round(plan.spam ?? 0)),
         confidence: 0.6
       }
     },
@@ -208,7 +222,8 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
       'addressed_to_me',
       'has_request',
       'proposes_meeting',
-      'phishing'
+      'phishing',
+      'spam'
     ])
     expect(body.questions.category.type).toBe('choice')
     expect(Object.keys(body.questions.category.criteria)).toEqual([
@@ -222,6 +237,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
     ])
     expect(body.questions.priority.criteria).toHaveLength(5)
     expect(body.questions.phishing.criteria).toHaveLength(3)
+    expect(body.questions.spam.criteria).toHaveLength(3)
     // Mail steht als unvertrauenswürdige Daten im state
     expect(body.state).toContain('<<<BEGIN MAIL (UNTRUSTED DATA)>>>')
   })
@@ -306,7 +322,13 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
   })
 
   it('speichert rohe Wahrscheinlichkeiten in ai_decisions', async () => {
-    stubSystemOne({ category: 'personal', proposes_meeting: 0.8, phishing: 0.3, priority: 0.4 })
+    stubSystemOne({
+      category: 'personal',
+      proposes_meeting: 0.8,
+      phishing: 0.3,
+      spam: 0.2,
+      priority: 0.4
+    })
     const id = seedMail(db, { body: 'Treffen wir uns Dienstag um 10 Uhr?' })
     await runTriage(db, id)
     expect(decisionRow(db, id)).toMatchObject({
@@ -314,6 +336,7 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
       category: 'personal',
       proposes_meeting: 0.8,
       phishing: 0.3,
+      spam: 0.2,
       priority_score: 0.4
     })
   })
@@ -335,15 +358,84 @@ describe('Hybrid-Triage (Entscheidungsmodell + Textmodell nur bei Bedarf)', () =
     await runTriage(db, id)
     const state = JSON.parse((systemOne.mock.calls[0] as [string, RequestInit])[1].body as string)
       .state as string
-    expect(state).toContain('Phishing-Prüfung')
+    expect(state).toContain('Sicherheits-Prüfung')
     expect(state).toContain('paypal.com')
     expect(state).toContain('Antworten gehen an other.io')
     expect(state).toContain('1 Link')
-    const p = getPhishing(db, id)
-    expect(p).toMatchObject({ score: 1.8, high: true })
+    const p = getMailSecurity(db, id)
+    expect(p?.phishing).toMatchObject({ ai: 1.8, level: 'high' })
+    expect(p?.model).toBe('clef-flash')
     expect(p?.signals).toEqual(
       expect.arrayContaining(['display_name_domain', 'reply_to_differs', 'link_mismatch:1'])
     )
+  })
+
+  it('Spam: Score aus der Triage landet in ai_decisions und ergibt die Stufe', async () => {
+    stubSystemOne({ category: 'promotions', priority: 0, spam: 1.7 })
+    const id = seedMail(db, {
+      subject: 'SIE HABEN GEWONNEN!!!',
+      fromAddr: 'win@lotto-prize.top',
+      body: 'Sie haben 1 Million Euro gewonnen. Jetzt handeln!'
+    })
+    await runTriage(db, id)
+    expect(decisionRow(db, id)?.spam).toBe(1.7)
+    const report = getMailSecurity(db, id)!
+    expect(report.spam).toMatchObject({ ai: 1.7, level: 'high' })
+    expect(report.signals).toEqual(expect.arrayContaining(['shouting_subject']))
+    expect(report.canCheck).toBe(false)
+  })
+
+  it('eigenständige Prüfung: nur Phishing + Spam gefragt, Ergebnis in mail_threat_checks', async () => {
+    stubSystemOne({ phishing: 1.5, spam: 0.4 })
+    const id = seedMail(db, { body: 'Bitte bestätigen Sie Ihr Konto: https://xn--pypal-4ve.com' })
+    expect(getMailSecurity(db, id)?.canCheck).toBe(true)
+    const result = await runThreatCheck(db, id)
+    expect(result).toEqual({ phishing: 1.5, spam: 0.4, model: 'clef-flash' })
+    const body = JSON.parse((systemOne.mock.calls[0] as [string, RequestInit])[1].body as string)
+    expect(Object.keys(body.questions)).toEqual(['phishing', 'spam'])
+    expect(body.state).toContain('<<<BEGIN MAIL (UNTRUSTED DATA)>>>')
+    expect(body.state).toContain('Ersatzzeichen')
+    const report = getMailSecurity(db, id)!
+    expect(report.phishing).toMatchObject({ ai: 1.5, level: 'high' })
+    expect(report.canCheck).toBe(false)
+  })
+
+  it('automatisch aussortieren: nur mit Einstellung, Modell-Bestätigung und unbekanntem Absender', async () => {
+    const moved: number[][] = []
+    setJunkExecutor((ids) => moved.push(ids))
+    stubSystemOne({ category: 'promotions', priority: 0, spam: 1.9 })
+    const id = seedMail(db, { fromAddr: 'deals@spam.top', body: 'Casino Jackpot!' })
+    await runTriage(db, id)
+    expect(maybeAutoJunk(db, id)).toBe(false) // Einstellung aus
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('security.autoJunk', '1')`).run()
+    expect(maybeAutoJunk(db, id)).toBe(true)
+    expect(moved).toEqual([[id]])
+    const acc = (
+      db.prepare('SELECT account_id a FROM messages WHERE id = ?').get(id) as { a: number }
+    ).a
+    db.prepare(
+      `INSERT INTO contact_stats (account_id, addr, sent_count, last_interaction) VALUES (?, 'deals@spam.top', 1, 1)`
+    ).run(acc)
+    expect(maybeAutoJunk(db, id)).toBe(false) // bekannter Kontakt
+    setJunkExecutor(() => {})
+  })
+
+  it('automatisch aussortieren: starke Regeln allein verschieben nie', async () => {
+    const moved: number[][] = []
+    setJunkExecutor((ids) => moved.push(ids))
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('security.autoJunk', '1')`).run()
+    stubSystemOne({ category: 'transactional', priority: 2, phishing: 0, spam: 0 })
+    const id = seedMail(db, { fromAddr: 'service@pаypal.com', body: 'Hallo' })
+    db.prepare(`UPDATE message_bodies SET html_raw = ? WHERE message_id = ?`).run(
+      '<a href="http://1.2.3.4/x">https://paypal.com/login</a><form></form>',
+      id
+    )
+    genReply({ summary: 'x' })
+    await runTriage(db, id)
+    expect(getMailSecurity(db, id)?.phishing.level).toBe('high')
+    expect(maybeAutoJunk(db, id)).toBe(false)
+    expect(moved).toEqual([])
+    setJunkExecutor(() => {})
   })
 
   it('Fallback: Entscheidungsmodell fehlt (404) → klassische Triage übernimmt', async () => {
@@ -419,6 +511,30 @@ describe('Ohne Entscheidungsmodell: Triage unverändert', () => {
   })
 })
 
+describe('Ohne Entscheidungsmodell: lokale Regeln allein', () => {
+  it('liefert Stufen aus Regeln, kein Modell-Urteil, keine Prüfung möglich', async () => {
+    const db = createAiTestDb()
+    try {
+      const id = seedMail(db, { fromAddr: 'security@paypa1.com', body: 'Konto gesperrt' })
+      db.prepare(`UPDATE message_bodies SET html_raw = ? WHERE message_id = ?`).run(
+        '<p>Ihr Konto wurde gesperrt.</p><a href="http://evil.example/x">https://paypal.com</a>',
+        id
+      )
+      const report = getMailSecurity(db, id)!
+      expect(report.model).toBeNull()
+      expect(report.canCheck).toBe(false)
+      expect(report.phishing.ai).toBeNull()
+      expect(report.phishing.level).toBe('high')
+      expect(report.signals).toEqual(
+        expect.arrayContaining(['lookalike_sender', 'link_mismatch:1', 'urgency_language'])
+      )
+      expect(await runThreatCheck(db, id)).toBeNull()
+    } finally {
+      closeTestDb(db)
+    }
+  })
+})
+
 describe('Reine Bausteine', () => {
   it('Prioritäts-Mapping 0..4 → 1..5 (gerundet, geklemmt)', () => {
     expect([0, 0.4, 0.5, 1, 2, 2.49, 3.5, 4].map(mapPriorityScore)).toEqual([
@@ -473,14 +589,14 @@ describe('Reine Bausteine', () => {
   })
 
   it('Phishing-Signale: Reply-To, Anzeigename-Domain, Link-Mismatch, IP-Link; harmlose Mail ohne Signale', () => {
-    const none = computePhishingSignals({
+    const none = computeMailSignals({
       fromName: 'Anna',
       fromAddr: 'anna@firma.de',
       replyToJson: JSON.stringify([{ address: 'anna@firma.de' }]),
       html: '<a href="https://firma.de/x">https://firma.de/x</a>'
     })
     expect(none.codes).toEqual([])
-    const bad = computePhishingSignals({
+    const bad = computeMailSignals({
       fromName: 'amazon.de Kundenservice',
       fromAddr: 'a@mailer.top',
       replyToJson: JSON.stringify([{ address: 'b@gmail.com' }]),
@@ -492,8 +608,17 @@ describe('Reine Bausteine', () => {
         'reply_to_differs',
         'link_mismatch:1',
         'ip_link:1',
-        'punycode_link:1'
+        // xn--pypal-4ve.com = „pаypal.com" mit kyrillischem а: mehr als nur Punycode
+        'homoglyph_link:1'
       ])
     )
+    // legitime IDN-Domain: nur der schwache Punycode-Hinweis, keine Homoglyph-Warnung
+    const idn = computeMailSignals({
+      fromName: 'Stadt',
+      fromAddr: 'info@stadt.de',
+      replyToJson: null,
+      html: '<a href="https://xn--mnchen-3ya.de/">Website</a>'
+    })
+    expect(idn.codes).toEqual(['punycode_link:1'])
   })
 })

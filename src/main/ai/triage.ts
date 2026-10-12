@@ -19,7 +19,8 @@ import {
   writeGates,
   type HybridWrite
 } from './decision-triage'
-import { computePhishingSignals } from './phishing-signals'
+import { computeMailSignals } from '../mail/threat-signals'
+import { loadThreatInput, signalStateBlock } from './threat-check'
 import { extractiveSummary } from './extractive-summary'
 import { NEEDS_REPLY_THRESHOLD, ADDRESSED_TO_ME_THRESHOLD } from '@shared/decision-thresholds'
 import { AppleGuardrailError, appleFmStatus, appleGate, appleTriage } from './apple-fm'
@@ -406,21 +407,9 @@ async function runHybridTriage(
 ): Promise<TriageOutcome | null> {
   const fullBodyText = row.text_plain?.trim() || htmlToText(row.html_raw ?? '')
   const bodyText = textBeforeForwardedMessage(row.subject, fullBodyText)
-  const signals = computePhishingSignals({
-    fromName: row.from_name,
-    fromAddr: row.from_addr,
-    replyToJson: row.reply_to,
-    html: row.html_raw
-  })
+  const signals = computeMailSignals(loadThreatInput(db, messageId, row)!)
   const userPrompt = buildUserPrompt(db, row)
-  const state = [
-    DECISION_STATE_NOTE,
-    '',
-    userPrompt,
-    signals.lines.length > 0
-      ? `\nPhishing-Prüfung (lokal, vor der Analyse berechnet):\n${signals.lines.map((l) => `- ${sanitizeUntrustedLine(l, 220)}`).join('\n')}`
-      : ''
-  ].join('\n')
+  const state = [DECISION_STATE_NOTE, '', userPrompt, signalStateBlock(signals)].join('\n')
 
   let result: Awaited<ReturnType<typeof decide>>
   try {
@@ -510,8 +499,8 @@ async function runHybridTriage(
   db.prepare(
     `INSERT OR REPLACE INTO ai_decisions (message_id, model, category, category_confidence,
        priority_score, needs_reply, addressed_to_me, has_request, proposes_meeting, phishing,
-       phishing_signals_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       spam, phishing_signals_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     messageId,
     cfg.model,
@@ -523,6 +512,7 @@ async function runHybridTriage(
     decision.hasRequest,
     decision.proposesMeeting,
     decision.phishing,
+    decision.spam,
     JSON.stringify(signals.codes),
     Date.now()
   )
