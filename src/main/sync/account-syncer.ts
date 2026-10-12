@@ -2,7 +2,8 @@ import { ImapFlow, type FetchMessageObject, type MessageAddressObject } from 'im
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { isTlsPinMismatch } from '../auth/loopback-tls'
 import { imapConnectOptions, type AccountRow, type MailCredentials } from '../auth/providers'
-import { parseMail, type ParsedMail } from '../mail/parser'
+import type { ParsedMail } from '../mail/parser'
+import { parseMailOffThread } from '../mail/parse-off-thread'
 import {
   applyFlagUpdates,
   deleteByUids,
@@ -708,25 +709,28 @@ export class AccountSyncer {
         lock.release()
       }
 
-      const stored: Array<{ id: number; threadKey: string; source: Buffer; parsed: ParsedMail }> =
-        []
-      for (const row of batch) {
-        const source = sources.get(row.uid)
-        if (!source) {
-          failedIds.push(row.id)
-          continue
-        }
-        metrics.count('sync.bodies.bytes', source.length)
-        try {
-          const parsed = await metrics.timeAsync('mail.parse', () => parseMail(source), {
-            kb: Math.round(source.length / 1024)
-          })
-          stored.push({ id: row.id, threadKey: row.thread_key, source, parsed })
-        } catch (error) {
-          console.warn(`[sync:${this.account.email}] parse failed:`, error)
-          failedIds.push(row.id)
-        }
-      }
+      // Parse the chunk in parallel in the parse workers (off the main thread)
+      const parsedRows = await Promise.all(
+        batch.map(async (row) => {
+          const source = sources.get(row.uid)
+          if (!source) return null
+          metrics.count('sync.bodies.bytes', source.length)
+          try {
+            const parsed = await metrics.timeAsync('mail.parse', () => parseMailOffThread(source), {
+              kb: Math.round(source.length / 1024)
+            })
+            return { id: row.id, threadKey: row.thread_key, source, parsed }
+          } catch (error) {
+            console.warn(`[sync:${this.account.email}] parse failed:`, error)
+            return null
+          }
+        })
+      )
+      const stored = parsedRows.filter(
+        (row): row is { id: number; threadKey: string; source: Buffer; parsed: ParsedMail } =>
+          row !== null
+      )
+      for (const row of batch) if (!stored.some((s) => s.id === row.id)) failedIds.push(row.id)
       const batchFailed = batch.filter((row) => !stored.some((s) => s.id === row.id))
       metrics.time(
         'sync.bodies.store',
@@ -814,7 +818,7 @@ export class AccountSyncer {
     )
     if (!msg || !msg.source) return null
     metrics.count('sync.bodies.bytes', msg.source.length)
-    const parsed = await metrics.timeAsync('mail.parse', () => parseMail(msg.source!), {
+    const parsed = await metrics.timeAsync('mail.parse', () => parseMailOffThread(msg.source!), {
       kb: Math.round(msg.source.length / 1024)
     })
     metrics.time('sync.bodies.store', () =>

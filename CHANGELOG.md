@@ -8,6 +8,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Fixed
 
+- **No stalls from large emails while bodies download**: MIME parsing for the background body download now runs in up to two worker threads (the ten bodies of a batch in parallel), so large or deeply nested emails no longer block the app. Opening an attachment still parses in the main process. If the workers cannot start, parsing falls back to the previous in-process mode.
 - **Faster typo-tolerant sender search**: the sender list behind "mail from jens buetfisch" is now kept as a token index and only rebuilt when new mail arrives or after a minute, and each distinct name part is compared once (repeat searches with 3,000 senders: 73 ms → 17 ms).
 - **Faster startup**: the one-time repair that removes old tasks from FYI forwards ran on every launch and read the body of every task; it now runs once per database (and no longer removes a task you later create by hand from a forward). The search-index cleanup runs a few seconds after startup instead of before the window is usable.
 - **Smooth app while building the search index**: the local search model now runs in a background worker thread instead of the main process, so indexing no longer stalls sync, IPC and the UI. On battery the indexer pauses briefly between batches. Picking the next messages to index uses a dedicated index (migration 040) instead of scanning the mailbox every 48 messages, and the search-index cleanup runs at most every six hours. If the worker cannot start, indexing falls back to the previous in-process mode.
