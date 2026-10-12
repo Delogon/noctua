@@ -11,8 +11,8 @@ describe('createSubjectProtocolParser', () => {
     const out: string[] = []
     let subject: string | null = null
     for (const delta of [
-      'BET',
-      'REFF: Kaffee nächste ',
+      'SUB',
+      'JECT: Kaffee nächste ',
       'Woche?\n--',
       '-\nHi Anna,\n',
       'passt Dienstag?'
@@ -27,7 +27,7 @@ describe('createSubjectProtocolParser', () => {
     expect(out.join('')).toBe('Hi Anna,\npasst Dienstag?')
   })
 
-  it('reicht Streams ohne BETREFF-Zeile unverändert durch', () => {
+  it('reicht Streams ohne SUBJECT-Zeile unverändert durch', () => {
     const p = createSubjectProtocolParser()
     const out: string[] = []
     for (const delta of ['Hallo ', 'Tim,\nhier der Text.']) {
@@ -39,15 +39,15 @@ describe('createSubjectProtocolParser', () => {
     expect(out.join('')).toBe('Hallo Tim,\nhier der Text.')
   })
 
-  it('puffert ein einzelnes B, bis klar ist, dass es kein Protokoll ist', () => {
+  it('puffert ein einzelnes S, bis klar ist, dass es kein Protokoll ist', () => {
     const p = createSubjectProtocolParser()
-    expect(p.feed('B').text).toBe('')
-    expect(p.feed('itte melde dich.').text).toBe('Bitte melde dich.')
+    expect(p.feed('S').text).toBe('')
+    expect(p.feed('ure, see you.').text).toBe('Sure, see you.')
   })
 
   it('behält die zweite Zeile, wenn sie keine Trennlinie ist', () => {
     const p = createSubjectProtocolParser()
-    const r1 = p.feed('BETREFF: Test\nHallo Anna,\nGruß')
+    const r1 = p.feed('SUBJECT: Test\nHallo Anna,\nGruß')
     expect(r1.subject).toBe('Test')
     expect(r1.text + p.flush().text).toBe('Hallo Anna,\nGruß')
   })
@@ -56,14 +56,14 @@ describe('createSubjectProtocolParser', () => {
 describe('createCompositionModeParser', () => {
   it('erkennt ein zerhacktes Diktat-Protokoll und entfernt die Moduszeile', () => {
     const parser = createCompositionModeParser()
-    const first = parser.feed('MOD')
-    const second = parser.feed('US: DIK')
-    const third = parser.feed('TAT\nBETREFF: Treffen\n---\nHallo Sabine,')
+    const first = parser.feed('MO')
+    const second = parser.feed('DE: DICTA')
+    const third = parser.feed('TION\nSUBJECT: Treffen\n---\nHallo Sabine,')
     expect(first).toEqual({ mode: null, text: '' })
     expect(second).toEqual({ mode: null, text: '' })
     expect(third).toEqual({
       mode: 'dictation',
-      text: 'BETREFF: Treffen\n---\nHallo Sabine,'
+      text: 'SUBJECT: Treffen\n---\nHallo Sabine,'
     })
   })
 

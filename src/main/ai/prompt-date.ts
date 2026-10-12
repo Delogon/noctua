@@ -23,7 +23,7 @@ export function localStamp(ts: number | Date, timeZone?: string): string {
 }
 
 export function currentDateLine(now = new Date()): string {
-  const readable = new Intl.DateTimeFormat('de-DE', {
+  const readable = new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -34,9 +34,10 @@ export function currentDateLine(now = new Date()): string {
     String(now.getMonth() + 1).padStart(2, '0'),
     String(now.getDate()).padStart(2, '0')
   ].join('-')
-  const time = new Intl.DateTimeFormat('de-DE', {
+  const time = new Intl.DateTimeFormat('en-GB', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    hour12: false
   }).format(now)
-  return `Heute ist ${readable} (${iso}), ${time} Uhr.`
+  return `Today is ${readable} (${iso}), ${time}.`
 }

@@ -31,8 +31,8 @@ export const EXPECTS_REPLY_QUESTIONS: Questions = {
   expects_reply: {
     type: 'noul',
     instructions:
-      'Der Nutzer hat diese E-Mail GESENDET. Erwartet er darauf realistisch eine Antwort (Frage gestellt, Bitte geäußert, Angebot gemacht)? Reine Danksagungen, Bestätigungen und Informationen erwarten keine Antwort.',
-    criteria: { false: 'Keine Antwort erwartet', true: 'Der Nutzer erwartet eine Antwort' }
+      'The user SENT this email. Do they realistically expect a reply to it (asked a question, made a request, made an offer)? Pure thank-you notes, confirmations and information do not expect a reply.',
+    criteria: { false: 'No reply expected', true: 'The user expects a reply' }
   }
 }
 
@@ -235,7 +235,7 @@ export class FollowupRadar {
           baseUrl: decision.profile.baseUrl,
           apiKey: decision.apiKey,
           model: decision.model,
-          state: `${UNTRUSTED_SYSTEM_NOTE}\n\nBetreff: ${sanitizeUntrustedLine(candidate.subject, 300)}\n\n${wrapUntrusted('MAIL', sanitizeUntrusted(text, 2500))}`,
+          state: `${UNTRUSTED_SYSTEM_NOTE}\n\nSubject: ${sanitizeUntrustedLine(candidate.subject, 300)}\n\n${wrapUntrusted('MAIL', sanitizeUntrusted(text, 2500))}`,
           questions: EXPECTS_REPLY_QUESTIONS
         })
         logUsage(this.db!, decision.model, result.usage.inputTokens, result.usage.outputTokens, 0)
@@ -256,13 +256,13 @@ export class FollowupRadar {
           {
             role: 'system',
             content:
-              'Der Nutzer hat diese E-Mail GESENDET. Beurteile, ob er darauf realistisch eine Antwort erwartet (Frage gestellt, Bitte geäußert, Angebot gemacht). Antworte NUR mit JSON: {"expects_reply": true|false}\n\n' +
+              'The user SENT this email. Judge whether they realistically expect a reply to it (asked a question, made a request, made an offer). Reply ONLY with JSON: {"expects_reply": true|false}\n\n' +
               UNTRUSTED_SYSTEM_NOTE
           },
           {
             role: 'user',
             // Gesendete Mails zitieren oft fremden Text — gleiche Härtung wie oben (SEC-15)
-            content: `Betreff: ${sanitizeUntrustedLine(candidate.subject, 300)}\n\n${wrapUntrusted('MAIL', sanitizeUntrusted(text, 2500))}`
+            content: `Subject: ${sanitizeUntrustedLine(candidate.subject, 300)}\n\n${wrapUntrusted('MAIL', sanitizeUntrusted(text, 2500))}`
           }
         ],
         json: true,

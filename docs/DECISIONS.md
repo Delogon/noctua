@@ -138,6 +138,15 @@ rule fires if its probability is ≥ 0.6 and all other conditions match. Without
 condition text is authored by the user (trusted); the mail content is passed as untrusted data
 (SEC-15).
 
+## Prompt language
+
+All prompts, decision-model questions and labels sent to models are English. Text the models write
+for the user (one-line summaries, task titles, event titles, rule names, style-profile notes) follows
+the app language (`ui.language`: `en` → English, otherwise German), via
+`src/main/ai/output-language.ts`. Owl answers follow the language of the question; drafts and
+nudges follow the language of the conversation or the dictated idea. Heuristics that match mail
+content (salutations, forwards, scam and scheduling phrases) stay bilingual on purpose.
+
 ## Privacy
 
 Decision models run **only on your own Ollama server**. A decision profile follows the same

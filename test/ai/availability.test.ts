@@ -197,7 +197,7 @@ describe('buildAvailabilityBlock', () => {
     addCalendar()
     busyEvent('Chemotherapie bei Dr. Geheim', '2026-10-06T08:00:00', '2026-10-06T12:00:00')
     const block = buildAvailabilityBlock(db, input)!
-    expect(block).toContain('<<<BEGIN FREIE ZEITFENSTER>>>')
+    expect(block).toContain('<<<BEGIN FREE TIME SLOTS>>>')
     // Dienstag: 08-12 belegt → frei erst ab 12:00
     expect(block).toContain('2026-10-06 (Tue): 12:00-18:00')
     expect(block).toContain('2026-10-05 (Mon): 09:00-18:00') // 07:00 + 2 h Vorlauf
@@ -228,7 +228,7 @@ describe('buildAvailabilityBlock', () => {
       busyEvent('Block', `2026-10-${d}T00:00:00`, `2026-10-${d}T23:59:00`)
     }
     const block = buildAvailabilityBlock(db, input)!
-    expect(block).toContain('keine freien Zeitfenster')
+    expect(block).toContain('no free time slots')
     expect(block).not.toContain('<<<BEGIN')
   })
 })

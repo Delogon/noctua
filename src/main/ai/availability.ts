@@ -165,11 +165,11 @@ export function buildAvailabilityBlock(
   const slots = computeFreeSlots(busy, { fromUtc: input.now, zone, workingDays: 10 })
   const lines = formatSlots(slots, zone)
   if (lines.length === 0) {
-    return `\n\nVerfügbarkeit des Nutzers (Zeitzone ${zone}): In den nächsten 10 Arbeitstagen (08-18 Uhr) sind keine freien Zeitfenster vorhanden. Schlage keine konkreten Zeiten vor, sondern bitte um alternative Termine oder spätere Zeiträume.`
+    return `\n\nUser availability (time zone ${zone}): there are no free time slots in the next 10 working days (08-18). Do not propose concrete times; ask for alternative dates or later periods instead.`
   }
-  return `\n\nVerfügbarkeit des Nutzers: Die Mail fragt nach einem Termin. Unten stehen NUR die freien Zeitfenster des Nutzers (Zeitzone ${zone}, Arbeitstage, 08-18 Uhr), sonst nichts über den Kalender.
-Schlage 2 bis 3 konkrete Zeiten ausschließlich aus dieser Liste vor (Datum, Wochentag, Uhrzeit) und erfinde keine anderen. Erwähne keine anderen Termine und keine Kalenderdetails.
-<<<BEGIN FREIE ZEITFENSTER>>>
+  return `\n\nUser availability: the email asks for an appointment. Below are ONLY the user's free time slots (time zone ${zone}, working days, 08-18), nothing else about the calendar.
+Propose 2 to 3 concrete times exclusively from this list (date, weekday, time) and do not invent others. Do not mention other appointments or calendar details.
+<<<BEGIN FREE TIME SLOTS>>>
 ${lines.join('\n')}
-<<<END FREIE ZEITFENSTER>>>`
+<<<END FREE TIME SLOTS>>>`
 }

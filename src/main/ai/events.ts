@@ -16,6 +16,7 @@ import {
 } from './untrusted'
 import { localStamp } from './prompt-date'
 import { PROPOSES_MEETING_THRESHOLD } from '@shared/decision-thresholds'
+import { outputLanguage, outputLanguageName, type OutputLanguage } from './output-language'
 
 /**
  * Terminvorschläge aus Mails (2.4). Eigener Job-Typ 'events' (nicht Teil der
@@ -123,15 +124,7 @@ export function localDayOf(ms: number): string {
   return localStamp(ms).slice(0, 10)
 }
 
-const WEEKDAYS_DE = [
-  'Sonntag',
-  'Montag',
-  'Dienstag',
-  'Mittwoch',
-  'Donnerstag',
-  'Freitag',
-  'Samstag'
-]
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 /**
  * Referenz-Kalender ab dem Mail-Datum („Montag 2026-10-05, Dienstag 2026-10-06 …"):
@@ -144,8 +137,8 @@ export function referenceCalendar(mailMs: number, days = 21): string {
   for (let i = 0; i < days; i++) {
     const date = addDaysTo(start, i)
     const [y, m, d] = date.split('-').map(Number)
-    const name = WEEKDAYS_DE[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
-    lines.push(`${name} ${date}${i === 0 ? ' (Datum der Mail)' : ''}`)
+    const name = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
+    lines.push(`${name} ${date}${i === 0 ? ' (date of the email)' : ''}`)
   }
   return lines.join('\n')
 }
@@ -236,38 +229,40 @@ export function parseEventExtraction(raw: string, mailMs: number): ResolvedEvent
 
 // --- Prompt ---------------------------------------------------------------------------------
 
-export const EVENTS_SYSTEM_PROMPT = `Du extrahierst Termine aus einer E-Mail für den Kalender des Empfängers.
+export function eventsSystemPrompt(language: OutputLanguage = outputLanguage()): string {
+  return `You extract appointments from an email for the recipient's calendar.
 ${UNTRUSTED_SYSTEM_NOTE}
-Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, exakt in dieser Form:
+Reply ONLY with a JSON object, exactly in this form:
 {
   "events": [
     {
-      "title": "kurzer Titel des Termins",
-      "start": "YYYY-MM-DDTHH:mm" (mit Uhrzeit) oder "YYYY-MM-DD" (nur Datum, ganztägig),
-      "end": "YYYY-MM-DDTHH:mm" oder "YYYY-MM-DD" oder null,
-      "duration_minutes": Ganzzahl oder null,
-      "location": "Ort/Adresse oder null",
-      "online_link": "https-Link zum Online-Meeting oder null",
-      "timezone": "IANA-Zeitzone wie Europe/Berlin, NUR wenn in der Mail ausdrücklich genannt, sonst null",
+      "title": "short title of the appointment, in ${outputLanguageName(language)}",
+      "start": "YYYY-MM-DDTHH:mm" (with time) or "YYYY-MM-DD" (date only, all-day),
+      "end": "YYYY-MM-DDTHH:mm" or "YYYY-MM-DD" or null,
+      "duration_minutes": integer or null,
+      "location": "place/address or null",
+      "online_link": "https link to the online meeting or null",
+      "timezone": "IANA time zone such as Europe/Berlin, ONLY if explicitly stated in the email, otherwise null",
       "status": "confirmed" | "proposed",
       "confidence": 0.0-1.0
     }
   ]
 }
 
-Regeln:
-- Nur konkrete Termine mit erkennbarem Datum (Treffen, Besprechungen, Anrufe, Verabredungen,
-  Veranstaltungen, Arzt-/Handwerkertermine), an denen der Empfänger teilnehmen soll.
-- status "confirmed": der Termin steht fest („Wir sehen uns am Dienstag um 10 Uhr"). "proposed":
-  Vorschlag oder Anfrage, auf die der Empfänger noch antworten muss („Passt dir Donnerstag 15 Uhr?").
-  Bietet die Mail mehrere Alternativen an, liste jede als eigenen "proposed"-Termin.
-- Relative Angaben („morgen", „nächsten Dienstag", „in zwei Wochen") rechne anhand der
-  REFERENZ-KALENDER-Tabelle in absolute Daten um; das Mail-Datum ist der Bezugspunkt.
-- Ohne Uhrzeit nur das Datum angeben (ganztägig). Uhrzeiten nie erfinden.
-- end/duration_minutes nur setzen, wenn in der Mail genannt.
-- Keine Termine aus: Newslettern, Werbung, Rechnungsfristen/Zahlungszielen, Lieferterminen,
-  Login-/Sicherheitsmeldungen, vergangenen Ereignissen, Signaturen oder reinen Zitaten alter Mails.
-- Gibt es keinen Termin: {"events": []}. Im Zweifel keinen Termin ausgeben.`
+Rules:
+- Only concrete appointments with a recognisable date (meetings, calls, appointments, events,
+  doctor's or tradesperson appointments) that the recipient is meant to attend.
+- status "confirmed": the appointment is fixed ("See you on Tuesday at 10"). "proposed": a
+  suggestion or request the recipient still has to answer ("Does Thursday 3 pm work for you?").
+  If the email offers several alternatives, list each as its own "proposed" appointment.
+- Convert relative dates ("tomorrow", "next Tuesday", "in two weeks") into absolute dates using the
+  REFERENCE CALENDAR table; the email's date is the reference point.
+- Without a time, give only the date (all-day). Never invent times.
+- Set end/duration_minutes only if stated in the email.
+- No appointments from: newsletters, advertising, invoice or payment deadlines, delivery dates,
+  sign-in or security messages, past events, signatures or mere quotes of older emails.
+- If there is no appointment: {"events": []}. When in doubt, output no appointment.`
+}
 
 export interface EventsPromptInput {
   fromName: string | null
@@ -280,15 +275,15 @@ export interface EventsPromptInput {
 export function buildEventsPrompt(input: EventsPromptInput): string {
   const ref = input.dateMs ?? Date.now()
   return [
-    `Von: ${sanitizeUntrustedLine(input.fromName, 120)} <${sanitizeUntrustedLine(input.fromAddr ?? 'unbekannt', 200)}>`,
-    `Betreff: ${sanitizeUntrustedLine(input.subject, 300) || '(kein Betreff)'}`,
-    `Datum der Mail: ${localStamp(ref)}`,
+    `From: ${sanitizeUntrustedLine(input.fromName, 120)} <${sanitizeUntrustedLine(input.fromAddr ?? 'unknown', 200)}>`,
+    `Subject: ${sanitizeUntrustedLine(input.subject, 300) || '(no subject)'}`,
+    `Date of the email: ${localStamp(ref)}`,
     '',
-    'REFERENZ-KALENDER (ab Mail-Datum):',
+    'REFERENCE CALENDAR (from the email date):',
     referenceCalendar(ref),
     '',
-    'Inhalt:',
-    wrapUntrusted('MAIL', sanitizeUntrusted(input.body, 6000) || '(kein Textinhalt)')
+    'Content:',
+    wrapUntrusted('MAIL', sanitizeUntrusted(input.body, 6000) || '(no text content)')
   ].join('\n')
 }
 
@@ -382,13 +377,13 @@ export async function runEventExtraction(
     const result = await client.complete({
       model,
       messages: [
-        { role: 'system', content: EVENTS_SYSTEM_PROMPT },
+        { role: 'system', content: eventsSystemPrompt() },
         {
           role: 'user',
           content:
             attempt === 0
               ? userPrompt
-              : `${userPrompt}\n\nDeine letzte Antwort war ungültig (${lastError}). Antworte exakt nach Schema.`
+              : `${userPrompt}\n\nYour last answer was invalid (${lastError}). Reply exactly according to the schema.`
         }
       ],
       json: true,

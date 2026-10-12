@@ -205,9 +205,9 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
     const system = call.messages.find((m) => m.role === 'system')!.content
     const user = call.messages.find((m) => m.role === 'user')!.content
     expect(system).toContain('addressed_to_me')
-    expect(user).toContain('EMPFÄNGER (Kontoinhaber)')
+    expect(user).toContain('RECIPIENT (account owner)')
     expect(user).toContain('lena.hartmann@example.org')
-    expect(user).toContain('weder in An noch CC')
-    expect(user).toContain('nennt namentlich: Jannik')
+    expect(user).toContain('neither in To nor CC')
+    expect(user).toContain('names: Jannik')
   })
 })

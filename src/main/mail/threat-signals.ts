@@ -22,7 +22,7 @@ export interface MailSignal {
   count: number
   phishing: number
   spam: number
-  /** deutsche Zeile für den state-Text des Entscheidungsmodells */
+  /** englische Zeile für den state-Text des Entscheidungsmodells */
   line: string
 }
 
@@ -275,6 +275,7 @@ function extractTextUrls(text: string): string[] {
 
 // --- Texte -------------------------------------------------------------------------------------
 
+// Bewusst zweisprachig: die Muster erkennen deutschen UND englischen Mailinhalt
 const URGENCY_PHRASES = [
   /verify your (?:account|identity|email)/i,
   /confirm your (?:account|identity|details|payment)/i,
@@ -371,7 +372,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
         1,
         2,
         1,
-        `Der Anzeigename nennt „${other}“, die echte Absenderadresse gehört aber zu ${fromDomain}`
+        `The display name mentions "${other}", but the real sender address belongs to ${fromDomain}`
       )
     }
   }
@@ -383,13 +384,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
         .map((r) => domainOfAddr(r.address))
         .find((d): d is string => !!d && !sameDomain(d, fromDomain))
       if (other) {
-        add(
-          'reply_to_differs',
-          1,
-          1,
-          0,
-          `Antworten gehen an ${other}, der Absender ist aber ${fromDomain}`
-        )
+        add('reply_to_differs', 1, 1, 0, `Replies go to ${other}, but the sender is ${fromDomain}`)
       }
     } catch {
       // kaputtes JSON: kein Signal
@@ -404,7 +399,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       1,
       4,
       2,
-      `Die Absenderdomain ${unicodeHost(fromDomain)} enthält Ersatzzeichen aus einem anderen Alphabet (z. B. kyrillisch), die wie lateinische Buchstaben aussehen`
+      `The sender domain ${unicodeHost(fromDomain)} contains look-alike characters from another alphabet (e.g. Cyrillic) that resemble Latin letters`
     )
   }
   const senderLookalike = fromDomain && !senderHomoglyph ? lookalikeBrand(fromDomain) : null
@@ -414,7 +409,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       1,
       4,
       1,
-      `Die Absenderdomain ${fromDomain} imitiert „${senderLookalike}“ mit vertauschten Zeichen`
+      `The sender domain ${fromDomain} imitates "${senderLookalike}" with swapped characters`
     )
   }
   const nameBrand = fromName ? brandInName(fromName) : null
@@ -429,7 +424,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       1,
       3,
       1,
-      `Der Anzeigename gibt sich als „${nameBrand}“ aus, die Mail kommt aber von einer Freemail-Adresse (${fromDomain})`
+      `The display name claims to be "${nameBrand}", but the email comes from a free email address (${fromDomain})`
     )
   }
 
@@ -441,18 +436,18 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
         1,
         3,
         2,
-        'DMARC-Prüfung fehlgeschlagen: die Absenderdomain hat die Mail nicht autorisiert'
+        'DMARC check failed: the sender domain did not authorise this email'
       )
     } else if (
       input.auth.spf === 'fail' ||
       input.auth.spf === 'softfail' ||
       input.auth.dkim === 'fail'
     ) {
-      add('auth_fail', 1, 1, 1, 'SPF- oder DKIM-Prüfung des Absenders fehlgeschlagen')
+      add('auth_fail', 1, 1, 1, 'SPF or DKIM check of the sender failed')
     }
   }
   if (input.serverSpamFlag) {
-    add('server_spam', 1, 0, 4, 'Der Mailserver hat die Mail als Spam markiert')
+    add('server_spam', 1, 0, 4, 'The mail server marked this email as spam')
   }
 
   // --- Schrift-Tricks in Betreff, Name und Text ---
@@ -466,7 +461,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       mixed.size,
       2,
       2,
-      `${plural(mixed.size, 'Wort mischt', 'Wörter mischen')} lateinische mit kyrillischen/griechischen Buchstaben (Täuschung oder Filter-Umgehung)`
+      `${plural(mixed.size, 'word mixes', 'words mix')} Latin with Cyrillic/Greek letters (deception or filter evasion)`
     )
   }
   const headerInvisible = countInvisibleChars(`${fromName}${subject}`)
@@ -480,7 +475,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       1,
       1,
       2,
-      'Unsichtbare Zeichen (Nullbreiten-Leerzeichen) zwischen Buchstaben – typisch, um Spamfilter zu umgehen'
+      'Invisible characters (zero-width spaces) between letters, typically used to evade spam filters'
     )
   }
   const filenames = (input.attachments ?? []).map((a) => a.filename ?? '')
@@ -490,7 +485,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       1,
       3,
       1,
-      'Steuerzeichen für die Schreibrichtung in Betreff, Name oder Dateiname (verschleiert z. B. „.exe“)'
+      'Text-direction control characters in subject, name or file name (e.g. hiding ".exe")'
     )
   }
 
@@ -533,7 +528,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       mismatches,
       3,
       1,
-      `${plural(mismatches, 'Link', 'Links')}: sichtbarer Linktext zeigt einen anderen Host als das tatsächliche Ziel`
+      `${plural(mismatches, 'link', 'links')}: the visible link text shows a different host than the actual target`
     )
   }
   if (homoglyph > 0) {
@@ -542,7 +537,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       homoglyph,
       4,
       1,
-      `${plural(homoglyph, 'Link führt', 'Links führen')} auf eine Domain mit Ersatzzeichen aus einem anderen Alphabet`
+      `${plural(homoglyph, 'link leads', 'links lead')} to a domain with look-alike characters from another alphabet`
     )
   }
   if (lookalike > 0) {
@@ -551,7 +546,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       lookalike,
       3,
       1,
-      `${plural(lookalike, 'Link führt', 'Links führen')} auf eine Domain, die eine bekannte Marke mit vertauschten Zeichen imitiert`
+      `${plural(lookalike, 'link leads', 'links lead')} to a domain imitating a well-known brand with swapped characters`
     )
   }
   if (ipLinks > 0) {
@@ -560,7 +555,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       ipLinks,
       2,
       1,
-      `${plural(ipLinks, 'Link führt', 'Links führen')} auf eine rohe IP-Adresse`
+      `${plural(ipLinks, 'link leads', 'links lead')} to a raw IP address`
     )
   }
   if (puny > 0) {
@@ -569,7 +564,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       puny,
       1,
       0,
-      `${plural(puny, 'Link nutzt', 'Links nutzen')} eine Punycode-Domain (xn--)`
+      `${plural(puny, 'link uses', 'links use')} a punycode domain (xn--)`
     )
   }
   if (userinfo > 0) {
@@ -578,7 +573,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       userinfo,
       3,
       0,
-      `${plural(userinfo, 'Link versteckt', 'Links verstecken')} das echte Ziel hinter einem „@“ (https://bank.de@fremd.example)`
+      `${plural(userinfo, 'link hides', 'links hide')} the real target behind an "@" (https://bank.example@other.example)`
     )
   }
   if (script > 0) {
@@ -587,7 +582,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       script,
       3,
       0,
-      `${plural(script, 'Link enthält', 'Links enthalten')} Skript- oder Daten-URLs`
+      `${plural(script, 'link contains', 'links contain')} script or data URLs`
     )
   }
   if (shortener > 0) {
@@ -596,7 +591,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       shortener,
       1,
       1,
-      `${plural(shortener, 'Link nutzt', 'Links nutzen')} einen URL-Kürzer, der das Ziel verbirgt`
+      `${plural(shortener, 'link uses', 'links use')} a URL shortener that hides the target`
     )
   }
 
@@ -607,7 +602,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       1,
       3,
       0,
-      'Die Mail enthält ein Eingabeformular (mögliche Abfrage von Zugangsdaten)'
+      'The email contains an input form (possible request for credentials)'
     )
   }
   const urgency = countMatches(`${subject}\n${text}`, URGENCY_PHRASES)
@@ -617,7 +612,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       1,
       urgency >= 2 ? 2 : 1,
       0,
-      'Typische Druck-Formulierungen (Konto gesperrt, Daten bestätigen, Frist in Stunden) zusammen mit Links'
+      'Typical pressure phrases (account locked, confirm your data, deadline in hours) together with links'
     )
   }
 
@@ -640,7 +635,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       dangerous,
       3,
       1,
-      `${plural(dangerous, 'Anhang ist', 'Anhänge sind')} ausführbar (Programm, Skript oder Disk-Image)`
+      `${plural(dangerous, 'attachment is', 'attachments are')} executable (program, script or disk image)`
     )
   }
   if (macro > 0) {
@@ -649,7 +644,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       macro,
       2,
       0,
-      `${plural(macro, 'Anhang enthält', 'Anhänge enthalten')} Office-Makros`
+      `${plural(macro, 'attachment contains', 'attachments contain')} Office macros`
     )
   }
   if (htmlAtt > 0) {
@@ -658,7 +653,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       htmlAtt,
       2,
       0,
-      `${plural(htmlAtt, 'Anhang ist', 'Anhänge sind')} eine HTML-/SVG-Datei (beliebter Weg für gefälschte Login-Seiten)`
+      `${plural(htmlAtt, 'attachment is', 'attachments are')} an HTML/SVG file (a common way to deliver fake login pages)`
     )
   }
   if (doubleExt > 0) {
@@ -667,7 +662,7 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       doubleExt,
       2,
       0,
-      `${plural(doubleExt, 'Anhang tarnt', 'Anhänge tarnen')} sich mit doppelter Dateiendung (z. B. „rechnung.pdf.exe“)`
+      `${plural(doubleExt, 'attachment is', 'attachments are')} disguised with a double extension (e.g. "invoice.pdf.exe")`
     )
   }
 
@@ -679,20 +674,26 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       spamPhrases,
       0,
       Math.min(3, spamPhrases),
-      `${plural(spamPhrases, 'typische Spam-Formulierung', 'typische Spam-Formulierungen')} (Gewinne, Krypto-Rendite, Erbschaft …)`
+      `${plural(spamPhrases, 'typical spam phrase', 'typical spam phrases')} (prizes, crypto returns, inheritance …)`
     )
   }
   if (subject && isShoutingSubject(subject)) {
-    add('shouting_subject', 1, 0, 1, 'Betreff in Großbuchstaben oder mit gehäuften !!!/$$$')
+    add('shouting_subject', 1, 0, 1, 'Subject in capitals or with piled-up !!!/$$$')
   }
   if (html && /<img\b/i.test(html) && text.replace(/\s+/g, ' ').trim().length < 120) {
-    add('image_only', 1, 0, 1, 'Die Mail besteht fast nur aus Bildern (Text für Filter unlesbar)')
+    add(
+      'image_only',
+      1,
+      0,
+      1,
+      'The email consists almost entirely of images (text unreadable for filters)'
+    )
   }
   const hidden = (
     html.match(/font-size\s*:\s*0(?:px|pt|em)?\s*[;"']|visibility\s*:\s*hidden/gi) ?? []
   ).length
   if (hidden >= 5) {
-    add('hidden_text', 1, 0, 1, 'Viel versteckter Text im HTML (Filter-Umgehung)')
+    add('hidden_text', 1, 0, 1, 'Lots of hidden text in the HTML (filter evasion)')
   }
 
   let phishingScore = signals.reduce((sum, s) => sum + s.phishing, 0)

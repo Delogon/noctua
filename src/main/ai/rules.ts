@@ -11,6 +11,7 @@ import {
   wrapUntrusted
 } from './untrusted'
 import { logUsage } from './budget'
+import { outputLanguage, outputLanguageName, type OutputLanguage } from './output-language'
 
 type RuleActionExecutor = (messageIds: number[], action: 'archive' | 'markRead' | 'flag') => void
 let executeAction: RuleActionExecutor = () => {}
@@ -91,16 +92,17 @@ export function ruleNeedsAi(rule: RuleJson): boolean {
   )
 }
 
-const DRAFT_PROMPT = `Du übersetzt eine natürlichsprachliche E-Mail-Regel in eine deterministische JSON-Regel.
-Antworte NUR mit JSON, exakt in dieser Form (nur benötigte Felder angeben):
+function draftPrompt(language: OutputLanguage = outputLanguage()): string {
+  return `You translate a natural-language email rule into a deterministic JSON rule.
+Reply ONLY with JSON, exactly in this form (only include the fields you need):
 {
-  "name": "kurzer Regelname",
-  "description": "Ein Satz, was die Regel tut",
+  "name": "short rule name in ${outputLanguageName(language)}",
+  "description": "one sentence in ${outputLanguageName(language)} describing what the rule does",
   "rule": {
     "match": {
-      "fromContains": ["substring in absender-adresse/name (lowercase)"],
-      "fromDomain": ["beispiel.de"],
-      "subjectContains": ["substring im betreff (lowercase)"],
+      "fromContains": ["substring of the sender address/name (lowercase)"],
+      "fromDomain": ["example.com"],
+      "subjectContains": ["substring of the subject (lowercase)"],
       "listUnsubscribe": true,
       "category": ["newsletter"],
       "minPriority": 1, "maxPriority": 5
@@ -108,13 +110,14 @@ Antworte NUR mit JSON, exakt in dieser Form (nur benötigte Felder angeben):
     "actions": { "archive": true, "markRead": true, "flag": true, "setCategory": "newsletter", "createTask": true }
   }
 }
-Nutze category/priority NUR, wenn die Regel wirklich auf AI-Einordnung Bezug nimmt —
-Absender-/Betreff-Regeln sind robuster. Erfinde keine Kriterien, die der Nutzer nicht nannte.`
+Use category/priority ONLY if the rule really refers to the AI classification —
+sender/subject rules are more robust. Do not invent criteria the user did not mention.`
+}
 
 const AI_CONDITION_HINT = `
-Zusätzliches optionales Match-Feld "aiCondition": eine Ja/Nein-Frage auf Deutsch (max. 200 Zeichen)
-zum Inhalt der Mail, z. B. "Ist das eine Rechnung?". NUR verwenden, wenn der Nutzer ein inhaltliches
-Kriterium nennt, das sich nicht aus Absender, Betreff oder Kategorie ergibt.`
+Additional optional match field "aiCondition": a yes/no question (max. 200 characters) about the
+content of the email, in the language the user wrote the rule in, e.g. "Is this an invoice?". ONLY
+use it if the user names a content criterion that cannot be derived from sender, subject or category.`
 
 export async function draftRule(
   db: Database.Database,
@@ -126,7 +129,7 @@ export async function draftRule(
     messages: [
       {
         role: 'system',
-        content: resolveDecision() ? `${DRAFT_PROMPT}${AI_CONDITION_HINT}` : DRAFT_PROMPT
+        content: resolveDecision() ? `${draftPrompt()}${AI_CONDITION_HINT}` : draftPrompt()
       },
       { role: 'user', content: text.slice(0, 1500) }
     ],
@@ -247,7 +250,7 @@ export async function evaluateAiConditions(
     questions[ruleQuestionName(row.id)] = {
       type: 'noul',
       instructions: condition,
-      criteria: { false: 'Nein, trifft nicht zu', true: 'Ja, trifft zu' }
+      criteria: { false: 'No, does not apply', true: 'Yes, applies' }
     }
   }
   if (Object.keys(questions).length === 0) return {}
@@ -273,10 +276,10 @@ export async function evaluateAiConditions(
   const state = [
     UNTRUSTED_SYSTEM_NOTE,
     '',
-    `Von: ${sanitizeUntrustedLine(body.from_name, 120)} <${sanitizeUntrustedLine(body.from_addr ?? 'unbekannt', 200)}>`,
-    `Betreff: ${sanitizeUntrustedLine(body.subject, 300) || '(kein Betreff)'}`,
+    `From: ${sanitizeUntrustedLine(body.from_name, 120)} <${sanitizeUntrustedLine(body.from_addr ?? 'unknown', 200)}>`,
+    `Subject: ${sanitizeUntrustedLine(body.subject, 300) || '(no subject)'}`,
     '',
-    wrapUntrusted('MAIL', sanitizeUntrusted(text, 6000) || '(kein Textinhalt)')
+    wrapUntrusted('MAIL', sanitizeUntrusted(text, 6000) || '(no text content)')
   ].join('\n')
 
   try {
