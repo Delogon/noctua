@@ -36,6 +36,7 @@ import m035 from './035_mail_threats.sql?raw'
 import m036 from './036_message_id_per_account.sql?raw'
 import m037 from './037_folder_date_index.sql?raw'
 import m038 from './038_folder_thread_index.sql?raw'
+import m039 from './039_body_backfill.sql?raw'
 
 /**
  * Migrations as ?raw imports so they get embedded into the main bundle
@@ -80,5 +81,6 @@ export const migrations: ReadonlyArray<{ version: number; name: string; sql: str
   { version: 35, name: '035_mail_threats', sql: m035 },
   { version: 36, name: '036_message_id_per_account', sql: m036 },
   { version: 37, name: '037_folder_date_index', sql: m037 },
-  { version: 38, name: '038_folder_thread_index', sql: m038 }
+  { version: 38, name: '038_folder_thread_index', sql: m038 },
+  { version: 39, name: '039_body_backfill', sql: m039 }
 ]
