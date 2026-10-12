@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { openDb, closeDb } from './db'
+import { startDbMaintenance } from './db/optimize'
 import { DatabaseTooNewError } from './db/migrate'
 import { DbKeyError } from './db/encryption'
 import { registerIpcHandlers, pushToWindow } from './ipc/register'
@@ -253,6 +254,8 @@ app
       }
     })
     if (!demo) syncEngine.startAll()
+    // Planner statistics (sqlite_stat1): first run a minute after startup
+    startDbMaintenance(db)
 
     aiQueue.init(db, push)
     if (!demo) aiQueue.start()

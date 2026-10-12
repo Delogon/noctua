@@ -368,12 +368,15 @@ export function semanticIndexStatus(
   }
 }
 
-function loadRows(db: Database.Database, messageIds: number[]): Map<number, SearchRow> {
-  if (messageIds.length === 0) return new Map()
-  const placeholders = messageIds.map(() => '?').join(',')
-  const rows = db
-    .prepare(
-      `SELECT m.id AS message_id, m.thread_key, m.account_id,
+/**
+ * Loads the result rows for a list of message ids. `+m.account_id` and
+ * `+m.folder_id` keep the plan on rowid seeks for the id list: with planner
+ * statistics SQLite otherwise walks every message of each account instead.
+ * Exported for the plan test.
+ */
+export function searchRowsSql(count: number): string {
+  const placeholders = Array.from({ length: count }, () => '?').join(',')
+  return `SELECT m.id AS message_id, m.thread_key, m.account_id,
               a.account_name, a.email AS account_email, f.special_use,
               m.subject, m.from_name, m.from_addr,
               coalesce(m.date, m.internal_date) AS mail_date,
@@ -384,13 +387,16 @@ function loadRows(db: Database.Database, messageIds: number[]): Map<number, Sear
                 WHERE a2.message_id = m.id AND a2.filename IS NOT NULL
               ), '') AS attachment_names
        FROM messages m
-       JOIN accounts a ON a.id = m.account_id
-       JOIN folders f ON f.id = m.folder_id
+       JOIN accounts a ON a.id = +m.account_id
+       JOIN folders f ON f.id = +m.folder_id
        LEFT JOIN message_bodies b ON b.message_id = m.id
        WHERE m.id IN (${placeholders})
          AND ${SEARCHABLE_MESSAGE_SQL}`
-    )
-    .all(...messageIds) as SearchRow[]
+}
+
+function loadRows(db: Database.Database, messageIds: number[]): Map<number, SearchRow> {
+  if (messageIds.length === 0) return new Map()
+  const rows = db.prepare(searchRowsSql(messageIds.length)).all(...messageIds) as SearchRow[]
   return new Map(rows.map((row) => [row.message_id, row]))
 }
 

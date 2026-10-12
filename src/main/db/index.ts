@@ -13,6 +13,7 @@ import {
   restrictPermissions
 } from './encryption'
 import { DB_KEY_FILENAME, loadOrCreateDbKey } from './key'
+import { configureCache, optimizeDb, stopDbMaintenance } from './optimize'
 
 let db: Database.Database | null = null
 
@@ -56,6 +57,7 @@ export function openDb(): Database.Database {
       opened.pragma('journal_mode = WAL')
       opened.pragma('synchronous = NORMAL')
       opened.pragma('foreign_keys = ON')
+      configureCache(opened)
       ;({ from, to } = runMigrations(opened))
     } catch (error) {
       // Downgrade guard/migration error: release the handle so the DB file
@@ -93,6 +95,14 @@ export function __setTestDb(instance: Database.Database | null): void {
 }
 
 export function closeDb(): void {
+  stopDbMaintenance()
+  try {
+    // Recommended before closing a long-lived connection: stores statistics
+    // for tables whose size changed a lot during this session.
+    if (db) optimizeDb(db, false)
+  } catch (error) {
+    console.warn('[db] optimize on close failed:', error)
+  }
   db?.close()
   db = null
 }
