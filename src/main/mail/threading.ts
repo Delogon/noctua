@@ -24,6 +24,18 @@ export interface ThreadKeyInput {
 const MAX_THREAD_REFS = 500
 
 /**
+ * Lookup of an existing thread by referenced Message-IDs. Uses
+ * idx_msg_account_msgid (migration 036) as a seek per ID; without it SQLite
+ * walked the whole account on every reply and ingest became quadratic.
+ */
+export function threadKeyLookupSql(refCount: number): string {
+  const placeholders = Array.from({ length: Math.max(1, refCount) }, () => '?').join(',')
+  return `SELECT thread_key FROM messages
+         WHERE account_id = ? AND message_id IN (${placeholders})
+         ORDER BY date DESC LIMIT 1`
+}
+
+/**
  * Thread key per account: Gmail authoritatively via X-GM-THRID, otherwise
  * JWZ-light via References/In-Reply-To (first hit in the DB wins),
  * fallback normalized subject, last resort Message-ID (single thread).
@@ -42,14 +54,8 @@ export function computeThreadKey(
     .filter(Boolean)
     .slice(-MAX_THREAD_REFS)
   if (refIds.length > 0) {
-    const placeholders = refIds.map(() => '?').join(',')
-    const row = db
-      .prepare(
-        `SELECT thread_key FROM messages
-         WHERE account_id = ? AND message_id IN (${placeholders})
-         ORDER BY date DESC LIMIT 1`
-      )
-      .get(accountId, ...refIds) as { thread_key: string } | undefined
+    const row = db.prepare(threadKeyLookupSql(refIds.length)).get(accountId, ...refIds) as
+      { thread_key: string } | undefined
     if (row) return row.thread_key
   }
 

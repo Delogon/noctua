@@ -33,6 +33,7 @@ import m032 from './032_event_suggestions.sql?raw'
 import m033 from './033_ai_decisions.sql?raw'
 import m034 from './034_folder_delimiter.sql?raw'
 import m035 from './035_mail_threats.sql?raw'
+import m036 from './036_message_id_per_account.sql?raw'
 
 /**
  * Migrations as ?raw imports so they get embedded into the main bundle
@@ -74,5 +75,6 @@ export const migrations: ReadonlyArray<{ version: number; name: string; sql: str
   { version: 32, name: '032_event_suggestions', sql: m032 },
   { version: 33, name: '033_ai_decisions', sql: m033 },
   { version: 34, name: '034_folder_delimiter', sql: m034 },
-  { version: 35, name: '035_mail_threats', sql: m035 }
+  { version: 35, name: '035_mail_threats', sql: m035 },
+  { version: 36, name: '036_message_id_per_account', sql: m036 }
 ]

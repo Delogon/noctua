@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import type Database from 'better-sqlite3-multiple-ciphers'
-import { normalizeSubject, computeThreadKey } from '@main/mail/threading'
+import { normalizeSubject, computeThreadKey, threadKeyLookupSql } from '@main/mail/threading'
 import {
   isForwardWithoutRequest,
   isForwardedSubject,
@@ -152,5 +152,33 @@ describe('computeThreadKey', () => {
     })
     // In-Reply-To is at the end and is kept → correct thread
     expect(key).toBe('thread-parent')
+  })
+  it('picks the newest thread among several referenced messages', () => {
+    setup()
+    const folderId = seedFolder(db, accountId, '\\Sent')
+    const insert = db.prepare(
+      `INSERT INTO messages (account_id, folder_id, uid, message_id, thread_key, date)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    insert.run(accountId, folderId, 1, '<old@x>', 'thread-old', 1000)
+    insert.run(accountId, folderId, 2, '<new@x>', 'thread-new', 2000)
+    const key = computeThreadKey(db, accountId, {
+      gmThrid: null,
+      messageId: '<reply2@x>',
+      inReplyTo: '<missing@x>',
+      references: ['<old@x>', '<new@x>'],
+      subject: 'Re: Thema'
+    })
+    expect(key).toBe('thread-new')
+  })
+
+  it('looks references up with an index seek per account, not an account scan', () => {
+    setup()
+    const plan = db
+      .prepare(`EXPLAIN QUERY PLAN ${threadKeyLookupSql(3)}`)
+      .all(accountId, '<a@x>', '<b@x>', '<c@x>') as Array<{ detail: string }>
+    expect(plan.map((row) => row.detail).join('\n')).toMatch(
+      /SEARCH messages USING INDEX idx_msg_account_msgid \(account_id=\? AND message_id=\?\)/
+    )
   })
 })
