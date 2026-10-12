@@ -4,7 +4,6 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { openDb, closeDb } from './db'
 import { startDbMaintenance } from './db/optimize'
-import { stopParsePool } from './mail/parse-off-thread'
 import { DatabaseTooNewError } from './db/migrate'
 import { DbKeyError } from './db/encryption'
 import { registerIpcHandlers, pushToWindow } from './ipc/register'
@@ -434,7 +433,6 @@ app.on('quit', () => {
   outboxWorker.stop()
   stopUpdateChecks()
   stopAppleFm()
-  stopParsePool()
   void syncEngine.stopAll()
   stopCalendar()
   closeDb()
