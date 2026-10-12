@@ -1,8 +1,8 @@
 import OpenAI from 'openai'
 
 /**
- * Einzige Stelle, die OpenAI-SDK-Clients baut — Test-Naht (die Tests mocken
- * dieses Modul und reichen einen Fake-Client durch).
+ * The only place that builds OpenAI SDK clients — test seam (the tests mock
+ * this module and pass a fake client through).
  */
 export function createOpenAiClient(opts: {
   baseUrl: string
@@ -10,7 +10,7 @@ export function createOpenAiClient(opts: {
   headers?: Record<string, string>
 }): OpenAI {
   return new OpenAI({
-    // Lokale Server brauchen oft keinen Key; das SDK verlangt aber einen Wert
+    // Local servers often need no key, but the SDK still requires a value
     apiKey: opts.apiKey || 'not-needed',
     baseURL: opts.baseUrl,
     defaultHeaders: opts.headers

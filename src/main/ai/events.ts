@@ -19,19 +19,19 @@ import { PROPOSES_MEETING_THRESHOLD } from '@shared/decision-thresholds'
 import { outputLanguage, outputLanguageName, type OutputLanguage } from './output-language'
 
 /**
- * Terminvorschläge aus Mails (2.4). Eigener Job-Typ 'events' (nicht Teil der
- * Triage → keine Neu-Triage, kein Einfluss auf PROMPT_VERSION): läuft nur für
- * NEUE Mails mit Triage-Annotation personal/work/other und nur, wenn ein
- * Kalender-Konto existiert. Provider: alles, was resolveTask('triage') liefert
- * (OpenRouter, lokale/eigene Server; Local only wird dort durchgesetzt).
- * Apple Foundation Models: übersprungen — der Helper kennt nur die festen
- * Schemata „triage" und „gate", freie Datums-/Zeitextraktion ist mit dem
- * kleinen On-Device-Modell nicht zuverlässig genug.
+ * Appointment suggestions from mails (2.4). Separate job type 'events' (not part of
+ * triage → no re-triage, no effect on PROMPT_VERSION): runs only for
+ * NEW mails with triage annotation personal/work/other and only if a
+ * calendar account exists. Provider: whatever resolveTask('triage') returns
+ * (OpenRouter, local/custom servers; Local only is enforced there).
+ * Apple Foundation Models: skipped — the helper only knows the fixed
+ * schemas "triage" and "gate"; free date/time extraction is not reliable
+ * enough with the small on-device model.
  */
 
 export const EVENTS_PROMPT_VERSION = 1
 
-/** Kategorien, die der Termin-Job überhaupt ansieht (Newsletter/Werbung etc. nie). */
+/** Categories the appointment job looks at at all (never newsletters/ads etc.). */
 export const EVENT_CATEGORIES = ['personal', 'work', 'other'] as const
 
 const MAX_EVENTS = 3
@@ -46,7 +46,7 @@ const dateOrDateTime = z.string().refine((v) => dateOnly.test(v) || dateTime.tes
   message: 'Datum/Zeit im Format YYYY-MM-DD oder YYYY-MM-DDTHH:mm erwartet'
 })
 
-// Ende darf auch nur eine Uhrzeit sein („14:00-15:30“): gilt dann am Starttag
+// End may also be just a time ("14:00-15:30"): then it applies on the start day
 const endValue = z
   .string()
   .refine((v) => dateOnly.test(v) || dateTime.test(v) || /^\d{2}:\d{2}$/.test(v), {
@@ -76,7 +76,7 @@ export const eventExtractionSchema = z.object({
 })
 export type RawEvent = z.infer<typeof rawEventSchema>
 
-// --- Datums-Arithmetik auf Wandzeit-Strings (keine Zeitzone nötig) ----------------------------
+// --- Date arithmetic on wall-time strings (no time zone needed) -------------------------------
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
@@ -119,7 +119,7 @@ function dayDiff(a: string, b: string): number {
   return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000)
 }
 
-/** Lokales Kalenderdatum 'YYYY-MM-DD' eines Zeitstempels. */
+/** Local calendar date 'YYYY-MM-DD' of a timestamp. */
 export function localDayOf(ms: number): string {
   return localStamp(ms).slice(0, 10)
 }
@@ -127,9 +127,9 @@ export function localDayOf(ms: number): string {
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 /**
- * Referenz-Kalender ab dem Mail-Datum („Montag 2026-10-05, Dienstag 2026-10-06 …"):
- * Modelle verrechnen sich bei „nächsten Dienstag" oft um eine Woche, wenn sie
- * Wochentage selbst ausrechnen müssen. Die Tabelle macht daraus ein Nachschlagen.
+ * Reference calendar from the mail date ("Montag 2026-10-05, Dienstag 2026-10-06 …"):
+ * models are often off by a week for "next Tuesday" when they have to
+ * compute weekdays themselves. The table turns that into a lookup.
  */
 export function referenceCalendar(mailMs: number, days = 21): string {
   const start = localDayOf(mailMs)
@@ -143,20 +143,20 @@ export function referenceCalendar(mailMs: number, days = 21): string {
   return lines.join('\n')
 }
 
-// --- Auflösung / Validierung -----------------------------------------------------------------
+// --- Resolution / validation ------------------------------------------------------------------
 
 /**
- * Wandelt ein validiertes Roh-Ereignis in ein speicherbares um: Ende aus
- * `end` oder Dauer (Standard 60 min), ganztägig bei reinem Datum (Ende
- * exklusiv), Zeitzone nur bei gültiger IANA-ID. Verwirft Ereignisse vor dem
- * Mail-Tag, zu weit in der Zukunft oder mit zu geringer Zuversicht (null).
+ * Converts a validated raw event into a storable one: end from
+ * `end` or duration (default 60 min), all-day for a bare date (end
+ * exclusive), time zone only for a valid IANA ID. Discards events before the
+ * mail day, too far in the future or with too little confidence (null).
  */
 export function resolveEvent(raw: RawEvent, mailMs: number): ResolvedEvent | null {
   if (raw.confidence < MIN_CONFIDENCE) return null
   const start = parseWall(raw.start.replace(' ', 'T'))
   if (!validDate(start.date)) return null
   const mailDay = localDayOf(mailMs)
-  // Termine vor dem Mail-Tag sind meist Rückblicke/Fehlauflösungen; zu ferne ebenso
+  // Appointments before the mail day are mostly retrospectives/misresolutions; likewise too distant ones
   if (start.date < mailDay || dayDiff(mailDay, start.date) > MAX_FUTURE_DAYS) return null
 
   const link = /^https?:\/\/\S+$/i.test(raw.online_link?.trim() ?? '')
@@ -175,7 +175,7 @@ export function resolveEvent(raw: RawEvent, mailMs: number): ResolvedEvent | nul
   if (!base.title) return null
 
   if (start.minutes === null) {
-    // Ganztägig: `end` (inklusiv, wie genannt) → exklusives Ende
+    // All-day: `end` (inclusive, as stated) → exclusive end
     let endDate = addDaysTo(start.date, 1)
     if (rawEnd) {
       const end = parseWall(rawEnd.replace(' ', 'T'))
@@ -187,7 +187,7 @@ export function resolveEvent(raw: RawEvent, mailMs: number): ResolvedEvent | nul
   let end: { date: string; minutes: number }
   const parsedEnd = rawEnd ? parseWall(rawEnd.replace(' ', 'T')) : null
   if (parsedEnd && validDate(parsedEnd.date) && parsedEnd.minutes !== null) {
-    // Nur Uhrzeit-Ende am selben Tag („14:00-15:30") kommt als Datum+Zeit an
+    // A time-only end on the same day ("14:00-15:30") arrives as date+time
     const candidate = { date: parsedEnd.date, minutes: parsedEnd.minutes }
     const startKey = start.date + String(start.minutes).padStart(4, '0')
     const endKey = candidate.date + String(candidate.minutes).padStart(4, '0')
@@ -208,7 +208,7 @@ export function resolveEvent(raw: RawEvent, mailMs: number): ResolvedEvent | nul
   }
 }
 
-/** JSON (ggf. in ```-Zaun) → validierte, aufgelöste Ereignisse. Wirft bei ungültigem JSON/Schema. */
+/** JSON (possibly in a ``` fence) → validated, resolved events. Throws on invalid JSON/schema. */
 export function parseEventExtraction(raw: string, mailMs: number): ResolvedEvent[] {
   const text = raw
     .trim()
@@ -219,7 +219,7 @@ export function parseEventExtraction(raw: string, mailMs: number): ResolvedEvent
   for (const item of parsed.events) {
     const event = resolveEvent(item, mailMs)
     if (!event) continue
-    // gleicher Start innerhalb derselben Antwort nur einmal
+    // same start only once within the same answer
     if (out.some((o) => o.startLocal === event.startLocal && o.allDay === event.allDay)) continue
     out.push(event)
     if (out.length >= MAX_EVENTS) break
@@ -309,20 +309,20 @@ export function hasCalendarAccount(db: Database.Database): boolean {
   return !!db.prepare('SELECT 1 FROM cal_accounts LIMIT 1').get()
 }
 
-/** Trägt die Mail bereits eine text/calendar-Einladung? Dann gibt es die Einladungskarte. */
+/** Does the mail already carry a text/calendar invitation? Then the invitation card exists. */
 export function hasInvitation(db: Database.Database, messageId: number): boolean {
   return !!db.prepare('SELECT 1 FROM invitations WHERE message_id = ? LIMIT 1').get(messageId)
 }
 
 /**
- * Extrahiert Terminvorschläge einer Mail und speichert sie. Wirft bei API-Fehlern
- * (die Queue klassifiziert transient/permanent wie bei der Triage).
+ * Extracts appointment suggestions from a mail and stores them. Throws on API errors
+ * (the queue classifies transient/permanent as with triage).
  */
 export async function runEventExtraction(
   db: Database.Database,
   messageId: number
 ): Promise<EventsOutcome> {
-  // Apple FM: nicht unterstützt (siehe Dateikopf) — Job gilt als erledigt, kein Retry
+  // Apple FM: not supported (see file header) — job counts as done, no retry
   if (getTriageProvider() === 'apple') return 'skipped-unsupported'
 
   const row = db
@@ -336,7 +336,7 @@ export async function runEventExtraction(
     .get(messageId) as EventsRow | undefined
   if (!row) return 'skipped-missing'
 
-  // Kein Kalender, Einladung vorhanden oder eigene Mail: nichts zu tun
+  // No calendar, invitation present or own mail: nothing to do
   if (!hasCalendarAccount(db)) return 'skipped-unsupported'
   if (hasInvitation(db, messageId)) return 'skipped-unsupported'
   if (isUserAuthoredMail(db, row.from_addr, row.folder_special_use)) return 'skipped-unsupported'
@@ -345,8 +345,8 @@ export async function runEventExtraction(
   const body = textBeforeForwardedMessage(row.subject, full)
   if (body.trim().length < 15) return 'skipped-unsupported'
 
-  // Gate: hat die Triage per Entscheidungsmodell „kein Termin" gesagt, spart der Job die Extraktion.
-  // Ohne gespeicherte Entscheidung (klassische Triage, ältere Mails) läuft sie wie bisher.
+  // Gate: if triage said "no appointment" via the decision model, the job skips extraction.
+  // Without a stored decision (classic triage, older mails) it runs as before.
   const decision = db
     .prepare('SELECT proposes_meeting FROM ai_decisions WHERE message_id = ?')
     .get(messageId) as { proposes_meeting: number | null } | undefined
@@ -358,7 +358,7 @@ export async function runEventExtraction(
     return 'skipped-unsupported'
   }
 
-  // Local only / fehlender Key / kein Modell → wie die Triage: pausieren, nicht verbrennen
+  // Local only / missing key / no model → like triage: pause, don't burn
   const resolved = resolveTask('triage')
   if (!resolved) return 'skipped-no-client'
   const { client, model } = resolved

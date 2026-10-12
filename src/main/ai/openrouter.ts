@@ -1,31 +1,31 @@
 import { getSetting } from '../db'
 
-// OpenRouter-Spezifika (ZDR-Routing, Kostenauslese). Der Client selbst kommt aus
-// der Provider-Schicht (providers/registry.ts).
+// OpenRouter specifics (ZDR routing, cost extraction). The client itself comes from
+// the provider layer (providers/registry.ts).
 
 /**
- * Zero Data Retention (M86): standardmäßig routet OpenRouter nur zu
- * Anbietern, die Prompts nicht speichern (`data_collection: 'deny'`).
- * Abschaltbar über ai.zdrOnly = '0' — dann stehen mehr Modelle bereit,
- * aber ohne ZDR-Garantie.
+ * Zero Data Retention (M86): by default OpenRouter only routes to
+ * providers that don't store prompts (`data_collection: 'deny'`).
+ * Can be disabled via ai.zdrOnly = '0' — then more models are available,
+ * but without a ZDR guarantee.
  */
 export function zdrOnly(): boolean {
   return getSetting('ai.zdrOnly') !== '0'
 }
 
-/** OpenRouter-Zusatzfelder für chat.completions.create — bei allen Calls spreaden. */
+/** OpenRouter extra fields for chat.completions.create — spread into every call. */
 export function providerBody(): Record<string, unknown> {
   return zdrOnly() ? { provider: { data_collection: 'deny' } } : {}
 }
 
-/** Default-Modelle des OpenRouter-Profils (ohne ausdrückliche Wahl in den Settings). */
+/** Default models of the OpenRouter profile (without an explicit choice in settings). */
 export const OPENROUTER_DEFAULT_MODELS = {
   triage: 'deepseek/deepseek-v4-flash',
   draft: 'anthropic/claude-opus-4.8',
-  // Diktat-Transkription. Hinweis: dediziertes Whisper (openai/whisper-large-v3)
-  // listet OpenRouter derzeit nicht — gpt-audio-mini ist der günstigste
-  // Audio-Input-Chat; die Auswahl in den Einstellungen speist sich live
-  // aus dem Katalog und zeigt Whisper automatisch, sobald es existiert.
+  // Dictation transcription. Note: OpenRouter currently doesn't list dedicated Whisper
+  // (openai/whisper-large-v3) — gpt-audio-mini is the cheapest
+  // audio-input chat; the selection in settings is fed live
+  // from the catalog and shows Whisper automatically once it exists.
   stt: 'openai/gpt-audio-mini'
 } as const
 
@@ -33,7 +33,7 @@ export function getTriageModel(): string {
   return getSetting('ai.triageModel') ?? OPENROUTER_DEFAULT_MODELS.triage
 }
 
-/** Wer rechnet die Triage: OpenRouter (Cloud) oder Apple Intelligence (lokal). */
+/** Who computes triage: OpenRouter (cloud) or Apple Intelligence (local). */
 export function getTriageProvider(): 'openrouter' | 'apple' {
   return getSetting('ai.triageProvider') === 'apple' ? 'apple' : 'openrouter'
 }
@@ -52,7 +52,7 @@ interface UsageLike {
   cost?: number
 }
 
-/** Kosten aus der OpenRouter-Response; Fallback: Preisschätzung fürs Default-Modell. */
+/** Costs from the OpenRouter response; fallback: price estimate for the default model. */
 export function extractUsage(usage: unknown): {
   inputTokens: number
   outputTokens: number

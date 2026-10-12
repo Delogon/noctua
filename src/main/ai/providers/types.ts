@@ -1,9 +1,9 @@
-// Provider-Abstraktion für alle AI-Aufrufe: ein Profil (Endpunkt) + ein
-// LlmClient, der je nach API-Stil Chat Completions oder Responses spricht.
+// Provider abstraction for all AI calls: a profile (endpoint) + an
+// LlmClient that speaks Chat Completions or Responses depending on the API style.
 
 export type ApiStyle = 'chat' | 'responses'
 export type ProfilePreset = 'openrouter' | 'custom'
-/** `decision`: Entscheidungsmodell (Ollama System One), optional und nur lokal sinnvoll */
+/** `decision`: decision model (Ollama System One), optional and only useful locally */
 export type AiTask = 'triage' | 'draft' | 'stt' | 'decision'
 
 export const OPENROUTER_PROFILE_ID = 'openrouter'
@@ -14,12 +14,12 @@ export interface AiProfile {
   name: string
   baseUrl: string
   apiStyle: ApiStyle
-  /** lokal/On-Prem (true) oder externer Dienst (false) — Grundlage für „Local only" */
+  /** local/on-prem (true) or external service (false) — basis for "Local only" */
   isLocal: boolean
   preset: ProfilePreset
-  /** von der Organisation (Org-Konfiguration) bereitgestellt: URL/Stil/Name gesperrt, nur der Key editierbar */
+  /** provided by the organization (org config): URL/style/name locked, only the key editable */
   managed: boolean
-  /** Key im Vault hinterlegt (der Key selbst verlässt den Main-Prozess nie) */
+  /** key stored in the vault (the key itself never leaves the main process) */
   hasKey: boolean
 }
 
@@ -37,14 +37,14 @@ export interface LlmRequest {
   messages: LlmMessage[]
   temperature?: number
   maxTokens?: number
-  /** JSON-Modus — Call-Sites setzen es nur dort, wo sie es schon vorher taten */
+  /** JSON mode — call sites set it only where they already did before */
   json?: boolean
 }
 
 export interface LlmUsage {
   inputTokens: number
   outputTokens: number
-  /** nur bei OpenRouter aussagekräftig, sonst 0 */
+  /** only meaningful for OpenRouter, otherwise 0 */
   costUsd: number
 }
 
@@ -58,7 +58,7 @@ export interface ModelInfo {
   promptPerM: number
   completionPerM: number
   context: number
-  /** nimmt Audio als Input (Diktat-Transkription) */
+  /** accepts audio as input (dictation transcription) */
   audioIn: boolean
 }
 
@@ -71,8 +71,8 @@ export interface LlmClient {
   stream(req: LlmRequest, onDelta: (text: string) => void, opts?: CallOptions): Promise<LlmResult>
   listModels(): Promise<ModelInfo[]>
   /**
-   * Nur Clients, die Audio können; sonst fehlt die Methode. Liefert das rohe
-   * Transkript samt Usage (bei OpenRouter fallen Kosten an).
+   * Only on clients that can handle audio; otherwise the method is absent. Returns
+   * the raw transcript plus usage (OpenRouter incurs costs).
    */
   transcribe?(audioBase64: string, format: 'wav' | 'mp3', model: string): Promise<LlmResult>
 }

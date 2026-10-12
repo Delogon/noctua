@@ -4,10 +4,10 @@ import { join } from 'node:path'
 import { app } from 'electron'
 
 /**
- * Brücke zu Apple Foundation Models (macOS 26+, Apple Silicon): spricht den
- * Swift-Helper `noctua-fm` (native/fm-helper) über ein JSON-Zeilenprotokoll.
- * Der Helper läuft als langlebiger Serve-Prozess; Anfragen sind seriell
- * (die AI-Queue arbeitet ohnehin eine Mail nach der anderen ab).
+ * Bridge to Apple Foundation Models (macOS 26+, Apple Silicon): talks to the
+ * Swift helper `noctua-fm` (native/fm-helper) via a JSON line protocol.
+ * The helper runs as a long-lived serve process; requests are serial
+ * (the AI queue processes one mail after another anyway).
  */
 
 export type AppleFmState =
@@ -23,8 +23,8 @@ export interface AppleFmStatus {
   detail: string | null
 }
 
-/** Guardrail-Ablehnungen bekommen eine eigene Fehlerklasse: die Triage
- *  schreibt dann ein neutrales Urteil statt den Job zu verbrennen. */
+/** Guardrail refusals get their own error class: triage then
+ *  writes a neutral verdict instead of burning the job. */
 export class AppleGuardrailError extends Error {}
 
 function helperPath(): string | null {
@@ -53,8 +53,8 @@ function classifyReason(reason: string | undefined): AppleFmState {
 
 let statusCache: { at: number; status: AppleFmStatus } | null = null
 
-/** Verfügbarkeit des On-Device-Modells (60 s gecacht — der Settings-Refetch
- *  und jeder Triage-Lauf fragen sonst denselben Zustand ab). */
+/** Availability of the on-device model (cached for 60 s — the settings refetch
+ *  and every triage run would otherwise query the same state). */
 export async function appleFmStatus(force = false): Promise<AppleFmStatus> {
   if (!force && statusCache && Date.now() - statusCache.at < 60_000) return statusCache.status
 
@@ -137,7 +137,7 @@ function ensureServeProcess(binary: string): ChildProcessWithoutNullStreams {
         if (message.ok && message.result !== undefined) waiter.resolve(message.result)
         else waiter.reject(new Error(message.error ?? message.state ?? 'Helper-Fehler'))
       } catch {
-        // halbe Zeile o. Ä. — ignorieren, nächste Zeile trägt die Antwort
+        // half a line or similar — ignore, the next line carries the answer
       }
     }
   })
@@ -179,9 +179,9 @@ function requestOnce(
 }
 
 /**
- * Eine Triage-Anfrage ans On-Device-Modell. Wirft AppleGuardrailError bei
- * Inhalts-Ablehnung; bei gesprengtem Kontextfenster wird einmal mit
- * gekürztem Prompt wiederholt.
+ * A triage request to the on-device model. Throws AppleGuardrailError on
+ * content refusal; if the context window overflows, retries once with a
+ * shortened prompt.
  */
 export async function appleTriage(instructions: string, prompt: string): Promise<unknown> {
   const binary = helperPath()
@@ -200,10 +200,10 @@ export async function appleTriage(instructions: string, prompt: string): Promise
 }
 
 /**
- * Aufgaben-Gate (M88): die enge Ja/Nein-Frage „bittet ein Mensch den
- * Kontoinhaber persönlich?" beantwortet das kleine Modell deutlich
- * zuverlässiger als die Extraktion im Gesamturteil (Eval: Precision
- * 64 % → 100 % bei Recall 90 %). Fehler werten konservativ als Nein.
+ * Task gate (M88): the narrow yes/no question "is a human asking the
+ * account owner personally?" is answered by the small model much more
+ * reliably than the extraction in the overall verdict (eval: precision
+ * 64 % → 100 % at recall 90 %). Errors count conservatively as no.
  */
 export async function appleGate(instructions: string, prompt: string): Promise<boolean> {
   const binary = helperPath()
@@ -216,13 +216,13 @@ export async function appleGate(instructions: string, prompt: string): Promise<b
     return result?.is_personal_request === true
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    // Guardrail/Kontext: konservativ keine Aufgabe — Triage läuft trotzdem
+    // Guardrail/context: conservatively no task — triage runs anyway
     if (/guardrail|context/i.test(message)) return false
     throw error
   }
 }
 
-/** Beim App-Ende den Helper mitnehmen. */
+/** Take the helper down on app exit. */
 export function stopAppleFm(): void {
   if (proc && proc.exitCode === null) proc.kill()
   proc = null

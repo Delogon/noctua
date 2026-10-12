@@ -6,10 +6,10 @@ import { decide, scoreOf, noulOf, type Questions } from './providers/systemone'
 import type { AiProfile, ModelInfo } from './providers/types'
 
 /**
- * Modellliste eines Profils für die Picker. 'chat' (Standard) schließt reine
- * Entscheidungsmodelle aus – sie würden im Chat nur Fehler liefern. 'decision'
- * liefert ausschließlich Modelle mit der Fähigkeit `decision` (nur Ollama;
- * andere Server ergeben eine leere Liste, der Freitext bleibt möglich).
+ * Model list of a profile for the pickers. 'chat' (default) excludes pure
+ * decision models – they would only produce errors in chat. 'decision'
+ * returns only models with the `decision` capability (Ollama only;
+ * other servers yield an empty list, free text remains possible).
  */
 export async function listProfileModels(
   profile: AiProfile,
@@ -25,13 +25,13 @@ export async function listProfileModels(
       .sort((a, b) => a.id.localeCompare(b.id))
   }
   const models = await getClient(profile).listModels()
-  // Fähigkeiten nur bei lokalen Profilen erfragen – kein zusätzlicher Request an externe Hosts
+  // Query capabilities only for local profiles – no extra request to external hosts
   if (profile.preset === 'openrouter' || !profile.isLocal) return models
   const caps = await getOllamaModelCaps(profile.baseUrl, { apiKey })
   return excludeDecisionOnly(models, caps)
 }
 
-/** Reine Entscheidungsmodelle aus einer Chat-Modellliste entfernen. */
+/** Remove pure decision models from a chat model list. */
 export function excludeDecisionOnly(
   models: ModelInfo[],
   caps: Array<{ name: string; capabilities: string[] | null }>
@@ -62,7 +62,7 @@ const TEST_QUESTIONS: Questions = {
 const TEST_STATE =
   'Subject: Invoice no. 4711\n\nHello, please find attached the invoice for 120 euros. Please transfer the amount by Friday.'
 
-/** Funktions-Test: zwei Mini-Fragen. Wie runModelTest nur gegen lokale Profile bei Local only. */
+/** Function test: two mini questions. Like runModelTest, only against local profiles under Local only. */
 export async function runDecisionTest(
   profileId: string,
   model: string

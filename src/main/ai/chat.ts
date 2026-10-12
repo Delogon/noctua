@@ -27,7 +27,7 @@ interface ChatInput {
   history: Array<{ role: 'user' | 'assistant'; content: string }>
 }
 
-// Unkaputtbar: {"keywords":[...]}, nacktes Array, lange Phrasen, Müll dazwischen.
+// Unbreakable: {"keywords":[...]}, bare array, long phrases, junk in between.
 const keywordSchema = z
   .any()
   .transform((input): string[] => {
@@ -43,10 +43,10 @@ const keywordSchema = z
   .pipe(z.array(z.string()).min(1))
 
 /**
- * Postfach-Q&A: Query-Expansion (Draft-Modell) → Hybrid-Retrieval
- * (lokale Embeddings via sqlite-vec + FTS5, dazu ein Aktualitäts-Kanal
- * mit den neuesten Threads) → Antwort mit Quellen-Verweisen
- * (Draft-Modell, gestreamt).
+ * Mailbox Q&A: query expansion (draft model) → hybrid retrieval
+ * (local embeddings via sqlite-vec + FTS5, plus a recency channel
+ * with the newest threads) → answer with source references
+ * (draft model, streamed).
  */
 export function startChat(
   db: Database.Database,
@@ -99,12 +99,12 @@ async function expandQuery(
   question: string,
   resolved: ResolvedTask
 ): Promise<string[]> {
-  // Draft-Modell: die Assoziation "Beschreibung -> Produktname" (z. B.
-  // "künstliche Stimmen" -> ElevenLabs) schafft das kleine Modell nicht
-  // zuverlässig; ein Call pro Chat-Frage ist es wert.
+  // Draft model: the small model can't reliably make the association
+  // "description -> product name" (e.g. "künstliche Stimmen" -> ElevenLabs);
+  // one call per chat question is worth it.
   const { client, model } = resolved
-  // Kein json-Modus: Anthropic-Modelle unterstützen json_object über
-  // OpenRouter nicht — JSON kommt per Instruktion und wird robust extrahiert.
+  // No JSON mode: Anthropic models don't support json_object via
+  // OpenRouter — JSON comes via instruction and is extracted robustly.
   const response = await client.complete({
     model,
     messages: [
@@ -127,14 +127,14 @@ Reply ONLY with JSON: {"keywords": ["…"]}`
   try {
     const jsonText = raw.match(/\{[\s\S]*\}|\[[\s\S]*\]/)?.[0] ?? raw
     const keywords = keywordSchema.parse(JSON.parse(jsonText))
-    // Suchbegriffe stammen aus der Nutzerfrage — nur in Dev loggen
+    // Search terms come from the user's question — log only in dev
     if (isDev) console.log(`[chat] keywords: ${keywords.join(', ')}`)
     return keywords
   } catch (error) {
     console.warn(
       '[chat] Query-Expansion unlesbar, Wort-Fallback:',
       (error as Error).message.slice(0, 120),
-      // Modellantwort kann Mail-Inhalt enthalten: im Release nur die Länge
+      // Model answer may contain mail content: in release only the length
       !isDev ? `| raw: ${raw.length} Zeichen` : `| raw: ${raw.slice(0, 200)}`
     )
     return question.split(/\s+/).filter((w) => w.length > 3)
@@ -165,7 +165,7 @@ function ftsThreadKeys(db: Database.Database, keywords: string[], limit: number)
   ).map((r) => r.thread_key)
 }
 
-/** Semantische Nachbarn über den lokalen Vektor-Index (sqlite-vec KNN). */
+/** Semantic neighbors via the local vector index (sqlite-vec KNN). */
 async function vectorThreadKeys(
   db: Database.Database,
   question: string,
@@ -188,15 +188,15 @@ async function vectorThreadKeys(
     }>
     return rows.map((r) => r.thread_key)
   } catch (error) {
-    // Modell noch nicht geladen / Index leer → FTS trägt allein
+    // Model not loaded yet / index empty → FTS carries it alone
     console.warn('[chat] Vektor-Retrieval nicht verfügbar:', (error as Error).message)
     return []
   }
 }
 
 /**
- * Die zuletzt eingetroffenen Threads (Eingang/Gesendet/Archiv, kein Spam) —
- * der Aktualitäts-Kanal, den thematisches Retrieval nicht liefern kann.
+ * The most recently arrived threads (inbox/sent/archive, no spam) —
+ * the recency channel that topical retrieval can't provide.
  */
 function newestThreadKeys(db: Database.Database, limit: number): string[] {
   return (
@@ -232,10 +232,10 @@ export function loadThreadContexts(db: Database.Database, threadKeys: string[]):
     }>
     const context = messages
       .map((m) => {
-        // SEC-15: Mailtext fremder Absender ist Daten, keine Anweisung
+        // SEC-15: mail text from external senders is data, not instructions
         const body = sanitizeUntrusted(m.text_plain?.trim() || htmlToText(m.html_raw ?? ''), 700)
-        // Mit Uhrzeit in Lokalzeit: „Welche Mails kamen heute an?" braucht
-        // mehr als das Datum, und UTC würde abends das Datum verschieben.
+        // With time in local time: "Which mails arrived today?" needs
+        // more than the date, and UTC would shift the date in the evening.
         const when = m.date ? localStamp(m.date) : '?'
         const from = sanitizeUntrustedLine(m.from_name ?? m.from_addr ?? '?')
         return `From ${from} on ${when}:\n${body}`
@@ -246,9 +246,9 @@ export function loadThreadContexts(db: Database.Database, threadKeys: string[]):
 }
 
 /**
- * Kontextblock für den Chat-Prompt. Jeder Thread steht in eigenen
- * UNTRUSTED-Delimitern (SEC-15, vuln-0013): Mails fremder Absender dürfen die
- * Antwort nicht per eingebetteter Anweisung steuern.
+ * Context block for the chat prompt. Each thread sits in its own
+ * UNTRUSTED delimiters (SEC-15, vuln-0013): mails from external senders must not
+ * steer the answer via embedded instructions.
  */
 export function formatContextBlock(threads: RetrievedThread[]): string {
   if (threads.length === 0) return '(no matching emails found)'
@@ -286,7 +286,7 @@ async function runChat(
   chatId: string,
   input: ChatInput
 ): Promise<void> {
-  // Local only / kein Key / Budget: klare Fehlermeldung statt stiller Leere
+  // Local only / no key / budget: clear error message instead of silent emptiness
   const resolved = requireTaskWithBudget(db, 'draft')
 
   const retrievalText = buildRetrievalText(input.question, input.history)
@@ -297,7 +297,7 @@ async function runChat(
   // "alle Mails von …" widens the channel so the answer can enumerate.
   const wantsAll = /\balle[nm]?\b/i.test(input.question)
   const senderKeys = fuzzySenderThreadKeys(db, queryTerms(retrievalText), wantsAll ? 14 : 6)
-  // Hybrid: semantische Treffer zuerst, Volltext füllt auf (dedupliziert).
+  // Hybrid: semantic hits first, full text fills up (deduplicated).
   const [vecKeys, vecKeywordKeys, ftsKeys] = await Promise.all([
     vectorThreadKeys(db, retrievalText, 8),
     keywords.length > 0
@@ -305,7 +305,7 @@ async function runChat(
       : Promise.resolve([] as string[]),
     Promise.resolve(ftsThreadKeys(db, keywords, 8))
   ])
-  // Interleaved mergen, damit beide Vektor-Sichten vorne vertreten sind
+  // Merge interleaved so both vector views are represented up front
   const interleaved: string[] = [...senderKeys]
   const maxLen = Math.max(vecKeys.length, vecKeywordKeys.length, ftsKeys.length)
   for (let i = 0; i < maxLen; i++) {
@@ -313,8 +313,8 @@ async function runChat(
       if (list[i]) interleaved.push(list[i])
     }
   }
-  // Aktualitäts-Kanal: bei Zeitbezug in der Frage tragen die neuesten Threads
-  // die Antwort und stehen vorn; sonst füllen ein paar hinten auf.
+  // Recency channel: if the question has a time reference, the newest threads carry
+  // the answer and come first; otherwise a few fill up at the end.
   const temporal = isTemporalQuestion(input.question)
   const newest = newestThreadKeys(db, temporal ? 10 : 4)
   const merged = blendThreadKeys({

@@ -16,9 +16,9 @@ import {
   type ResolvedTask
 } from './types'
 
-// Profil-Registry: CRUD über die Tabelle ai_profiles, Keys im Vault, und
-// resolveTask() — die einzige Stelle, die entscheidet, welcher Client eine
-// Aufgabe bedient (inkl. „Local only").
+// Profile registry: CRUD over the ai_profiles table, keys in the vault, and
+// resolveTask() — the only place that decides which client serves a
+// task (incl. "Local only").
 
 interface ProfileRow {
   id: string
@@ -30,7 +30,7 @@ interface ProfileRow {
   managed: number
 }
 
-/** Vault-Key eines Profils; das OpenRouter-Preset behält den Upstream-Key. */
+/** Vault key of a profile; the OpenRouter preset keeps the upstream key. */
 export function profileSecretKey(profile: Pick<AiProfile, 'id' | 'preset'>): string {
   return profile.preset === 'openrouter' ? 'openrouter.apiKey' : `ai.profile.${profile.id}.apiKey`
 }
@@ -69,7 +69,7 @@ export interface ProfileInput {
   isLocal: boolean
 }
 
-/** Basis-URL normalisieren: nur http(s), ohne Slash am Ende. Wirft bei Unsinn. */
+/** Normalize the base URL: http(s) only, no trailing slash. Throws on nonsense. */
 export function normalizeBaseUrl(raw: string): string {
   let url: URL
   try {
@@ -112,10 +112,10 @@ export function createProfile(input: ProfileInput, db: Database.Database = getDb
 }
 
 /**
- * Profil ändern. Beim OpenRouter-Preset sind nur Name und lokal-Flag fix bzw.
- * unveränderlich: URL und API-Stil gehören zum Preset (Header, ZDR, Katalog).
- * Von der Organisation bereitgestellte Profile (managed) sind komplett gesperrt;
- * nur der Key (setProfileKey) bleibt änderbar.
+ * Update a profile. For the OpenRouter preset only name and local flag are fixed or
+ * immutable: URL and API style belong to the preset (headers, ZDR, catalog).
+ * Profiles provided by the organization (managed) are fully locked;
+ * only the key (setProfileKey) remains editable.
  */
 export function updateProfile(
   id: string,
@@ -133,10 +133,10 @@ export function updateProfile(
     apiStyle: !builtin && patch.apiStyle !== undefined ? patch.apiStyle : current.apiStyle,
     isLocal: !builtin && patch.isLocal !== undefined ? patch.isLocal : current.isLocal
   }
-  // SEC: Der Vault-Key gilt für die Basis-URL, für die er eingegeben wurde. Bei
-  // einer Änderung der Basis-URL wird er verworfen — der Key verlässt den
-  // Main-Prozess nie Richtung anderem Endpunkt (Schutz vor renderer-gesteuerter
-  // Umleitung eines profilierten Endpunkts auf einen Angreifer-Host).
+  // SEC: The vault key applies to the base URL it was entered for. When
+  // the base URL changes it is discarded — the key never leaves the
+  // main process toward another endpoint (protection against renderer-driven
+  // redirection of a profiled endpoint to an attacker host).
   const nextUrl = next.baseUrl !== current.baseUrl
   if (nextUrl && current.hasKey) {
     deleteSecret(profileSecretKey(current))
@@ -149,7 +149,7 @@ export function updateProfile(
   return getProfile(id, db)!
 }
 
-/** Löscht ein eigenes Profil samt Key; Aufgaben darauf fallen auf OpenRouter zurück. */
+/** Deletes a custom profile with its key; tasks on it fall back to OpenRouter. */
 export function deleteProfile(id: string, db: Database.Database = getDb()): void {
   const current = getProfile(id, db)
   if (!current) return
@@ -161,7 +161,7 @@ export function deleteProfile(id: string, db: Database.Database = getDb()): void
     for (const task of TASKS) {
       if (getTaskProfileId(task) === id) {
         if (task === 'decision') {
-          // Entscheidungen sind optional: ohne Profil einfach aus
+          // Decisions are optional: without a profile simply off
           db.prepare('DELETE FROM settings WHERE key IN (?, ?)').run(
             profileKey(task),
             modelKey(task)
@@ -169,7 +169,7 @@ export function deleteProfile(id: string, db: Database.Database = getDb()): void
           continue
         }
         setSetting(profileKey(task), OPENROUTER_PROFILE_ID)
-        // Modell gehörte zum gelöschten Profil — OpenRouter-Default greift wieder
+        // Model belonged to the deleted profile — OpenRouter default applies again
         db.prepare('DELETE FROM settings WHERE key = ?').run(modelKey(task))
       }
     }
@@ -193,7 +193,7 @@ export function clearProfileKey(id: string): void {
   clientCache.delete(id)
 }
 
-// --- Aufgaben-Zuordnung -------------------------------------------------------
+// --- Task assignment ---------------------------------------------------------
 
 export const TASKS: readonly AiTask[] = ['triage', 'draft', 'stt', 'decision']
 
@@ -205,21 +205,21 @@ function modelKey(task: AiTask): string {
 }
 
 /**
- * Profil-ID einer Aufgabe. Triage kennt zusätzlich die Pseudo-ID 'apple'
- * (On-Device-Modell, Legacy-Setting ai.triageProvider); 'apple' gilt später auch
- * für stt. Solche Pseudo-Profile liefert resolveTask() nicht — die Aufrufer
- * behandeln sie vorher selbst.
+ * Profile ID of a task. Triage additionally knows the pseudo ID 'apple'
+ * (on-device model, legacy setting ai.triageProvider); 'apple' later also applies
+ * to stt. resolveTask() doesn't return such pseudo profiles — the callers
+ * handle them themselves beforehand.
  */
 export function getTaskProfileId(task: AiTask): string {
-  // Entscheidungen sind optional: nicht gesetzt = leere ID (kein Standard-Profil)
+  // Decisions are optional: not set = empty ID (no default profile)
   if (task === 'decision') return getSetting(profileKey(task))?.trim() ?? ''
   if (task === 'triage' && getSetting('ai.triageProvider') === 'apple') return 'apple'
   const id = getSetting(profileKey(task))?.trim() || OPENROUTER_PROFILE_ID
-  // stt: Apple-Spracherkennung als Pseudo-Profil (ai.sttProfile = 'apple')
+  // stt: Apple speech recognition as pseudo profile (ai.sttProfile = 'apple')
   return task === 'stt' && id === 'apple' ? 'apple' : id
 }
 
-/** Modell der Aufgabe: ausdrücklich gesetzt, sonst nur beim OpenRouter-Profil ein Default. */
+/** Model of the task: explicitly set, otherwise a default only for the OpenRouter profile. */
 export function getTaskModel(task: AiTask, profile: Pick<AiProfile, 'preset'>): string | null {
   const configured = getSetting(modelKey(task))?.trim()
   if (configured) return configured
@@ -230,7 +230,7 @@ export function getTaskModel(task: AiTask, profile: Pick<AiProfile, 'preset'>): 
 export function setTaskAssignment(task: AiTask, profileId: string, model: string): void {
   if (task === 'decision') {
     if (!profileId) {
-      // „Aus": Zuordnung entfernen
+      // "Off": remove the assignment
       getDb()
         .prepare('DELETE FROM settings WHERE key IN (?, ?)')
         .run(profileKey(task), modelKey(task))
@@ -272,7 +272,7 @@ function buildClient(profile: AiProfile, apiKey: string | null): LlmClient {
 
 const clientCache = new Map<string, { signature: string; client: LlmClient }>()
 
-/** Client pro Profil+Key cachen; Änderungen an URL/Stil/Key bauen ihn neu. */
+/** Cache the client per profile+key; changes to URL/style/key rebuild it. */
 export function getClient(profile: AiProfile): LlmClient {
   const apiKey = getSecret(profileSecretKey(profile))
   const signature = [profile.baseUrl, profile.apiStyle, profile.preset, apiKey ?? ''].join('\n')
@@ -283,18 +283,18 @@ export function getClient(profile: AiProfile): LlmClient {
   return client
 }
 
-/** Warum eine Aufgabe gerade nicht laufen kann — null, wenn sie läuft. */
+/** Why a task can't run right now — null if it runs. */
 export function taskBlockReason(task: AiTask): BlockReason | null {
   const profile = getProfile(getTaskProfileId(task))
   if (!profile) return 'no-profile'
   if (isLocalOnly() && !profile.isLocal) return 'local-only'
-  // OpenRouter ist ohne Key nutzlos; lokale/eigene Server dürfen keylos sein
+  // OpenRouter is useless without a key; local/custom servers may be keyless
   if (profile.preset === 'openrouter' && !profile.hasKey) return 'no-key'
   if (!getTaskModel(task, profile)) return 'no-model'
   return null
 }
 
-/** Client + Modell + Profil der Aufgabe, oder null (Local only, kein Key, kein Modell). */
+/** Client + model + profile of the task, or null (Local only, no key, no model). */
 export function resolveTask(task: AiTask): ResolvedTask | null {
   if (taskBlockReason(task) !== null) return null
   const profile = getProfile(getTaskProfileId(task))!
@@ -309,9 +309,9 @@ const TASK_LABEL: Record<AiTask, string> = {
 }
 
 /**
- * Entscheidungsmodell (System One) oder null: nicht eingerichtet, Local only mit
- * externem Profil, kein Modell. Kein Chat-Client nötig – systemone.ts spricht
- * den Server direkt.
+ * Decision model (System One) or null: not set up, Local only with an
+ * external profile, no model. No chat client needed – systemone.ts talks to
+ * the server directly.
  */
 export interface ResolvedDecision {
   profile: AiProfile
@@ -330,7 +330,7 @@ export function resolveDecision(): ResolvedDecision | null {
   }
 }
 
-/** Verständliche Fehlermeldung für ein blockiertes Task (Main wirft sie an den Renderer). */
+/** Understandable error message for a blocked task (main throws it to the renderer). */
 export function blockMessage(task: AiTask, reason: BlockReason): string {
   switch (reason) {
     case 'local-only':
@@ -344,21 +344,21 @@ export function blockMessage(task: AiTask, reason: BlockReason): string {
   }
 }
 
-/** Wie resolveTask, wirft aber mit klarer Meldung (für Aufrufer, die dem Nutzer antworten). */
+/** Like resolveTask, but throws with a clear message (for callers that answer the user). */
 export function requireTask(task: AiTask): ResolvedTask {
   const reason = taskBlockReason(task)
   if (reason) throw new Error(blockMessage(task, reason))
   return resolveTask(task)!
 }
 
-/** Budget-Gate gilt nur für externe, bepreiste Profile (OpenRouter-Preset). */
+/** Budget gate applies only to external, priced profiles (OpenRouter preset). */
 export function budgetBlocks(db: Database.Database, resolved: ResolvedTask): boolean {
   return (
     resolved.profile.preset === 'openrouter' && !resolved.profile.isLocal && isBudgetExceeded(db)
   )
 }
 
-/** Wie requireTask, prüft zusätzlich das Budget (Fehlertext wie bisher). */
+/** Like requireTask, additionally checks the budget (error text as before). */
 export function requireTaskWithBudget(
   db: Database.Database,
   task: AiTask,
@@ -369,10 +369,10 @@ export function requireTaskWithBudget(
   return resolved
 }
 
-/** Pausiert die Hintergrund-Triage am Budget? Apple/lokale/geblockte Profile nie. */
+/** Does background triage pause at the budget? Never for Apple/local/blocked profiles. */
 export function triageBudgetBlocked(db: Database.Database): boolean {
   if (getTaskProfileId('triage') === 'apple') return false
-  // Mit Entscheidungsmodell läuft die Triage lokal weiter; das Budget bremst nur das Textmodell
+  // With a decision model triage keeps running locally; the budget only throttles the text model
   if (resolveDecision() !== null) return false
   const profile = getProfile(getTaskProfileId('triage'))
   if (!profile) return false

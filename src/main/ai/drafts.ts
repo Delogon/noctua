@@ -44,7 +44,7 @@ function bodyText(row: { text_plain: string | null; html_raw: string | null }): 
   return (row.text_plain?.trim() || htmlToText(row.html_raw ?? '')).slice(0, 1500)
 }
 
-/** 3 Stilbeispiele aus dem Sent-Ordner: bevorzugt an dieselbe Gegenstelle. */
+/** 3 style examples from the Sent folder: preferably to the same counterpart. */
 function styleExamples(
   db: Database.Database,
   accountId: number,
@@ -69,9 +69,9 @@ function styleExamples(
 }
 
 /**
- * Du/Sie aus dem konkreten Verlauf mit der Person — hat VORRANG vor dem
- * gelernten Postfach-Profil. Prio: eigene frühere Mails an den Kontakt,
- * dann dessen Mails an den Nutzer; ohne Signal entscheidet das Profil.
+ * Du/Sie from the concrete history with the person — takes PRECEDENCE over the
+ * learned mailbox profile. Priority: own earlier mails to the contact,
+ * then their mails to the user; without a signal the profile decides.
  */
 function formalityBlock(
   db: Database.Database,
@@ -113,13 +113,13 @@ function formalityBlock(
   }.`
 }
 
-/** Harte Schreibregeln für ALLE Entwürfe (Tims Vorgabe, M30). */
+/** Hard writing rules for ALL drafts (Tim's requirement, M30). */
 const BASE_STYLE_RULES =
   '- No bullet points or list markers, no dashes (– or —) and no semicolons: write in complete sentences and normal paragraphs.'
 
 /**
- * Manuelle Stil-Anweisungen (haben Vorrang vor dem gelernten Profil):
- * global (ai.styleInstructions) plus adressspezifisch (ai.styleInstructions.<id>).
+ * Manual style instructions (take precedence over the learned profile):
+ * global (ai.styleInstructions) plus address-specific (ai.styleInstructions.<id>).
  */
 function styleInstructionsBlock(accountId?: number | null): string {
   const parts = [
@@ -146,15 +146,15 @@ function signatureState(
       .filter((value): value is string => !!value?.trim())
       .join('\n')
   } catch {
-    // Ungueltige Alt-Konfiguration: klassische Kontosignatur verwenden.
+    // Invalid legacy configuration: use the classic account signature.
   }
   return { configured, reference }
 }
 
 /**
- * Streamt einen Antwortentwurf (Opus) in den Composer. Chunks gehen als
- * ai:draftChunk-Events raus; der Entwurf ist immer editierbar, gesendet wird
- * ausschließlich manuell.
+ * Streams a reply draft (Opus) into the composer. Chunks go out as
+ * ai:draftChunk events; the draft is always editable, sending is
+ * strictly manual.
  */
 export function startDraftReply(
   db: Database.Database,
@@ -205,8 +205,8 @@ async function runDraft(
   const lastForeign = messages.find((m) => m.from_addr !== account.email) ?? messages[0]
   const examples = styleExamples(db, accountId, lastForeign.from_addr)
 
-  // Stil-Profil: einmalig lernen, danach aus den Settings; plus die konkrete
-  // Anrede/Grußformel, die der Nutzer bei genau diesem Kontakt verwendet.
+  // Style profile: learn once, then from the settings; plus the concrete
+  // salutation/closing the user uses with exactly this contact.
   let profile = getStyleProfile(accountId)
   if (!profile) {
     try {
@@ -218,7 +218,7 @@ async function runDraft(
   const contactStyle = extractContactStyle(db, accountId, lastForeign.from_addr)
   const formality = formalityBlock(db, accountId, account.email, lastForeign.from_addr, messages)
 
-  // SEC-15: Mail-Inhalt ist unvertrauenswürdig — bereinigt und in Delimitern
+  // SEC-15: mail content is untrusted — cleaned and in delimiters
   const threadContext = wrapUntrusted(
     'THREAD',
     [...messages]
@@ -230,7 +230,7 @@ async function runDraft(
       .join('\n\n')
   )
 
-  // Verfügbarkeit (opt-out über ai.draftUseCalendar): nur wenn die Mail nach einem Termin fragt
+  // Availability (opt-out via ai.draftUseCalendar): only if the mail asks for an appointment
   const availability = buildAvailabilityBlock(db, {
     now: Date.now(),
     lastMessageText: stripQuoted(bodyText(lastForeign)),
@@ -303,7 +303,7 @@ ${BASE_STYLE_RULES}${profileBlock}${contactBlock}${formality}${styleInstructions
       else push('ai:draftChunk', { draftId, chunk: delta, done: false, error: null, subject: null })
     }
   )
-  // Der Adapter schätzt die Usage selbst, falls der Stream keine liefert
+  // The adapter estimates usage itself if the stream doesn't provide any
   logUsage(db, model, usage.inputTokens, usage.outputTokens, usage.costUsd)
   if (replySignature.configured) {
     const safeText = stripRedundantSignatureTail(signatureSafeBuffer, replySignature.reference)
@@ -331,9 +331,9 @@ interface ParsedCompositionMode {
 }
 
 /**
- * Entfernt das interne `MODUS: DIKTAT|IDEE` am Stream-Anfang und reicht den
- * eigentlichen Ausgabe-Stream weiter. Fehlt das Protokoll, geht kein Text
- * verloren.
+ * Strips the internal `MODE: DICTATION|IDEA` at the start of the stream and passes on
+ * the actual output stream. If the protocol is missing, no text is
+ * lost.
  */
 export function createCompositionModeParser(): {
   feed: (delta: string) => ParsedCompositionMode
@@ -399,10 +399,10 @@ export function createCompositionModeParser(): {
 }
 
 /**
- * Streaming-Parser für das BETREFF-Protokoll neuer Mails: Das Modell darf als
- * erste Zeile `BETREFF: <Vorschlag>` gefolgt von einer `---`-Zeile liefern;
- * beides wird abgefangen, der Rest fließt als normaler Text durch. Beginnt der
- * Stream anders, wird alles unverändert durchgereicht.
+ * Streaming parser for the SUBJECT protocol of new mails: the model may return
+ * `SUBJECT: <suggestion>` as the first line, followed by a `---` line;
+ * both are intercepted, the rest flows through as normal text. If the
+ * stream starts differently, everything is passed through unchanged.
  */
 export function createSubjectProtocolParser(): {
   feed: (delta: string) => ParsedChunk
@@ -440,7 +440,7 @@ export function createSubjectProtocolParser(): {
       const nl = buf.indexOf('\n')
       if (nl === -1) {
         if (buf !== '' && !/^-+$/.test(buf)) {
-          // kann keine Trennlinie mehr werden → Text
+          // can no longer become a separator line → text
           state = 'pass'
           const text = buf
           buf = ''
@@ -467,7 +467,7 @@ export function createSubjectProtocolParser(): {
     },
     flush(): ParsedChunk {
       if (state === 'subject') {
-        // Stream endete in der Betreffzeile — als Betreff werten
+        // Stream ended in the subject line — treat as subject
         const subject = buf.trim() || null
         buf = ''
         state = 'pass'
@@ -482,10 +482,10 @@ export function createSubjectProtocolParser(): {
 }
 
 /**
- * Streamt einen kurzen Nachfass-„Stups" für eine unbeantwortete gesendete
- * Mail (Waiting-View). Höflich, ohne Druck, im Stil des sendenden Kontos.
- * Mit `idea` formuliert die Eule den vom Nutzer bearbeiteten/diktierten
- * Stups neu (⌘J im Stups-Composer).
+ * Streams a short follow-up "nudge" for an unanswered sent
+ * mail (waiting view). Polite, without pressure, in the style of the sending account.
+ * With `idea`, the owl rephrases the nudge edited/dictated by the user
+ * (⌘J in the nudge composer).
  */
 export function startDraftNudge(
   db: Database.Database,
@@ -537,9 +537,9 @@ async function runDraftNudge(
     display_name: string | null
     signature: string | null
   }
-  // Signatur-Verhalten exakt wie beim Antwortentwurf: ist eine Signatur
-  // eingerichtet, schreibt das Modell keine Grußformel/Signatur — der Versand
-  // hängt sie genau einmal an (sendMail/appendSignatureText).
+  // Signature behavior exactly as for the reply draft: if a signature is
+  // set up, the model writes no closing/signature — sending
+  // appends it exactly once (sendMail/appendSignatureText).
   const nudgeSignature = signatureState(sent.account_id, account.signature)
   const to = (JSON.parse(sent.to_json ?? '[]') as Array<{ name?: string; address: string }>)[0]
   const profile = getStyleProfile(sent.account_id)
@@ -564,8 +564,8 @@ ${BASE_STYLE_RULES}${profileBlock}${formality}${styleInstructionsBlock(sent.acco
       : 'Write the follow-up.'
   }`
 
-  // Mit Signatur wird gepuffert, damit eine trotz Anweisung erzeugte
-  // Grußformel/Signaturzeile vor der Anzeige entfernt werden kann (wie runDraft).
+  // With a signature, output is buffered so a closing/signature line generated
+  // despite the instruction can be removed before display (like runDraft).
   let signatureSafeBuffer = ''
   const { usage } = await client.stream(
     {
@@ -601,9 +601,9 @@ interface DraftNewInput {
 }
 
 /**
- * Verfasst eine NEUE Mail aus einer diktierten/getippten Idee. Ohne
- * vorhandenen Betreff schlägt das Modell per BETREFF-Protokoll einen vor
- * (kommt als `subject`-Feld im ersten draftChunk-Event an).
+ * Composes a NEW mail from a dictated/typed idea. Without an
+ * existing subject, the model suggests one via the SUBJECT protocol
+ * (arrives as the `subject` field in the first draftChunk event).
  */
 export function startDraftNew(
   db: Database.Database,
@@ -777,7 +777,7 @@ ${input.idea.trim()}`
   push('ai:draftChunk', { draftId, chunk: '', done: true, error: null, subject: null })
 }
 
-/** Beispielantwort mit dem AKTUELLEN Stil-Setup (Profil + Regeln) — Settings-Probe. */
+/** Sample reply with the CURRENT style setup (profile + rules) — settings probe. */
 export async function stylePreview(db: Database.Database, accountId: number): Promise<string> {
   const { client, model } = requireTaskWithBudget(db, 'draft')
 
@@ -801,7 +801,7 @@ ${BASE_STYLE_RULES}${profileBlock}${styleInstructionsBlock(accountId)}${
       ? `\n\nStyle examples:\n${examples.map((e, i) => `Example ${i + 1}:\n${e}`).join('\n\n')}`
       : ''
   }`
-  // Die Testnachricht folgt der App-Sprache, damit die Probe den Stil in dieser Sprache zeigt
+  // The test message follows the app language so the probe shows the style in that language
   const sample =
     outputLanguage() === 'en'
       ? 'Hi,\ncould you let me know by Friday whether the meeting on Tuesday at 3 pm works for you?\nBest regards\nAlex'
