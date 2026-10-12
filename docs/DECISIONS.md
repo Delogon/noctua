@@ -138,8 +138,11 @@ Two layers, combined per mail (`src/main/ai/threat-check.ts`):
    Cyrillic/Greek letters, invisible zero-width characters between letters, text-direction
    controls, link text naming another host than the target, links to IPs, homoglyph or look-alike
    hosts, punycode hosts, `user@host` tricks, `javascript:`/`data:` URLs and URL shorteners, input
-   forms, pressure phrases together with links, executable / macro / HTML-SVG attachments and
-   double extensions, spam phrases, shouting subjects, image-only mails and hidden text. Mails from
+   forms, pressure phrases together with links, requests for bank details, credentials or a
+   fee, a brand in the display name sent from a domain that is not the brand's, an executive
+   title ("CEO", "Geschäftsführer") from a freemail address, a payment to be kept confidential,
+   executable / macro / HTML-SVG attachments and double extensions, spam phrases, shouting
+   subjects, image-only mails and hidden text. Mails from
    known contacts get a spam discount. Signals are recomputed on demand and never stored, so better
    rules apply to old mail too.
 2. **Decision model** (optional): the hybrid triage asks `phishing` and `spam` (each a score 0..2)
@@ -159,6 +162,22 @@ signs and offers "Move to junk" in the inbox. Noctua moves mail on its own **onl
 on Settings → Privacy → "Move likely spam to junk automatically" (`security.autoJunk`): then a
 freshly triaged inbox mail goes to Junk when spam or phishing is high **and** the model itself says
 at least 0.8 **and** the sender is not a known contact. Rules alone never move mail.
+
+#### Evaluation
+
+`test/ai/threat-rules-eval.test.ts` runs the local rules on the labelled set of 32 German and
+English emails (`test/local/decision-eval.dataset.ts`) in CI. Rules only, no model:
+
+| Group                                                                             | Emails | Warned (suspicious or high)                |
+| --------------------------------------------------------------------------------- | ------ | ------------------------------------------ |
+| Legitimate (personal, work, newsletter, promotions, notifications, transactional) | 23     | 0                                          |
+| Likely phishing                                                                   | 5      | 5                                          |
+| Spam                                                                              | 6      | 5 (cold SEO outreach is left to the model) |
+
+`pnpm test:decision-eval` adds the decision model and reports, per mode, the combined levels:
+warning banners on legitimate emails and on newsletters/promotions, recall of any warning, and the
+emails "Move likely spam to junk" would move (which must never include a legitimate one). It
+needs a reachable Ollama with a decision model; results are written to `test/local/out/`.
 
 ### Rules with an AI condition
 

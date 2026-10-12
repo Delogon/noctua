@@ -168,6 +168,68 @@ describe('lokale Spam-/Phishing-Signale', () => {
   })
 })
 
+describe('request and impersonation signals', () => {
+  it('brand in the display name from a domain that is not the brand', () => {
+    expect(codes({ fromName: 'DHL Express', fromAddr: 'info@dhl-zustellung.example' })).toContain(
+      'brand_other_domain'
+    )
+    // Official domains and subdomains stay quiet
+    expect(codes({ fromName: 'DHL Paket', fromAddr: 'noreply@dhl.de' })).toEqual([])
+    expect(codes({ fromName: 'PayPal', fromAddr: 'service@mail.paypal.com' })).toEqual([])
+    // Freemail is covered by brand_freemail, look-alikes by their own signal
+    expect(codes({ fromName: 'Sparkasse', fromAddr: 'sk@gmail.com' })).not.toContain(
+      'brand_other_domain'
+    )
+    expect(codes({ fromName: 'PayPal', fromAddr: 'service@paypa1.com' })).not.toContain(
+      'brand_other_domain'
+    )
+  })
+
+  it('executive title from a free email address', () => {
+    expect(codes({ fromName: 'Thomas Berg (CEO)', fromAddr: 'tberg@gmail.com' })).toContain(
+      'executive_freemail'
+    )
+    expect(codes({ fromName: 'Geschäftsführerin Maria Klein', fromAddr: 'mk@web.de' })).toContain(
+      'executive_freemail'
+    )
+    expect(codes({ fromName: 'Thomas Berg (CEO)', fromAddr: 'thomas.berg@firma.de' })).toEqual([])
+  })
+
+  it('confidential payment requests', () => {
+    expect(
+      codes({
+        text: 'Ich brauche heute noch eine Überweisung an einen neuen Lieferanten. Bitte vertraulich behandeln.'
+      })
+    ).toContain('confidential_payment')
+    expect(
+      codes({ text: 'Please keep this confidential: we need a wire transfer to the new supplier.' })
+    ).toContain('confidential_payment')
+    // Confidential, but no payment (e.g. HR) – and a payment that is not secret
+    expect(codes({ text: 'Vertraulich: die Bewerbungsunterlagen für die Stelle.' })).toEqual([])
+    expect(codes({ text: 'Die Zahlung ist eingegangen, vielen Dank.' })).toEqual([])
+  })
+
+  it('requests for bank details, credentials or a fee, but not invoices', () => {
+    for (const text of [
+      'Senden Sie uns Ihre Bankdaten, um den Gewinn zu erhalten.',
+      'Zahlen Sie die Zollgebühr von 1,99 € hier.',
+      'Please send us your bank details to receive the refund.',
+      'Pay the customs fee of 2.99 EUR to release your parcel.',
+      'Enter your password to keep your mailbox.'
+    ]) {
+      expect(codes({ text }), text).toContain('sensitive_request')
+    }
+    for (const text of [
+      'Rechnung 2024-117: Bitte überweisen Sie den Betrag auf unsere Bankverbindung IBAN DE12 3456.',
+      'Ihre Bankverbindung wurde erfolgreich geändert.',
+      'Your password was changed. If this was you, no action is needed.',
+      'Bitte zahlen Sie den Betrag bis zum 15. Oktober.'
+    ]) {
+      expect(codes({ text }), text).toEqual([])
+    }
+  })
+})
+
 describe('Stufen aus Modell + Regeln', () => {
   it('Modell allein, Modell mit Bestätigung, Regeln allein', () => {
     expect(phishingLevel(1.5, 0)).toBe('high')
