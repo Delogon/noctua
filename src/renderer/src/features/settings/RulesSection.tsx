@@ -211,7 +211,7 @@ export function RulesSection(): React.JSX.Element {
               <span
                 className="toggle-dot"
                 style={{
-                  background: rule.enabled ? '#F4F1EA' : 'var(--ink)',
+                  background: rule.enabled ? 'var(--paper)' : 'var(--ink)',
                   marginLeft: rule.enabled ? 12 : 0
                 }}
               />

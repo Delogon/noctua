@@ -677,7 +677,7 @@ function InboxList(): React.JSX.Element {
               {e.subject.trim() && (
                 <div
                   className="truncate"
-                  style={{ font: '400 12px var(--serif)', color: '#8a8272', marginTop: 2 }}
+                  style={{ font: '400 12px var(--serif)', color: 'var(--meta)', marginTop: 2 }}
                 >
                   {e.subject}
                 </div>
@@ -735,7 +735,7 @@ function InboxList(): React.JSX.Element {
                   style={{
                     font: '400 12px var(--serif)',
                     fontStyle: 'italic',
-                    color: r.unread ? 'var(--secondary)' : '#8a8272',
+                    color: r.unread ? 'var(--secondary)' : 'var(--meta)',
                     marginTop: 2
                   }}
                 >
@@ -745,7 +745,7 @@ function InboxList(): React.JSX.Element {
               {!r.aiSummary && r.subject && (
                 <div
                   className="truncate"
-                  style={{ font: '400 12px var(--serif)', color: '#8a8272', marginTop: 2 }}
+                  style={{ font: '400 12px var(--serif)', color: 'var(--meta)', marginTop: 2 }}
                 >
                   {r.subject}
                 </div>
@@ -1125,7 +1125,7 @@ export function ListPane(): React.JSX.Element {
     return () => window.removeEventListener('paper:move', onMove)
   }, [threadsQuery.data, followups.data, openTasks.data, doneTasks.data, hiddenThreads, mbox])
   return (
-    <div className="flex min-h-0 w-[400px] flex-none flex-col border-r border-ink">
+    <div className="flex min-h-0 w-full min-w-0 flex-col border-r border-ink">
       {(view === 'inbox' || view === 'compose') && <InboxList />}
       {view === 'waiting' && <WaitingList />}
       {view === 'tasks' && <TasksList />}

@@ -1534,6 +1534,29 @@ const table = {
     de: 'Spam-Ordner erscheinen nie im gemeinsamen Posteingang, bei „Braucht dich“ oder in der Suche – nur, wenn du sie gezielt öffnest.'
   },
   classicNewMail: { en: 'New email', de: 'Neue E-Mail' },
+  paneList: { en: 'List', de: 'Liste' },
+  paneResizeAria: { en: 'Resize {name}', de: '{name}: Breite ändern' },
+  paneResizeTip: {
+    en: 'Drag to resize · double-click to collapse',
+    de: 'Ziehen ändert die Breite · Doppelklick klappt ein'
+  },
+  paneExpandAria: { en: 'Expand {name}', de: '{name} aufklappen' },
+  paneCollapseAria: { en: 'Collapse {name}', de: '{name} einklappen' },
+  paneAutoCollapsedTip: {
+    en: 'Collapsed because the window is narrow — click to keep it open',
+    de: 'Eingeklappt, weil das Fenster schmal ist – Klick hält es offen'
+  },
+  themeToLight: { en: 'Switch to light mode', de: 'Zum hellen Modus wechseln' },
+  themeToDark: { en: 'Switch to dark mode', de: 'Zum dunklen Modus wechseln' },
+  themeHead: { en: 'Colors', de: 'Farben' },
+  themeLight: { en: 'Light', de: 'Hell' },
+  themeDark: { en: 'Dark', de: 'Dunkel' },
+  panesHead: { en: 'Panes', de: 'Spalten' },
+  panesHint: {
+    en: 'Drag a pane’s edge to resize it, double-click it to collapse. Narrow windows collapse panes automatically so the email keeps its room.',
+    de: 'Spaltenrand ziehen ändert die Breite, Doppelklick klappt ein. In schmalen Fenstern klappen Spalten automatisch ein, damit die E-Mail Platz behält.'
+  },
+  panesReset: { en: 'Reset widths', de: 'Breiten zurücksetzen' },
   barAria: { en: 'Email actions', de: 'E-Mail-Aktionen' },
   barReply: { en: 'Reply', de: 'Antworten' },
   barReplyAll: { en: 'Reply all', de: 'Allen antworten' },

@@ -144,7 +144,7 @@ export function OwlConversationsPane(): React.JSX.Element {
                 style={{
                   font: '400 12px var(--serif)',
                   fontStyle: 'italic',
-                  color: '#8a8272',
+                  color: 'var(--meta)',
                   marginTop: 2
                 }}
               >

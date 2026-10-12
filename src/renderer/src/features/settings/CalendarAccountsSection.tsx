@@ -407,7 +407,7 @@ function CalendarAccountCard({
                 <span
                   className="toggle-dot"
                   style={{
-                    background: c.visible ? '#F4F1EA' : 'var(--ink)',
+                    background: c.visible ? 'var(--paper)' : 'var(--ink)',
                     marginLeft: c.visible ? 12 : 0
                   }}
                 />

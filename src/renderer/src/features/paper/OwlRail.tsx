@@ -135,7 +135,7 @@ export function OwlRail(): React.JSX.Element {
 
   return (
     <div
-      className="flex w-[290px] flex-none flex-col gap-[11px] overflow-y-auto border-l border-ink"
+      className="flex w-full min-w-0 flex-col gap-[11px] overflow-y-auto border-l border-ink"
       style={{ background: 'var(--rail)', padding: '14px 15px 12px', boxSizing: 'border-box' }}
     >
       <div className="flex flex-none items-baseline gap-2">

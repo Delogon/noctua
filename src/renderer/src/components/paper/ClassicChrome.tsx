@@ -7,6 +7,8 @@ import { useTasks } from '@renderer/queries/tasks'
 import { useLocalOnly } from '@renderer/queries/intel'
 import { useThreads } from '@renderer/queries/threads'
 import { FolderTree } from '@renderer/features/paper/FolderTree'
+import type { PaneId } from '@renderer/features/paper/pane-layout'
+import { ThemeToggle } from './ThemeToggle'
 
 /**
  * „Classic"-Rahmen (Einstellung ui.layout): Outlook-nahe Muster — Titelleiste
@@ -20,8 +22,9 @@ const ICONS: Record<'mail' | 'waiting' | 'tasks' | 'calendar' | 'owl' | 'setting
   tasks: 'M2.5 2.5h11v11h-11z M5 8l2 2 4-4',
   calendar: 'M2.5 3.5h11v10h-11z M2.5 6.5h11 M5.5 2v3 M10.5 2v3',
   owl: 'M3 5.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0z M8 5.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0z M3 5.5v5.5l5 3 5-3V5.5',
+  // Zahnrad (nicht Sonne — die Sonne ist der Hell/Dunkel-Schalter)
   settings:
-    'M8 5.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5z M8 1.5v2 M8 12.5v2 M1.5 8h2 M12.5 8h2 M3.4 3.4l1.4 1.4 M11.2 11.2l1.4 1.4 M3.4 12.6l1.4-1.4 M11.2 4.8l1.4-1.4'
+    'M6.9 1.5h2.2l.4 1.7 1.2.5 1.5-.9 1.6 1.6-.9 1.5.5 1.2 1.7.4v2.2l-1.7.4-.5 1.2.9 1.5-1.6 1.6-1.5-.9-1.2.5-.4 1.7H6.9l-.4-1.7-1.2-.5-1.5.9-1.6-1.6.9-1.5-.5-1.2-1.7-.4V6.9l1.7-.4.5-1.2-.9-1.5 1.6-1.6 1.5.9 1.2-.5z M8 5.9a2.1 2.1 0 1 0 0 4.2a2.1 2.1 0 1 0 0-4.2z'
 }
 
 function Icon({ name }: { name: keyof typeof ICONS }): React.JSX.Element {
@@ -29,6 +32,50 @@ function Icon({ name }: { name: keyof typeof ICONS }): React.JSX.Element {
     <svg viewBox="0 0 16 16" aria-hidden="true" className="classic-icon">
       <path d={ICONS[name]} />
     </svg>
+  )
+}
+
+/** Spalten ein-/ausblenden (Ordner, Liste, Eule) — wie Outlooks Ansicht-Menü, nur direkt. */
+function PaneToggles(): React.JSX.Element {
+  const t = useT()
+  const view = usePaper((s) => s.view)
+  const folders = usePaper((s) => s.showFolderPane)
+  const list = usePaper((s) => s.showList)
+  const rail = usePaper((s) => s.showRail)
+  const open: Record<PaneId, boolean> = { folders, list, rail }
+  const expandPane = usePaper((s) => s.expandPane)
+  const collapsePane = usePaper((s) => s.collapsePane)
+  const items: Array<{ id: PaneId; label: string; fill: string }> = [
+    ...(view === 'inbox' || view === 'compose'
+      ? [{ id: 'folders' as const, label: t('foldersTreeAria'), fill: 'M2.5 2.5h3v11h-3z' }]
+      : []),
+    { id: 'list', label: t('paneList'), fill: 'M5.5 2.5h4v11h-4z' },
+    { id: 'rail', label: t('classicOwl'), fill: 'M10.5 2.5h3v11h-3z' }
+  ]
+  return (
+    <div className="classic-pane-toggles" role="group" aria-label={t('panesHead')}>
+      {items.map((item) => {
+        const label = open[item.id]
+          ? t('paneCollapseAria', { name: item.label })
+          : t('paneExpandAria', { name: item.label })
+        return (
+          <button
+            key={item.id}
+            type="button"
+            className="classic-topbar__btn"
+            aria-pressed={open[item.id]}
+            aria-label={label}
+            title={label}
+            onClick={() => (open[item.id] ? collapsePane(item.id) : expandPane(item.id, false))}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true" className="classic-icon">
+              <path d="M1.5 2.5h13v11h-13z" />
+              <path d={item.fill} className="classic-pane-toggles__fill" />
+            </svg>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -56,6 +103,8 @@ export function ClassicTopBar(): React.JSX.Element {
         <kbd>/</kbd>
       </button>
       <div className="classic-topbar__end titlebar-no-drag">
+        <PaneToggles />
+        <ThemeToggle className="classic-topbar__btn" />
         {localOnly && (
           <button
             type="button"

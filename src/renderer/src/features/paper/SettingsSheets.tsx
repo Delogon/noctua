@@ -21,6 +21,7 @@ import {
   DecisionCard
 } from '@renderer/features/settings/AiProvidersSection'
 import { usePaper, type PaperLayout } from '@renderer/stores/paper'
+import { PANE_LIMITS } from '@renderer/features/paper/pane-layout'
 import { rowTime, useI18n, useT } from '@renderer/lib/i18n'
 import { useStyleMeta, useStyleProfile } from '@renderer/features/paper/useVoiceTag'
 import {
@@ -1040,7 +1041,7 @@ function PrivacyToggle({
           <span
             className="toggle-dot"
             style={{
-              background: on ? '#F4F1EA' : 'var(--ink)',
+              background: on ? 'var(--paper)' : 'var(--ink)',
               marginLeft: on ? 12 : 0
             }}
           />
@@ -1298,7 +1299,10 @@ function VoiceCard({ account }: { account: AccountSummary }): React.JSX.Element 
           >
             <span
               className="toggle-dot"
-              style={{ background: learn ? '#F4F1EA' : 'var(--ink)', marginLeft: learn ? 12 : 0 }}
+              style={{
+                background: learn ? 'var(--paper)' : 'var(--ink)',
+                marginLeft: learn ? 12 : 0
+              }}
             />
           </span>
           <span style={{ font: '400 9px var(--mono)', color: 'var(--muted)' }}>
@@ -2031,7 +2035,7 @@ function TasksAutoCard(): React.JSX.Element {
           <span className="toggle-track" style={{ background: on ? 'var(--ink)' : 'transparent' }}>
             <span
               className="toggle-dot"
-              style={{ background: on ? '#F4F1EA' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
+              style={{ background: on ? 'var(--paper)' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
             />
           </span>
           <span style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}>
@@ -2068,6 +2072,14 @@ export function AppearanceSheet(): React.JSX.Element {
   const setLayout = usePaper((s) => s.setLayout)
   const showFolders = usePaper((s) => s.showFolders)
   const setShowFolders = usePaper((s) => s.setShowFolders)
+  const theme = usePaper((s) => s.theme)
+  const setTheme = usePaper((s) => s.setTheme)
+  const resetPaneWidths = (): void => {
+    const { setPaneWidth } = usePaper.getState()
+    for (const id of ['folders', 'list', 'rail'] as const) {
+      setPaneWidth(id, PANE_LIMITS[id].default, id === 'rail')
+    }
+  }
   const options: Array<{ id: PaperLayout; name: string; desc: string }> = [
     { id: 'letterpress', name: t('layoutLetterpress'), desc: t('layoutLetterpressDesc') },
     { id: 'classic', name: t('layoutClassic'), desc: t('layoutClassicDesc') }
@@ -2094,6 +2106,31 @@ export function AppearanceSheet(): React.JSX.Element {
             </span>
           </button>
         ))}
+      </div>
+      <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
+        {t('themeHead')}
+      </div>
+      <div className="appearance-segment" role="radiogroup" aria-label={t('themeHead')}>
+        {(['light', 'dark'] as const).map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={theme === id}
+            onClick={() => setTheme(id)}
+          >
+            {t(id === 'light' ? 'themeLight' : 'themeDark')}
+          </button>
+        ))}
+      </div>
+      <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
+        {t('panesHead')}
+      </div>
+      <div className="appearance-note" style={{ alignItems: 'center' }}>
+        <span style={{ flex: 1 }}>{t('panesHint')}</span>
+        <button type="button" className="appearance-reset" onClick={resetPaneWidths}>
+          {t('panesReset')}
+        </button>
       </div>
       <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
         {t('mailboxHead')}
