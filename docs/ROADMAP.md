@@ -104,6 +104,9 @@ not been run against a real Ollama + `clef-flash` yet (checklist in [DECISIONS.m
 
 ## Working mode
 
+Code comments, AI prompts and docs are written in English; UI copy stays bilingual in
+`src/renderer/src/i18n/strings.ts`.
+
 Implementation is done by subagents per work package (parallel where files don't overlap),
 each validated with `pnpm typecheck`, `pnpm lint` (changed files), and `pnpm test:ci`
 before merge into the phase branch.
