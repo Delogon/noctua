@@ -2,6 +2,22 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import { davNamesForEmails, searchDavContacts } from '../../contacts/repo'
 
 /**
+ * Most frequent display name per address, so the recipient suggestions
+ * don't have to look it up from messages on every keystroke. Ties go to the
+ * most recently used name, then alphabetically. The unary `+` matters: without
+ * it SQLite walks the whole idx_msg_from_addr_lower index for every contact
+ * (contacts × messages; 33 s at 20k messages) instead of seeking into it.
+ */
+export const CONTACT_DISPLAY_NAME_SQL = `UPDATE contact_stats SET display_name = (
+    SELECT m.from_name FROM messages m
+    WHERE lower(m.from_addr) = +contact_stats.addr AND m.from_name IS NOT NULL
+    GROUP BY m.from_name
+    ORDER BY count(*) DESC, max(coalesce(m.date, m.internal_date, 0)) DESC, m.from_name
+    LIMIT 1
+  )
+  WHERE account_id = ?`
+
+/**
  * Rebuilds contact_stats for an account: sent_count from the recipients of the
  * Sent folder (priority boost "has Tim ever written to them?" + style examples),
  * received_count from the senders in the INBOX.
@@ -29,17 +45,7 @@ export function rebuildContactStats(db: Database.Database, accountId: number): v
          received_count = excluded.received_count,
          last_interaction = max(contact_stats.last_interaction, excluded.last_interaction)`
     ).run(accountId)
-    // Most frequent display name per address, so the recipient suggestions
-    // don't have to look it up from messages on every keystroke. Runs as an
-    // indexed lookup per contact via idx_msg_from_addr_lower.
-    db.prepare(
-      `UPDATE contact_stats SET display_name = (
-         SELECT m.from_name FROM messages m
-         WHERE lower(m.from_addr) = contact_stats.addr AND m.from_name IS NOT NULL
-         GROUP BY m.from_name ORDER BY count(*) DESC LIMIT 1
-       )
-       WHERE account_id = ?`
-    ).run(accountId)
+    db.prepare(CONTACT_DISPLAY_NAME_SQL).run(accountId)
   })
   tx()
 }
