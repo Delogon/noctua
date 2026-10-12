@@ -30,23 +30,23 @@ const BODY_PASS_LIMIT = 50
 const FLAG_RESYNC_WINDOW = 500
 const BACKOFF_BASE_MS = 5_000
 const BACKOFF_MAX_MS = 5 * 60_000
-// Falls IDLE still stirbt: INBOX zusätzlich regelmäßig abfragen
+// In case IDLE dies silently: additionally poll INBOX regularly
 const INBOX_WATCHDOG_MS = 5 * 60_000
 
 export type SyncState = 'idle' | 'connecting' | 'syncing' | 'error' | 'needs-reauth' | 'off'
 
 /**
- * Login vom Server abgelehnt (imapflow setzt `authenticationFailed`)? Dann
- * hilft kein Reconnect-Loop — der Nutzer muss neue Zugangsdaten liefern.
+ * Login rejected by the server (imapflow sets `authenticationFailed`)? Then
+ * no reconnect loop helps — the user has to provide new credentials.
  */
 export function isAuthFailure(error: unknown): boolean {
   const e = error as { authenticationFailed?: unknown; serverResponseCode?: unknown } | null
   return (
     e?.authenticationFailed === true ||
     e?.serverResponseCode === 'AUTHENTICATIONFAILED' ||
-    // OAuth-Refresh gescheitert (invalid_grant / interaction_required)
+    // OAuth refresh failed (invalid_grant / interaction_required)
     isReauthError(error) ||
-    // Bridge-Zertifikat geändert: kein Retry-Loop, Nutzer bestätigt per Passwort
+    // Bridge certificate changed: no retry loop, user confirms via password
     isTlsPinMismatch(error)
   )
 }
@@ -65,7 +65,7 @@ export interface QueuedOp {
     add?: string[]
     remove?: string[]
     targetSpecialUse?: string
-    /** UIDVALIDITY des Ordners beim Einreihen — bei Abweichung sind die UIDs ungültig. */
+    /** The folder's UIDVALIDITY at enqueue — if it differs, the UIDs are invalid. */
     uidValidity?: number
   }
 }
@@ -88,10 +88,10 @@ function isSearchableFolder(folder: Pick<FolderRow, 'special_use'>): boolean {
 }
 
 /**
- * Backfill-Grenze eines Kontos als Epoch-Millisekunden: ein gesetzter
- * Sync-Zeitraum (accounts.sync_days) gilt für Liste UND Suche, 0 heißt
- * „alles synchronisieren" (Grenze 0). Ohne Einstellung gelten die
- * Standardfenster (90 Tage Liste, 183 Tage Suche).
+ * An account's backfill limit as epoch milliseconds: a set
+ * sync period (accounts.sync_days) applies to list AND search, 0 means
+ * "sync everything" (limit 0). Without a setting the
+ * default windows apply (90 days list, 183 days search).
  */
 export function backfillCutoff(
   syncDays: number | null | undefined,
@@ -104,9 +104,9 @@ export function backfillCutoff(
 }
 
 /**
- * Iterativ statt rekursiv: BODYSTRUCTURE kommt vom Server — eine tief
- * verschachtelte Struktur darf keinen Stack-Overflow auslösen, der die
- * Ingest-Transaktion bei jedem Sync erneut abbricht (SEC, vuln-0008).
+ * Iterative instead of recursive: BODYSTRUCTURE comes from the server — a deeply
+ * nested structure must not trigger a stack overflow that aborts the
+ * ingest transaction again on every sync (SEC, vuln-0008).
  */
 export function structureHasAttachments(root: unknown): boolean {
   const stack: unknown[] = [root]
@@ -127,7 +127,7 @@ function extractHeader(headers: Buffer | undefined, name: string): string | null
   return headers.toString('binary').match(pattern)?.[1] ?? null
 }
 
-/** Obergrenze für References — die jüngsten (letzten) Einträge reichen fürs Threading. */
+/** Upper limit for References — the newest (last) entries suffice for threading. */
 const MAX_REFERENCES = 100
 
 function extractReferences(headers: Buffer | undefined): string[] {
@@ -185,8 +185,8 @@ function toEnvelopeData(msg: FetchMessageObject): EnvelopeData {
 }
 
 /**
- * Synchronisiert ein Konto: Kommando-Verbindung (Backfill, Fetches, Ops) plus
- * dedizierte IDLE-Verbindung auf INBOX. Reconnect mit Exponential-Backoff.
+ * Syncs an account: command connection (backfill, fetches, ops) plus
+ * a dedicated IDLE connection on INBOX. Reconnect with exponential backoff.
  */
 export class AccountSyncer {
   private cmd: ImapFlow | null = null
@@ -199,7 +199,7 @@ export class AccountSyncer {
   private pollTimer: NodeJS.Timeout | null = null
   private watchdogTimer: NodeJS.Timeout | null = null
   private needsReauth = false
-  // Noch nicht gestartete Ordner-Syncs — gleiche Anforderungen teilen sich einen Lauf
+  // Folder syncs not yet started — identical requests share one run
   private pendingFolderSyncs = new Map<number, Promise<void>>()
   private folders: FolderRow[] = []
 
@@ -227,16 +227,16 @@ export class AccountSyncer {
   }
 
   /**
-   * Bricht einen laufenden Backoff-Wait ab (z. B. nach System-Wakeup). Im
-   * needs-reauth-Zustand bewusst wirkungslos: Wiederholte falsche Logins
-   * können das Konto beim Anbieter sperren.
+   * Aborts a running backoff wait (e.g. after system wakeup). Deliberately
+   * ineffective in the needs-reauth state: repeated wrong logins
+   * can get the account locked at the provider.
    */
   wake(): void {
     if (this.needsReauth) return
     this.wakeReconnect?.()
   }
 
-  /** Nutzer-Aktion (RETRY, neue Zugangsdaten): beendet auch needs-reauth. */
+  /** User action (RETRY, new credentials): also ends needs-reauth. */
   retryNow(): void {
     this.needsReauth = false
     this.wakeReconnect?.()
@@ -246,7 +246,7 @@ export class AccountSyncer {
     return !!this.cmd?.usable
   }
 
-  /** Serialisiert Arbeit auf der Kommando-Verbindung. */
+  /** Serializes work on the command connection. */
   private enqueue<T>(fn: () => Promise<T>): Promise<T> {
     const next = this.chain.then(fn, fn)
     this.chain = next.catch(() => undefined)
@@ -266,8 +266,8 @@ export class AccountSyncer {
         const message = error instanceof Error ? error.message : String(error)
         console.warn(`[sync:${this.account.email}] error: ${message}`)
         if (isAuthFailure(error)) {
-          // Kein Backoff-Loop gegen falsche Zugangsdaten: warten, bis der Nutzer
-          // RETRY drückt oder die Zugangsdaten ändert (retryNow / Neustart).
+          // No backoff loop against wrong credentials: wait until the user
+          // presses RETRY or changes the credentials (retryNow / restart).
           this.needsReauth = true
           this.backoffAttempt = 0
           this.events.onState('needs-reauth', message)
@@ -319,8 +319,8 @@ export class AccountSyncer {
       }
     }
     const inbox = folders.find((f) => f.special_use === '\\Inbox')
-    // IDLE zuerst starten; der progressive Body-Backfill darf neue Mails nicht
-    // fuer Minuten blockieren.
+    // Start IDLE first; the progressive body backfill must not block new mails
+    // for minutes.
     if (inbox) await this.startIdle(inbox)
 
     for (const folder of folders.filter(isSearchableFolder)) {
@@ -328,7 +328,7 @@ export class AccountSyncer {
         console.warn(`[sync:${this.account.email}] Body-Backfill ${folder.path}:`, error)
       )
     }
-    // Nicht-INBOX-Ordner haben kein IDLE — alle 10 Minuten inkrementell nachziehen.
+    // Non-INBOX folders have no IDLE — catch up incrementally every 10 minutes.
     if (this.pollTimer) clearInterval(this.pollTimer)
     this.pollTimer = setInterval(() => {
       for (const folder of this.folders) {
@@ -339,8 +339,8 @@ export class AccountSyncer {
         }
       }
     }, 10 * 60_000)
-    // Watchdog: IDLE kann ohne close-Event sterben — dann würde die INBOX nie
-    // wieder syncen. Scheitert der Poll, greift der normale Reconnect.
+    // Watchdog: IDLE can die without a close event — then the INBOX would never
+    // sync again. If the poll fails, the normal reconnect kicks in.
     if (this.watchdogTimer) clearInterval(this.watchdogTimer)
     this.watchdogTimer = null
     if (inbox) {
@@ -353,16 +353,16 @@ export class AccountSyncer {
   }
 
   /**
-   * Manueller Refresh (Refresh-Button/⌘K): alle Voll-Sync-Ordner sofort
-   * inkrementell nachziehen, statt auf IDLE bzw. den 10-Minuten-Poll zu
-   * warten — für Ordner ohne IDLE (v. a. Spam) der einzige schnelle Weg.
+   * Manual refresh (refresh button/⌘K): catch up all full-sync folders
+   * incrementally right away instead of waiting for IDLE or the 10-minute
+   * poll — the only fast path for folders without IDLE (esp. spam).
    */
   refreshNow(): void {
-    // Getrennt/Backoff: aufwecken reicht — der Reconnect synct ohnehin alles.
+    // Disconnected/backoff: waking up is enough — the reconnect syncs everything anyway.
     this.retryNow()
     if (!this.cmd) return
-    // Ordnerliste neu lesen: neue Ordner und ein umgeschalteter Ordner-Sync
-    // (mail.showFolders) greifen so ohne Reconnect.
+    // Re-read the folder list: new folders and a toggled folder sync
+    // (mail.showFolders) take effect without a reconnect.
     void this.enqueue(async () => {
       this.folders = await this.syncFolderList()
     })
@@ -377,7 +377,7 @@ export class AccountSyncer {
       })
   }
 
-  /** Gezielter Resync eines Ordners (z. B. Sent direkt nach dem Senden). */
+  /** Targeted resync of a folder (e.g. Sent right after sending). */
   resyncSpecialUse(specialUse: string): Promise<void> {
     const folder = this.folders.find((f) => f.special_use === specialUse)
     if (!folder || !this.cmd) return Promise.resolve()
@@ -391,27 +391,27 @@ export class AccountSyncer {
   }
 
   /**
-   * Reiht einen Ordner-Sync (+ Body-Backfill) ein. Ist für den Ordner schon
-   * einer eingereiht, der noch nicht läuft, teilen sich beide Anforderungen
-   * diesen Lauf — IDLE-Bursts, Poll und Refresh stauen sich nicht mehr auf.
+   * Enqueues a folder sync (+ body backfill). If one is already queued for the
+   * folder and not yet running, both requests share
+   * that run — IDLE bursts, poll and refresh no longer pile up.
    */
   private enqueueFolderSync(folder: FolderRow): Promise<void> {
     const pending = this.pendingFolderSyncs.get(folder.id)
     if (pending) return pending
     const run = this.enqueue(async () => {
-      this.pendingFolderSyncs.delete(folder.id) // ab jetzt zählt eine neue Anforderung wieder
+      this.pendingFolderSyncs.delete(folder.id) // from now on a new request counts again
       await this.syncFolder(folder)
       if (isSearchableFolder(folder)) await this.backfillBodies(folder)
     })
     this.pendingFolderSyncs.set(folder.id, run)
-    // Scheitert der Lauf, bevor er startete, darf der Eintrag nicht hängen bleiben
+    // If the run fails before it started, the entry must not get stuck
     void run.catch(() => {
       if (this.pendingFolderSyncs.get(folder.id) === run) this.pendingFolderSyncs.delete(folder.id)
     })
     return run
   }
 
-  /** Ordner nach verworfener Op neu abgleichen lassen (voller Backfill dedupliziert). */
+  /** Have the folder re-reconciled after a discarded op (full backfill dedupes). */
   invalidateFolder(folderId: number): void {
     const folder = this.folders.find((f) => f.id === folderId)
     this.db
@@ -449,19 +449,19 @@ export class AccountSyncer {
        RETURNING id, path, special_use, uidvalidity, uidnext, sync_mode,
                  envelope_backfill_since, body_backfill_since`
     )
-    // Ordneransicht an: eigene Ordner ebenfalls (Envelopes im Backfill-Fenster) syncen
+    // Folder view on: sync own folders too (envelopes in the backfill window)
     const userFolders =
       (
         this.db.prepare("SELECT value FROM settings WHERE key = 'mail.showFolders'").get() as
           { value: string } | undefined
       )?.value === '1'
-    // Server ohne SPECIAL-USE: Rollen über den Namen ergänzen — v. a. Junk
+    // Server without SPECIAL-USE: fill in roles by name — esp. Junk
     const specialUses = inferSpecialUses(list)
     list.forEach((box, i) => {
       const specialUse = specialUses[i]
       let syncMode = 'off'
-      // Junk voll syncen: der SPAM-Ordner-Filter braucht die Envelopes.
-      // Triage/Embeddings/Badge bleiben auf \Inbox begrenzt — Spam kostet nichts.
+      // Sync Junk fully: the SPAM folder filter needs the envelopes.
+      // Triage/embeddings/badge stay limited to \Inbox — spam costs nothing.
       if (
         specialUse === '\\Inbox' ||
         specialUse === '\\Sent' ||
@@ -472,7 +472,7 @@ export class AccountSyncer {
       else if (specialUse === '\\Trash') syncMode = 'flags'
       else if (specialUse === null && userFolders && !box.flags?.has('\\Noselect'))
         syncMode = 'full'
-      // Gmail "Alle Nachrichten" ist die Duplikat-Falle — nie synchronisieren.
+      // Gmail "All Mail" is the duplicate trap — never sync it.
       if (specialUse === '\\All' || specialUse === '\\Flagged') syncMode = 'off'
       rows.push(
         upsert.get(
@@ -497,7 +497,7 @@ export class AccountSyncer {
 
       if (folder.uidvalidity !== null && folder.uidvalidity !== uidValidity) {
         console.warn(`[sync:${this.account.email}] UIDVALIDITY changed for ${folder.path} — reset`)
-        // Atomar (REL-3): löschen + neue UIDVALIDITY + Cursor-Reset in einer Transaktion
+        // Atomic (REL-3): delete + new UIDVALIDITY + cursor reset in one transaction
         resetFolderForUidValidity(this.db, folder.id, uidValidity)
         folder.uidvalidity = uidValidity
         folder.uidnext = null
@@ -509,8 +509,8 @@ export class AccountSyncer {
         await this.backfillFolder(folder)
       } else {
         await this.incrementalSync(folder)
-        // M13: bestehende Konten hatten bereits uidnext, aber nur 90 Tage.
-        // Der Cursor zieht die fehlende Historie genau einmal nach.
+        // M13: existing accounts already had uidnext, but only 90 days.
+        // The cursor catches up on the missing history exactly once.
         if (isSearchableFolder(folder)) await this.backfillFolder(folder)
       }
 
@@ -606,7 +606,7 @@ export class AccountSyncer {
   }
 
   private async incrementalSync(folder: FolderRow): Promise<void> {
-    // 1) Neue Nachrichten ab bekanntem UIDNEXT
+    // 1) New messages from the known UIDNEXT
     const endNew = metrics.span('sync.incremental.newMessages')
     const messages: FetchMessageObject[] = []
     for await (const msg of this.cmd!.fetch(`${folder.uidnext}:*`, this.fetchOptions(), {
@@ -620,7 +620,7 @@ export class AccountSyncer {
       this.events.onMessagesChanged(folder.id, threadKeys)
     }
 
-    // 2) Flags + Expunge im jüngsten Fenster (CONDSTORE-unabhängig, robust)
+    // 2) Flags + expunge in the most recent window (CONDSTORE-independent, robust)
     const known = this.db
       .prepare('SELECT uid FROM messages WHERE folder_id = ? ORDER BY uid DESC LIMIT ?')
       .all(folder.id, FLAG_RESYNC_WINDOW) as Array<{ uid: number }>
@@ -677,7 +677,7 @@ export class AccountSyncer {
       if (this.stopped) return
       const batch = pending.slice(i, i + BODY_CHUNK)
       const threadKeys = new Set<string>()
-      // Ein Lock pro Batch — garantiert die richtige selektierte Mailbox.
+      // One lock per batch — guarantees the right selected mailbox.
       const lock = await this.cmd!.getMailboxLock(folder.path)
       try {
         for (const { id } of batch) {
@@ -717,15 +717,15 @@ export class AccountSyncer {
         )
         .get(folder.id, cutoff, ...nextExcluded) as { count: number }
       if (untried.count === 0) return
-      // Naechsten kleinen Durchlauf hinten anstellen. So erreicht der Backfill
-      // mehr als 500 Bodies, ohne Senden/Archivieren minutenlang zu blockieren.
+      // Queue the next small pass at the back. That way the backfill reaches
+      // more than 500 bodies without blocking sending/archiving for minutes.
       void this.enqueue(() => this.backfillBodies(folder, nextExcluded)).catch((error) =>
         console.warn(`[sync:${this.account.email}] Body-Backfill ${folder.path}:`, error)
       )
     }
   }
 
-  /** Setzt voraus, dass die Mailbox der Nachricht bereits gelockt/selektiert ist. */
+  /** Assumes the message's mailbox is already locked/selected. */
   private async fetchBodyInSelectedMailbox(messageId: number): Promise<string | null> {
     const row = this.db
       .prepare('SELECT uid, thread_key FROM messages WHERE id = ?')
@@ -759,7 +759,7 @@ export class AccountSyncer {
     return row.thread_key
   }
 
-  /** Roher RFC822-Source einer Nachricht (Attachment-Extraktion). */
+  /** Raw RFC822 source of a message (attachment extraction). */
   fetchRawSource(messageId: number): Promise<Buffer | null> {
     return this.enqueue(async () => {
       const row = this.db
@@ -778,7 +778,7 @@ export class AccountSyncer {
     })
   }
 
-  /** Nur Envelope + vollständige Header; lädt keine oft großen Bodies/Anhänge. */
+  /** Only envelope + full headers; doesn't load often large bodies/attachments. */
   fetchMessageHeaders(messageId: number): Promise<FetchedMessageHeaderData | null> {
     return this.enqueue(async () => {
       const row = this.db
@@ -811,7 +811,7 @@ export class AccountSyncer {
     })
   }
 
-  /** On-demand Body-Fetch (Reader öffnet eine Mail ohne gecachten Inhalt). */
+  /** On-demand body fetch (reader opens a mail without cached content). */
   fetchBody(messageId: number): Promise<string | null> {
     return this.enqueue(async () => {
       const row = this.db
@@ -849,7 +849,7 @@ export class AccountSyncer {
     this.idleConn.on('flags', trigger)
   }
 
-  /** Führt eine Queue-Operation auf der Kommando-Verbindung aus. */
+  /** Runs a queue operation on the command connection. */
   executeOp(op: QueuedOp): Promise<void> {
     return this.enqueue(async () => {
       const { payload } = op
@@ -860,8 +860,8 @@ export class AccountSyncer {
       if (!folder) throw new OpDeadError('folder-gone', 'Ordner existiert nicht mehr')
       const range = payload.uids.join(',')
 
-      // Zielordner VOR dem Lock auflösen: fehlt er, ist die Op dauerhaft
-      // unausführbar — nie still als Erfolg werten (Mail wäre lokal weg, serverseitig nicht).
+      // Resolve the target folder BEFORE the lock: if it's missing, the op is permanently
+      // unexecutable — never count it as silent success (mail gone locally, not on server).
       let moveTarget: string | null = null
       if (op.kind === 'move') {
         moveTarget = this.resolveSpecialUse(payload.targetSpecialUse)
@@ -874,7 +874,7 @@ export class AccountSyncer {
       }
       let deleteTrash: string | null = null
       if (op.kind === 'delete' && this.account.provider !== 'gmail') {
-        // Ohne Papierkorb NICHT hart löschen — Datenverlust wäre unumkehrbar
+        // Without a trash folder do NOT hard-delete — data loss would be irreversible
         deleteTrash = this.resolveSpecialUse('\\Trash')
         if (!deleteTrash) throw new OpDeadError('no-trash', 'Kein Papierkorb-Ordner vorhanden')
       }
@@ -897,8 +897,8 @@ export class AccountSyncer {
           await this.cmd!.messageMove(range, moveTarget!, { uid: true })
         } else if (op.kind === 'delete') {
           if (this.account.provider === 'gmail') {
-            // Gmail: \Deleted + Expunge in INBOX = Archivieren (Label weg);
-            // echtes Löschen läuft als move nach \Trash.
+            // Gmail: \Deleted + expunge in INBOX = archive (label removed);
+            // real deletion runs as a move to \Trash.
             await this.cmd!.messageDelete(range, { uid: true })
           } else {
             await this.cmd!.messageMove(range, deleteTrash!, { uid: true })

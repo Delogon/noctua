@@ -31,7 +31,7 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-/** Klartext-DB mit vollem Schema, offenem WAL und ein paar Zeilen. */
+/** Plaintext DB with full schema, open WAL and a few rows. */
 function makePlainDb(): void {
   const db = new Database(dbPath)
   sqliteVec.load(db)
@@ -39,7 +39,7 @@ function makePlainDb(): void {
   db.pragma('foreign_keys = ON')
   runMigrations(db)
   db.prepare(`INSERT INTO settings (key, value) VALUES ('probe', 'hallo')`).run()
-  // WAL bewusst NICHT checkpointen: die Daten liegen noch im -wal
+  // Deliberately do NOT checkpoint the WAL: the data is still in the -wal
   expect(existsSync(dbPath + '-wal')).toBe(true)
   db.close()
 }
@@ -59,11 +59,11 @@ describe('Schlüsselverwaltung', () => {
     const hex = loadOrCreateDbKey(keyPath, true)
     expect(hex).toMatch(/^[0-9a-f]{64}$/)
     const stored = readFileSync(keyPath)
-    // Mock-safeStorage stellt "enc:" voran; im Klartext darf der Hex-Key nie stehen,
-    // die Datei muss über safeStorage laufen.
+    // Mock safeStorage prepends "enc:"; the hex key must never appear in plaintext,
+    // the file must go through safeStorage.
     expect(stored.subarray(0, 4).toString()).toBe('enc:')
     expect(statSync(keyPath).mode & 0o777).toBe(0o600)
-    // Zweiter Aufruf liefert denselben Schlüssel
+    // Second call returns the same key
     expect(loadOrCreateDbKey(keyPath, false)).toBe(hex)
   })
 
@@ -98,7 +98,7 @@ describe('verschlüsselte DB', () => {
     const ok = openEncrypted(dbPath, KEY)
     sqliteVec.load(ok)
     expect(ok.prepare('SELECT count(*) AS c FROM v').get()).toEqual({ c: 0 })
-    // Temp-Dateien im RAM: der Codec verschlüsselt sie nicht (vuln-0014)
+    // Temp files in RAM: the codec doesn't encrypt them (vuln-0014)
     expect(ok.pragma('temp_store', { simple: true })).toBe(2)
     ok.close()
 
@@ -153,7 +153,7 @@ describe('Migration Klartext → verschlüsselt', () => {
     expect(() => bare.prepare('SELECT 1 FROM sqlite_master').get()).toThrow()
     bare.close()
 
-    // Backup liegt als lesbarer Klartext bis zum ersten erfolgreichen Öffnen
+    // Backup stays readable plaintext until the first successful open
     const backup = dbPath + '.plain-backup'
     expect(isPlaintextSqlite(backup)).toBe(true)
     expect(statSync(backup).mode & 0o777).toBe(0o600)
@@ -173,7 +173,7 @@ describe('Migration Klartext → verschlüsselt', () => {
       })
     ).toThrow('simulierter Absturz')
 
-    // Quelle noch Klartext, vollständig, lesbar; keine Arbeitskopie übrig
+    // Source still plaintext, complete, readable; no working copy left
     expect(isPlaintextSqlite(dbPath)).toBe(true)
     expect(existsSync(dbPath + '.encrypting')).toBe(false)
     const plain = new Database(dbPath)
@@ -184,7 +184,7 @@ describe('Migration Klartext → verschlüsselt', () => {
     })
     plain.close()
 
-    // Harter Abbruch (Arbeitskopie bleibt liegen) → nächster Start räumt auf und migriert
+    // Hard abort (working copy left behind) → next start cleans up and migrates
     writeFileSync(dbPath + '.encrypting', 'Müll eines abgebrochenen Laufs')
     migratePlaintextToEncrypted(dbPath, KEY)
     expect(isEncryptedFile(dbPath)).toBe(true)
@@ -193,7 +193,7 @@ describe('Migration Klartext → verschlüsselt', () => {
 
   it('verifiziert user_version/Verschlüsselung und tauscht nur bei Erfolg', () => {
     makePlainDb()
-    // Falscher Key-Format → bricht vor jeder Änderung an der Quelle ab
+    // Wrong key format → aborts before any change to the source
     expect(() => migratePlaintextToEncrypted(dbPath, 'zz')).toThrow(/Schlüssel/)
     expect(isPlaintextSqlite(dbPath)).toBe(true)
   })

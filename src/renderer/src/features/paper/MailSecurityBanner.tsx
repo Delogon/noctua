@@ -8,11 +8,11 @@ import { usePaper } from '@renderer/stores/paper'
 import type { StringKey } from '@renderer/i18n/strings'
 
 /**
- * Spam-/Phishing-Hinweis in der Mail-Ansicht. Grundlage sind lokale Regeln
- * (Homoglyphen, Link-Täuschung, Anhänge, SPF/DMARC …) und – falls eingerichtet –
- * das lokale Entscheidungsmodell. Zeigen die Regeln etwas und fehlt noch ein
- * Modell-Urteil, prüft das Modell einmal nach. Nichts wird blockiert; im Eingang
- * gibt es einen Knopf „In den Spam-Ordner".
+ * Spam/phishing notice in the mail view. Based on local rules (homoglyphs,
+ * link deception, attachments, SPF/DMARC …) and – if set up – the local
+ * decision model. If the rules flag something and a model verdict is still
+ * missing, the model checks once more. Nothing is blocked; in the inbox
+ * there is a „In den Spam-Ordner" button.
  */
 
 const TITLE: Record<NonNullable<ReturnType<typeof bannerKind>>, StringKey> = {
@@ -30,7 +30,7 @@ export function MailSecurityBanner({ messageId }: { messageId: number }): React.
   const security = query.data?.security ?? null
   const checked = useRef<number | null>(null)
 
-  // Triage im Hintergrund fertig → neues Modell-Urteil laden
+  // Triage finished in the background → load the new model verdict
   useEffect(
     () =>
       onPush('ai:annotated', ({ messageIds }) => {
@@ -41,7 +41,7 @@ export function MailSecurityBanner({ messageId }: { messageId: number }): React.
     [queryClient, messageId]
   )
 
-  // Regeln schlagen an, Modell hat noch nicht geurteilt → einmal nachprüfen lassen
+  // Rules fire, model hasn't judged yet → have it re-check once
   const flagged =
     !!security && (security.phishing.level !== 'none' || security.spam.level !== 'none')
   useEffect(() => {
@@ -50,7 +50,7 @@ export function MailSecurityBanner({ messageId }: { messageId: number }): React.
     void invoke('security:check', { messageId })
       .then((r) => queryClient.setQueryData(['security', messageId], r))
       .catch(() => {
-        // Modell nicht erreichbar: Regel-Urteil bleibt stehen
+        // Model unreachable: the rule verdict stands
       })
   }, [security?.canCheck, flagged, messageId, queryClient])
 

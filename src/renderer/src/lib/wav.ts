@@ -1,8 +1,8 @@
-// Aufnahme-Blob (webm/opus vom MediaRecorder) → mono 16-kHz PCM16-WAV.
-// Chromium dekodiert webm nativ via decodeAudioData; WAV braucht der
-// Audio-Input im Chat-Completions-Format (webm nimmt er nicht).
+// Recording blob (webm/opus from MediaRecorder) → mono 16 kHz PCM16 WAV.
+// Chromium decodes webm natively via decodeAudioData; the audio input in
+// Chat Completions format needs WAV (it does not accept webm).
 
-/** WAV + Spitzenpegel — der Pegel entlarvt stumme Aufnahmen vor dem API-Call. */
+/** WAV + peak level — the level exposes silent recordings before the API call. */
 export async function blobToWav(blob: Blob): Promise<{ base64: string; peak: number }> {
   const arrayBuffer = await blob.arrayBuffer()
   const decodeCtx = new AudioContext()
@@ -41,7 +41,7 @@ export async function blobToWav(blob: Blob): Promise<{ base64: string; peak: num
     view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true)
   }
 
-  // Base64 in Häppchen (String.fromCharCode-Limit)
+  // Base64 in chunks (String.fromCharCode limit)
   const bytes = new Uint8Array(buffer)
   let binary = ''
   const chunk = 0x8000

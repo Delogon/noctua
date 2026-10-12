@@ -2,20 +2,20 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import { cleanupSearchOrphans } from '../mail/ingest'
 
 /**
- * Setzt einen Ordner nach UIDVALIDITY-Wechsel zurück — ATOMAR in einer
- * Transaktion: Nachrichten löschen, Suchindex-Waisen bereinigen, neue
- * UIDVALIDITY speichern und uidnext/Backfill-Cursor auf NULL. Ein Absturz
- * mittendrin hinterlässt so nie einen leeren Ordner mit altem uidnext, der
- * nie mehr befüllt würde (uidnext NULL = voller Backfill beim nächsten Sync).
+ * Resets a folder after a UIDVALIDITY change — ATOMICALLY in one
+ * transaction: delete messages, clean up search index orphans, store the new
+ * UIDVALIDITY and set uidnext/backfill cursor to NULL. A crash
+ * midway thus never leaves an empty folder with an old uidnext that
+ * would never be filled again (uidnext NULL = full backfill on the next sync).
  *
- * Bekannte Grenze: lokale Daten, die an der Nachrichtenzeile hängen (KI-
- * Annotationen, Aufgaben, Follow-ups, Header-Details), fallen per ON DELETE
- * CASCADE mit weg und werden NICHT über die Message-ID auf die neu geladenen
- * Zeilen übertragen — das bräuchte einen Zwischenspeicher über den Resync
- * hinweg. Die KI-Queue annotiert neue Inbox-Mails ohnehin neu.
+ * Known limitation: local data attached to the message row (AI
+ * annotations, tasks, follow-ups, header details) is dropped via ON DELETE
+ * CASCADE and is NOT carried over via the Message-ID to the newly loaded
+ * rows — that would need a temporary store across the resync.
+ * The AI queue re-annotates new inbox mails anyway.
  *
- * Noch nicht ausgeführte Ops ohne UIDVALIDITY-Stempel (vor REL-5 eingereiht)
- * werden mit-verworfen; gestempelte erkennt die Op-Queue selbst am Mismatch.
+ * Not yet executed ops without a UIDVALIDITY stamp (enqueued before REL-5)
+ * are discarded too; the op queue itself detects stamped ones by the mismatch.
  */
 export function resetFolderForUidValidity(
   db: Database.Database,

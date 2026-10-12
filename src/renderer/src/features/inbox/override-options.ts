@@ -1,8 +1,8 @@
 import type { AiCategory } from '@shared/types'
 import type { StringKey } from '@renderer/i18n/strings'
 
-// Pure Tastenlogik des Kategorie-Override-Menüs (Design 3d) — getrennt vom
-// Overlay, damit die 1–7/0-Zuordnung und die ↑↓-Auswahl testbar bleiben.
+// Pure key logic of the category override menu (Design 3d) — separate from the
+// overlay so the 1–7/0 mapping and the ↑↓ selection stay testable.
 
 export interface OverrideOption {
   key: string
@@ -21,12 +21,12 @@ export const OVERRIDE_OPTIONS: readonly OverrideOption[] = [
   { key: '0', category: null, labelKey: 'overrideReset' }
 ]
 
-/** Option zur gedrückten Taste (1–7 setzt, 0 gibt die Entscheidung zurück an die Eule). */
+/** Option for the pressed key (1–7 sets, 0 hands the decision back to the owl). */
 export function overrideOptionForKey(key: string): OverrideOption | undefined {
   return OVERRIDE_OPTIONS.find((option) => option.key === key)
 }
 
-/** ↑↓-Auswahl: bewegt den Index und hält ihn innerhalb der Liste. */
+/** ↑↓ selection: moves the index and keeps it within the list. */
 export function moveOverrideSelection(index: number, delta: -1 | 1): number {
   return Math.max(0, Math.min(OVERRIDE_OPTIONS.length - 1, index + delta))
 }

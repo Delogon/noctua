@@ -1,6 +1,6 @@
 import type { StringKey } from '@renderer/i18n/strings'
 
-// Lokale Signal-Codes (src/main/mail/threat-signals.ts) → Texte der Warnung.
+// Local signal codes (src/main/mail/threat-signals.ts) → warning texts.
 const REASON_KEY: Record<string, StringKey> = {
   display_name_domain: 'phishReasonDisplayName',
   reply_to_differs: 'phishReasonReplyTo',
@@ -33,7 +33,7 @@ const REASON_KEY: Record<string, StringKey> = {
   hidden_text: 'threatReasonHiddenText'
 }
 
-/** "link_mismatch:2" → { key: 'link_mismatch', n: 2 }; unbekannte Codes entfallen. */
+/** "link_mismatch:2" → { key: 'link_mismatch', n: 2 }; unknown codes are dropped. */
 export function parseSignal(code: string): { key: StringKey; n: number } | null {
   const [name, count] = code.split(':')
   const key = REASON_KEY[name]
@@ -49,8 +49,8 @@ export interface BannerInput {
 }
 
 /**
- * Welche Warnung zeigt die Mail-Ansicht? Phishing geht vor Spam; „verdächtig"
- * ist ein leiser Hinweis. Im Spam-Ordner keine Spam-Meldung (dort ist sie schon).
+ * Which warning does the mail view show? Phishing beats spam; „verdächtig"
+ * is a quiet hint. No spam notice in the spam folder (it is already there).
  */
 export function bannerKind(
   s: BannerInput

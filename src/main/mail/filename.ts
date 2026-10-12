@@ -3,12 +3,12 @@ import { basename } from 'node:path'
 const MAX_FILENAME_LENGTH = 120
 
 /**
- * Macht einen absenderkontrollierten Dateinamen als Vorschlag für den
- * Speichern-Dialog unschädlich: kein Pfad, keine Steuerzeichen, keine
- * führenden Punkte, keine Windows-Stolperfallen am Ende.
+ * Makes a sender-controlled file name harmless as a suggestion for the
+ * save dialog: no path, no control characters, no
+ * leading dots, no Windows pitfalls at the end.
  */
 export function sanitizeFilename(name: string | null | undefined, fallback = 'anhang'): string {
-  // Beide Separator-Stile abschneiden, unabhängig von der Plattform
+  // Cut off both separator styles, regardless of the platform
   let clean = basename((name ?? '').replace(/\\/g, '/'))
   clean = clean
     // eslint-disable-next-line no-control-regex

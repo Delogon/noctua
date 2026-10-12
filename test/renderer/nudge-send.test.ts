@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { buildNudgeSend, nudgedToday } from '@renderer/features/paper/nudge-send'
 
-// Stups-Versand-Payload: Signatur bleibt draußen (der Versand-Pfad hängt sie
-// genau einmal an), der Stups fädelt sich per replyToMessageId in den Thread.
+// Nudge send payload: signature stays out (the send path appends it
+// exactly once); the nudge threads into the thread via replyToMessageId.
 
 describe('buildNudgeSend', () => {
   const followup = {

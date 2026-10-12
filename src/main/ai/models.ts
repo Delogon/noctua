@@ -1,8 +1,8 @@
 import type { ModelInfo } from './providers/types'
 
-// Live-Modellliste von OpenRouter (README-Vorgabe: keine hartkodierten IDs).
-// Gefiltert auf brauchbare Text-Modelle; Kuratierung (scan vs. write) macht
-// der Renderer aus Preis/Kontext.
+// Live model list from OpenRouter (README requirement: no hardcoded IDs).
+// Filtered to usable text models; curation (scan vs. write) is done by
+// the renderer based on price/context.
 
 interface OpenRouterModel {
   id: string

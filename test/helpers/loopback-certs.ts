@@ -1,6 +1,6 @@
 /**
- * Selbstsignierte Test-Zertifikate (EC P-256, 100 Jahre gültig) für die
- * Loopback-Pinning-Tests — simulieren Proton Bridge bzw. einen Fremdprozess.
+ * Self-signed test certificates (EC P-256, valid 100 years) for the
+ * loopback pinning tests — simulate Proton Bridge or a foreign process.
  */
 export const CERT_A = `-----BEGIN CERTIFICATE-----
 MIIBxzCCAW2gAwIBAgIUJnSdmtXe5OgaYNUmxrodwTSTEq8wCgYIKoZIzj0EAwIw

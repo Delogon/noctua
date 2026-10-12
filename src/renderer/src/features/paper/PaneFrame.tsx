@@ -4,12 +4,12 @@ import { useT } from '@renderer/lib/i18n'
 import { PANE_LIMITS, STRIP_WIDTH, type PaneId } from './pane-layout'
 
 /**
- * Rahmen einer Seitenspalte: feste Breite aus dem Store plus Zieh-Griff an der
- * Innenkante. Doppelklick, Enter oder Ziehen weit unter das Minimum klappt die
- * Spalte ein; Pfeiltasten ändern die Breite (Griff ist fokussierbar).
+ * Frame of a side column: fixed width from the store plus a drag handle on
+ * the inner edge. Double-click, Enter or dragging far below the minimum
+ * collapses the column; arrow keys change the width (handle is focusable).
  */
 
-/** So weit unter das Minimum gezogen, klappt die Spalte ein. */
+/** Dragged this far below the minimum, the column collapses. */
 const COLLAPSE_DRAG = 90
 const KEY_STEP = 16
 
@@ -21,7 +21,7 @@ export function ResizablePane({
   children
 }: {
   id: PaneId
-  /** Lage der Spalte: links (Griff rechts) oder rechts (Griff links). */
+  /** Side of the column: left (handle on the right) or right (handle on the left). */
   side: 'left' | 'right'
   width: number
   label: string
@@ -34,7 +34,7 @@ export function ResizablePane({
   const drag = useRef<{ x: number; w: number; last: number } | null>(null)
   const [dragging, setDragging] = useState(false)
 
-  // Während des Ziehens: Textauswahl und iframes (Mail-Body) dürfen den Zeiger nicht schlucken
+  // While dragging: text selection and iframes (mail body) must not swallow the pointer
   useEffect(() => {
     if (!dragging) return
     document.body.classList.add('pane-resizing')
@@ -61,7 +61,7 @@ export function ResizablePane({
     drag.current = null
     setDragging(false)
     if (last < PANE_LIMITS[id].min - COLLAPSE_DRAG) {
-      // Breite von vor dem Ziehen merken, damit Aufklappen sie wiederherstellt
+      // Remember the width from before dragging so expanding restores it
       setPaneWidth(id, w, true)
       collapsePane(id)
     } else setPaneWidth(id, last, true)
@@ -101,7 +101,7 @@ export function ResizablePane({
         onDoubleClick={() => collapsePane(id)}
         onKeyDown={onKeyDown}
       />
-      {/* Sichtbarer Einklapp-Knopf auf der Kante — Gegenstück zur Leiste */}
+      {/* Visible collapse button on the edge — counterpart to the rail */}
       <button
         type="button"
         className="pane-collapse"
@@ -119,7 +119,7 @@ export function ResizablePane({
   )
 }
 
-/** Eingeklappte Spalte: schmale Leiste, ein Klick klappt sie wieder auf. */
+/** Collapsed column: narrow rail, one click expands it again. */
 export function PaneStrip({
   id,
   side,
@@ -133,7 +133,7 @@ export function PaneStrip({
 }): React.JSX.Element {
   const t = useT()
   const expandPane = usePaper((s) => s.expandPane)
-  // Pfeil zeigt in die Richtung, in die die Spalte aufgeht
+  // Arrow points in the direction the column opens
   const opensRight = side === 'left'
   return (
     <button

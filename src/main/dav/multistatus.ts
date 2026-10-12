@@ -1,30 +1,30 @@
 import { child, children, textOf, NS, type XmlNode } from './xml'
 import { normalizeHref } from './url'
 
-/** Geparster 207-Multistatus (RFC 4918 §13) inkl. sync-token (RFC 6578). */
+/** Parsed 207 multistatus (RFC 4918 §13) incl. sync-token (RFC 6578). */
 
 export interface DavPropstat {
   status: number
-  /** Kinder des <prop>-Elements */
+  /** Children of the <prop> element */
   props: XmlNode[]
 }
 
 export interface DavResponse {
-  /** Normalisierter Pfad (siehe normalizeHref) */
+  /** Normalized path (see normalizeHref) */
   href: string
-  /** Absolute URL (Origin der Antwort bzw. des absoluten Hrefs + normalisierter Pfad) */
+  /** Absolute URL (origin of the response or of the absolute href + normalized path) */
   url: string
-  /** Status auf Response-Ebene (z. B. 404 für gelöschte Member in sync-collection) */
+  /** Status at response level (e.g. 404 for deleted members in sync-collection) */
   status: number | null
   propstats: DavPropstat[]
-  /** DAV:error-Inhalt auf Response-Ebene */
+  /** DAV:error content at response level */
   error: string | null
 }
 
 export interface Multistatus {
   responses: DavResponse[]
   syncToken: string | null
-  /** URL, gegen die relative Hrefs aufgelöst wurden (finale URL nach Redirects) */
+  /** URL against which relative hrefs were resolved (final URL after redirects) */
   baseUrl: string
 }
 
@@ -67,7 +67,7 @@ export function parseMultistatus(root: XmlNode, baseUrl: string): Multistatus {
   return { responses, syncToken: textOf(child(root, NS.dav, 'sync-token')), baseUrl }
 }
 
-/** Erstes erfolgreich (2xx) geliefertes Property-Element. */
+/** First property element delivered successfully (2xx). */
 export function okProp(response: DavResponse, ns: string, name: string): XmlNode | undefined {
   for (const ps of response.propstats) {
     if (ps.status < 200 || ps.status >= 300) continue
@@ -81,7 +81,7 @@ export function okPropText(response: DavResponse, ns: string, name: string): str
   return textOf(okProp(response, ns, name))
 }
 
-/** href-Kind eines Properties → absolute, normalisierte URL (Origin bleibt erhalten). */
+/** href child of a property → absolute, normalized URL (the origin is preserved). */
 export function okPropUrl(
   response: DavResponse,
   ns: string,
@@ -98,7 +98,7 @@ export function okPropUrl(
   }
 }
 
-/** href-Kind eines Properties (z. B. current-user-principal) → normalisierter Pfad. */
+/** href child of a property (e.g. current-user-principal) → normalized path. */
 export function okPropHref(
   response: DavResponse,
   ns: string,
@@ -114,7 +114,7 @@ export function okPropHref(
   }
 }
 
-/** Menge von Kindelement-Namen (z. B. resourcetype → {collection, calendar}). */
+/** Set of child element names (e.g. resourcetype → {collection, calendar}). */
 export function childNames(node: XmlNode | undefined): Set<string> {
   return new Set((node?.children ?? []).map((c) => c.name))
 }

@@ -6,7 +6,7 @@ import { setSetting } from '@main/db'
 import { storeBody, upsertEnvelope } from '@main/mail/ingest'
 import { closeTestDb, createAiTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 
-// Unsichtbare Zeichen per Code statt Literal (Linter/Formatter würden sie sichtbar machen)
+// Invisible characters via code, not literals (linter/formatter would make them visible)
 const ZW = String.fromCharCode(0x200b)
 const RLO = String.fromCharCode(0x202e)
 

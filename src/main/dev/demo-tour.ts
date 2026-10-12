@@ -11,11 +11,11 @@ type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => vo
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 /**
- * Dev-only (NOCTUA_TEST_SHOTS=demo, siehe scripts/demo-tour.sh): Screenshot-Tour
- * über die Demo-Daten (dev/demo-seed.ts). Bedient die UI per Menü-Aktionen,
- * Tasten (sendInputEvent) und DOM-Klicks im Renderer; jeder Schritt läuft
- * einzeln in try/catch, damit ein verändertes Label nicht die ganze Tour kippt.
- * Durchläufe (NOCTUA_DEMO_PASS): main = Hauptansichten, small = 1180px-Breite.
+ * Dev-only (NOCTUA_TEST_SHOTS=demo, see scripts/demo-tour.sh): screenshot tour
+ * over the demo data (dev/demo-seed.ts). Drives the UI via menu actions,
+ * keys (sendInputEvent) and DOM clicks in the renderer; each step runs
+ * individually in try/catch so a changed label does not topple the whole tour.
+ * Passes (NOCTUA_DEMO_PASS): main = main views, small = 1180px width.
  */
 export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void {
   const outDir = process.env.NOCTUA_SHOT_DIR || join(app.getPath('temp'), 'noctua-demo-shots')
@@ -52,7 +52,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
     w.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 })
   }
 
-  /** Klickt (echte Mausereignisse) die Mitte des ersten Elements, dessen Text passt. */
+  /** Clicks (real mouse events) the center of the first element whose text matches. */
   const clickText = async (
     selector: string,
     text: string,
@@ -111,7 +111,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
     console.log(`[dump:${label}] ${JSON.stringify(text)}`)
   }
 
-  /** Scrollt die breiteste scrollbare Fläche der Mitte (Sheet) auf y. */
+  /** Scrolls the widest scrollable area in the center (sheet) to y. */
   const scrollMain = async (y: number, fromEnd = false): Promise<void> => {
     await js(`(() => {
       const els = [...document.querySelectorAll('*')].filter((e) => {
@@ -125,7 +125,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
     await wait(400)
   }
 
-  /** Klick auf einen Link im Mail-iframe (Koordinaten des iframes + des Ankers). */
+  /** Click on a link in the mail iframe (coordinates of the iframe + the anchor). */
   const clickMailLink = async (textPart: string): Promise<boolean> => {
     const pos = await js<{ x: number; y: number } | null>(`(() => {
       const f = document.querySelector('iframe.mail-html')
@@ -147,7 +147,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
     await wait(1200)
   }
 
-  /** Klick in eine Tagesspalte des Kalenders (dayIndex ab sichtbarem Anfang, Stunde als Dezimalzahl). */
+  /** Click into a calendar day column (dayIndex from visible start, hour as a decimal). */
   const clickSlot = async (dayIndex: number, hour: number): Promise<void> => {
     const pos = await js<{ x: number; y: number } | null>(`(() => {
       const sc = document.querySelector('.cal-scroll')
@@ -177,7 +177,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
     await wait(1200)
   }
 
-  // Ab hier: die eigentlichen Durchläufe
+  // From here: the actual passes
   const main = async (): Promise<void> => {
     await resize(1440, 900)
     await step('inbox', async () => {
@@ -243,7 +243,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       )
       await wait(900)
       await shot('14b-event-editor-attendees-list')
-      // Autocomplete: Adressbuch/Mail-Historie
+      // Autocomplete: address book/mail history
       await js(`(() => {
         const i = document.querySelector('.cal-editor input[aria-label*="ttendee" i], .cal-editor input[aria-label*="eilnehmer" i]')
         if (i) i.focus()
@@ -251,7 +251,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       typeText('ma')
       await wait(900)
       await shot('14c-event-editor-attendee-autocomplete')
-      // Fokus weg (unvollständige Eingabe wird verworfen), nicht Escape: das würde den Editor schließen
+      // Move focus away (incomplete input is discarded), not Escape: that would close the editor
       await js(`(() => { if (document.activeElement) document.activeElement.blur() })()`)
       await wait(300)
       await clickText('.cal-editor button.text-btn', 'next free slot|nächste freie zeit')
@@ -356,9 +356,9 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
   }
 
   /**
-   * Fake-Ollama auf 127.0.0.1:11434: Modellliste, /api/tags mit Fähigkeiten und ein
-   * plausibles /v1/systemone (Entscheidungsmodell clef-flash). withDecision=false
-   * bildet einen Ollama ohne Entscheidungsmodell nach (Onboarding-Tipp).
+   * Fake Ollama on 127.0.0.1:11434: model list, /api/tags with capabilities and a
+   * plausible /v1/systemone (decision model clef-flash). withDecision=false
+   * emulates an Ollama without a decision model (onboarding tip).
    */
   const startFakeOllama = async (withDecision: boolean): Promise<{ close: () => void }> => {
     const chat = [
@@ -402,8 +402,8 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
   }
 
   /**
-   * Entscheidungsmodelle: Settings → KI (Karte „Entscheidungen" + Test), Regel mit
-   * KI-Bedingung und die Phishing-Warnung in der Mail-Ansicht.
+   * Decision models: Settings → AI (card "Entscheidungen" + test), rule with
+   * AI condition and the phishing warning in the mail view.
    */
   const decision = async (): Promise<void> => {
     await resize(1440, 900)
@@ -427,7 +427,7 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
       }),
       Date.now()
     )
-    // Phishing-Einschätzung für die Sparkasse-Mail (die mit der Link-Abweichung)
+    // Phishing assessment for the Sparkasse mail (the one with the link mismatch)
     const phish = db
       .prepare(
         `SELECT id FROM messages WHERE from_name LIKE '%Sparkasse%' OR subject LIKE '%Sparkasse%' LIMIT 1`
@@ -467,14 +467,14 @@ export function runDemoTour(win: () => BrowserWindow | null, push: PushFn): void
   }
 
   /**
-   * Onboarding: Schritt 3. Mit Org-Build (NOCTUA_ORG_CONFIG) die Org-Profile,
-   * sonst die KI-Wahl — dafür läuft ein Fake-Ollama auf 127.0.0.1:11434, den
-   * ai:detectLocal findet.
+   * Onboarding: step 3. With an org build (NOCTUA_ORG_CONFIG) the org profiles,
+   * otherwise the AI choice — for that a fake Ollama runs on 127.0.0.1:11434,
+   * which ai:detectLocal finds.
    */
   const onboarding = async (): Promise<void> => {
     await resize(1440, 900)
     const lang = process.env.NOCTUA_DEMO_LANG === 'de' ? 'de-' : ''
-    // DEMO_NO_DECISION=1: Ollama ohne Entscheidungsmodell → Tipp „ollama pull clef-flash"
+    // DEMO_NO_DECISION=1: Ollama without a decision model → tip "ollama pull clef-flash"
     const noDecision = process.env.NOCTUA_DEMO_NO_DECISION === '1'
     const fake = await startFakeOllama(!noDecision)
     await step('onboarding', async () => {

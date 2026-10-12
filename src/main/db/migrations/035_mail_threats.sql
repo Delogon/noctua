@@ -1,7 +1,7 @@
--- Spam-Erkennung: Spam-Score der Hybrid-Triage (0..2 wie phishing) und eigenständige
--- Sicherheitsprüfungen des Entscheidungsmodells für Mails ohne Hybrid-Triage
--- (älter als das Triage-Fenster, andere Ordner, vor Aktivierung des Modells).
--- Die lokalen Regel-Signale werden nicht gespeichert, sondern bei Bedarf neu berechnet.
+-- Spam detection: spam score of the hybrid triage (0..2 like phishing) and standalone
+-- security checks of the decision model for mails without hybrid triage
+-- (older than the triage window, other folders, before the model was enabled).
+-- The local rule signals are not stored but recomputed on demand.
 ALTER TABLE ai_decisions ADD COLUMN spam REAL;
 
 CREATE TABLE IF NOT EXISTS mail_threat_checks (

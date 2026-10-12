@@ -1,4 +1,4 @@
--- Eindeutiger, rein interner Postfachname. Der sichtbare Absendername bleibt display_name.
+-- Unique, purely internal mailbox name. The visible sender name stays display_name.
 ALTER TABLE accounts ADD COLUMN account_name TEXT;
 
 UPDATE accounts
@@ -10,9 +10,9 @@ SET account_name = CASE
   ELSE substr(email, 1, instr(email, '@') - 1)
 END;
 
--- Bei mehreren bestehenden Konten mit demselben abgeleiteten Namen bleibt das
--- älteste kurz; weitere erhalten zunächst eine eindeutige Nummer und können in
--- den Einstellungen umbenannt werden.
+-- If several existing accounts derive the same name, the oldest keeps the
+-- short one; the others first get a unique number and can be renamed in
+-- the settings.
 UPDATE accounts
 SET account_name = account_name || ' ' || id
 WHERE id NOT IN (

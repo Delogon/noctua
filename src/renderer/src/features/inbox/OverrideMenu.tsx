@@ -11,9 +11,9 @@ import {
 } from '@renderer/features/inbox/override-options'
 
 /**
- * Kategorie-Override (Taste l) — die Korrektur schlägt das Modell dauerhaft.
- * Optik: Paletten-Vokabular (Design 3d) — Accent-Balken, Serif-Label,
- * kbd-Chips 1–7/0, Fußzeile wie die Befehls-Palette.
+ * Category override (key l) — the correction permanently beats the model.
+ * Look: palette vocabulary (Design 3d) — accent bar, serif label,
+ * kbd chips 1–7/0, footer like the command palette.
  */
 export function OverrideMenu({ thread }: { thread: ThreadListItem }): React.JSX.Element {
   const t = useT()

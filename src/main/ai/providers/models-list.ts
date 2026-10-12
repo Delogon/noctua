@@ -1,9 +1,9 @@
 import type { ModelInfo } from './types'
 
 /**
- * Modellliste eines OpenAI-kompatiblen Endpunkts: GET {baseUrl}/models.
- * Funktioniert mit Ollama, LM Studio, llama.cpp, vLLM und LiteLLM. Preise
- * kennen diese Server nicht — die Felder bleiben 0.
+ * Model list of an OpenAI-compatible endpoint: GET {baseUrl}/models.
+ * Works with Ollama, LM Studio, llama.cpp, vLLM and LiteLLM. These servers
+ * don't know prices — the fields stay 0.
  */
 export async function fetchOpenAiModels(
   baseUrl: string,
@@ -23,7 +23,7 @@ export async function fetchOpenAiModels(
     data?: Array<{ id?: unknown; context_length?: unknown }>
     models?: Array<{ id?: unknown; name?: unknown; model?: unknown }>
   }
-  // llama.cpp/Ollama liefern teils `models` statt `data`
+  // llama.cpp/Ollama sometimes return `models` instead of `data`
   const rows: Array<{ id?: unknown; name?: unknown; model?: unknown; context_length?: unknown }> =
     body.data ?? body.models ?? []
   const seen = new Set<string>()

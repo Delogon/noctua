@@ -3,7 +3,7 @@ import type { StringKey } from '@renderer/i18n/strings'
 import { useT } from '@renderer/lib/i18n'
 import { SCOPE_ORDER } from './scope'
 
-// Bereichswahl für Serien: „Nur dieser Termin / Dieser und folgende / Alle Termine".
+// Scope choice for series: "Only this event / This and following / All events".
 
 const LABELS: Record<'edit' | 'delete', Record<CalendarEditScope, StringKey>> = {
   edit: { this: 'cvScopeThis', following: 'cvScopeFollowing', all: 'cvScopeAll' },

@@ -11,7 +11,7 @@ describe('Diagnose-Metriken', () => {
     const t = m.snapshot().timings.find((x) => x.name === 'ipc.threads:list')!
     expect(t.count).toBe(100)
     expect(t.maxMs).toBe(1200)
-    expect(t.p50Ms).toBe(5) // Eimer bis 5 ms
+    expect(t.p50Ms).toBe(5) // bucket up to 5 ms
     expect(t.p99Ms).toBe(500)
     expect(t.totalMs).toBeCloseTo(98 * 3 + 1600)
   })
@@ -29,7 +29,7 @@ describe('Diagnose-Metriken', () => {
     m.record('sync.folder', 250, {
       messages: 40,
       backfill: true,
-      // Strings (z. B. ein Betreff) dürfen nie in den Export
+      // Strings (e.g. a subject) must never end up in the export
       subject: 'Geheim' as unknown as number,
       'bad key': 1
     })

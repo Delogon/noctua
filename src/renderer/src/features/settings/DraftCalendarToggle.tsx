@@ -4,8 +4,8 @@ import { invoke } from '@renderer/lib/ipc'
 import { useT } from '@renderer/lib/i18n'
 
 /**
- * Settings → Intelligenz: Dürfen Antwortentwürfe die freien Zeitfenster des
- * Kalenders nutzen (ai.draftUseCalendar, Standard an)? '0' = aus.
+ * Settings → Intelligence: may reply drafts use the calendar's free time
+ * slots (ai.draftUseCalendar, default on)? '0' = off.
  */
 export function DraftCalendarToggle(): React.JSX.Element {
   const t = useT()

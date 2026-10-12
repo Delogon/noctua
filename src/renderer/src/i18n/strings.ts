@@ -1,15 +1,15 @@
-// String-Tabelle des Letterpress-Designs (aus dem ursprünglichen Design-Handoff).
-// („Noctua Mail.dc.html" = EN kanonisch, „Noctua Mail DE.dc.html" = DE).
-// Platzhalter in {braces} werden von t() ersetzt.
+// String table of the Letterpress design (from the original design handoff).
+// ("Noctua Mail.dc.html" = EN canonical, "Noctua Mail DE.dc.html" = DE).
+// Placeholders in {braces} are replaced by t().
 
 export type Lang = 'de' | 'en'
 
 const table = {
-  // ── Allgemein ──
+  // ── General ──
   cancel: { en: 'Cancel', de: 'Abbrechen' },
   noSubject: { en: '(No subject)', de: '(Kein Betreff)' },
 
-  // ── Die eine Toast-Leiste (Design 1c) ──
+  // ── The one toast bar (Design 1c) ──
   toastUndo: { en: 'Undo', de: 'Rückgängig' },
   toastDismiss: { en: 'Dismiss', de: 'Schließen' },
   toastSendingIn: { en: 'Sending as {addr} in {n}s', de: 'Wird in {n} s als {addr} gesendet' },
@@ -25,7 +25,7 @@ const table = {
   },
   toastOpenDraft: { en: 'Open draft', de: 'Entwurf öffnen' },
 
-  // ── Op-Queue: nicht ausführbare Aktionen (Dead-Letter) ──
+  // ── Op queue: non-executable actions (dead letter) ──
   opsDeadAttempts: {
     en: '{n} action(s) could not be synced to the server and were dropped.',
     de: '{n} Aktion(en) konnten nicht mit dem Server abgeglichen werden und wurden verworfen.'
@@ -43,7 +43,7 @@ const table = {
     de: '{n} Aktion(en) wurden verworfen, weil der Ordner nicht mehr existiert.'
   },
 
-  // ── Kalender-Konten (CalDAV, Phase 2.1) ──
+  // ── Calendar accounts (CalDAV, Phase 2.1) ──
   taskSyncHead: { en: 'SYNC TASKS (CALDAV)', de: 'AUFGABEN SYNCHRONISIEREN (CALDAV)' },
   taskSyncNote: {
     en: 'Accepted tasks and one calendar’s task list stay in sync both ways. Owl suggestions you haven’t accepted are never uploaded; dismissing or deleting a task removes it on the server too.',
@@ -129,7 +129,7 @@ const table = {
     de: 'Kalender: „{title}“ konnte nicht hochgeladen werden und wurde zurückgesetzt.'
   },
 
-  // ── Kalenderansicht (Phase 2.2) ──
+  // ── Calendar view (Phase 2.2) ──
   navCalendar: { en: 'CALENDAR', de: 'KALENDER' },
   cmdGoCalendar: { en: 'Go to Calendar', de: 'Zum Kalender' },
   helpCalView: {
@@ -347,11 +347,11 @@ const table = {
     de: 'Der Termin konnte nicht geladen werden.'
   },
 
-  // ── Update-Hinweis ──
+  // ── Update notice ──
   updateAvailable: { en: 'Version {v} is available', de: 'Version {v} ist verfügbar' },
   updateDownload: { en: 'Download', de: 'Herunterladen' },
 
-  // ── Kategorie-Override (Taste l, Design 3d) ──
+  // ── Category override (key l, Design 3d) ──
   overrideTitle: { en: 'Set category', de: 'Kategorie festlegen' },
   overrideReset: { en: 'Let the owl decide again', de: 'Die Eule wieder entscheiden lassen' },
   overrideFooterSet: { en: '1–7 / 0 SET', de: '1–7 / 0 WÄHLEN' },
@@ -364,7 +364,7 @@ const table = {
   catTransactional: { en: 'Transaction', de: 'Belege' },
   catOther: { en: 'Other', de: 'Sonstiges' },
 
-  // ── Remote-Bilder (Tracking-Schutz) ──
+  // ── Remote images (tracking protection) ──
   remoteImagesBlockedOne: {
     en: '1 remote image blocked (tracking protection)',
     de: '1 externes Bild blockiert (Tracking-Schutz)'
@@ -381,7 +381,7 @@ const table = {
   },
   linkMismatchOpen: { en: 'Open anyway', de: 'Trotzdem öffnen' },
 
-  // ── Owl-View (Suchen + Fragen in einem Eingabefeld) ──
+  // ── Owl view (search + ask in one input field) ──
   chatEmptyTitle: { en: 'Ask your inbox.', de: 'Frag deine E-Mails.' },
   chatSuggestion1: {
     en: 'Which invoices did I receive this month?',
@@ -456,7 +456,7 @@ const table = {
     de: 'DIE EULE INDEXIERT {n} E-MAILS · {coverage}% SEMANTISCH · LOKAL'
   },
 
-  // ── Konto-Dialog (Onboarding) ──
+  // ── Account dialog (onboarding) ──
   addAccountTitle: { en: 'Add account', de: 'Konto hinzufügen' },
   addImapGeneric: { en: 'Other provider (IMAP)', de: 'Anderer Anbieter (IMAP)' },
   addMicrosoftButton: { en: 'Sign in with Microsoft', de: 'Mit Microsoft anmelden' },
@@ -503,13 +503,13 @@ const table = {
   navTasks: { en: 'TASKS', de: 'AUFGABEN' },
   navSettings: { en: 'SETTINGS', de: 'EINSTELLUNGEN' },
 
-  // ── Key-Strip / g-Hint ──
+  // ── Key strip / g hint ──
   keyMove: { en: 'move', de: 'navigieren' },
   keyFile: { en: 'archive', de: 'archivieren' },
   keyDictate: { en: 'dictate', de: 'diktieren' },
   keyKeys: { en: 'keys', de: 'Kürzel' },
 
-  // ── Inbox-Liste ──
+  // ── Inbox list ──
   mailboxFilterLabel: { en: 'ACCOUNT', de: 'KONTO' },
   mailboxFilterAll: { en: 'ALL ACCOUNTS', de: 'ALLE KONTEN' },
   mailboxFilterLoading: { en: 'LOADING…', de: 'LÄDT…' },
@@ -628,7 +628,7 @@ const table = {
     de: 'ERLEDIGTE AUFGABEN SIND AUSGEBLENDET'
   },
 
-  // ── Reading sheet / Task-Strip ──
+  // ── Reading sheet / task strip ──
   owlFoundTask: { en: 'THE OWL FOUND A TASK', de: 'DIE EULE FAND EINE AUFGABE' },
   tAdd: { en: 'T ADD', de: 'T ÜBERNEHMEN' },
   inYourTasks: { en: '✓ IN YOUR TASKS', de: '✓ IN DEINEN AUFGABEN' },
@@ -701,7 +701,7 @@ const table = {
   send: { en: '↵ SEND', de: '↵ SENDEN' },
   redraft: { en: '⇧R REDRAFT', de: '⇧R NEU ENTWERFEN' },
 
-  // ── Owl-Rail ──
+  // ── Owl rail ──
   theOwl: { en: 'THE OWL', de: 'DIE EULE' },
   owlQuiet: { en: 'working quietly', de: 'arbeitet leise' },
   owlAsleepNoKey: { en: 'asleep — no key.', de: 'schläft – kein Schlüssel.' },
@@ -782,14 +782,14 @@ const table = {
   indexing: { en: 'indexing…', de: 'indexiert…' },
   errorState: { en: 'error', de: 'Fehler' },
   disconnect: { en: 'DISCONNECT', de: 'TRENNEN' },
-  // Zweitklick-Bestätigung beim Trennen (Design 3b)
+  // Second-click confirmation when disconnecting (Design 3b)
   disconnectHint: {
     en: 'removes the account + its local index',
     de: 'entfernt das Konto und seinen lokalen Index'
   },
   disconnectYes: { en: 'YES, DISCONNECT', de: 'JA, TRENNEN' },
   disconnectKeep: { en: 'KEEP', de: 'BEHALTEN' },
-  // Sync-Fehler inline (Design 3b): gespeicherter Fehlertext + Zeitpunkt
+  // Inline sync error (Design 3b): stored error text + timestamp
   syncFailed: { en: 'sync failed', de: 'Sync fehlgeschlagen' },
   syncNeedsReauth: { en: 'sign-in needed', de: 'Anmeldung nötig' },
   syncNeedsReauthHint: {
@@ -881,7 +881,7 @@ const table = {
   updatedToday: { en: 'updated today', de: 'heute aktualisiert' },
   updatedYesterday: { en: 'updated yesterday', de: 'gestern aktualisiert' },
   updatedDaysAgo: { en: 'updated {n} days ago', de: 'vor {n} Tagen aktualisiert' },
-  // Ehrlich gescheitertes Nachlernen (Design 3e) — Gründe für ok:false
+  // Honestly failed relearning (Design 3e) — reasons for ok:false
   voiceNoSent: {
     en: 'no sent replies to learn from yet',
     de: 'noch keine gesendeten Antworten zum Lernen'
@@ -934,7 +934,7 @@ const table = {
     de: 'Diktat wird jetzt von {model} transkribiert'
   },
   accountColor: { en: 'COLOR', de: 'FARBE' },
-  // Privacy-Default gedreht (Design 3b): blocken, bis der Nutzer erlaubt
+  // Privacy default flipped (Design 3b): block until the user allows
   privacyHead: { en: 'PRIVACY', de: 'PRIVATSPHÄRE' },
   imagesBlockToggle: {
     en: 'block remote images until I allow them',
@@ -957,7 +957,7 @@ const table = {
     de: 'Kein Schlüssel? E-Mail funktioniert trotzdem – nur die Eule schläft: keine Kurzfassungen, keine Entwürfe, kein Zählen.'
   },
 
-  // ── KI-Anbieter (Profile), Aufgaben-Zuordnung, Local only ──
+  // ── AI providers (profiles), task assignment, Local only ──
   profilesHead: { en: 'AI PROVIDERS', de: 'KI-ANBIETER' },
   profilesSub: {
     en: 'OpenRouter or any OpenAI-compatible server — Ollama, LM Studio, vLLM, LiteLLM …',
@@ -1084,7 +1084,7 @@ const table = {
     de: '✓ Suchmodell bereit – Indexierung startet'
   },
 
-  // ── Palette (nur Befehle — die Mailsuche wohnt bei der Eule) ──
+  // ── Palette (commands only — mail search lives with the owl) ──
   palPlaceholder: { en: 'Type a command…', de: 'Befehl eingeben…' },
   palAria: { en: 'Command palette', de: 'Befehlspalette' },
   palCommandMode: { en: 'COMMANDS ONLY', de: 'NUR BEFEHLE' },
@@ -1141,7 +1141,7 @@ const table = {
   cmdOwlSearchNote: { en: 'email search lives here now', de: 'die E-Mail-Suche ist jetzt hier' },
   cmdLanguage: { en: 'Sprache: Deutsch', de: 'Language: English' },
 
-  // ── Hilfe ──
+  // ── Help ──
   helpTitle: { en: 'Keyboard', de: 'Tastatur' },
   helpSub: {
     en: 'EVERYTHING WORKS WITHOUT THE MOUSE · ESC TO CLOSE',
@@ -1315,7 +1315,7 @@ const table = {
     de: 'du kannst den Stil jederzeit unter STIL neu lernen lassen'
   },
 
-  // ── Onboarding — Schlüssel-Schritt + pausiertes Training (Design 1b) ──
+  // ── Onboarding — key step + paused training (Design 1b) ──
   obOrgHead: { en: 'Your organization’s AI', de: 'Die KI deiner Organisation' },
   obOrgSub: {
     en: 'Gists, tasks and drafts run on the AI profiles your organization provides. Add your key where one is needed.',
@@ -1360,7 +1360,7 @@ const table = {
     de: 'E-Mail funktioniert auch ohne Schlüssel – nur die Eule schläft'
   },
 
-  // ── Onboarding — KI-Schritt „Wo soll die KI laufen?" (lokal zuerst) ──
+  // ── Onboarding — AI step "Where should the AI run?" (local first) ──
   obAiHead: { en: 'Where should the AI run?', de: 'Wo soll die KI laufen?' },
   obAiSub: {
     en: 'The owl reads your email to sort it and write drafts. Choose where that happens — you can change it anytime in Settings → AI.',
@@ -1457,7 +1457,7 @@ const table = {
     de: 'E-Mail funktioniert auch ohne KI – nur die Eule schläft'
   },
 
-  // ── Compose-Overlay (Feature-Erhalt, nicht im Prototyp) ──
+  // ── Compose overlay (feature preserved, not in the prototype) ──
   composeTo: { en: 'TO', de: 'AN' },
   composeCc: { en: 'CC', de: 'CC' },
   composeBcc: { en: 'BCC', de: 'BCC' },
@@ -1484,7 +1484,7 @@ const table = {
   },
   composeChipRemove: { en: 'Remove {addr}', de: '{addr} entfernen' },
 
-  // ── Ordneransicht + Darstellung ──
+  // ── Folder view + appearance ──
   folderUnified: { en: 'Unified inbox', de: 'Alle Posteingänge' },
   folderUnifiedSent: { en: 'All sent', de: 'Alle gesendeten' },
   folderUnifiedJunk: { en: 'All junk', de: 'Gesamter Spam' },
@@ -1594,7 +1594,7 @@ const table = {
     de: 'Möglicherweise gesendet – sieh im Ordner „Gesendet“ nach'
   },
   composeDraftRestored: { en: 'Draft restored', de: 'Entwurf wiederhergestellt' },
-  // ── Terminvorschläge aus Mails (AI) ──
+  // ── Event suggestions from mails (AI) ──
   eventSuggestHead: { en: 'ADD TO CALENDAR?', de: 'IN DEN KALENDER EINTRAGEN?' },
   eventSuggestProposed: { en: 'PROPOSED', de: 'VORSCHLAG' },
   eventSuggestConfirmed: { en: 'CONFIRMED', de: 'BESTÄTIGT' },
@@ -1648,7 +1648,7 @@ const table = {
     de: 'Nur als Vorschlag in der E-Mail – übernehmen mit T.'
   },
 
-  // ── Regeln (Design 3c — Letterpress) ──
+  // ── Rules (Design 3c — Letterpress) ──
   rulesHead: { en: 'Rules', de: 'Regeln' },
   rulesSub: {
     en: 'describe it in a sentence — the owl builds the rule',
@@ -1726,7 +1726,7 @@ const table = {
   sigImgPadding: { en: 'PADDING', de: 'ABSTAND' },
   sigImgBackground: { en: 'BACKGROUND', de: 'HINTERGRUND' },
   sigImgBackgroundTransparent: { en: 'Transparent', de: 'Transparent' },
-  // Kuratierte Swatches statt OS-Farbwähler (Design 3f)
+  // Curated swatches instead of the OS color picker (Design 3f)
   sigSwatchPaper: { en: 'Paper', de: 'Papier' },
   sigSwatchPastel: { en: 'Pastel {hex}', de: 'Pastell {hex}' },
   sigSwatchInk: { en: 'Ink', de: 'Tinte' },
@@ -1880,7 +1880,7 @@ const table = {
   toggleRailLabel: { en: 'show/hide the owl', de: 'Eule ein-/ausblenden' },
   loading: { en: 'loading…', de: 'lädt…' },
 
-  // ── Rechtschreibprüfung ──
+  // ── Spell checking ──
   followupRadarHead: { en: 'FOLLOW-UP RADAR', de: 'NACHFASS-RADAR' },
   followupRadarSub: {
     en: 'when unanswered sent emails appear under WAITING',
@@ -1896,7 +1896,7 @@ const table = {
   spellIgnore: { en: 'IGNORE', de: 'IGNORIEREN' },
   spellNoSuggestions: { en: 'no suggestions', de: 'keine Vorschläge' },
 
-  // ── Technik-Seite: „Wie die Eule denkt" (Pipelines in Bildern) ──
+  // ── Technology page: "How the owl thinks" (pipelines in pictures) ──
   cmdTech: { en: 'How the owl thinks', de: 'Wie die Eule denkt' },
   cmdTechNote: { en: 'every pipeline, one picture', de: 'jeder Ablauf als Bild' },
   techHead: { en: 'How the owl thinks', de: 'Wie die Eule denkt' },
@@ -1938,7 +1938,7 @@ const table = {
     de: 'Jede neue E-Mail im Posteingang wird einmal günstig gelesen: Kategorie, Priorität, Zusammenfassung in einer Zeile – und ob sie dich braucht. Ein Budget-Wächter begrenzt die Kosten pro Tag und Monat; ist das Budget aufgebraucht, wartet die Warteschlange einfach.'
   },
 
-  // 02 · Adressat-Erkennung
+  // 02 · Addressee detection
   techAddrTitle: { en: 'Who is actually meant', de: 'Wer wirklich gemeint ist' },
   techAddrS1: { en: '1 · SALUTATION', de: '1 · ANREDE' },
   techAddrS1Sample: { en: '“Hi Tim,”', de: '„Hallo Tim,“' },
@@ -1961,7 +1961,7 @@ const table = {
     de: 'Eine Aufgabe entsteht nur, wenn wirklich du gemeint bist: Eine Anrede mit deinem Namen schlägt den Umschlag, der Umschlag schlägt das Modell. Und wenn das Modell zweifelt, schlägt die Eule nur vor – nie legt sie etwas stillschweigend an.'
   },
 
-  // 03 · Aufgaben-Sieb
+  // 03 · Task sieve
   techSieveTitle: { en: 'The task sieve', de: 'Das Aufgaben-Sieb' },
   techSieveIn: { en: 'ACTION ITEMS FROM TRIAGE', de: 'KANDIDATEN AUS DER VORSORTIERUNG' },
   techSieve1: { en: 'AUTO-CREATE IS OFF', de: 'AUTOMATISCHES ANLEGEN IST AUS' },
@@ -1982,7 +1982,7 @@ const table = {
     de: 'Sechs Siebe in genau dieser Reihenfolge – was hängen bleibt, wird verworfen, und im Zweifel gibt es nur einen Vorschlag. Nur was durch alle sechs fällt, wird von selbst zur Aufgabe.'
   },
 
-  // 04 · Semantische Suche
+  // 04 · Semantic search
   techSearchTitle: { en: 'Search — text and meaning', de: 'Suche – Text und Bedeutung' },
   techSearchIn: { en: 'YOUR QUERY', de: 'DEINE SUCHE' },
   techSearchSample: { en: '“lease agreement”', de: '„mietvertrag“' },
@@ -1999,7 +1999,7 @@ const table = {
     de: 'Volltext- und Bedeutungssuche laufen parallel, eine Rang-Fusion mischt beide Listen. Alles läuft auf deinem Gerät – das Embedding-Modell liegt lokal, kostet keine Tokens, und die Abdeckung steht unten in der Eulen-Ansicht.'
   },
 
-  // 05 · Die Eule fragen
+  // 05 · Ask the owl
   techAskTitle: { en: 'Ask the owl', de: 'Die Eule fragen' },
   techAskQ: { en: 'YOUR QUESTION', de: 'DEINE FRAGE' },
   techAskExpand: { en: 'SEARCH TERMS', de: 'SUCHBEGRIFFE' },
@@ -2016,7 +2016,7 @@ const table = {
     de: 'Eine Frage durchsucht zuerst lokal deine E-Mails; nur die Frage und die gefundenen Ausschnitte gehen an das Modell. Die Antwort kommt als Stream mit [n]-Zitaten – das Gespräch selbst bleibt in deiner lokalen Datenbank.'
   },
 
-  // 06 · Entwürfe & Stimme
+  // 06 · Drafts & voice
   techVoiceTitle: { en: 'Drafts & your voice', de: 'Entwürfe & dein Stil' },
   techVoiceSent1: { en: 'SENT', de: 'GESENDETE' },
   techVoiceSent2: { en: 'EMAILS', de: 'E-MAILS' },
@@ -2039,7 +2039,7 @@ const table = {
     de: 'Die Eule lernt deinen Stil pro Adresse aus deinen gesendeten E-Mails. Ob du duzt oder siezt, richtet sich nach dem tatsächlichen Verlauf mit der Person – deterministisch und vor dem Profil. Und es wird nie etwas von allein gesendet: Der letzte Klick gehört immer dir.'
   },
 
-  // 07 · Rechtschreibprüfung
+  // 07 · Spell checking
   techSpellTitle: { en: 'Spelling — offline, honest', de: 'Rechtschreibung – offline und ehrlich' },
   techSpellSample: { en: 'definately', de: 'Rechtschreibpürfung' },
   techSpellEngine: { en: 'HUNSPELL · WASM', de: 'HUNSPELL · WASM' },
@@ -2054,7 +2054,7 @@ const table = {
     de: 'Ein echtes Hunspell läuft als WebAssembly direkt in der App, deutsche und englische Wörterbücher sind gleich mit dabei. Kein Wort verlässt deinen Rechner – die Rechtschreibprüfung von macOS ist bewusst abgeschaltet.'
   },
 
-  // 08 · Regeln
+  // 08 · Rules
   techRulesTitle: {
     en: 'Rules — drafted once, applied forever',
     de: 'Regeln – einmal entworfen, immer angewendet'
@@ -2086,7 +2086,7 @@ const table = {
     de: 'Das Modell entwirft das Regel-JSON nur einmal, aus deiner Beschreibung. Angewendet wird die Regel danach bei jeder E-Mail deterministisch – ganz ohne weitere KI-Aufrufe.'
   },
 
-  // 09 · Follow-up-Radar
+  // 09 · Follow-up radar
   techRadarTitle: { en: 'The follow-up radar', de: 'Das Nachfass-Radar' },
   techRadarSent1: { en: 'YOUR SENT', de: 'GESENDETE' },
   techRadarSent2: { en: 'EMAIL', de: 'E-MAIL' },
@@ -2106,7 +2106,7 @@ const table = {
     de: 'Das Radar findet deine gesendeten E-Mails, die unbeantwortet geblieben sind, zählt die Tage und fragt ein günstiges Modell, ob überhaupt eine Antwort erwartet wird. Der Stups ist nur ein Entwurf in deinem Stil – abgeschickt wird er von dir.'
   },
 
-  // 10 · Datenhaltung
+  // 10 · Data storage
   techDataTitle: { en: 'Where your data lives', de: 'Wo deine Daten liegen' },
   techDataMac: { en: 'YOUR MAC', de: 'DEIN MAC' },
   techDataDb: { en: 'NOCTUA.SQLITE', de: 'NOCTUA.SQLITE' },
@@ -2156,7 +2156,7 @@ const table = {
   techNetTaskStt: { en: 'dictation', de: 'Diktat' },
   techNetTaskDecision: { en: 'decisions', de: 'Entscheidungen' },
 
-  // Entscheidungsmodelle (Ollama System One: clef-flash, nimble, …)
+  // Decision models (Ollama System One: clef-flash, nimble, …)
   modelDecision: { en: 'DECISIONS', de: 'ENTSCHEIDUNGEN' },
   modelDecisionSub: {
     en: 'optional · decision model on your own Ollama server',
@@ -2206,7 +2206,7 @@ const table = {
     de: 'Tipp: „ollama pull clef-flash“ für schnellere Sortierung'
   },
 
-  // Phishing-Warnung in der Mail-Ansicht
+  // Phishing warning in the mail view
   phishingBanner: {
     en: 'This email looks like phishing — do not click links or enter credentials.',
     de: 'Diese E-Mail sieht nach Phishing aus – klicke keine Links, gib keine Zugangsdaten ein.'
@@ -2356,7 +2356,7 @@ const table = {
     de: 'Links nutzen eine Domain mit Ersatzzeichen (Punycode) ({n})'
   },
 
-  // Leistungsdiagnose (Technik-Seite)
+  // Performance diagnostics (technology page)
   diagTitle: { en: 'Performance diagnostics', de: 'Leistungsdiagnose' },
   diagToggle: { en: 'Measure', de: 'Messen' },
   diagCap: {
@@ -2394,7 +2394,7 @@ const table = {
     de: '{samples} Messpunkte · {n} frühere Sitzungen auf diesem Mac'
   },
 
-  // Regeln mit KI-Bedingung
+  // Rules with AI condition
   ruleAiCondition: { en: 'AI condition', de: 'KI-Bedingung' },
   ruleAiNeedsModel: {
     en: 'Needs a decision model (Settings → AI) — skipped until then.',

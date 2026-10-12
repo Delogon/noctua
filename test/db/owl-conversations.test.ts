@@ -9,8 +9,8 @@ import {
 } from '@main/db/repos/owl'
 import { createTestDb, closeTestDb } from '../helpers/db'
 
-// Persistenz der Eulen-Gespräche: Roundtrip über die In-Memory-DB
-// (Muster wie repos.test.ts) — Speichern, Listen mit Gist, Laden, Löschen.
+// Persistence of owl conversations: round trip through the in-memory DB
+// (same pattern as repos.test.ts) — save, list with gist, load, delete.
 
 describe('owl-conversations-repo', () => {
   let db: Database.Database
@@ -36,14 +36,14 @@ describe('owl-conversations-repo', () => {
     expect(listed[0]).toMatchObject({
       id,
       title: 'Welche Rechnungen kamen diesen Monat?',
-      // Gist = erster Satz der ersten Eulen-Antwort
+      // Gist = first sentence of the first owl answer
       answerGist: 'Drei — Hetzner, Adobe und ein DB-Ticket.'
     })
 
     const loaded = getOwlConversation(db, id)
     expect(loaded?.messages).toEqual(messages)
 
-    // Follow-up: Upsert mit id erweitert den Verlauf statt zu duplizieren
+    // Follow-up: upsert with id extends the history instead of duplicating
     const followUp = [
       ...messages,
       { role: 'user' as const, content: 'Welche davon kann ich absetzen?', at: 3 },

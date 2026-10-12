@@ -5,7 +5,7 @@ import type { PushChannel, PushPayload } from '@shared/ipc-contract'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
-/** Natives App-Menü mit Noctua-Aktionen für Dev- und Release-Bundle. */
+/** Native app menu with Noctua actions for dev and release bundles. */
 export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | null): void {
   const name = productName()
   const links = helpLinks()
@@ -90,7 +90,7 @@ export function installAppMenu(push: PushFn, getWindow: () => BrowserWindow | nu
         { label: 'Aufgaben', accelerator: 'Cmd+3', click: () => send('tasks') },
         { label: 'Kalender', accelerator: 'Cmd+4', click: () => send('calendar') },
         { type: 'separator' },
-        // Bewusst ohne Accelerator: ⌘5 ist abgeschafft, / und ⌘F führen zur Suche
+        // Deliberately without accelerator: ⌘5 is gone, / and ⌘F lead to search
         { label: 'Suchen & die Eule fragen', click: () => send('chat') },
         { type: 'separator' },
         { role: 'togglefullscreen', label: 'Vollbild ein/aus' },

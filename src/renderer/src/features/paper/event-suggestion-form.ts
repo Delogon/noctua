@@ -4,9 +4,9 @@ import { NO_RECURRENCE } from '@renderer/features/calendar/rrule'
 import type { EventForm } from '@renderer/features/calendar/event-form'
 
 /**
- * Terminvorschlag → Editor-Vorbelegung („Bearbeiten…") und Zeitanzeige. Reine
- * Funktionen. Ganztägige Vorschläge haben ein EXKLUSIVES Ende; das Formular
- * zeigt das Enddatum inklusiv (wie der Editor).
+ * Event suggestion → editor prefill („Bearbeiten…") and time display. Pure
+ * functions. All-day suggestions have an EXCLUSIVE end; the form shows the
+ * end date inclusively (like the editor).
  */
 export function formFromSuggestion(
   s: Pick<
@@ -18,7 +18,7 @@ export function formFromSuggestion(
 ): EventForm {
   const startDate = s.startLocal.slice(0, 10)
   const endDate = s.allDay
-    ? // exklusiv → inklusiv, nie vor dem Start
+    ? // exclusive → inclusive, never before the start
       (() => {
         const incl = dayKey(addDays(parseDayKey(s.endLocal.slice(0, 10)), -1))
         return incl < startDate ? startDate : incl
@@ -47,7 +47,7 @@ function dayDate(day: string): Date {
   return new Date(Date.UTC(y, m - 1, d))
 }
 
-/** „Dienstag, 6. Oktober 2026, 10:00–11:00" (Wandzeit wie in der Mail, ohne Umrechnung). */
+/** „Dienstag, 6. Oktober 2026, 10:00–11:00" (wall time as in the mail, no conversion). */
 export function formatSuggestionWhen(
   s: Pick<EventSuggestionView, 'allDay' | 'startLocal' | 'endLocal' | 'tzid'>,
   lang: 'de' | 'en',
@@ -70,7 +70,7 @@ export function formatSuggestionWhen(
   const tail = sameDay
     ? ` – ${endTime}`
     : ` – ${dayFmt.format(dayDate(s.endLocal.slice(0, 10)))}, ${endTime}`
-  // Abweichende, in der Mail genannte Zeitzone sichtbar machen
+  // Make a differing time zone named in the mail visible
   const tz = s.tzid && s.tzid !== zone ? ` (${s.tzid})` : ''
   return `${head}${tail}${tz}`
 }

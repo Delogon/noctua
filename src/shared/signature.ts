@@ -11,7 +11,7 @@ export interface SignatureConfig {
   imgHeight?: number
   imgBorder?: boolean
   imgPadding?: number
-  /** Hex-Farbe oder null/undefined fuer echte Transparenz. */
+  /** Hex color, or null/undefined for real transparency. */
   imgBackground?: string | null
 }
 
@@ -46,7 +46,7 @@ export function renderSignatureText(config: Pick<SignatureConfig, 'blocks' | 'va
     .join('\n')
 }
 
-/** Fügt die Signatur genau einmal mit einem lesbaren Abstand an den Mailtext an. */
+/** Appends the signature to the mail body exactly once, with a readable gap. */
 export function appendSignatureText(body: string, signature: string): string {
   const content = body.trimEnd()
   const cleanSignature = signature.trim()
@@ -81,9 +81,9 @@ function isClosingLine(line: string): boolean {
 }
 
 /**
- * Entfernt eine vom Modell erzeugte Grußformel bzw. wiederholte
- * Signaturzeilen am Ende. Der eigentliche Inhalt vor dem Schlussblock bleibt
- * unverändert; die separat konfigurierte Signatur wird beim Versand ergänzt.
+ * Removes a model-generated closing or repeated signature lines at the end.
+ * The actual content before the closing block stays unchanged; the
+ * separately configured signature is added when sending.
  */
 export function stripRedundantSignatureTail(body: string, signatureReference = ''): string {
   const lines = body.replace(/\r\n/g, '\n').split('\n')
@@ -125,7 +125,7 @@ export function stripRedundantSignatureTail(body: string, signatureReference = '
   return kept.join('\n').trimEnd()
 }
 
-/** Einheitliche Bildmaße für Signatur-Vorschau und tatsächlich versandte HTML-Mail. */
+/** Consistent image dimensions for the signature preview and the HTML mail actually sent. */
 export function fitSignatureImage(
   sourceWidth: number | undefined,
   sourceHeight: number | undefined,

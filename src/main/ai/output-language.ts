@@ -1,8 +1,8 @@
 import { getSetting } from '../db'
 
-// Sprache, in der Modelle Text für den Nutzer schreiben (Zusammenfassungen,
-// Antworten der Eule, Aufgabentitel). Prompts selbst sind englisch; die
-// Ausgabe folgt der App-Sprache, Standard Deutsch wie überall im Main-Prozess.
+// Language in which models write text for the user (summaries, the owl's
+// answers, task titles). Prompts themselves are English; the output
+// follows the app language, default German as everywhere in the main process.
 
 export type OutputLanguage = 'de' | 'en'
 
@@ -14,7 +14,7 @@ export function outputLanguage(): OutputLanguage {
   }
 }
 
-/** Sprachname für Prompts („Write in German."). */
+/** Language name for prompts ("Write in German."). */
 export function outputLanguageName(language: OutputLanguage = outputLanguage()): string {
   return language === 'en' ? 'English' : 'German'
 }

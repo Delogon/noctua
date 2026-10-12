@@ -14,8 +14,8 @@ export interface FusedSearchCandidate {
 }
 
 /**
- * Reciprocal Rank Fusion verbindet Ranglisten, ohne BM25- und
- * Vektordistanzen auf eine vermeintlich gemeinsame Skala zu zwingen.
+ * Reciprocal Rank Fusion combines ranked lists without forcing BM25 and
+ * vector distances onto a supposedly common scale.
  */
 export function reciprocalRankFusion(lists: RankedSearchList[], rrfK = 60): FusedSearchCandidate[] {
   const fused = new Map<number, FusedSearchCandidate>()

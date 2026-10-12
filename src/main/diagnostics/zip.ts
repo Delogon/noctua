@@ -1,7 +1,7 @@
 import { deflateRawSync } from 'node:zlib'
 
-// Minimaler ZIP-Schreiber (PKZIP 2.0, Deflate, UTF-8-Namen) für den Diagnose-
-// Export — keine neue Abhängigkeit. Kein ZIP64: Einträge und Archiv < 4 GiB.
+// Minimal ZIP writer (PKZIP 2.0, deflate, UTF-8 names) for the diagnostics
+// export — no new dependency. No ZIP64: entries and archive < 4 GiB.
 
 export interface ZipEntry {
   name: string
@@ -50,7 +50,7 @@ export function createZip(entries: ZipEntry[], now = new Date()): Buffer {
     const local = Buffer.alloc(30)
     local.writeUInt32LE(0x04034b50, 0)
     local.writeUInt16LE(20, 4) // Version needed
-    local.writeUInt16LE(0x0800, 6) // UTF-8-Namen
+    local.writeUInt16LE(0x0800, 6) // UTF-8 names
     local.writeUInt16LE(stored ? 0 : 8, 8)
     local.writeUInt16LE(time, 10)
     local.writeUInt16LE(date, 12)

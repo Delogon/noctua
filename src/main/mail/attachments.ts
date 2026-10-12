@@ -16,9 +16,9 @@ interface AttachmentRow {
 }
 
 /**
- * Lädt den Roh-Source der Nachricht und extrahiert Attachments via postal-mime.
- * Bewusst simpel (ganze Mail statt IMAP-Part-Fetch) — ausreichend für typische
- * Größen; BODYSTRUCTURE-Part-Fetching ist der dokumentierte Optimierungspunkt.
+ * Loads the raw source of the message and extracts attachments via postal-mime.
+ * Deliberately simple (whole mail instead of IMAP part fetch) — sufficient for typical
+ * sizes; BODYSTRUCTURE part fetching is the documented optimization point.
  */
 async function loadParsedAttachments(messageId: number): Promise<
   Array<{
@@ -70,7 +70,7 @@ export async function saveAttachment(
 
 const MAX_INLINE_BYTES = 2 * 1024 * 1024
 
-/** cid: → data:-URIs für Inline-Bilder einer Nachricht. */
+/** cid: → data: URIs for a message's inline images. */
 export async function getInlineImages(
   db: Database.Database,
   messageId: number

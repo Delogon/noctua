@@ -5,12 +5,12 @@ import {
   type UpdatesConfig
 } from '@shared/org-config'
 
-// Org-Konfiguration zur Laufzeit: die zur Build-Zeit validierte und in den
-// Bundle eingebettete Konfiguration (`__NOCTUA_ORG_CONFIG__`, siehe
-// electron.vite.config.ts) — nie von der Platte gelesen. Ohne Konfiguration
-// ist alles Upstream. `getOrgConfig()` ist die einzige Lesestelle; eine spätere
-// MDM-Quelle (Managed Preferences) kann hier mit der eingebetteten
-// Konfiguration zusammengeführt werden, ohne dass Aufrufer sich ändern.
+// Org configuration at runtime: the configuration validated at build time and
+// embedded in the bundle (`__NOCTUA_ORG_CONFIG__`, see electron.vite.config.ts)
+// — never read from disk. Without configuration everything is upstream.
+// `getOrgConfig()` is the only read site; a later MDM source (Managed
+// Preferences) can be merged with the embedded configuration here without
+// callers having to change.
 
 let override: OrgConfig | null | undefined
 
@@ -18,12 +18,12 @@ function embedded(): OrgConfig | null {
   return typeof __NOCTUA_ORG_CONFIG__ === 'undefined' ? null : __NOCTUA_ORG_CONFIG__
 }
 
-/** Die aktive Org-Konfiguration oder null (Upstream-Build). */
+/** The active org configuration or null (upstream build). */
 export function getOrgConfig(): OrgConfig | null {
   return override !== undefined ? override : embedded()
 }
 
-/** Nur Tests: Konfiguration setzen (undefined = zurück auf die eingebettete). */
+/** Tests only: set the configuration (undefined = back to the embedded one). */
 export function __setOrgConfigForTest(config: OrgConfig | null | undefined): void {
   override = config
 }
@@ -32,16 +32,16 @@ export function productName(): string {
   return getOrgConfig()?.productName ?? 'Noctua'
 }
 
-/** AppUserModelId / Bundle-ID. */
+/** AppUserModelId / bundle ID. */
 export function appId(): string {
   return getOrgConfig()?.appId ?? 'de.timsigl.noctua'
 }
 
 /**
- * Interner App-Name (bestimmt userData-Ordner und Safe-Storage-Schlüssel) der
- * verpackten App. Upstream: 'noctua-prod'. Eine Company Edition bekommt einen
- * eigenen Namen, damit sie neben dem Upstream-Build installierbar ist, ohne
- * dieselbe Datenbank zu teilen.
+ * Internal app name (determines the userData folder and safe-storage key) of the
+ * packaged app. Upstream: 'noctua-prod'. A Company Edition gets its own name
+ * so it can be installed next to the upstream build without sharing the same
+ * database.
  */
 export function packagedAppName(): string {
   const org = getOrgConfig()
@@ -54,7 +54,7 @@ export type UpdateFeed =
   | { mode: 'url'; url: string; pageUrl: string }
   | { mode: 'off'; pageUrl: string }
 
-/** Auflösung der Update-Quelle; Default = Upstream-GitHub-Releases. */
+/** Resolution of the update source; default = upstream GitHub releases. */
 export function resolveUpdateFeed(config: OrgConfig | null = getOrgConfig()): UpdateFeed {
   const updates: UpdatesConfig = config?.updates ?? { mode: 'github', repo: UPSTREAM_UPDATE_REPO }
   const fallbackPage = config?.links?.homepage
@@ -73,7 +73,7 @@ export function resolveUpdateFeed(config: OrgConfig | null = getOrgConfig()): Up
   }
 }
 
-/** Menü-Links (Hilfe/Über); Upstream: GitHub-Repo. */
+/** Menu links (Help/About); upstream: GitHub repo. */
 export function helpLinks(config: OrgConfig | null = getOrgConfig()): {
   homepage: string
   support: string | null

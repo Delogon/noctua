@@ -1,14 +1,14 @@
 import Foundation
 import FoundationModels
 
-// Noctua-Helper für Apple Foundation Models (macOS 26+, Apple Silicon).
-// Zwei Modi:
-//   noctua-fm check  → eine JSON-Zeile mit der Verfügbarkeit
-//   noctua-fm serve  → Zeilenprotokoll auf stdin/stdout:
-//     Anfrage : {"id":1,"instructions":"…","prompt":"…"}
-//     Antwort : {"id":1,"ok":true,"result":{…}} | {"id":1,"ok":false,"error":"…"}
-// Guided Generation garantiert die Struktur; die Wertebereiche (Kategorie-
-// Enum, Prioritätsklemme) validiert der TypeScript-Aufrufer.
+// Noctua helper for Apple Foundation Models (macOS 26+, Apple Silicon).
+// Two modes:
+//   noctua-fm check  → one JSON line with the availability
+//   noctua-fm serve  → line protocol on stdin/stdout:
+//     Request : {"id":1,"instructions":"…","prompt":"…"}
+//     Response: {"id":1,"ok":true,"result":{…}} | {"id":1,"ok":false,"error":"…"}
+// Guided generation guarantees the structure; the value ranges (category
+// enum, priority clamp) are validated by the TypeScript caller.
 
 @Generable
 struct FMActionItem {
@@ -88,8 +88,8 @@ func triagePayload(_ result: FMTriage) -> [String: Any] {
   ]
 }
 
-/// Dispatcher für die stt-Modi; Fehler werden strukturiert gemeldet (Exit 0,
-/// damit der Aufrufer die JSON-Zeile auswertet statt den Exit-Code).
+/// Dispatcher for the stt modes; errors are reported structured (exit 0,
+/// so the caller evaluates the JSON line instead of the exit code).
 func runSpeech(mode: String, args: [String]) async {
   do {
     switch mode {
@@ -121,7 +121,7 @@ struct Helper {
       return
     }
 
-    // Spracherkennung (speech.swift): Einmal-Prozesse, unabhängig vom FM-Modell
+    // Speech recognition (speech.swift): one-shot processes, independent of the FM model
     if ["stt-check", "stt-install", "transcribe"].contains(mode) {
       await runSpeech(mode: mode, args: Array(CommandLine.arguments.dropFirst(2)))
       return
@@ -152,7 +152,7 @@ struct Helper {
       let mode = request["mode"] as? String ?? "triage"
 
       do {
-        // Frische Session je Anfrage: kein Kontextwachstum über Mails hinweg.
+        // Fresh session per request: no context growth across mails.
         let session = LanguageModelSession(instructions: instructions)
         if mode == "gate" {
           let response = try await session.respond(to: prompt, generating: FMGate.self)

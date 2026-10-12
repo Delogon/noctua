@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
- * Ein gemeinsamer Mikrofon-Stream fuer Pegelanzeige und Aufnahme. Falls der
- * Zugriff noch aussteht oder verweigert wird, bleibt die Waveform dekorativ
- * aktiv; getippte Diktate funktionieren dann weiterhin.
+ * One shared microphone stream for level meter and recording. If access is
+ * still pending or denied, the waveform stays decoratively active; typed
+ * dictation keeps working in that case.
  */
 export function useListeningAudio(active: boolean): {
   bars: number[]
@@ -35,8 +35,8 @@ export function useListeningAudio(active: boolean): {
       }, 110)
     }
 
-    // Das macOS-Permission-Fenster kann laenger offen bleiben. Bis dahin
-    // signalisiert die Animation bereits, dass Noctua zuhoert.
+    // The macOS permission window may stay open for a while. Until then
+    // the animation already signals that Noctua is listening.
     const pending = setTimeout(startFallback, 1200)
 
     void navigator.mediaDevices
@@ -67,9 +67,9 @@ export function useListeningAudio(active: boolean): {
             recorderRef.current = null
           }
         }
-        // Bei schneller Wiederverwendung des Mikrofons (zweites Diktat kurz
-        // nach dem ersten) liefert macOS den Track anfangs stummgeschaltet —
-        // ein sofort gestarteter Recorder nähme nur Stille auf.
+        // When the microphone is reused quickly (second dictation shortly
+        // after the first), macOS initially delivers the track muted —
+        // a recorder started immediately would record only silence.
         const track = nextStream.getAudioTracks()[0]
         if (track?.muted) track.addEventListener('unmute', startRecorder, { once: true })
         else startRecorder()

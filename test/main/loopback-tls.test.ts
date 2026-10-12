@@ -17,7 +17,7 @@ import { buildImapOptions } from '@main/auth/providers'
 const FP_A = new X509Certificate(CERT_A).fingerprint256
 const FP_B = new X509Certificate(CERT_B).fingerprint256
 
-/** Fake-Bridge: STARTTLS (IMAP/SMTP) oder implizites TLS, Zertifikat umschaltbar. */
+/** Fake bridge: STARTTLS (IMAP/SMTP) or implicit TLS, switchable certificate. */
 class FakeBridge {
   server!: Server
   port = 0
@@ -89,7 +89,7 @@ class FakeBridge {
   }
 }
 
-/** Verbindet mit den gepinnten Optionen — so wie imapflow/nodemailer es tun. */
+/** Connects with the pinned options — the way imapflow/nodemailer do. */
 function connectWith(port: number, options: PinnedTlsOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     const socket = tlsConnect({ host: '127.0.0.1', port, ...options }, () => {
@@ -171,9 +171,9 @@ describe('Loopback-Zertifikat-Pinning (vuln-0010)', () => {
 
     it('bindet die eigentliche Verbindung kryptografisch an den Pin', async () => {
       const options = await pinnedLoopbackTls(accountId, '127.0.0.1', bridge.port, 'smtp', true)
-      // Selbstsigniertes Zertifikat wird mit rejectUnauthorized=true akzeptiert …
+      // Self-signed certificate is accepted with rejectUnauthorized=true …
       await expect(connectWith(bridge.port, options)).resolves.toBeUndefined()
-      // … ein anderes Zertifikat (Port-Übernahme nach der Probe) dagegen nicht
+      // … but a different certificate (port takeover after the probe) is not
       bridge.swapCert()
       await expect(connectWith(bridge.port, options)).rejects.toBeTruthy()
     })

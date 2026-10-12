@@ -16,7 +16,7 @@ import {
 } from '@renderer/features/calendar/scope'
 import type { CalendarEventFields } from '@shared/calendar-types'
 
-// Zeitzone vor dem Sammeln der Tests setzen (Modul-Konstanten mit Date)
+// Set the time zone before tests are collected (module constants using Date)
 process.env.TZ = 'Europe/Berlin'
 
 const timedCtx = { allDay: false, tzid: 'Europe/Berlin' }
@@ -54,11 +54,11 @@ describe('RRULE bauen', () => {
     expect(
       buildRrule(spec({ freq: 'DAILY', end: { kind: 'until', date: '2026-12-31' } }), dayCtx)
     ).toBe('FREQ=DAILY;UNTIL=20261231')
-    // Berlin im Winter: 23:59:59 lokal = 22:59:59 UTC
+    // Berlin in winter: 23:59:59 local = 22:59:59 UTC
     expect(
       buildRrule(spec({ freq: 'DAILY', end: { kind: 'until', date: '2026-12-31' } }), timedCtx)
     ).toBe('FREQ=DAILY;UNTIL=20261231T225959Z')
-    // Sommerzeit: 21:59:59 UTC
+    // Summer time: 21:59:59 UTC
     expect(
       buildRrule(spec({ freq: 'WEEKLY', end: { kind: 'until', date: '2026-07-15' } }), timedCtx)
     ).toBe('FREQ=WEEKLY;UNTIL=20260715T215959Z')
@@ -191,7 +191,7 @@ describe('Bereichs-Dialog-Logik', () => {
   })
 
   it('Serienzeit verschieben: Delta des Vorkommens auf den Serienstart', () => {
-    // Serie startet Mo 5.10. 09:00; bearbeitet wird das Vorkommen vom 19.10., neu 10:00–11:00
+    // Series starts Mon 5.10. 09:00; the 19.10. occurrence is edited, new 10:00–11:00
     const master = baseFields.time
     const occ = {
       ...master,

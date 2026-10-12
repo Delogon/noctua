@@ -8,9 +8,9 @@ import type { StringKey } from '@renderer/i18n/strings'
 import { folderTreeEntries } from './folder-tree'
 
 /**
- * Ordnerbaum (Ordneransicht): oben die vereinheitlichten Sichten, darunter je
- * Konto die Ordner. Spam steht immer zuletzt und gedämpft — er gehört nie zum
- * gemeinsamen Posteingang, nur wer ihn gezielt öffnet, sieht ihn.
+ * Folder tree (folder view): the unified views on top, below them the folders
+ * per account. Spam is always last and dimmed — it never belongs to the
+ * shared inbox; only those who open it deliberately see it.
  */
 
 interface Target {
@@ -61,7 +61,7 @@ function FolderButton({
 export function FolderTree({
   showUserFolders
 }: {
-  /** false: je Konto nur die festen Ordner (Classic ohne Ordneransicht). */
+  /** false: only the fixed folders per account (Classic without folder view). */
   showUserFolders: boolean
 }): React.JSX.Element {
   const t = useT()
@@ -139,7 +139,7 @@ export function FolderTree({
               const target: Target = {
                 accountId: account.id,
                 mbox: folder.role === 'sent' ? 'sent' : folder.role === 'junk' ? 'spam' : 'inbox',
-                // Posteingang eines Kontos = Kontofilter auf die gemeinsame Sicht
+                // An account's inbox = account filter on the shared view
                 folderId: folder.role === 'inbox' ? null : folder.id
               }
               return (

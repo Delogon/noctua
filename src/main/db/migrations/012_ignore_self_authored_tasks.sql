@@ -1,5 +1,5 @@
--- Eigene gesendete Nachrichten und kontenuebergreifende Selbst-Sends sind
--- keine Aufgaben fuer den Nutzer. Bestehende Fehlklassifikationen bereinigen.
+-- Own sent messages and cross-account self-sends are not
+-- tasks for the user. Clean up existing misclassifications.
 DELETE FROM tasks
 WHERE source_kind = 'mail'
   AND source_id IN (

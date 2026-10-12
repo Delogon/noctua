@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import { createTestDb, closeTestDb, seedAccount } from '../helpers/db'
 import { getSecret, setSecret } from '@main/auth/secrets'
 
-// Browser-Logins mocken — der Handler-Rest (Dedupe, Vault) läuft echt.
+// Mock browser logins — the rest of the handler (dedupe, vault) runs for real.
 vi.mock('@main/auth/google', () => ({
   googleInteractiveLogin: vi.fn(async () => ({ email: 'bestand@gmail.com' })),
   googleAccessToken: vi.fn()
@@ -12,7 +12,7 @@ vi.mock('@main/auth/msal', () => ({
   msInteractiveLogin: vi.fn(async () => ({ email: 'bestand@hotmail.de' })),
   msAccessToken: vi.fn()
 }))
-// Zieht sonst die Hunspell-Wörterbücher als ?asset-Importe in den Test
+// Otherwise pulls the Hunspell dictionaries into the test as ?asset imports
 vi.mock('@main/spell', () => ({ getSpellEngine: vi.fn() }))
 
 import { handlers } from '@main/ipc/handlers'
@@ -24,7 +24,7 @@ describe('accounts:addGoogle / addMicrosoft — Dedupe', () => {
   it('blockt eine bereits verbundene Google-Adresse und räumt das Refresh-Token weg', async () => {
     db = createTestDb()
     seedAccount(db, { email: 'bestand@gmail.com' })
-    // Der Login hat zu diesem Zeitpunkt schon ein Refresh-Token abgelegt
+    // At this point the login has already stored a refresh token
     setSecret('google:refresh:bestand@gmail.com', 'frisch')
 
     await expect(
@@ -33,7 +33,7 @@ describe('accounts:addGoogle / addMicrosoft — Dedupe', () => {
       })
     ).rejects.toThrow(/bereits als „Testkonto \d+“ verbunden.*trenne das Konto/)
 
-    // Konto läuft per Passwort — das überflüssige Google-Token darf nicht liegen bleiben
+    // Account uses a password — the superfluous Google token must not be left behind
     expect(getSecret('google:refresh:bestand@gmail.com')).toBeNull()
   })
 

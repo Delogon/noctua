@@ -1,8 +1,8 @@
 import { invoke } from '@renderer/lib/ipc'
 
 /**
- * Zwischengespeicherter Composer-Entwurf (Neue Nachricht). Liegt als JSON im
- * settings-Store — ein Slot, passend zum einen Composer der App.
+ * Cached composer draft (New message). Stored as JSON in the
+ * settings store — one slot, matching the app's single composer.
  */
 export interface ComposeDraft {
   accountId: number | null
@@ -17,7 +17,7 @@ export interface ComposeDraft {
 
 const KEY = 'compose.draft'
 
-/** Leer = nichts Erhaltenswertes: keine Empfänger, kein Betreff, kein eigener Text. */
+/** Empty = nothing worth keeping: no recipients, no subject, no own text. */
 export function isComposeDraftEmpty(draft: ComposeDraft): boolean {
   return (
     draft.to.length === 0 &&
@@ -29,7 +29,7 @@ export function isComposeDraftEmpty(draft: ComposeDraft): boolean {
 }
 
 export async function saveComposeDraft(draft: ComposeDraft | null): Promise<void> {
-  // settings:set erlaubt max. 100k Zeichen — überlange Inhalte kappen statt scheitern
+  // settings:set allows max. 100k characters — truncate overlong content instead of failing
   const value = draft
     ? JSON.stringify({
         ...draft,

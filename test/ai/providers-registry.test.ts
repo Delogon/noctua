@@ -25,7 +25,7 @@ import {
 import { logUsage } from '@main/ai/budget'
 import { closeTestDb, createTestDb } from '../helpers/db'
 
-// Der SDK-Client wird nie gebraucht, aber das Modul zieht „openai" — sauber wegmocken
+// The SDK client is never needed, but the module pulls in „openai" — mock it out
 vi.mock('@main/ai/providers/openai-factory', () => ({
   createOpenAiClient: () => ({ chat: { completions: { create: vi.fn() } } })
 }))
@@ -86,7 +86,7 @@ describe('Profil-CRUD', () => {
     setProfileKey(p.id, 'geheim')
     expect(hasSecret(`ai.profile.${p.id}.apiKey`)).toBe(true)
     expect(getProfile(p.id)!.hasKey).toBe(true)
-    // Key des OpenRouter-Profils bleibt unberührt
+    // The OpenRouter profile's key stays untouched
     expect(hasSecret('openrouter.apiKey')).toBe(false)
     clearProfileKey(p.id)
     expect(getProfile(p.id)!.hasKey).toBe(false)
@@ -121,14 +121,14 @@ describe('Profil-CRUD', () => {
   it('verwirft den Key, wenn die Basis-URL eines Profils geändert wird', () => {
     const p = createProfile({ ...local, baseUrl: 'https://api.example.com/v1' })
     setProfileKey(p.id, 'geheim')
-    // Basis-URL-Änderung (auch nur Pfad/Port) verwirft den Key: der Vault-Key
-    // darf nie an einen anderen Endpunkt gesendet werden als den, für den er
-    // eingegeben wurde (Schutz vor renderer-gesteuerter Umleitung).
+    // Changing the base URL (even just path/port) discards the key: the vault key
+    // must never be sent to an endpoint other than the one it was
+    // entered for (protection against renderer-driven redirection).
     const changed = updateProfile(p.id, { baseUrl: 'http://evil.example/v1' })
     expect(changed.baseUrl).toBe('http://evil.example/v1')
     expect(changed.hasKey).toBe(false)
     expect(hasSecret(`ai.profile.${p.id}.apiKey`)).toBe(false)
-    // Gleiche URL (andere Felder) hält den Key
+    // Same URL (other fields) keeps the key
     setProfileKey(p.id, 'geheim2')
     const renamed = updateProfile(p.id, { name: 'Weiter so' })
     expect(renamed.hasKey).toBe(true)
@@ -205,7 +205,7 @@ describe('resolveTask', () => {
     setLocalOnly(true)
     expect(resolveTask('triage')!.profile.id).toBe(ollama.id)
     expect(resolveTask('draft')).toBeNull()
-    expect(resolveTask('stt')).toBeNull() // OpenRouter, extern
+    expect(resolveTask('stt')).toBeNull() // OpenRouter, external
     expect(taskBlockReason('draft')).toBe('local-only')
     expect(() => requireTask('draft')).toThrow(/Nur lokal/)
 
@@ -218,7 +218,7 @@ describe('resolveTask', () => {
     expect(getTaskProfileId('triage')).toBe('apple')
     expect(getSetting('ai.triageProvider')).toBe('apple')
     expect(() => setTaskAssignment('draft', 'apple', '')).toThrow()
-    // zurück auf ein echtes Profil
+    // back to a real profile
     setTaskAssignment('triage', 'openrouter', 'x/y')
     expect(getTaskProfileId('triage')).toBe('openrouter')
     expect(getSetting('ai.triageProvider')).toBe('openrouter')
@@ -227,7 +227,7 @@ describe('resolveTask', () => {
   it('Apple-Spracherkennung ist als stt-Pseudo-Profil wählbar', () => {
     setTaskAssignment('stt', 'apple', '')
     expect(getTaskProfileId('stt')).toBe('apple')
-    expect(resolveTask('stt')).toBeNull() // kein Client — transcribe.ts behandelt 'apple' selbst
+    expect(resolveTask('stt')).toBeNull() // no client — transcribe.ts handles 'apple' itself
     setTaskAssignment('stt', 'openrouter', '')
     expect(getTaskProfileId('stt')).toBe('openrouter')
   })

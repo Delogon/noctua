@@ -70,8 +70,8 @@ function buildThreadItem(db: Database.Database, agg: ThreadAggRow): ThreadListIt
       { color: string | null } | undefined
   )?.color
 
-  // AI-Sicht des Threads: Kategorie/Summary der neuesten annotierten Nachricht,
-  // Priorität als Maximum über den Thread; Nutzer-Override schlägt das Modell.
+  // AI view of the thread: category/summary of the newest annotated message,
+  // priority as the maximum across the thread; user override beats the model.
   const ai = db
     .prepare(
       `SELECT coalesce(a.user_override_category, a.category) cat, a.summary, a.needs_reply
@@ -80,9 +80,9 @@ function buildThreadItem(db: Database.Database, agg: ThreadAggRow): ThreadListIt
     )
     .get(agg.thread_key) as { cat: string; summary: string | null; needs_reply: number } | undefined
 
-  // Letterpress: Aufgaben-Vorschlag der Eule + Entscheidungszustand.
-  // accepted/dismissed = es existiert ein Task mit Quelle in diesem Thread;
-  // suggested = Annotation hat action_items, aber noch kein Task.
+  // Letterpress: the owl's task suggestion + decision state.
+  // accepted/dismissed = a task exists with its source in this thread;
+  // suggested = annotation has action_items, but no task yet.
   const taskRow = db
     .prepare(
       `SELECT t.status, t.title, t.due_date, m.subject, b.text_plain, b.html_raw FROM tasks t
@@ -152,8 +152,8 @@ function buildThreadItem(db: Database.Database, agg: ThreadAggRow): ThreadListIt
   } else if (
     actionItem?.label &&
     !isSecurityNotification(latest.subject) &&
-    // Adressat-Gate: 'none' (Verteiler/Bcc, nur CC, fremde Anrede) zeigt auch
-    // keinen Vorschlag; 'suggest' und 'create' lassen den Streifen zu.
+    // Addressee gate: 'none' (distribution list/Bcc, CC only, other salutation)
+    // shows no suggestion either; 'suggest' and 'create' allow the strip.
     taskAddresseeVerdict({
       accountEmail: actionItem.account_email,
       displayName: actionItem.account_display_name,
@@ -230,8 +230,8 @@ export function listThreads(
   mbox: 'inbox' | 'sent' | 'spam' = 'inbox',
   folderId?: number
 ): ThreadListItem[] {
-  // Ordneransicht: genau ein Ordner. Sonst die vereinheitlichte Sicht über die
-  // Special-Use — \Junk taucht damit nur auf, wenn SPAM ausdrücklich gewählt ist.
+  // Folder view: exactly one folder. Otherwise the unified view across the
+  // special-use folders — \Junk thus only shows up when SPAM is explicitly selected.
   const where =
     folderId != null
       ? `JOIN folders f ON m.folder_id = f.id WHERE f.id = ?`
@@ -245,16 +245,16 @@ export function listThreads(
       `${THREAD_AGG_SELECT} ${where}${accountFilter} GROUP BY m.thread_key ORDER BY max_date DESC LIMIT ?`
     )
     .all(...params) as ThreadAggRow[]
-  // Aggregat und Zeilenaufbau getrennt messen: buildThreadItem macht pro Thread
-  // weitere Abfragen (Diagnose großer Postfächer)
+  // Measure aggregate and row building separately: buildThreadItem runs further
+  // queries per thread (diagnosing large mailboxes)
   return metrics.time('db.threads.buildItems', () => rows.map((agg) => buildThreadItem(db, agg)), {
     rows: rows.length
   })
 }
 
 /**
- * Ordnerbaum je Konto für die Ordneransicht: nur Ordner mit Envelopes
- * (Voll-Sync). Papierkorb/Entwürfe/„Alle Nachrichten" bleiben draußen.
+ * Folder tree per account for the folder view: only folders with envelopes
+ * (full sync). Trash/Drafts/"All Mail" stay out.
  */
 export function listFolders(db: Database.Database): FolderListItem[] {
   const rows = db
@@ -311,8 +311,8 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
      ORDER BY CAST(part_id AS INTEGER), id`
   )
   const allowStmt = db.prepare('SELECT value FROM settings WHERE key = ?')
-  // Local only: keine automatischen Remote-Bilder — weder Absender-Freigabe noch
-  // globaler Default greifen; „Bilder anzeigen" pro Nachricht bleibt möglich.
+  // Local only: no automatic remote images — neither sender approval nor
+  // the global default apply; "show images" per message stays possible.
   const localOnly =
     (allowStmt.get('privacy.localOnly') as { value: string } | undefined)?.value === '1'
   return rows.map((r) => {
@@ -340,10 +340,10 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
       listUnsubscribe: r.list_unsubscribe === 1,
       remoteImagesAllowed:
         !localOnly &&
-        // Default BLOCKIERT (Design 3b, Privacy-Versprechen): Remote-Bilder
-        // laden nur, wenn der Nutzer es global erlaubt hat ('1') ODER der
-        // Absender auf der Freigabeliste steht. Explizit gespeicherte Werte
-        // ('1'/'0') behalten ihre Bedeutung — nur der ungesetzte Default dreht.
+        // Default BLOCKED (design 3b, privacy promise): remote images
+        // load only if the user allowed it globally ('1') OR the
+        // sender is on the allowlist. Explicitly stored values
+        // ('1'/'0') keep their meaning — only the unset default flips.
         ((allowStmt.get('mail.remoteImagesDefault') as { value: string } | undefined)?.value ===
           '1' ||
           (
@@ -371,7 +371,7 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
   })
 }
 
-/** Thread-Zähler je Ordner (für die Segmented-Control), optional je Konto. */
+/** Thread counts per folder (for the segmented control), optionally per account. */
 export function mboxCounts(
   db: Database.Database,
   accountId?: number

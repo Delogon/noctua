@@ -118,7 +118,7 @@ describe('computeThreadKey', () => {
       references: [],
       subject: 'Re: Angebot'
     })
-    expect(a).toBe(b) // gleicher Betreff → gleicher Thread
+    expect(a).toBe(b) // same subject → same thread
     expect(a.startsWith(`${accountId}:sub:`)).toBe(true)
   })
 
@@ -150,7 +150,7 @@ describe('computeThreadKey', () => {
       references: junk,
       subject: 'Re: Thema'
     })
-    // In-Reply-To steht hinten und bleibt erhalten → richtiger Thread
+    // In-Reply-To is at the end and is kept → correct thread
     expect(key).toBe('thread-parent')
   })
 })

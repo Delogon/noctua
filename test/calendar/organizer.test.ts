@@ -75,7 +75,7 @@ afterEach(() => {
   closeTestDb(db)
 })
 
-/** Simuliert den erfolgreichen PUT: Ops weg, Objekte übertragen. */
+/** Simulates the successful PUT: ops gone, objects transferred. */
 const clearOps = (): void => {
   db.prepare('DELETE FROM cal_pending_ops').run()
   db.prepare('UPDATE cal_objects SET pending_op = NULL, etag = ?').run('"e"')
@@ -88,7 +88,7 @@ describe('Organisator-Einladungen ohne Server-Scheduling', () => {
     createEvent(input())
     const obj = db.prepare('SELECT ics FROM cal_objects').get() as { ics: string }
     expect(obj.ics).toMatch(/ORGANIZER.*me@mail\.example\.com/)
-    expect(flushItipQueue(db, calAccount)).toBe(0) // PUT steht noch aus
+    expect(flushItipQueue(db, calAccount)).toBe(0) // PUT still pending
     expect(sent).toHaveLength(0)
     clearOps()
     expect(flushItipQueue(db, calAccount)).toBe(1)
@@ -98,7 +98,7 @@ describe('Organisator-Einladungen ohne Server-Scheduling', () => {
     expect(mail.to.sort()).toEqual(['bob@partner.example.net', 'carla@partner.example.net'])
     expect(mail.ics).toContain('METHOD:REQUEST')
     expect(mail.subject).toContain('Planung')
-    expect(flushItipQueue(db, calAccount)).toBe(0) // nicht doppelt
+    expect(flushItipQueue(db, calAccount)).toBe(0) // not twice
   })
 
   it('endgültig gescheiterter PUT: keine Einladung', () => {
@@ -193,7 +193,7 @@ describe('Organisator-Einladungen ohne Server-Scheduling', () => {
     flushItipQueue(db, calAccount)
     sent.length = 0
     deleteEvent(a.objectId, 'all', null)
-    expect(flushItipQueue(db, calAccount)).toBe(0) // DELETE noch ausstehend
+    expect(flushItipQueue(db, calAccount)).toBe(0) // DELETE still pending
     db.prepare('DELETE FROM cal_pending_ops').run()
     flushItipQueue(db, calAccount)
     expect(sent).toHaveLength(1)

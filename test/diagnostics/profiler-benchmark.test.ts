@@ -109,7 +109,7 @@ describe('SQL-Profiler und Benchmark', () => {
       expect(c.error, c.name).toBeNull()
       expect(c.runs).toBe(2)
     }
-    // listThreads macht pro Thread Folgeabfragen – der Benchmark zeigt das
+    // listThreads runs follow-up queries per thread – the benchmark shows that
     const list = result.cases.find((c) => c.name === 'threads.list.inbox(300)')!
     expect(list.statements).toBeGreaterThan(10)
     expect(db.prepare('SELECT count(*) n FROM ai_jobs').get()).toEqual(jobsBefore)
@@ -127,7 +127,7 @@ describe('SQL-Profiler und Benchmark', () => {
       dir,
       appInfo: () => ({ appVersion: '0.0.0-test', platform: 'test' })
     })
-    // die Suche im Benchmark und echte Abfragen mit Parametern laufen vorher
+    // the benchmark search and real parameterized queries run beforehand
     db.prepare('SELECT id FROM messages WHERE subject = ? AND from_addr = ?').all(
       SECRET_SUBJECT,
       SECRET_ADDR

@@ -180,7 +180,7 @@ describe('Chat-Completions-Adapter — eigenes Profil', () => {
   it('keine OpenRouter-Extras, keine Header, Kosten immer 0', async () => {
     chatCreate.mockResolvedValueOnce({
       choices: [{ message: { content: 'ok' } }],
-      // selbst ein cost-Feld oder große Token-Zahlen erzeugen keine Kosten
+      // even a cost field or large token counts produce no cost
       usage: { prompt_tokens: 1_000_000, completion_tokens: 1_000_000, cost: 5 }
     })
     const client = createChatCompletionsClient({ profile: custom('chat'), apiKey: null })

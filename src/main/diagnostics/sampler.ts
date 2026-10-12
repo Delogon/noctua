@@ -3,27 +3,27 @@ import { monitorEventLoopDelay } from 'node:perf_hooks'
 type IntervalHistogram = ReturnType<typeof monitorEventLoopDelay>
 import { metrics } from './metrics'
 
-// Zeitreihe der Prozesslast: CPU, Speicher, Event-Loop-Verzögerung des Main-
-// Prozesses (blockierte Loop = hängende UI-Antworten), dazu die Electron-
-// Prozesse (Renderer, GPU) und wie viel SQL/IPC im Intervall lief. Ringpuffer.
+// Time series of process load: CPU, memory, event loop delay of the main
+// process (blocked loop = hanging UI responses), plus the Electron
+// processes (renderer, GPU) and how much SQL/IPC ran in the interval. Ring buffer.
 
 export interface ProcessSample {
   t: number
-  /** CPU des Main-Prozesses in % eines Kerns */
+  /** Main process CPU in % of one core */
   mainCpuPct: number
   rssMb: number
   heapUsedMb: number
   externalMb: number
-  /** Event-Loop-Verzögerung (ms) im Intervall */
+  /** Event loop delay (ms) in the interval */
   loopP50Ms: number
   loopP99Ms: number
   loopMaxMs: number
-  /** Summe aller Electron-Prozesse (CPU % / Arbeitsspeicher MB), falls verfügbar */
+  /** Sum of all Electron processes (CPU % / memory MB), if available */
   appCpuPct: number | null
   appMemMb: number | null
   rendererCpuPct: number | null
   gpuCpuPct: number | null
-  /** Last im Intervall */
+  /** Load in the interval */
   sqlCalls: number
   sqlMs: number
   ipcCalls: number
@@ -92,7 +92,7 @@ export class ProcessSampler {
         appMemMb = Math.round(appMemMb * 10) / 10
       }
     } catch {
-      // Electron-Metriken nicht verfügbar (Tests)
+      // Electron metrics not available (tests)
     }
     const totals = metrics.totals()
     const sample: ProcessSample = {

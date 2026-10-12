@@ -36,10 +36,10 @@ import { ScopeChoice } from './ScopeChoice'
 import { CalendarSelect, DateField, EventTimeFields } from './TimeFields'
 import { weekdayShort } from './format'
 
-// Termin-Editor als Seitenblatt neben dem Raster (gleiche sheet-card-Sprache wie
-// Aufgaben/Wartet). Neue Termine füllen das Formular direkt, bestehende laden erst die
-// Details. Schreibgeschützte Kalender: alle Felder gesperrt, keine Speichern/Löschen-
-// Knöpfe. Die Kalenderwahl ist bei bestehenden Terminen fest (Backend kann nicht verschieben).
+// Event editor as a side sheet next to the grid (same sheet-card language as
+// Tasks/Waiting). New events fill the form directly, existing ones load the
+// details first. Read-only calendars: all fields locked, no save/delete
+// buttons. The calendar choice is fixed for existing events (backend cannot move them).
 
 const ALARM_KEYS: Record<(typeof ALARM_PRESETS)[number]['id'], StringKey> = {
   none: 'cvAlarmNone',
@@ -162,7 +162,7 @@ function RecurrenceEditor({
                     data-on={on}
                     onClick={() => {
                       const byday = on ? rec.byday.filter((x) => x !== d) : [...rec.byday, d]
-                      // mindestens ein Tag bleibt gewählt
+                      // at least one day stays selected
                       if (byday.length > 0) onChange({ ...form, rec: { ...rec, byday } })
                     }}
                   >
@@ -241,7 +241,7 @@ function EditorForm({
   calendars
 }: {
   detail: CalendarEventDetail | null
-  /** Vorkommen, über das der Editor geöffnet wurde (für Bereich 'dieser Termin') */
+  /** Occurrence through which the editor was opened (for scope 'this event') */
   recurrenceId: string | null
   initialForm: EventForm
   calendars: readonly CalendarSummary[]
@@ -251,7 +251,7 @@ function EditorForm({
   const finishEditor = useCalendar((s) => s.finishEditor)
   const actions = useCalendarEventActions()
   const [form, setForm] = useState(initialForm)
-  // Basis für den Diff: der Stand beim Öffnen (spätere Sync-Aktualisierungen ändern ihn nicht)
+  // Base for the diff: the state at open time (later sync updates do not change it)
   const [baseline] = useState(() => detail?.fields ?? null)
   const [prompt, setPrompt] = useState<'save' | 'delete' | null>(null)
   const [busy, setBusy] = useState(false)
@@ -265,16 +265,16 @@ function EditorForm({
   const recurring = detail?.recurring ?? false
   const error = validateForm(form)
   const writable = calendars.filter((c) => !c.readOnly && c.components.includes('VEVENT'))
-  // Bestehender Termin: sein Kalender steht fest, auch wenn er nicht (mehr) in der Auswahl wäre
+  // Existing event: its calendar is fixed, even if it is not (or no longer) in the selection
   const selectable = detail ? calendars.filter((c) => c.id === detail.calendarId) : writable
   const canSave = !readOnly && !busy && error === null && form.calendarId !== null
-  // Nur der Organisator ändert Teilnehmer; bis die Auskunft da ist, gilt ein bestehender Termin als fremd
+  // Only the organizer changes attendees; until the info is in, an existing event counts as foreign
   const organizerIsMe = info ? info.organizerIsMe : !detail
   const editableAttendees = !readOnly && !busy && organizerIsMe
   const baseAttendees = baseline?.attendees ?? []
   const hasAttendees = hasAnyAttendees(baseAttendees, attendees)
   const serverSends = info?.autoSchedule ?? false
-  // „Teilnehmer benachrichtigen" wird nur mitgegeben, wenn es etwas zu benachrichtigen gibt
+  // "Notify attendees" is only passed along if there is something to notify about
   const notifyOpt = hasAttendees && organizerIsMe && !serverSends ? notify : undefined
   const diff = diffAttendees(baseAttendees, attendees)
   const organizer =
@@ -308,7 +308,7 @@ function EditorForm({
         if (Object.keys(patch).length > 0) {
           const target = { recurring }
           const chosen = effectiveScope(target, scope)
-          // Ganze Serie + Zeitänderung an einem Vorkommen: Serienstart mitführen
+          // Whole series + time change on one occurrence: carry the series start along
           let masterTime: CalendarEventFields['time'] | null = null
           if (recurring && chosen === 'all' && patch.time) {
             const master = await invoke('calendar:events:get', {
@@ -355,7 +355,7 @@ function EditorForm({
   const onSaveClick = (): void => {
     if (!canSave) return
     if (detail && needsScope({ recurring })) {
-      // Ohne Änderung kein Dialog
+      // No change, no dialog
       const changed =
         baseline &&
         Object.keys(
@@ -717,7 +717,7 @@ function ExistingEditor({
   )
 }
 
-/** Wurzel: wählt je nach Ziel Neu-/Bearbeiten-Formular. */
+/** Root: picks the new or edit form depending on the target. */
 export function EventEditor({
   calendars
 }: {

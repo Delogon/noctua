@@ -51,13 +51,13 @@ describe('isTrustedAppUrl / isTrustedIpcSender', () => {
   it('Sender: nur Top-Frame des Hauptfensters auf der App-Seite', () => {
     const url = `file://${prod.indexPath}`
     expect(isTrustedIpcSender({ isMainWindowTopFrame: true, frameUrl: url }, prod)).toBe(true)
-    // Subframe (z. B. Mail-iframe) oder anderes Fenster
+    // Subframe (e.g. mail iframe) or another window
     expect(isTrustedIpcSender({ isMainWindowTopFrame: false, frameUrl: url }, prod)).toBe(false)
-    // Top-Frame, aber auf fremder Seite
+    // Top frame, but on a foreign page
     expect(
       isTrustedIpcSender({ isMainWindowTopFrame: true, frameUrl: 'https://evil.example/' }, prod)
     ).toBe(false)
-    // Zerstörter Frame
+    // Destroyed frame
     expect(isTrustedIpcSender({ isMainWindowTopFrame: true, frameUrl: undefined }, prod)).toBe(
       false
     )

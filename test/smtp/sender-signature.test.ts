@@ -6,9 +6,9 @@ import { setSecret } from '@main/auth/secrets'
 import { accountSecretKey } from '@main/auth/providers'
 import { closeTestDb, createTestDb, seedAccount } from '../helpers/db'
 
-// Versand-Pfad des Stups (M75): compose:send schickt den Text OHNE Signatur —
-// sendMail hängt die Konto-Signatur genau einmal an. Diese Tests belegen das
-// mit gemocktem SMTP (kein echter Versand).
+// Nudge send path (M75): compose:send sends the text WITHOUT a signature —
+// sendMail appends the account signature exactly once. These tests prove that
+// with mocked SMTP (no real sending).
 
 const { transportSendMail } = vi.hoisted(() => ({ transportSendMail: vi.fn(async () => {}) }))
 
@@ -121,7 +121,7 @@ describe('sendMail — Signatur genau einmal (Stups-Pfad)', () => {
       'Hallo Heike,\n\nwollte kurz nachhaken.\n\nLena Hartmann\nStudio Fernweh'
     )
     expect(occurrences(sent.text, 'Lena Hartmann')).toBe(1)
-    // Auch die HTML-Alternative trägt die Signatur nur einmal
+    // The HTML alternative also carries the signature only once
     expect(occurrences(sent.html ?? '', 'Lena Hartmann')).toBe(1)
   })
 

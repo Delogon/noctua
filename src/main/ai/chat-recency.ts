@@ -1,8 +1,8 @@
 /**
- * Aktualitäts-Kanal des Chat-Retrievals: Vektor- und Volltext-Suche sind rein
- * thematisch — „Welche Mails kamen heute an?" fand deshalb thematisch passende
- * statt neuer Mails. Die neuesten Threads laufen jetzt immer als eigener Kanal
- * mit; bei erkennbarem Zeitbezug in der Frage rücken sie an die Spitze.
+ * Recency channel of chat retrieval: vector and full-text search are purely
+ * topical — "Which mails arrived today?" therefore found topically matching
+ * instead of new mails. The newest threads now always run along as a separate
+ * channel; if the question has a recognizable time reference they move to the top.
  */
 
 const TEMPORAL_PATTERNS: RegExp[] = [
@@ -25,15 +25,15 @@ const TEMPORAL_PATTERNS: RegExp[] = [
   /\blast\s+(week|month|days?|hours?)\b/i
 ]
 
-/** Fragt die Frage nach einem Zeitbezug („heute", „letzte Woche", „latest"…). */
+/** Does the question ask about a time reference ("today", "last week", "latest"…)? */
 export function isTemporalQuestion(question: string): boolean {
   return TEMPORAL_PATTERNS.some((re) => re.test(question))
 }
 
 /**
- * Mischt thematische Kandidaten mit den neuesten Threads. Zeitbezug in der
- * Frage ⇒ die neuesten zuerst (sie SIND die Antwort); sonst füllen sie hinten
- * auf, damit „Was ist neu?"-artige Anschlussfragen Material haben.
+ * Merges topical candidates with the newest threads. Time reference in the
+ * question ⇒ newest first (they ARE the answer); otherwise they fill up at the
+ * end so "What's new?"-style follow-up questions have material.
  */
 export function blendThreadKeys(params: {
   topical: string[]

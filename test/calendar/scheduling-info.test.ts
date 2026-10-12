@@ -91,7 +91,7 @@ describe('Scheduling-Kontext des Editors', () => {
     )
     const info = schedulingInfo(db, { calendarId: calId, objectId: foreign.objectId })
     expect(info.organizerIsMe).toBe(false)
-    expect(info.invitation).toBeNull() // keine Einladungsmail zu diesem Termin
+    expect(info.invitation).toBeNull() // no invitation mail for this event
   })
 })
 

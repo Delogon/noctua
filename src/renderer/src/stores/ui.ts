@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 
 /**
- * Rest-Store neben stores/paper.ts: nur noch die zwei Overlays, die nicht am
- * Papier-Layout hängen. Alles Weitere (View, Selektion, Suche, Composer)
- * wohnt in usePaper — hier nichts neu anbauen.
+ * Remaining store next to stores/paper.ts: only the two overlays that don't
+ * depend on the paper layout. Everything else (view, selection, search, composer)
+ * lives in usePaper — don't add anything new here.
  */
 interface UiState {
   overrideMenuOpen: boolean

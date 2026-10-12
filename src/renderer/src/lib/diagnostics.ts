@@ -1,8 +1,8 @@
 import { emptyHistogram, observe, summarize, type Histogram } from '@shared/histogram'
 
-// Renderer-Seite der Leistungsdiagnose: Antwortzeit jedes IPC-Aufrufs (inkl.
-// Serialisierung) und lange Tasks (> 50 ms blockierter UI-Thread = Ruckeln).
-// Bleibt im Speicher; nur beim ZIP-Export geht eine Zusammenfassung an Main.
+// Renderer side of the performance diagnostics: response time of every IPC call (incl.
+// serialization) and long tasks (> 50 ms blocked UI thread = jank).
+// Stays in memory; only the ZIP export sends a summary to main.
 
 const ipc = new Map<string, Histogram>()
 const longTasks = {
@@ -23,7 +23,7 @@ export function recordInvoke(channel: string, ms: number): void {
   observe(h, ms)
 }
 
-/** Lange Tasks beobachten (Chromium: PerformanceObserver 'longtask'). */
+/** Observe long tasks (Chromium: PerformanceObserver 'longtask'). */
 export function startLongTaskObserver(): void {
   if (observing || typeof PerformanceObserver === 'undefined') return
   if (!PerformanceObserver.supportedEntryTypes?.includes('longtask')) return

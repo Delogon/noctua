@@ -11,9 +11,9 @@ export function sanitizeComposerHtml(html: string): string {
 }
 
 /**
- * HTML-Alternative für den Versand. Fehlt echtes Editor-HTML (oder ist es nur
- * roher Text ohne Zeilen-Tags), wird der Klartext in <div>-Blöcke gewandelt —
- * sonst kollabieren die Zeilenumbrüche in HTML-Clients und der Gesendet-Ansicht.
+ * HTML alternative for sending. If real editor HTML is missing (or it is only
+ * raw text without line tags), the plain text is converted into <div> blocks —
+ * otherwise the line breaks collapse in HTML clients and the Sent view.
  */
 export function composerHtmlForSend(html: string, text: string): string {
   const trimmed = html.trim()

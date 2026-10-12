@@ -2,22 +2,22 @@ import type { CalendarInstance } from '@shared/calendar-types'
 import { addDays, dayKey, startOfDay } from './dates'
 import { compareEvents, dayRange } from './layout'
 
-// Agenda der Owl-Rail: die nächsten Termine von heute und morgen.
+// Owl rail agenda: the next events of today and tomorrow.
 
 export interface AgendaItems {
   today: CalendarInstance[]
   tomorrow: CalendarInstance[]
 }
 
-/** Abfragefenster [heute 00:00, übermorgen 00:00) in ms. */
+/** Query window [today 00:00, day after tomorrow 00:00) in ms. */
 export function agendaRange(now: Date): { start: number; end: number } {
   const start = startOfDay(now)
   return { start: start.getTime(), end: addDays(start, 2).getTime() }
 }
 
 /**
- * Heute: nur, was noch nicht vorbei ist (Ganztägiges bleibt den ganzen Tag);
- * morgen: alles. Abgesagte Termine fallen heraus.
+ * Today: only what is not over yet (all-day stays for the whole day);
+ * tomorrow: everything. Cancelled events are dropped.
  */
 export function agendaItems(events: readonly CalendarInstance[], now: Date): AgendaItems {
   const todayKey = dayKey(now)

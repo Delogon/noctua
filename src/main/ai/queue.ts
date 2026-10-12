@@ -14,20 +14,20 @@ const MAX_ATTEMPTS = 5
 const CONCURRENCY = 2
 const POLL_INTERVAL_MS = 20_000
 const TRIAGE_WINDOW_DAYS = 30
-// Transiente Fehler (429/5xx/Netz) verbrennen keine Versuche; nach so vielen
-// in Folge pausiert die ganze Queue (Circuit Breaker) statt Jobs zu verbrauchen.
+// Transient errors (429/5xx/network) don't burn attempts; after this many
+// in a row the whole queue pauses (circuit breaker) instead of consuming jobs.
 const BREAKER_THRESHOLD = 5
 const BREAKER_PAUSE_MS = 5 * 60_000
 const TRANSIENT_BACKOFF_BASE_MS = 30_000
 const TRANSIENT_BACKOFF_MAX_MS = 10 * 60_000
 const PROMPT_VERSION_SETTING = 'ai.queuePromptVersion'
-// Termin-Extraktion (Job 'events'): nur Mails, die NACH diesem Zeitpunkt ankamen — beim ersten
-// Lauf mit Kalender-Konto gesetzt, damit nie das 30-Tage-Fenster rückwirkend bezahlt wird.
+// Appointment extraction (job 'events'): only mails that arrived AFTER this time — set on the
+// first run with a calendar account so the 30-day window is never paid for retroactively.
 const EVENTS_SINCE_SETTING = 'ai.eventsSince'
 
 /**
- * Triage-Kandidaten einreihen (Parameter: since, PROMPT_VERSION). Exportiert,
- * damit der Diagnose-Benchmark dieselbe Abfrage misst.
+ * Enqueue triage candidates (parameters: since, PROMPT_VERSION). Exported
+ * so the diagnostic benchmark measures the same query.
  */
 export const TRIAGE_DISCOVERY_SQL = `INSERT OR IGNORE INTO ai_jobs (message_id, kind, status)
   SELECT m.id, 'triage', 'pending'
@@ -71,8 +71,8 @@ function readRetryAfterMs(headers: unknown): number | null {
 }
 
 /**
- * Transient = Wiederholen lohnt sich, der Job selbst ist nicht schuld:
- * HTTP 408/429/5xx und Netzwerkfehler. Alles andere ist ein permanenter Fehler.
+ * Transient = retrying is worthwhile, the job itself is not at fault:
+ * HTTP 408/429/5xx and network errors. Everything else is a permanent error.
  */
 export function classifyAiError(error: unknown): {
   transient: boolean
@@ -103,9 +103,9 @@ export function classifyAiError(error: unknown): {
 }
 
 /**
- * AI-Job-Queue: entdeckt triage-fähige Nachrichten (idempotent über
- * UNIQUE(message_id, kind) — nie doppelt scannen) und arbeitet sie mit
- * begrenzter Parallelität ab. Hartes Budget-Gate vor jedem Request.
+ * AI job queue: discovers triage-eligible messages (idempotent via
+ * UNIQUE(message_id, kind) — never scan twice) and processes them with
+ * limited parallelism. Hard budget gate before every request.
  */
 export class AiQueue {
   private db: Database.Database | null = null
@@ -134,8 +134,8 @@ export class AiQueue {
   }
 
   /**
-   * Ein Absturz mitten im Request lässt Jobs auf 'running' zurück, die nie
-   * wieder angefasst würden — beim Start zurück auf 'pending'.
+   * A crash mid-request leaves jobs in 'running' that would never
+   * be touched again — reset to 'pending' on startup.
    */
   recoverRunning(): number {
     if (!this.db) return 0
@@ -143,7 +143,7 @@ export class AiQueue {
       .changes
   }
 
-  /** Permanent gescheiterte Jobs (z. B. nach Prompt-/Modellwechsel) erneut versuchen. */
+  /** Retry permanently failed jobs (e.g. after a prompt/model change). */
   requeueFailed(): number {
     if (!this.db) return 0
     return this.db
@@ -154,7 +154,7 @@ export class AiQueue {
       .run().changes
   }
 
-  /** Neue PROMPT_VERSION = neue Chance für Jobs, die am alten Prompt gescheitert sind. */
+  /** New PROMPT_VERSION = new chance for jobs that failed on the old prompt. */
   private requeueOnPromptChange(): void {
     const db = this.db!
     const row = db
@@ -167,7 +167,7 @@ export class AiQueue {
     ).run(PROMPT_VERSION_SETTING, String(PROMPT_VERSION))
   }
 
-  /** Discovery + Drain anstoßen (nach Ingest, Body-Store, App-Start). */
+  /** Kick off discovery + drain (after ingest, body store, app start). */
   kick(): void {
     if (!this.db) return
     this.discover()
@@ -183,9 +183,9 @@ export class AiQueue {
   }
 
   /**
-   * Termin-Jobs nur für NEUE Mails (Ankunft nach ai.eventsSince), nur mit Kalender-Konto,
-   * nur für bereits getriagte Mails der Kategorien personal/work/other und ohne
-   * Einladungs-Teil (die hat die Einladungskarte). UNIQUE(message_id, kind) macht es idempotent.
+   * Appointment jobs only for NEW mails (arrival after ai.eventsSince), only with a calendar
+   * account, only for already triaged mails of the categories personal/work/other and without
+   * an invitation part (the invitation card covers those). UNIQUE(message_id, kind) makes it idempotent.
    */
   private discoverEvents(): void {
     const db = this.db!
@@ -268,13 +268,13 @@ export class AiQueue {
         }
         this.consecutiveTransient = 0
         db.prepare(`UPDATE ai_jobs SET status = 'done', last_error = NULL WHERE id = ?`).run(job.id)
-        // Renderer lädt die Mail-Ansicht (Terminvorschläge) neu
+        // Renderer reloads the mail view (appointment suggestions)
         if (outcome === 'done') this.push('ai:annotated', { messageIds: [job.message_id] })
         return
       }
       const outcome = await runTriage(db, job.message_id)
       if (outcome === 'skipped-no-client') {
-        // Kein API-Key hinterlegt — Job zurücklegen, ohne attempts zu verbrennen.
+        // No API key stored — put the job back without burning attempts.
         db.prepare(`UPDATE ai_jobs SET status = 'pending', next_attempt_at = ? WHERE id = ?`).run(
           Date.now() + 5 * 60_000,
           job.id
@@ -285,7 +285,7 @@ export class AiQueue {
       db.prepare(`UPDATE ai_jobs SET status = 'done', last_error = NULL WHERE id = ?`).run(job.id)
       try {
         await applyRulesPostTriage(db, job.message_id)
-        // Aussortierter Spam löst keine Benachrichtigung aus
+        // Filtered-out spam doesn't trigger a notification
         if (!maybeAutoJunk(db, job.message_id)) maybeNotify(job.message_id)
         updateBadge()
       } catch (error) {
@@ -296,8 +296,8 @@ export class AiQueue {
       const message = error instanceof Error ? error.message.slice(0, 500) : String(error)
       const { transient, retryAfterMs } = classifyAiError(error)
       if (transient) {
-        // Rate-Limit/Ausfall/Netz: Job zurücklegen ohne attempts zu verbrennen,
-        // Retry-After des Servers respektieren, bei Serie die Queue pausieren.
+        // Rate limit/outage/network: put the job back without burning attempts,
+        // respect the server's Retry-After, pause the queue on a streak.
         this.consecutiveTransient += 1
         const backoff = Math.min(
           TRANSIENT_BACKOFF_MAX_MS,

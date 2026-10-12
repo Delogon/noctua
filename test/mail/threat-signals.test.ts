@@ -70,7 +70,7 @@ describe('lokale Spam-/Phishing-Signale', () => {
     expect(
       codes({ fromName: 'Sparkasse Kundenservice', fromAddr: 'sk.service@gmail.com' })
     ).toContain('brand_freemail')
-    // Google schreibt legitim von gmail.com-nahen Adressen – keine Warnung
+    // Google legitimately sends from gmail.com-like addresses – no warning
     expect(codes({ fromName: 'Gmail Team', fromAddr: 'team@gmail.com' })).not.toContain(
       'brand_freemail'
     )

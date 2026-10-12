@@ -9,8 +9,8 @@ export function useTaskInvalidation(): void {
     const invalidate = (): void => {
       void queryClient.invalidateQueries({ queryKey: ['tasks'] })
     }
-    // Jede Task-Mutation pusht tasks:changed aus dem Main-Prozess — so ist der
-    // Toggle überall sofort sichtbar, egal von welcher Stelle der invoke kommt.
+    // Every task mutation pushes tasks:changed from the main process — so the
+    // toggle is visible everywhere immediately, no matter where the invoke comes from.
     const offAnnotated = onPush('ai:annotated', invalidate)
     const offChanged = onPush('tasks:changed', invalidate)
     return () => {
@@ -28,7 +28,7 @@ export function useTasks(status: 'open' | 'done'): UseQueryResult<InvokeOutput<'
   })
 }
 
-/** Gewählte CalDAV-Aufgabenliste + wählbare Listen (Phase 3.2). */
+/** Selected CalDAV task list + selectable lists (Phase 3.2). */
 export function useTasksSyncSettings(): UseQueryResult<InvokeOutput<'tasks:sync:get'>> {
   const queryClient = useQueryClient()
   useEffect(

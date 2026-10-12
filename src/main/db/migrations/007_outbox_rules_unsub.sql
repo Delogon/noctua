@@ -1,4 +1,4 @@
--- M10: Undo Send (Outbox), NL-Regeln, Unsubscribe-Header-Werte.
+-- M10: Undo Send (outbox), NL rules, unsubscribe header values.
 
 CREATE TABLE outbox (
   id INTEGER PRIMARY KEY,
@@ -15,9 +15,9 @@ CREATE TABLE rules (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT,
-  source_text TEXT NOT NULL,            -- die ursprüngliche Formulierung des Nutzers
-  rule_json TEXT NOT NULL,              -- deterministische Match/Action-Definition
-  needs_ai INTEGER NOT NULL DEFAULT 0,  -- referenziert Kategorie/Priorität → Post-Triage-Phase
+  source_text TEXT NOT NULL,            -- the user's original wording
+  rule_json TEXT NOT NULL,              -- deterministic match/action definition
+  needs_ai INTEGER NOT NULL DEFAULT 0,  -- references category/priority → post-triage phase
   enabled INTEGER NOT NULL DEFAULT 1,
   hits INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL

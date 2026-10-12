@@ -6,7 +6,7 @@ import {
   INBOX_FILTERS
 } from '@renderer/features/paper/inbox-filters'
 
-/** Filter-Registry der Posteingangs-Liste (Design Turn 7). */
+/** Filter registry of the inbox list (Design Turn 7). */
 
 const rows = [{ aiPriority: 5 }, { aiPriority: 4 }, { aiPriority: 3 }, { aiPriority: null }]
 
@@ -39,7 +39,7 @@ describe('Registry', () => {
   })
 
   it('gleiche Sektion gruppiert, neue Sektion entsteht mit dem ersten Def', () => {
-    // Struktur-Eigenschaft der Gruppierung, nicht der heutigen Registry:
+    // Structural property of the grouping, not of today's registry:
     const sections = filterSections()
     const uniqueSections = new Set(INBOX_FILTERS.map((d) => d.section))
     expect(sections).toHaveLength(uniqueSections.size)

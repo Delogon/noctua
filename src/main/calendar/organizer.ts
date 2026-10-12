@@ -16,18 +16,18 @@ import { inviteBody, itipSubject, sendItipMail, type MailLang, type WhenInfo } f
 import type { CalAccountRow } from './repo'
 
 /**
- * Organisator-Seite (RFC 5546/6638): Einladungen, Änderungen und Absagen.
+ * Organizer side (RFC 5546/6638): invitations, changes and cancellations.
  *
- * - Konto mit `calendar-auto-schedule`: nur der normale PUT/DELETE — der Server
- *   verschickt die Einladungen (iMIP/Inbox) selbst. Wir senden NICHT zusätzlich.
- * - Sonst: iMIP-Nachrichten gehen erst raus, wenn die lokale Änderung auf dem
- *   Server angekommen ist (Tabelle cal_itip_queue; Versand, sobald keine
- *   wartende cal_pending_op für die UID mehr existiert; scheitert die Op
- *   endgültig, wird nichts versendet).
+ * - Account with `calendar-auto-schedule`: only the normal PUT/DELETE — the server
+ *   sends the invitations (iMIP/inbox) itself. We do NOT send in addition.
+ * - Otherwise: iMIP messages only go out once the local change has reached the
+ *   server (table cal_itip_queue; sent as soon as no pending
+ *   cal_pending_op exists for the UID any more; if the op fails
+ *   permanently, nothing is sent).
  */
 
 export interface SchedulingOptions {
-  /** Teilnehmer benachrichtigen (Standard: ja, sofern Teilnehmer vorhanden und wir Organisator sind) */
+  /** Notify attendees (default: yes, if there are attendees and we are the organizer) */
   notifyAttendees?: boolean
 }
 
@@ -36,8 +36,8 @@ function lang(): MailLang {
 }
 
 /**
- * Hat der Termin Teilnehmer, aber keinen Organisator, wird der Nutzer
- * (Hauptadresse des Kontos) Organisator — sonst wäre es kein Meeting.
+ * If the event has attendees but no organizer, the user
+ * (primary address of the account) becomes organizer — otherwise it would not be a meeting.
  */
 export function withDefaultOrganizer<T extends CalendarEventFields>(
   db: Database.Database,
@@ -51,8 +51,8 @@ export function withDefaultOrganizer<T extends CalendarEventFields>(
 }
 
 /**
- * Wie `withDefaultOrganizer`, für Änderungen: Kommen Teilnehmer zu einem Termin ohne
- * Organisator hinzu, wird der Nutzer Organisator — sonst gingen keine Einladungen raus.
+ * Like `withDefaultOrganizer`, for changes: if attendees are added to an event without an
+ * organizer, the user becomes organizer — otherwise no invitations would go out.
  */
 export function withDefaultOrganizerPatch(
   db: Database.Database,
@@ -119,7 +119,7 @@ function enqueueItip(
       `DELETE FROM cal_itip_queue WHERE account_id = ? AND uid = ? AND kind = 'request'`
     ).run(account.id, p.uid)
   } else if (p.kind === 'cancel') {
-    // Absage der ganzen Ressource macht wartende Einladungen gegenstandslos
+    // Cancelling the whole resource makes pending invitations moot
     db.prepare(
       `DELETE FROM cal_itip_queue WHERE account_id = ? AND uid = ? AND kind = 'request'`
     ).run(account.id, p.uid)
@@ -146,18 +146,18 @@ function enqueueItip(
   )
 }
 
-/** Verwirft wartende Einladungen einer UID (z. B. Termin gelöscht, bevor er je übertragen wurde). */
+/** Discards pending invitations of a UID (e.g. event deleted before it was ever uploaded). */
 export function dropQueuedItip(db: Database.Database, accountId: number, uid: string): void {
   db.prepare('DELETE FROM cal_itip_queue WHERE account_id = ? AND uid = ?').run(accountId, uid)
 }
 
 export interface SchedulingPlan {
-  /** Endgültiges ICS (SEQUENCE/PARTSTAT bei wesentlicher Änderung angepasst) */
+  /** Final ICS (SEQUENCE/PARTSTAT adjusted on a significant change) */
   ics: string
   significant: boolean
 }
 
-/** Neuanlage: Einladung an alle Teilnehmer einreihen (nur ohne Server-Scheduling). */
+/** New event: queue an invitation to all attendees (only without server scheduling). */
 export function queueForCreate(
   db: Database.Database,
   account: CalAccountRow,
@@ -188,8 +188,8 @@ export function queueForCreate(
 }
 
 /**
- * Änderung: SEQUENCE sauber führen (auch mit Server-Scheduling — der Server
- * erwartet korrekte SEQUENCE) und ohne Server-Scheduling REQUEST/CANCEL einreihen.
+ * Change: keep SEQUENCE correct (also with server scheduling — the server
+ * expects a correct SEQUENCE) and queue REQUEST/CANCEL without server scheduling.
  */
 export function planUpdate(
   db: Database.Database,
@@ -250,7 +250,7 @@ export function planUpdate(
   return { ics: normalized.ics, significant: normalized.significant }
 }
 
-/** Löschen: CANCEL an alle Teilnehmer (ganze Ressource oder einzelnes Vorkommen / dieses und folgende). */
+/** Delete: CANCEL to all attendees (whole resource or single occurrence / this and following). */
 export function queueForDelete(
   db: Database.Database,
   account: CalAccountRow,
@@ -299,9 +299,9 @@ interface QueueRow {
 }
 
 /**
- * Versendet eingereihte Nachrichten, deren Änderung auf dem Server angekommen
- * ist. Vom Sync nach jedem Push-Durchlauf aufgerufen. Gibt die Zahl der
- * versendeten Nachrichten zurück.
+ * Sends queued messages whose change has reached the server.
+ * Called by the sync after each push pass. Returns the number of
+ * messages sent.
  */
 export function flushItipQueue(db: Database.Database, accountId: number): number {
   const rows = db
@@ -322,7 +322,7 @@ export function flushItipQueue(db: Database.Database, accountId: number): number
       )
       .get(accountId, row.uid, row.created_at - 5000)
     if (dead) {
-      // Änderung wurde verworfen: nichts ankündigen, was nicht passiert ist
+      // Change was discarded: don't announce something that didn't happen
       db.prepare('DELETE FROM cal_itip_queue WHERE id = ?').run(row.id)
       continue
     }
@@ -342,7 +342,7 @@ export function flushItipQueue(db: Database.Database, accountId: number): number
         ics: row.ics
       })
     } catch (error) {
-      // Versand (noch) nicht möglich: Zeile bleibt für den nächsten Durchlauf
+      // Sending not possible (yet): the row stays for the next pass
       console.warn(
         `[calendar] Einladung nicht versendet: ${error instanceof Error ? error.message : String(error)}`
       )

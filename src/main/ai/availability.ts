@@ -4,11 +4,11 @@ import { selfBusy } from '../calendar/freebusy'
 import { systemTimeZone, utcToWallIana, wallToUtcIana, type Wall } from '../calendar/tz'
 
 /**
- * Verfügbarkeit für Antwortentwürfe (2.4): Wenn eine Mail um einen Termin
- * bittet, bekommt das Modell die FREIEN Zeitfenster des Nutzers (nächste
- * Arbeitstage, 08–18 Uhr lokal) und schlägt daraus 2–3 konkrete vor.
- * Datenschutz: nur lokale Belegung (`selfBusy`), nur freie Zeitfenster als
- * Daten — nie Termintitel, Orte, Teilnehmer oder belegte Intervalle.
+ * Availability for reply drafts (2.4): when a mail asks for an
+ * appointment, the model gets the user's FREE time slots (next
+ * workdays, 08–18 local) and suggests 2–3 concrete ones from them.
+ * Privacy: only local busy data (`selfBusy`), only free time slots as
+ * data — never event titles, locations, attendees or busy intervals.
  */
 
 export interface TimeSlot {
@@ -18,14 +18,14 @@ export interface TimeSlot {
 
 export interface SlotOptions {
   fromUtc: number
-  /** Anzahl Arbeitstage (Mo–Fr), Standard 10 */
+  /** Number of workdays (Mon–Fri), default 10 */
   workingDays?: number
   startHour?: number
   endHour?: number
   zone: string
-  /** Kürzeste ausgegebene Lücke in Minuten */
+  /** Shortest emitted gap in minutes */
   minMinutes?: number
-  /** Vorlauf ab fromUtc, in dem nichts vorgeschlagen wird (Minuten) */
+  /** Lead time from fromUtc in which nothing is suggested (minutes) */
   leadMinutes?: number
 }
 
@@ -50,12 +50,12 @@ function wallAt(day: Ymd, hour: number): Wall {
   return { ...day, h: hour, mi: 0, s: 0 }
 }
 
-/** Die nächsten Arbeitstage (Mo–Fr) ab dem lokalen Kalendertag von fromUtc. */
+/** The next workdays (Mon–Fri) from the local calendar day of fromUtc. */
 export function workingDayList(fromUtc: number, zone: string, count: number): Ymd[] {
   const start = utcToWallIana(fromUtc, zone)
   let day: Ymd = { y: start.y, m: start.m, d: start.d }
   const out: Ymd[] = []
-  // Obergrenze gegen Endlosschleifen; 10 Arbeitstage = höchstens ~14 Kalendertage
+  // Upper bound against endless loops; 10 workdays = at most ~14 calendar days
   for (let i = 0; i < count * 3 + 7 && out.length < count; i++) {
     const wd = weekday(day)
     if (wd >= 1 && wd <= 5) out.push(day)
@@ -65,9 +65,9 @@ export function workingDayList(fromUtc: number, zone: string, count: number): Ym
 }
 
 /**
- * Freie Zeitfenster innerhalb der Arbeitszeit. Die Fenster werden je Tag in
- * Wandzeit der Zone gebildet (DST-fest über wallToUtcIana), belegte Intervalle
- * (auch BUSY-TENTATIVE) werden abgezogen, Überlappungen vorab verschmolzen.
+ * Free time slots within working hours. The windows are built per day in
+ * the zone's wall time (DST-safe via wallToUtcIana), busy intervals
+ * (incl. BUSY-TENTATIVE) are subtracted, overlaps merged beforehand.
  */
 export function computeFreeSlots(
   busy: ReadonlyArray<{ startUtc: number; endUtc: number }>,
@@ -107,7 +107,7 @@ export function computeFreeSlots(
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
-/** „2026-10-12 (Mon): 09:00-11:30, 14:00-18:00" — sprachneutral, ein Tag je Zeile. */
+/** "2026-10-12 (Mon): 09:00-11:30, 14:00-18:00" — language-neutral, one day per line. */
 export function formatSlots(slots: TimeSlot[], zone: string, maxPerDay = 4): string[] {
   const byDay = new Map<string, string[]>()
   for (const s of slots) {
@@ -121,13 +121,13 @@ export function formatSlots(slots: TimeSlot[], zone: string, maxPerDay = 4): str
   return [...byDay].map(([day, ranges]) => `${day}: ${ranges.join(', ')}`)
 }
 
-/** Eigene Kalender-Daten dürfen in Entwurfs-Prompts: Setting nicht aus + Kalender-Konto da. */
+/** Own calendar data may go into draft prompts: setting not off + calendar account present. */
 export function draftCalendarEnabled(db: Database.Database): boolean {
   if (getSetting('ai.draftUseCalendar') === '0') return false
   return !!db.prepare('SELECT 1 FROM cal_accounts LIMIT 1').get()
 }
 
-// Billige Erkennung „Mail fragt nach einem Termin / einer Uhrzeit".
+// Cheap detection of "mail asks for an appointment / a time".
 const MEETING_ASK =
   /\b(termin|treffen|besprechung|meeting|telefonat|call|videocall|gespräch|kaffee|mittagessen|zeit(?:punkt|fenster)?|verfügbar|passt (?:es|dir|ihnen)|wann (?:hast|haben|passt|könnt|können)|vorschlag|appointment|schedule|reschedule|availability|available|catch up|get together|lunch|coffee|when (?:are|can|could|would|works)|works for you|free (?:on|at|for))\b/i
 
@@ -138,17 +138,17 @@ export function asksForMeeting(text: string, hasEventSuggestion: boolean): boole
 export interface AvailabilityBlockInput {
   now: number
   zone?: string
-  /** Text der letzten fremden Nachricht (ohne Zitate) */
+  /** Text of the last message from someone else (without quotes) */
   lastMessageText: string
-  /** Gibt es für den Thread einen Terminvorschlag aus der Extraktion? */
+  /** Is there an appointment suggestion from extraction for the thread? */
   hasEventSuggestion: boolean
   /** Triage-Annotation needs_reply */
   needsReply?: boolean
 }
 
 /**
- * Prompt-Abschnitt mit den freien Zeitfenstern, oder null (Setting aus, kein
- * Kalender, Mail fragt nicht nach einem Termin, keine freien Fenster).
+ * Prompt section with the free time slots, or null (setting off, no
+ * calendar, mail doesn't ask for an appointment, no free slots).
  */
 export function buildAvailabilityBlock(
   db: Database.Database,

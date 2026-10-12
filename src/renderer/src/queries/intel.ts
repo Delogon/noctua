@@ -3,8 +3,8 @@ import { invoke } from '@renderer/lib/ipc'
 import type { InvokeOutput } from '@shared/ipc-contract'
 
 /**
- * Key-Status + aktive Modelle (aus ai:usage — dort liegt beides schon).
- * hasKey = OpenRouter-Schlüssel hinterlegt; ready/block = kann die AI entwerfen.
+ * Key status + active models (from ai:usage — both are already there).
+ * hasKey = OpenRouter key stored; ready/block = whether the AI can draft.
  */
 export function useOrKeyStatus(): UseQueryResult<{
   hasKey: boolean
@@ -28,7 +28,7 @@ export function useModels(): UseQueryResult<{ scanModel: string; writeModel: str
   })
 }
 
-/** Verfügbarkeit von Apple Intelligence (On-Device-Triage). */
+/** Availability of Apple Intelligence (on-device triage). */
 export function useAppleFm(): UseQueryResult<InvokeOutput<'ai:appleFm'>> {
   return useQuery({
     queryKey: ['ai', 'appleFm'],
@@ -43,7 +43,7 @@ export type TaskAssignments = InvokeOutput<'ai:tasks:get'>
 export type AiTaskName = keyof TaskAssignments
 export type ProfileModels = InvokeOutput<'ai:profileModels'>
 
-/** Alle Provider-Profile (eingebautes OpenRouter zuerst). */
+/** All provider profiles (built-in OpenRouter first). */
 export function useProfiles(): UseQueryResult<AiProfile[]> {
   return useQuery({
     queryKey: ['ai', 'profiles'],
@@ -53,7 +53,7 @@ export function useProfiles(): UseQueryResult<AiProfile[]> {
   })
 }
 
-/** Zuordnung Aufgabe → Profil + Modell (inkl. Blockiergrund). */
+/** Assignment task → profile + model (incl. blocking reason). */
 export function useTaskAssignments(): UseQueryResult<TaskAssignments> {
   return useQuery({
     queryKey: ['ai', 'tasks'],
@@ -62,7 +62,7 @@ export function useTaskAssignments(): UseQueryResult<TaskAssignments> {
   })
 }
 
-/** „Local only": globaler Schalter (Masthead-Anzeige + Einstellungen). */
+/** "Local only": global toggle (masthead indicator + settings). */
 export function useLocalOnly(): UseQueryResult<boolean> {
   return useQuery({
     queryKey: ['privacy', 'localOnly'],
@@ -73,9 +73,9 @@ export function useLocalOnly(): UseQueryResult<boolean> {
 }
 
 /**
- * Modellliste eines Profils (OpenRouter: Live-Katalog, sonst GET /models).
- * Bei Local only liefert Main für externe Profile `skipped` — die Oberfläche
- * bietet dann einen ausdrücklichen „Liste laden"-Knopf (manual) an.
+ * Model list of a profile (OpenRouter: live catalog, otherwise GET /models).
+ * With Local only, main returns `skipped` for external profiles — the UI
+ * then offers an explicit "Load list" button (manual).
  */
 export function useProfileModels(profileId: string | null): UseQueryResult<ProfileModels> {
   return useQuery({
@@ -88,7 +88,7 @@ export function useProfileModels(profileId: string | null): UseQueryResult<Profi
   })
 }
 
-/** Entscheidungsmodelle (Fähigkeit `decision`) eines Profils – getrennt von der Chat-Liste. */
+/** Decision models (capability `decision`) of a profile – separate from the chat list. */
 export function useDecisionModels(profileId: string | null): UseQueryResult<ProfileModels> {
   return useQuery({
     queryKey: ['ai', 'profileModels', profileId, 'decision'],
@@ -100,7 +100,7 @@ export function useDecisionModels(profileId: string | null): UseQueryResult<Prof
   })
 }
 
-/** Spam-/Phishing-Einschätzung einer Mail (lokale Regeln + ggf. Entscheidungsmodell). */
+/** Spam/phishing assessment of a mail (local rules + decision model if any). */
 export function useMailSecurity(messageId: number): UseQueryResult<InvokeOutput<'security:get'>> {
   return useQuery({
     queryKey: ['security', messageId],
@@ -109,7 +109,7 @@ export function useMailSecurity(messageId: number): UseQueryResult<InvokeOutput<
   })
 }
 
-/** Status des lokalen Suchmodells (Embeddings). */
+/** Status of the local search model (embeddings). */
 export function useEmbeddingStatus(): UseQueryResult<InvokeOutput<'embeddings:status'>> {
   return useQuery({
     queryKey: ['ai', 'embeddings'],
@@ -118,7 +118,7 @@ export function useEmbeddingStatus(): UseQueryResult<InvokeOutput<'embeddings:st
   })
 }
 
-/** Branding-/Onboarding-Hinweise der Org-Konfiguration (Upstream: Standardwerte). */
+/** Branding/onboarding hints of the org configuration (upstream: defaults). */
 export function useOrgInfo(): UseQueryResult<InvokeOutput<'org:info'>> {
   return useQuery({
     queryKey: ['org', 'info'],

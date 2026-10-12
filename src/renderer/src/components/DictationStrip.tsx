@@ -2,9 +2,9 @@ import { useT } from '@renderer/lib/i18n'
 import type { DictationState } from '@renderer/lib/useDictation'
 
 /**
- * Kompakte Diktat-Statuszeile für Eingabefelder — nutzt bewusst die
- * Composer-Klassen (roter Punkt, Pegel, Stopp-Knopf), damit Einsprechen
- * überall gleich aussieht.
+ * Compact dictation status line for input fields — deliberately uses the
+ * composer classes (red dot, level, stop button) so that dictation
+ * looks the same everywhere.
  */
 export function DictationStrip({
   state,

@@ -6,8 +6,8 @@ import { usePaper } from '@renderer/stores/paper'
 import { useTasksSyncSettings } from '@renderer/queries/tasks'
 import { cleanIpcError } from '@renderer/features/paper/account-states'
 
-// Settings → Konten: „Aufgaben synchronisieren mit …“ (Phase 3.2). Eine
-// CalDAV-Aufgabenliste (VTODO) insgesamt; Standard aus.
+// Settings → Accounts: „Aufgaben synchronisieren mit …“ (Phase 3.2). One
+// CalDAV task list (VTODO) overall; off by default.
 
 export function TasksSyncSection(): React.JSX.Element | null {
   const t = useT()
@@ -16,7 +16,7 @@ export function TasksSyncSection(): React.JSX.Element | null {
   const settings = useTasksSyncSettings()
   const [busy, setBusy] = useState(false)
   const lists = settings.data?.lists ?? []
-  // Ohne Kalender-Konto mit VTODO-Liste gibt es nichts zu wählen
+  // Without a calendar account with a VTODO list there's nothing to choose
   if (lists.length === 0 && settings.data?.calendarId == null) return null
 
   const choose = (value: string): void => {

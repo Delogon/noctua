@@ -19,8 +19,8 @@ import { children, escapeXml, NS, textOf } from './xml'
 import { isRelatedHost, normalizeCollectionHref, parseServerInput } from './url'
 
 /**
- * CalDAV-Schicht (RFC 4791, 6764, 6578, 6638-Erkennung) auf dem DavClient:
- * Discovery, Kalenderliste, Reports (calendar-query, multiget, sync-collection).
+ * CalDAV layer (RFC 4791, 6764, 6578, 6638 detection) on top of the DavClient:
+ * discovery, calendar list, reports (calendar-query, multiget, sync-collection).
  */
 
 export class SyncTokenInvalidError extends DavError {
@@ -31,12 +31,12 @@ export class SyncTokenInvalidError extends DavError {
 }
 
 export interface DavCalendarInfo {
-  /** Absolute, normalisierte Collection-URL (mit Slash am Ende) */
+  /** Absolute, normalized collection URL (with trailing slash) */
   url: string
   displayName: string | null
-  /** #RRGGBB oder null */
+  /** #RRGGBB or null */
   color: string | null
-  /** z. B. ['VEVENT', 'VTODO'] */
+  /** e.g. ['VEVENT', 'VTODO'] */
   components: string[]
   ctag: string | null
   syncToken: string | null
@@ -47,7 +47,7 @@ export interface DavCalendarInfo {
 }
 
 export interface DiscoveryResult {
-  /** URL, auf der die Discovery erfolgreich war (nach Redirects) */
+  /** URL at which discovery succeeded (after redirects) */
   serverUrl: string
   principalUrl: string | null
   homeUrl: string
@@ -55,7 +55,7 @@ export interface DiscoveryResult {
   scheduleOutboxUrl: string | null
   /** calendar-user-address-set (mailto:…) */
   userAddresses: string[]
-  /** Normalisierte Tokens des DAV-Headers */
+  /** Normalized tokens of the DAV header */
   davCapabilities: string[]
   autoSchedule: boolean
   calendars: DavCalendarInfo[]
@@ -78,7 +78,7 @@ export const systemDns: DnsResolver = {
   resolveTxt: (name) => dns.resolveTxt(name)
 }
 
-// --- Request-Bodies ------------------------------------------------------------
+// --- Request bodies ------------------------------------------------------------
 
 const XML_HEAD = '<?xml version="1.0" encoding="utf-8"?>'
 const ALL_NS =
@@ -106,9 +106,9 @@ function syncBody(token: string | null): string {
   return `${XML_HEAD}<d:sync-collection ${ALL_NS}>${t}<d:sync-level>1</d:sync-level><d:prop><d:getetag/></d:prop></d:sync-collection>`
 }
 
-// --- Hilfsfunktionen ------------------------------------------------------------
+// --- Helpers --------------------------------------------------------------------
 
-/** "#RRGGBBAA"/"#RGB"/"red"-Werte auf #RRGGBB reduzieren; sonst null. */
+/** Reduce "#RRGGBBAA"/"#RGB"/"red" values to #RRGGBB; otherwise null. */
 export function normalizeCalendarColor(raw: string | null): string | null {
   if (!raw) return null
   const v = raw.trim()
@@ -120,14 +120,14 @@ export function normalizeCalendarColor(raw: string | null): string | null {
   return null
 }
 
-/** Etag-Header-Wert normalisieren: Anführungszeichen bleiben (für If-Match), W/-Präfix auch. */
+/** Normalize an Etag header value: quotes stay (for If-Match), as does the W/ prefix. */
 export function cleanEtag(raw: string | null): string | null {
   if (!raw) return null
   const t = raw.trim()
   return t === '' ? null : t
 }
 
-/** Etag aus <getetag> (Property-Text): Server liefern es mit Anführungszeichen. */
+/** Etag from <getetag> (property text): servers deliver it with quotes. */
 export function propEtag(r: DavResponse): string | null {
   return cleanEtag(okPropText(r, NS.dav, 'getetag'))
 }
@@ -151,7 +151,7 @@ function parseCalendarResponse(r: DavResponse): DavCalendarInfo | null {
     (c) => c.ns === NS.caldav && c.name === 'calendar'
   )
   if (!isCalendar) return null
-  // Subscribed-Kalender (Nextcloud/Apple) sind nur lesbar
+  // Subscribed calendars (Nextcloud/Apple) are read-only
   const subscribed = types.has('subscribed')
 
   const compSet = okProp(r, NS.caldav, 'supported-calendar-component-set')
@@ -160,7 +160,7 @@ function parseCalendarResponse(r: DavResponse): DavCalendarInfo | null {
         .map((c) => (c.attrs.name ?? '').toUpperCase())
         .filter(Boolean)
     : ['VEVENT', 'VTODO']
-  // Reine Journal-/Freebusy-Kalender interessieren nicht
+  // Pure journal/freebusy calendars are of no interest
   if (!components.includes('VEVENT') && !components.includes('VTODO')) return null
 
   const reports = okProp(r, NS.dav, 'supported-report-set')
@@ -188,7 +188,7 @@ function parseCalendarResponse(r: DavResponse): DavCalendarInfo | null {
   }
 }
 
-/** Absolute URL mit Slash am Ende (Collections). */
+/** Absolute URL with trailing slash (collections). */
 export function collectionUrl(url: string): string {
   const u = new URL(url)
   u.pathname = normalizeCollectionHref(u.pathname, u)
@@ -201,7 +201,7 @@ export function sameCollection(a: string, b: string): boolean {
 
 // --- Discovery ------------------------------------------------------------------
 
-/** Bekannte Anbieter, deren Server sich nicht per SRV/well-known erraten lassen. */
+/** Known providers whose servers cannot be guessed via SRV/well-known. */
 const KNOWN_PROVIDERS: Record<string, string> = {
   'mailbox.org': 'https://dav.mailbox.org/',
   'fastmail.com': 'https://caldav.fastmail.com/dav/',
@@ -213,7 +213,7 @@ const KNOWN_PROVIDERS: Record<string, string> = {
   'mac.com': 'https://caldav.icloud.com/'
 }
 
-/** Kandidaten-URLs aus einer Mail-Adresse oder Domain ableiten (RFC 6764 + Anbieter-Tabelle). */
+/** Derive candidate URLs from a mail address or domain (RFC 6764 + provider table). */
 export async function candidateUrlsForDomain(
   domain: string,
   resolver: DnsResolver = systemDns,
@@ -230,9 +230,9 @@ export async function candidateUrlsForDomain(
       .slice()
       .sort((a, b) => a.priority - b.priority || b.weight - a.weight)[0]
     const srvHost = srv?.name?.replace(/\.$/, '').toLowerCase()
-    // RFC 6764 §8: unsigniertes DNS darf Zugangsdaten nicht still auf einen
-    // fremden Host lenken — SRV-Ziele nur innerhalb der eigenen Domain nutzen,
-    // sonst muss der Nutzer die Server-Adresse selbst eingeben.
+    // RFC 6764 §8: unsigned DNS must not silently redirect credentials to a
+    // foreign host — only use SRV targets within the own domain,
+    // otherwise the user must enter the server address manually.
     if (srvHost && (srvHost === lower || srvHost.endsWith(`.${lower}`))) {
       const host = srvHost
       const port = srv.port && srv.port !== 443 ? `:${srv.port}` : ''
@@ -244,12 +244,12 @@ export async function candidateUrlsForDomain(
           if (entry) path = entry[1]
         }
       } catch {
-        // kein TXT → Standardpfad
+        // no TXT → default path
       }
       out.push(`https://${host}${port}${path}`)
     }
   } catch {
-    // kein SRV-Eintrag
+    // no SRV record
   }
   out.push(`https://${lower}/`)
   return [...new Set(out)]
@@ -270,8 +270,8 @@ export function looksLikeBareDomain(v: string): boolean {
 }
 
 /**
- * Server finden und Kalender auflisten. `input` darf eine URL (Nextcloud-Basis
- * oder DAV-Endpunkt), eine Domain oder eine Mail-Adresse sein.
+ * Find the server and list calendars. `input` may be a URL (Nextcloud base
+ * or DAV endpoint), a domain or a mail address.
  */
 export async function discoverCalDav(
   input: string,
@@ -291,7 +291,7 @@ export async function discoverCalDav(
     const path = url.pathname.replace(/\/+$/, '')
     if (path !== '') candidates.push(url.toString())
     candidates.push(`${url.origin}/.well-known/caldav`)
-    // Nextcloud/ownCloud/Baïkal ohne funktionierendes well-known
+    // Nextcloud/ownCloud/Baïkal without a working well-known
     candidates.push(`${url.origin}/remote.php/dav/`, `${url.origin}/dav.php/`)
     candidates.push(`${url.origin}/`)
   }
@@ -321,7 +321,7 @@ export async function discoverCalDav(
 }
 
 async function discoverFrom(client: DavClient, startUrl: string): Promise<DiscoveryResult | null> {
-  // 1. Kontext: current-user-principal / calendar-home-set (Depth 0)
+  // 1. Context: current-user-principal / calendar-home-set (Depth 0)
   const first = await client.propfind(startUrl, PROPFIND_PRINCIPAL, '0').catch((error) => {
     if (
       error instanceof DavHttpError &&
@@ -333,14 +333,14 @@ async function discoverFrom(client: DavClient, startUrl: string): Promise<Discov
   })
   if (!first) return null
 
-  // Finale URL (nach Redirects) als Basis für relative Hrefs
+  // Final URL (after redirects) as the base for relative hrefs
   const base = first.baseUrl
   const self = first.responses[0]
   if (!self) return null
 
   const anchor = new URL(base)
-  // Hrefs auf fremde Hosts werden ignoriert: ein Server darf die Zugangsdaten
-  // nicht an einen anderen Anbieter umlenken.
+  // Hrefs to foreign hosts are ignored: a server must not redirect the credentials
+  // to another provider.
   const trusted = (url: string | null): string | null => {
     if (!url) return null
     try {
@@ -374,7 +374,7 @@ async function discoverFrom(client: DavClient, startUrl: string): Promise<Discov
     }
   }
 
-  // Die eingegebene URL könnte selbst der Kalender-Home sein
+  // The entered URL could itself be the calendar home
   if (!homeUrl) homeUrl = collectionUrl(self.url)
 
   const calendars = await listCalendars(client, homeUrl)
@@ -384,7 +384,7 @@ async function discoverFrom(client: DavClient, startUrl: string): Promise<Discov
   try {
     dav = (await client.optionsRequest(homeUrl)).dav
   } catch {
-    // OPTIONS ist nur für die Capability-Erkennung
+    // OPTIONS is only for capability detection
   }
 
   return {
@@ -400,7 +400,7 @@ async function discoverFrom(client: DavClient, startUrl: string): Promise<Discov
   }
 }
 
-// --- Kalenderliste & Zustand ------------------------------------------------------
+// --- Calendar list & state --------------------------------------------------------
 
 export async function listCalendars(
   client: DavClient,
@@ -418,7 +418,7 @@ export async function listCalendars(
   return out
 }
 
-/** ctag + sync-token eines Kalenders (günstiger Änderungs-Check). */
+/** ctag + sync-token of a calendar (cheap change check). */
 export async function getCalendarState(
   client: DavClient,
   calendarUrl: string
@@ -438,13 +438,13 @@ export interface EtagEntry {
   etag: string | null
 }
 
-/** Alle Objekte eines Kalenders mit ETag (calendar-query ohne Daten). */
+/** All objects of a calendar with ETag (calendar-query without data). */
 export async function queryEtags(client: DavClient, calendarUrl: string): Promise<EtagEntry[]> {
   let ms: Multistatus
   try {
     ms = await client.report(calendarUrl, QUERY_ETAGS, '1')
   } catch (error) {
-    // Manche Server lehnen den leeren comp-filter ab: PROPFIND Depth 1 als Ausweg
+    // Some servers reject the empty comp-filter: PROPFIND Depth 1 as a fallback
     if (error instanceof DavHttpError && [400, 403, 501].includes(error.status)) {
       ms = await client.propfind(calendarUrl, PROPFIND_ETAG, '1')
     } else {
@@ -456,7 +456,7 @@ export async function queryEtags(client: DavClient, calendarUrl: string): Promis
     if (r.status !== null && r.status >= 400) continue
     if (sameCollection(new URL(r.href, calendarUrl).toString(), calendarUrl)) continue
     const etag = propEtag(r)
-    // PROPFIND-Fallback liefert auch Nicht-.ics-Kinder ohne ETag → überspringen
+    // The PROPFIND fallback also returns non-.ics children without ETag → skip
     if (!etag) continue
     out.push({ href: r.href, etag })
   }
@@ -469,7 +469,7 @@ export interface FetchedObject {
   ics: string
 }
 
-/** calendar-multiget in Blöcken. Fehlende Hrefs (404) fehlen im Ergebnis. */
+/** calendar-multiget in chunks. Missing hrefs (404) are absent from the result. */
 export async function multiget(
   client: DavClient,
   calendarUrl: string,
@@ -494,13 +494,13 @@ export interface SyncCollectionResult {
   changed: EtagEntry[]
   removed: string[]
   syncToken: string | null
-  /** Server hat gekürzt (507): mit dem neuen Token erneut anfragen */
+  /** Server truncated (507): request again with the new token */
   truncated: boolean
 }
 
 /**
- * sync-collection (RFC 6578). `token = null` → initialer Abgleich (alle Member).
- * Ungültiger Token (403/409 valid-sync-token) → SyncTokenInvalidError.
+ * sync-collection (RFC 6578). `token = null` → initial sync (all members).
+ * Invalid token (403/409 valid-sync-token) → SyncTokenInvalidError.
  */
 export async function syncCollection(
   client: DavClient,
@@ -528,7 +528,7 @@ export async function syncCollection(
   for (const r of ms.responses) {
     const isSelf = sameCollection(new URL(r.href, calendarUrl).toString(), calendarUrl)
     if (r.status === 507) {
-      // RFC 6578 §3.6: Ergebnis gekürzt, Token gilt für das bisher Gelieferte
+      // RFC 6578 §3.6: result truncated, the token covers what was delivered so far
       if (isSelf) truncated = true
       continue
     }
@@ -539,14 +539,14 @@ export async function syncCollection(
     }
     if (r.status !== null && r.status >= 400) continue
     const etag = propEtag(r)
-    // Eintrag ohne Etag (z. B. Sub-Collection) ist kein Kalenderobjekt
+    // An entry without Etag (e.g. a sub-collection) is not a calendar object
     if (etag === null && r.propstats.some((p) => p.status === 404)) continue
     changed.push({ href: r.href, etag })
   }
   return { changed, removed, syncToken: ms.syncToken, truncated }
 }
 
-/** ETag per PROPFIND nachladen (PUT lieferte keinen). */
+/** Fetch the ETag via PROPFIND (PUT returned none). */
 export async function fetchEtag(client: DavClient, objectUrl: string): Promise<string | null> {
   const ms = await client.propfind(objectUrl, PROPFIND_ETAG, '0')
   const r = ms.responses[0]

@@ -1,8 +1,8 @@
--- M13: belastbarer lokaler Suchindex und nachvollziehbarer Embedding-Stand.
+-- M13: robust local search index and traceable embedding state.
 
--- Die bisherige contentless FTS-Tabelle konnte weder normal aktualisiert noch
--- verwaiste Zeilen loeschen. Die gespeicherte Variante bleibt voll lokal, ist
--- aber mit DELETE + INSERT deterministisch wartbar.
+-- The previous contentless FTS table could neither be updated normally nor
+-- delete orphaned rows. The stored variant stays fully local but is
+-- deterministically maintainable with DELETE + INSERT.
 DROP TABLE IF EXISTS messages_fts;
 CREATE VIRTUAL TABLE messages_fts USING fts5(
   subject, sender, recipients, body,
@@ -10,8 +10,8 @@ CREATE VIRTUAL TABLE messages_fts USING fts5(
   prefix = '2 3'
 );
 
--- Bereits geladene Daten sofort wieder durchsuchbar machen. Auch Envelopes
--- ohne Body landen im Index; Anhangnamen werden Teil des Volltexts.
+-- Make already loaded data searchable again right away. Envelopes
+-- without a body are indexed too; attachment names become part of the full text.
 INSERT INTO messages_fts (rowid, subject, sender, recipients, body)
 SELECT
   m.id,
@@ -26,9 +26,9 @@ SELECT
 FROM messages m
 LEFT JOIN message_bodies b ON b.message_id = m.id;
 
--- content_hash beschreibt den aktuell lokalen Mailinhalt. embedded_hash und
--- embedding_model beschreiben exakt den Vektor, der in message_vecs liegt.
--- Ein abweichender Hash macht die Nachricht automatisch wieder pending.
+-- content_hash describes the current local mail content. embedded_hash and
+-- embedding_model describe exactly the vector stored in message_vecs.
+-- A differing hash automatically makes the message pending again.
 CREATE TABLE message_embedding_state (
   message_id INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
   content_hash TEXT NOT NULL,
@@ -40,12 +40,12 @@ CREATE TABLE message_embedding_state (
 CREATE INDEX idx_embedding_state_current
   ON message_embedding_state(embedding_model, embedded_hash, content_hash);
 
--- Alte Vektoren hatten weder Content-Hash noch Modellversion. Ein einmaliger
--- sauberer Rebuild verhindert, dass ein inzwischen geaenderter Body als
--- aktuell gilt.
+-- Old vectors had neither a content hash nor a model version. A one-time
+-- clean rebuild prevents a body that has since changed from being
+-- treated as current.
 DELETE FROM message_vecs;
 
--- Bestehende Installationen hatten nur 90 Tage Envelopes und 30 Tage Bodies.
--- NULL zwingt den Syncer zu einer einmaligen, fortsetzbaren 183-Tage-Runde.
+-- Existing installations only had 90 days of envelopes and 30 days of bodies.
+-- NULL forces the syncer into a one-time, resumable 183-day round.
 ALTER TABLE folders ADD COLUMN envelope_backfill_since INTEGER;
 ALTER TABLE folders ADD COLUMN body_backfill_since INTEGER;

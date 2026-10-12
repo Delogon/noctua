@@ -8,7 +8,7 @@ interface ResponsesUsage {
   output_tokens?: number
 }
 
-/** Responses-Usage → einheitliche Form; Kosten gibt es hier nie (kein OpenRouter-Pfad). */
+/** Responses usage → unified shape; never any costs here (no OpenRouter path). */
 export function mapResponsesUsage(usage: ResponsesUsage | null | undefined): LlmUsage {
   return {
     inputTokens: usage?.input_tokens ?? 0,
@@ -23,8 +23,8 @@ function plainText(content: LlmMessage['content']): string {
 }
 
 /**
- * System-Nachrichten wandern in `instructions`, der Rest als Input-Items.
- * Bleibt nur eine User-Nachricht übrig, geht sie als einfacher String durch.
+ * System messages go into `instructions`, the rest as input items.
+ * If only a single user message remains, it is passed as a plain string.
  */
 export function toResponsesInput(messages: LlmMessage[]): {
   instructions: string | undefined
@@ -45,7 +45,7 @@ export function toResponsesInput(messages: LlmMessage[]): {
   return { instructions: system.length > 0 ? system.join('\n\n') : undefined, input }
 }
 
-/** Adapter für OpenAI Responses (`responses.create`). */
+/** Adapter for OpenAI Responses (`responses.create`). */
 export function createResponsesClient({ profile, apiKey }: AdapterOptions): LlmClient {
   const client = createOpenAiClient({ baseUrl: profile.baseUrl, apiKey })
 
@@ -58,7 +58,7 @@ export function createResponsesClient({ profile, apiKey }: AdapterOptions): LlmC
       ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
       ...(req.maxTokens !== undefined ? { max_output_tokens: req.maxTokens } : {}),
       ...(req.json ? { text: { format: { type: 'json_object' } } } : {}),
-      // Kein Server-seitiges Aufbewahren der Mail-Inhalte
+      // No server-side storage of mail contents
       store: false
     }
   }
@@ -72,7 +72,7 @@ export function createResponsesClient({ profile, apiKey }: AdapterOptions): LlmC
         output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>
         usage?: ResponsesUsage
       }
-      // `output_text` ist ein SDK-Convenience-Feld; sonst aus den Items zusammensetzen
+      // `output_text` is an SDK convenience field; otherwise assemble from the items
       const text =
         response.output_text ??
         (response.output ?? [])

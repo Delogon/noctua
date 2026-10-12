@@ -5,17 +5,17 @@ import type { QueuedOp } from './account-syncer'
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
 export const MAX_OP_ATTEMPTS = 10
-// Tote Ops bleiben zur Diagnose liegen, werden aber irgendwann aufgeräumt
+// Dead ops stay around for diagnosis, but are cleaned up eventually
 const DEAD_OP_RETENTION_MS = 14 * 24 * 3600 * 1000
 
 export type DeadReason =
   'attempts' | 'uidvalidity' | 'no-target-folder' | 'no-trash' | 'folder-gone'
 
 /**
- * Permanenter Op-Fehler: Wiederholen ist sinnlos (Zielordner fehlt, UIDs
- * gehören zu einer anderen UIDVALIDITY, …). Die Queue legt die Op als „dead"
- * ab und meldet das dem Nutzer, statt sie still zu verwerfen oder ewig zu
- * wiederholen.
+ * Permanent op error: retrying is pointless (target folder missing, UIDs
+ * belong to a different UIDVALIDITY, …). The queue stores the op as "dead"
+ * and reports it to the user instead of silently discarding it or retrying
+ * forever.
  */
 export class OpDeadError extends Error {
   constructor(
@@ -27,19 +27,19 @@ export class OpDeadError extends Error {
   }
 }
 
-/** Was die Queue vom Syncer braucht — als Interface, damit Tests ihn mocken können. */
+/** What the queue needs from the syncer — as an interface so tests can mock it. */
 export interface OpExecutor {
   executeOp(op: QueuedOp): Promise<void>
-  /** Steht die Kommando-Verbindung? Ohne sie zählen Fehler nicht als Versuch. */
+  /** Is the command connection up? Without it, errors don't count as an attempt. */
   isConnected(): boolean
-  /** Ordner neu abgleichen lassen, wenn eine Op verworfen wurde (lokal schon angewendet). */
+  /** Have the folder re-reconciled when an op was discarded (already applied locally). */
   invalidateFolder?(folderId: number): void
 }
 
 /**
- * Legt eine Op in die Queue und stempelt die aktuelle UIDVALIDITY des Ordners
- * in den Payload: Nach einem UIDVALIDITY-Wechsel zeigen die UIDs auf andere
- * (oder gar keine) Nachrichten — dann darf die Op nicht mehr laufen.
+ * Puts an op into the queue and stamps the folder's current UIDVALIDITY
+ * into the payload: after a UIDVALIDITY change the UIDs point at different
+ * (or no) messages — then the op must not run anymore.
  */
 export function enqueueOp(
   db: Database.Database,
@@ -60,13 +60,13 @@ export function enqueueOp(
 }
 
 /**
- * Arbeitet die ausstehenden Ops eines Kontos der Reihe nach ab.
- * - Verbindung weg: abbrechen, ohne Versuche zu verbrennen (nächster Connect).
- * - Op scheitert bei stehender Verbindung: Versuch zählen und die nächste Op
- *   probieren — eine kaputte Op blockiert nicht die ganze Queue. Spätere Ops
- *   auf dieselben Nachrichten werden dabei übersprungen (Reihenfolge je
- *   Nachricht bleibt gewahrt: kein „Archivieren" vor dem fehlgeschlagenen „Gelesen").
- * - Endgültig gescheiterte Ops werden „dead" + per Push gemeldet.
+ * Processes an account's pending ops in order.
+ * - Connection gone: abort without burning attempts (next connect).
+ * - Op fails while connected: count the attempt and try the next op
+ *   — one broken op doesn't block the whole queue. Later ops
+ *   on the same messages are skipped meanwhile (order per
+ *   message is preserved: no "archive" before the failed "mark read").
+ * - Ops that failed for good become "dead" + are reported via push.
  */
 export async function processOpQueue(
   db: Database.Database,
@@ -103,8 +103,8 @@ export async function processOpQueue(
       rowId
     )
     dead.set(reason, (dead.get(reason) ?? 0) + 1)
-    // Lokal wurde die Aktion optimistisch schon angewendet (Mail aus der DB
-    // gelöscht) — den Ordner neu abgleichen, damit der Server-Stand zurückkommt.
+    // The action was already applied optimistically locally (mail deleted from
+    // the DB) — re-reconcile the folder so the server state comes back.
     if (folderId !== undefined && reason !== 'uidvalidity' && reason !== 'folder-gone') {
       staleFolders.add(folderId)
     }
@@ -123,7 +123,7 @@ export async function processOpQueue(
     const keys = (payload.uids ?? []).map((uid) => `${payload.folderId}:${uid}`)
     if (keys.some((key) => failedKeys.has(key))) continue
 
-    // UIDVALIDITY-Stempel prüfen: nach einem Reset sind die UIDs wertlos
+    // Check the UIDVALIDITY stamp: after a reset the UIDs are worthless
     if (payload.folderId !== undefined) {
       const folder = db
         .prepare('SELECT uidvalidity FROM folders WHERE id = ?')
@@ -156,7 +156,7 @@ export async function processOpQueue(
         markDead(row.id, error.reason, message, payload.folderId)
         continue
       }
-      if (!syncer.isConnected()) break // Verbindung weg — nächster Connect versucht erneut
+      if (!syncer.isConnected()) break // Connection gone — next connect retries
       const attempts = row.attempts + 1
       if (attempts >= MAX_OP_ATTEMPTS) {
         markDead(row.id, 'attempts', message, payload.folderId)

@@ -5,10 +5,10 @@ import { suggestIsLocal } from '@shared/local-host'
 import type { AiChoice } from '@renderer/features/paper/onboarding-steps'
 import type { Endpoint, OnboardingAi } from '@renderer/features/paper/useOnboardingAi'
 
-// Onboarding-Schritt 3 („Wo soll die KI laufen?"): vier Optionen als
-// Letterpress-Karten — lokaler Server (empfohlen), Apple On-Device, Cloud,
-// Überspringen — plus „Nur lokal"-Schalter. Zustand und IPC liegen in
-// useOnboardingAi; hier steht nur das Rendering.
+// Onboarding step 3 („Wo soll die KI laufen?"): four options as
+// letterpress cards — local server (recommended), Apple On-Device, cloud,
+// skip — plus a „Nur lokal" switch. State and IPC live in
+// useOnboardingAi; only the rendering is here.
 
 const SMALL_BTN: React.CSSProperties = {
   font: '500 10px var(--mono)',
@@ -27,7 +27,7 @@ const SMALL_BTN_GHOST: React.CSSProperties = {
 const LABEL: React.CSSProperties = { color: 'var(--muted)', display: 'block', marginBottom: 5 }
 const NOTE: React.CSSProperties = { font: '400 9.5px/1.5 var(--mono)', color: 'var(--muted)' }
 
-/** Kopfzeile einer Option: Radio-Glyph, Titel, optional Badge, eine Zeile Beschreibung. */
+/** Header of an option: radio glyph, title, optional badge, one line of description. */
 function OptionCard({
   id,
   selected,
@@ -108,7 +108,7 @@ function OptionCard({
   )
 }
 
-/** Modellwahl: Auswahlliste, solange der Server welche kennt, sonst Freitext. */
+/** Model choice: a select list as long as the server knows models, otherwise free text. */
 function ModelField({
   label,
   value,
@@ -155,7 +155,7 @@ function ModelField({
   )
 }
 
-/** Adresse + optionaler Key + TESTEN; danach (wenn verifiziert) die zwei Modellwahlen. */
+/** Address + optional key + TESTEN; afterwards (when verified) the two model choices. */
 function EndpointForm({
   ep,
   edit,
@@ -257,7 +257,7 @@ function EndpointForm({
   )
 }
 
-/** Zwei Modellwahlen (Sortieren / Schreiben) mit Hinweis auf die automatische Vorwahl. */
+/** Two model choices (sorting / writing) with a note on the automatic preselection. */
 function ModelPair({
   ep,
   patch,
@@ -295,8 +295,8 @@ function ModelPair({
 }
 
 /**
- * Entscheidungsmodell (Ollama System One): vorgewählt, wenn der Server eines hat,
- * sonst ein kleiner Tipp. Nur für Ollama — andere Server kennen die API nicht.
+ * Decision model (Ollama System One): preselected if the server has one,
+ * otherwise a small tip. Ollama only — other servers don't know the API.
  */
 function DecisionHint({
   ep,
@@ -448,7 +448,7 @@ function LocalBody({ ai }: { ai: OnboardingAi }): React.JSX.Element {
         </button>
       )}
 
-      {/* Diktat: optional, standardmäßig eingeklappt */}
+      {/* Dictation: optional, collapsed by default */}
       <div style={{ borderTop: '1px dashed var(--hairline)', paddingTop: 8 }}>
         <button
           type="button"
@@ -573,7 +573,7 @@ function CloudBody({
               value={ai.key}
               onChange={(e) => ai.setKey(e.target.value)}
               onKeyDown={(e) => {
-                // Enter im Input = speichern, nie Schritt-Weiter (Design 1b)
+                // Enter in the input = save, never next step (Design 1b)
                 if (e.key === 'Enter') ai.saveKey(() => keyInputRef.current?.blur())
                 e.stopPropagation()
               }}

@@ -8,11 +8,11 @@ import { PROMPT_VERSION } from '../ai/triage'
 import { sqlFingerprint } from './metrics'
 import { setSqlCapture } from './db-profiler'
 
-// Benchmark gegen die echte, lokale Datenbank: die Operationen, die bei großen
-// Postfächern auffallen (Liste, Zähler, Ordner, Thread öffnen, Suche, KI-Discovery,
-// Kontakt-Statistik), je mehrfach gemessen. Schreibende Operationen laufen in einem
-// SAVEPOINT und werden zurückgerollt. Dazu EXPLAIN QUERY PLAN für jede Abfrage, die
-// dabei lief — Pläne nennen nur Tabellen/Indizes, keine Werte.
+// Benchmark against the real, local database: the operations that stand out with
+// large mailboxes (list, counters, folders, open thread, search, AI discovery,
+// contact stats), each measured several times. Writing operations run in a
+// SAVEPOINT and are rolled back. Plus EXPLAIN QUERY PLAN for every query that
+// ran — plans only name tables/indexes, no values.
 
 export interface BenchmarkCase {
   name: string
@@ -20,7 +20,7 @@ export interface BenchmarkCase {
   minMs: number
   medianMs: number
   maxMs: number
-  /** Anweisungen pro Lauf (zeigt N+1-Muster) */
+  /** Statements per run (reveals N+1 patterns) */
   statements: number
   error: string | null
 }
@@ -29,11 +29,11 @@ export interface QueryPlan {
   sql: string
   usedBy: string[]
   plan: string[]
-  /** Tabellen, die ohne Index ganz gelesen werden */
+  /** Tables read in full without an index */
   fullScans: string[]
-  /** Tabellen, deren Index komplett durchlaufen wird (kein gezieltes SEARCH) */
+  /** Tables whose index is traversed completely (no targeted SEARCH) */
   indexScans: string[]
-  /** Temporäre B-Bäume für ORDER BY / GROUP BY / DISTINCT */
+  /** Temporary B-trees for ORDER BY / GROUP BY / DISTINCT */
   tempBtrees: number
 }
 
@@ -46,7 +46,7 @@ export interface BenchmarkResult {
 
 type CaseSpec =
   | { name: string; write?: false; run: () => unknown }
-  /** Schreibfälle müssen synchron sein (SAVEPOINT/ROLLBACK im selben Tick). */
+  /** Write cases must be synchronous (SAVEPOINT/ROLLBACK in the same tick). */
   | { name: string; write: true; run: () => void }
 
 const MAX_PLANS = 80
@@ -59,8 +59,8 @@ function median(values: number[]): number {
 const round = (n: number): number => Math.round(n * 100) / 100
 
 /**
- * Plan-Zeilen auswerten: `SCAN t` liest die ganze Tabelle, `SCAN t USING INDEX i`
- * den ganzen Index (auch O(n), nur billiger). `SEARCH` ist ein gezielter Zugriff.
+ * Evaluate plan rows: `SCAN t` reads the whole table, `SCAN t USING INDEX i`
+ * the whole index (also O(n), just cheaper). `SEARCH` is a targeted access.
  */
 export function analysePlan(lines: string[]): {
   fullScans: string[]
@@ -96,7 +96,7 @@ function specs(db: Database.Database): CaseSpec[] {
     { name: 'folders.list', run: () => listFolders(db) },
     { name: 'search.index.status', run: () => semanticIndexStatus(db) },
     {
-      // fester, generischer Suchbegriff; nur Volltext + Absender-Kanal (ohne Modell)
+      // fixed, generic search term; full text + sender channel only (no model)
       name: 'search.lexical("rechnung meeting")',
       run: () =>
         searchSemantic(db, { q: 'rechnung meeting', limit: 30 }, { embedQuery: async () => [] })
@@ -124,8 +124,8 @@ function specs(db: Database.Database): CaseSpec[] {
 }
 
 /**
- * Führt den Benchmark aus. Blockiert den Main-Prozess für die Dauer der Läufe
- * (das ist gewollt: genau so blockieren diese Abfragen auch im Alltag).
+ * Runs the benchmark. Blocks the main process for the duration of the runs
+ * (intended: these queries block exactly like this in everyday use).
  */
 export async function runBenchmark(
   db: Database.Database,
@@ -154,8 +154,8 @@ export async function runBenchmark(
       for (let i = 0; i < runs; i++) {
         const t = performance.now()
         if (spec.write) {
-          // Streng synchron: zwischen SAVEPOINT und ROLLBACK darf kein anderer
-          // Task (Sync, KI-Queue) schreiben – sonst würde er mit zurückgerollt.
+          // Strictly synchronous: between SAVEPOINT and ROLLBACK no other
+          // task (sync, AI queue) may write – otherwise it would be rolled back too.
           db.exec('SAVEPOINT noctua_bench')
           try {
             spec.run()
@@ -185,7 +185,7 @@ export async function runBenchmark(
       statements: times.length ? Math.round(statements / times.length) : 0,
       error
     })
-    // Event-Loop zwischen den Fällen kurz freigeben
+    // Briefly yield the event loop between cases
     await new Promise((resolve) => setImmediate(resolve))
   }
 
@@ -199,7 +199,7 @@ export async function runBenchmark(
       const lines = rows.map((r) => r.detail)
       plans.push({ sql: fp, usedBy: [...entry.usedBy], plan: lines, ...analysePlan(lines) })
     } catch {
-      // Plan nicht ermittelbar (z. B. virtuelle Tabelle ohne Parameter) — überspringen
+      // Plan not determinable (e.g. virtual table without parameters) — skip
     }
   }
   plans.sort(

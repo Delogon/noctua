@@ -3,9 +3,9 @@ import { usePaper } from '@renderer/stores/paper'
 import { initDraftAutosave, removeDraft } from '@renderer/features/paper/draft-autosave'
 
 /**
- * Der Autosave lauscht zentral auf den paper-Store: Tippen wird entprellt
- * gesichert, ein Threadwechsel sichert sofort, Senden/Löschen darf den
- * Entwurf nicht wiederbeleben.
+ * Autosave listens centrally on the paper store: typing is saved
+ * debounced, a thread switch saves immediately, send/delete must not
+ * revive the draft.
  */
 
 const invokeMock = vi.fn().mockResolvedValue({ ok: true })

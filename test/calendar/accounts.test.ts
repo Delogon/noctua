@@ -56,7 +56,7 @@ describe('Kalender-Konten', () => {
     expect(
       db.prepare('SELECT count(*) n FROM calendars WHERE account_id = ?').get(res.accountId)
     ).toEqual({ n: 2 })
-    // Passwort steht nirgends in der DB-Zeile
+    // Password appears nowhere in the DB row
     expect(JSON.stringify(acc)).not.toContain('abcdefgh')
   })
 
@@ -106,7 +106,7 @@ describe('Kalender-Konten', () => {
     expect(db.prepare('SELECT mail_account_id FROM cal_accounts').get()).toEqual({
       mail_account_id: mailId
     })
-    // Eigenständiges Konto: Löschen des Kalender-Kontos lässt das Mail-Passwort unberührt
+    // Standalone account: deleting the calendar account leaves the mail password untouched
     removeAccount(db, res.accountId)
     expect(hasSecret(accountSecretKey(mailId))).toBe(true)
   })

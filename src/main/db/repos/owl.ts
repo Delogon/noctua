@@ -10,12 +10,12 @@ interface OwlConversationRow {
 }
 
 /**
- * Erster Satz einer Antwort für die Gist-Zeile der Gesprächsliste
- * („↳ Drei — Hetzner, Adobe und ein DB-Ticket."). Bewusst simpel:
- * Satzende oder Zeilenumbruch beendet, überlange Sätze werden gekappt.
+ * First sentence of an answer for the gist line of the conversation list
+ * ("↳ Three — Hetzner, Adobe and a DB ticket."). Deliberately simple:
+ * sentence end or line break terminates, overlong sentences are truncated.
  */
 export function answerGist(content: string): string | null {
-  // Markdown-Marker gehören nicht in die einzeilige Gist-Anzeige
+  // Markdown markers don't belong in the single-line gist display
   const plain = content
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
@@ -37,7 +37,7 @@ function parseMessages(json: string): OwlMessage[] {
   }
 }
 
-/** Alle Gespräche, jüngste zuerst — Gist aus der ersten Antwort der Eule. */
+/** All conversations, newest first — gist from the owl's first answer. */
 export function listOwlConversations(db: Database.Database): OwlConversationListItem[] {
   const rows = db
     .prepare('SELECT * FROM owl_conversations ORDER BY updated_at DESC')
@@ -53,7 +53,7 @@ export function listOwlConversations(db: Database.Database): OwlConversationList
   })
 }
 
-/** Ein Gespräch samt Verlauf; null, wenn es (inzwischen) nicht mehr existiert. */
+/** A conversation including its history; null if it no longer exists. */
 export function getOwlConversation(db: Database.Database, id: number): OwlConversation | null {
   const row = db.prepare('SELECT * FROM owl_conversations WHERE id = ?').get(id) as
     OwlConversationRow | undefined
@@ -67,7 +67,7 @@ export function getOwlConversation(db: Database.Database, id: number): OwlConver
   }
 }
 
-/** Upsert: ohne id (oder mit verwaister id) wird neu angelegt; Rückgabe ist die id. */
+/** Upsert: without id (or with an orphaned id) a new one is created; returns the id. */
 export function saveOwlConversation(
   db: Database.Database,
   input: { id?: number; title: string; messages: OwlMessage[] }
@@ -91,7 +91,7 @@ export function saveOwlConversation(
   return Number(result.lastInsertRowid)
 }
 
-/** Löscht ein Gespräch; true, wenn eines existierte. */
+/** Deletes a conversation; true if one existed. */
 export function deleteOwlConversation(db: Database.Database, id: number): boolean {
   return db.prepare('DELETE FROM owl_conversations WHERE id = ?').run(id).changes > 0
 }

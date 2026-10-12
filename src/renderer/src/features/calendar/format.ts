@@ -2,13 +2,13 @@ import type { CalendarInstance } from '@shared/calendar-types'
 import type { Lang } from '@renderer/i18n/strings'
 import { isoWeek, pad2, addDays, type CalView } from './dates'
 
-// Anzeigeformate der Kalenderansicht (24-h, Montag-Wochen).
+// Display formats of the calendar view (24 h, Monday weeks).
 
 export function locale(lang: Lang): string {
   return lang === 'de' ? 'de-DE' : 'en-GB'
 }
 
-/** 'HH:mm' (24 h) eines Zeitstempels in der Systemzone. */
+/** 'HH:mm' (24 h) of a timestamp in the system zone. */
 export function hhmm(ms: number): string {
   const d = new Date(ms)
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
@@ -19,9 +19,9 @@ export function timeRange(e: Pick<CalendarInstance, 'startUtc' | 'endUtc'>): str
 }
 
 /**
- * Zeitangabe eines Termins für EINEN Tag (Tagesbeginn `dayStartMs`, lokal). Über Mitternacht
- * laufende Termine zeigen am ersten Tag den Start mit „→", am Folgetag nur „→ Ende" — der Start
- * wird nicht wiederholt. `start`: am Starttag nur die Startzeit (Monatschips).
+ * Time label of an event for ONE day (start of day `dayStartMs`, local). Events running
+ * past midnight show the start with "→" on the first day, only "→ end" on the following day — the start
+ * is not repeated. `start`: on the start day only the start time (month chips).
  */
 export function dayTimeLabel(
   e: Pick<CalendarInstance, 'startUtc' | 'endUtc'>,
@@ -41,7 +41,7 @@ export function weekdayShort(lang: Lang, d: Date): string {
   return d.toLocaleDateString(locale(lang), { weekday: 'short' }).replace('.', '').toUpperCase()
 }
 
-/** Titel der Toolbar je Ansicht (Monat/Jahr, Zeitraum + KW, langer Tag). */
+/** Toolbar title per view (month/year, range + week number, long day). */
 export function periodTitle(
   lang: Lang,
   view: CalView,
@@ -72,7 +72,7 @@ export function weekLabel(lang: Lang, d: Date): string {
   return `${lang === 'de' ? 'KW' : 'W'} ${isoWeek(d)}`
 }
 
-/** Datum für Listen/Agenda: 'MO 5. OKT.' */
+/** Date for lists/agenda: 'MO 5. OKT.' */
 export function dayLabel(lang: Lang, d: Date): string {
   return d.toLocaleDateString(locale(lang), { weekday: 'short', day: 'numeric', month: 'short' })
 }

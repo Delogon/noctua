@@ -16,9 +16,9 @@ function normalizedContentId(value: string | null): string {
 }
 
 /**
- * Inline-CID-Bilder erscheinen bereits im Mailtext und technische MIME-Teile
- * sind keine Dateien, die Empfaenger als Anhang abgelegt haben. Content-ID
- * allein reicht nicht: Manche echten Anhaenge besitzen ebenfalls eine.
+ * Inline CID images already appear in the mail text, and technical MIME parts
+ * are not files that senders attached. Content-ID
+ * alone is not enough: some real attachments have one as well.
  */
 export function isVisibleMailAttachment(
   attachment: AttachmentVisibilityInput,
@@ -26,8 +26,8 @@ export function isVisibleMailAttachment(
 ): boolean {
   const mimeType = (attachment.mimeType ?? '').trim().toLowerCase()
   if (TECHNICAL_MIME_PARTS.has(mimeType)) return false
-  // Namenloser text/calendar-Teil = Alternative zum Mailtext, die die Einladungskarte
-  // zeigt; eine benannte .ics-Datei bleibt als Anhang sichtbar.
+  // Nameless text/calendar part = alternative to the mail text, shown by the invitation card;
+  // a named .ics file stays visible as an attachment.
   if (mimeType === 'text/calendar' && !(attachment.filename ?? '').trim()) return false
 
   const contentId = normalizedContentId(attachment.contentId)

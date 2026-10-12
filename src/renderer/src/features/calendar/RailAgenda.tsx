@@ -9,9 +9,9 @@ import { colorMapOf } from './palette'
 import { hhmm } from './format'
 import { useNow } from './useNow'
 
-// Kompakte „Heute"-Agenda der Owl-Rail: die nächsten Termine von heute (und morgen).
-// Klick springt in die Kalenderansicht auf den Termin. Ohne Kalender bleibt die Rail
-// unverändert (keine Karte).
+// Compact "Today" agenda of the Owl rail: the next events of today (and tomorrow).
+// Click jumps to the event in the calendar view. Without calendars the rail stays
+// unchanged (no card).
 
 const MAX_ITEMS = 5
 
@@ -60,7 +60,7 @@ export function RailAgenda(): React.JSX.Element | null {
     [calendars]
   )
   const colors = useMemo(() => colorMapOf(calendars ?? []), [calendars])
-  // Tagesbeginn als Abfrageschlüssel: stabil über den Tag, wechselt um Mitternacht
+  // Start of day as query key: stable over the day, changes at midnight
   const range = useMemo(() => agendaRange(new Date(now)), [now])
   const { events } = useCalendarEvents(range.start, range.end, visibleIds)
   const items = useMemo(() => agendaItems(events, new Date(now)), [events, now])

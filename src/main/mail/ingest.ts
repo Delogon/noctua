@@ -61,9 +61,9 @@ function recipientsForSearch(...values: Array<string | null>): string {
 }
 
 /**
- * Baut FTS und den Content-Hash aus derselben lokalen Momentaufnahme neu auf.
- * Der Hash invalidiert einen Vektor nur, wenn sich semantisch relevanter Inhalt
- * (inklusive Envelope-Metadaten oder Anhangnamen) wirklich geaendert hat.
+ * Rebuilds FTS and the content hash from the same local snapshot.
+ * The hash only invalidates a vector if semantically relevant content
+ * (including envelope metadata or attachment names) actually changed.
  */
 export function refreshMessageSearchIndex(db: Database.Database, messageId: number): void {
   const row = db
@@ -113,7 +113,7 @@ export function refreshMessageSearchIndex(db: Database.Database, messageId: numb
   )
 
   if (!previous || previous.content_hash !== contentHash) {
-    // Ein alter Vektor darf waehrend des Rebuilds keine falschen Treffer liefern.
+    // An old vector must not produce wrong hits during the rebuild.
     db.prepare('DELETE FROM message_vecs WHERE rowid = ?').run(BigInt(messageId))
   }
   db.prepare(
@@ -141,7 +141,7 @@ export interface SearchOrphanCleanup {
   states: number
 }
 
-/** Entfernt Indexzeilen, die virtuelle Tabellen nicht per FK-Cascade verlieren. */
+/** Removes index rows that virtual tables don't lose via FK cascade. */
 /**
  * One-time repair (M94): the trigram rebuild in migration 021 populated the
  * index from text_plain/snippet only — HTML-only mails lost their body text
@@ -209,8 +209,8 @@ export function cleanupSearchOrphans(db: Database.Database): SearchOrphanCleanup
 }
 
 /**
- * Envelope-Phase: legt die Nachricht an oder aktualisiert Flags, wenn sie
- * schon existiert. Gibt die messages.id zurück (oder null bei Gmail-Duplikat).
+ * Envelope phase: creates the message, or updates flags if it
+ * already exists. Returns messages.id (or null for a Gmail duplicate).
  */
 export function upsertEnvelope(
   db: Database.Database,
@@ -260,7 +260,7 @@ export function upsertEnvelope(
     return { messageId: existing.id, threadKey: existing.thread_key, isNew: false }
   }
 
-  // Gmail-Dedupe: dieselbe Mail kann über mehrere synchronisierte Ordner kommen.
+  // Gmail dedupe: the same mail can arrive via several synced folders.
   if (env.gmMsgid) {
     const dupe = db
       .prepare('SELECT id FROM messages WHERE account_id = ? AND gm_msgid = ? AND folder_id != ?')
@@ -315,12 +315,12 @@ export function upsertEnvelope(
     )
 
   const messageId = Number(result.lastInsertRowid)
-  // Envelope-Metadaten sind sofort suchbar, auch waehrend Bodies nachladen.
+  // Envelope metadata is searchable right away, even while bodies are loading.
   refreshMessageSearchIndex(db, messageId)
   return { messageId, threadKey, isNew: true }
 }
 
-/** Body-Phase: speichert Text/HTML, Attachment-Metadaten und den FTS-Eintrag. */
+/** Body phase: stores text/HTML, attachment metadata and the FTS entry. */
 export function storeBody(db: Database.Database, messageId: number, parsed: ParsedMail): void {
   const row = db
     .prepare(
@@ -357,11 +357,11 @@ export function storeBody(db: Database.Database, messageId: number, parsed: Pars
     `UPDATE messages SET body_state = 'full', snippet = ?, has_attachments = ? WHERE id = ?`
   ).run(parsed.snippet, hasVisibleAttachments ? 1 : 0, messageId)
 
-  // Immer ersetzen: wiederholte Fetches koennen korrigierte Bodies oder
-  // Attachment-Metadaten enthalten und muessen dann FTS + Vektor invalidieren.
+  // Always replace: repeated fetches can contain corrected bodies or
+  // attachment metadata and must then invalidate FTS + vector.
   refreshMessageSearchIndex(db, messageId)
 
-  // Einladungen (text/calendar): geparste Zusammenfassung ablegen; wirft nie
+  // Invitations (text/calendar): store the parsed summary; never throws
   storeInvitations(db, messageId, parsed.calendarParts)
 }
 

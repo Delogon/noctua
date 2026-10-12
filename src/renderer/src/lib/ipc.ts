@@ -7,7 +7,7 @@ import type {
 } from '@shared/ipc-contract'
 import { recordInvoke } from './diagnostics'
 
-/** Dünner, typisierter Zugriff auf die Preload-Brücke. */
+/** Thin, typed access to the preload bridge. */
 export function invoke<C extends InvokeChannel>(
   channel: C,
   input: InvokeInput<C>

@@ -12,13 +12,13 @@ import { setSetting } from '@main/db'
 import { closeTestDb, createTestDb } from '../helpers/db'
 
 const Z = 'Europe/Berlin'
-// Montag 2026-10-05 00:00 UTC (= 02:00 in Berlin, Sommerzeit)
+// Monday 2026-10-05 00:00 UTC (= 02:00 in Berlin, summer time)
 const MON = Date.UTC(2026, 9, 5, 0, 0)
 const h = (iso: string): number => Date.parse(iso)
 
 describe('workingDayList', () => {
   it('überspringt Wochenenden', () => {
-    // Freitag 2026-10-09 → Fr, Mo, Di
+    // Friday 2026-10-09 → Fri, Mon, Tue
     const days = workingDayList(Date.UTC(2026, 9, 9, 10), Z, 3)
     expect(days.map((d) => `${d.y}-${d.m}-${d.d}`)).toEqual([
       '2026-10-9',
@@ -31,7 +31,7 @@ describe('workingDayList', () => {
 describe('computeFreeSlots', () => {
   it('Arbeitszeit 08-18 lokal (Sommerzeit: 06:00-16:00Z), ohne Wochenende', () => {
     const slots = computeFreeSlots([], {
-      fromUtc: Date.UTC(2026, 9, 9, 3), // Freitag früh
+      fromUtc: Date.UTC(2026, 9, 9, 3), // Friday early
       zone: Z,
       workingDays: 2,
       leadMinutes: 0
@@ -46,9 +46,9 @@ describe('computeFreeSlots', () => {
     const slots = computeFreeSlots(
       [
         { startUtc: h('2026-10-05T08:00:00Z'), endUtc: h('2026-10-05T09:00:00Z') },
-        { startUtc: h('2026-10-05T08:30:00Z'), endUtc: h('2026-10-05T10:00:00Z') }, // überlappt
-        { startUtc: h('2026-10-05T10:10:00Z'), endUtc: h('2026-10-05T13:00:00Z') }, // 10-min-Lücke
-        { startUtc: h('2026-10-05T15:00:00Z'), endUtc: h('2026-10-05T20:00:00Z') } // ragt über Ende
+        { startUtc: h('2026-10-05T08:30:00Z'), endUtc: h('2026-10-05T10:00:00Z') }, // overlaps
+        { startUtc: h('2026-10-05T10:10:00Z'), endUtc: h('2026-10-05T13:00:00Z') }, // 10-min gap
+        { startUtc: h('2026-10-05T15:00:00Z'), endUtc: h('2026-10-05T20:00:00Z') } // extends past end
       ],
       { fromUtc: MON, zone: Z, workingDays: 1, leadMinutes: 0 }
     )
@@ -68,7 +68,7 @@ describe('computeFreeSlots', () => {
 
   it('Vorlauf und laufender Tag: nichts in der Vergangenheit, auf 15 min aufgerundet', () => {
     const slots = computeFreeSlots([], {
-      fromUtc: h('2026-10-05T08:07:00Z'), // 10:07 lokal
+      fromUtc: h('2026-10-05T08:07:00Z'), // 10:07 local
       zone: Z,
       workingDays: 1,
       leadMinutes: 60
@@ -79,7 +79,7 @@ describe('computeFreeSlots', () => {
   })
 
   it('Zeitumstellung: Arbeitszeit bleibt 08-18 lokal vor und nach dem Wechsel (25.10.2026)', () => {
-    // Fr 23.10. (CEST, +2) und Mo 26.10. (CET, +1)
+    // Fri 23.10. (CEST, +2) and Mon 26.10. (CET, +1)
     const slots = computeFreeSlots([], {
       fromUtc: h('2026-10-23T00:00:00Z'),
       zone: Z,
@@ -98,7 +98,7 @@ describe('computeFreeSlots', () => {
 
   it('Frühjahrs-Umstellung (29.03.2026) verschiebt die Montags-Fenster', () => {
     const slots = computeFreeSlots([], {
-      fromUtc: h('2026-03-27T00:00:00Z'), // Freitag, CET
+      fromUtc: h('2026-03-27T00:00:00Z'), // Friday, CET
       zone: Z,
       workingDays: 2,
       leadMinutes: 0
@@ -137,7 +137,7 @@ describe('asksForMeeting', () => {
 describe('buildAvailabilityBlock', () => {
   let db: Database.Database
   let calId: number
-  const NOW = h('2026-10-05T05:00:00Z') // Montag 07:00 Berlin
+  const NOW = h('2026-10-05T05:00:00Z') // Monday 07:00 Berlin
 
   beforeEach(() => {
     db = createTestDb()
@@ -198,9 +198,9 @@ describe('buildAvailabilityBlock', () => {
     busyEvent('Chemotherapie bei Dr. Geheim', '2026-10-06T08:00:00', '2026-10-06T12:00:00')
     const block = buildAvailabilityBlock(db, input)!
     expect(block).toContain('<<<BEGIN FREE TIME SLOTS>>>')
-    // Dienstag: 08-12 belegt → frei erst ab 12:00
+    // Tuesday: 08-12 busy → free only from 12:00
     expect(block).toContain('2026-10-06 (Tue): 12:00-18:00')
-    expect(block).toContain('2026-10-05 (Mon): 09:00-18:00') // 07:00 + 2 h Vorlauf
+    expect(block).toContain('2026-10-05 (Mon): 09:00-18:00') // 07:00 + 2 h lead time
     expect(block).not.toMatch(/Chemo|Geheim|Praxis|vertraulich/)
   })
 

@@ -17,12 +17,12 @@ import {
   wallToUtc
 } from '@renderer/features/calendar/dates'
 
-// Zeitzone vor dem Sammeln der Tests setzen (Modul-Konstanten mit Date)
+// Set the time zone before tests are collected (module constants using Date)
 process.env.TZ = 'Europe/Berlin'
 
 describe('Wochenberechnung (Montag, DST-sicher)', () => {
   it('Woche beginnt am Montag', () => {
-    // Mittwoch, 7. Oktober 2026
+    // Wednesday, 7 October 2026
     const start = startOfWeek(new Date(2026, 9, 7, 15, 30))
     expect(dayKey(start)).toBe('2026-10-05')
     expect(start.getHours()).toBe(0)
@@ -37,7 +37,7 @@ describe('Wochenberechnung (Montag, DST-sicher)', () => {
     const range = visibleRange('week', new Date(2026, 9, 25))
     expect(dayKey(range.start)).toBe('2026-10-19')
     expect(dayKey(range.end)).toBe('2026-10-26')
-    // 25-h-Tag: Differenz in ms ist NICHT 7 × 24 h, aber die Tage stimmen
+    // 25-h day: the difference in ms is NOT 7 × 24 h, but the days are correct
     expect(range.end.getTime() - range.start.getTime()).toBe(7 * 86_400_000 + 3_600_000)
     expect(viewDays('week', new Date(2026, 9, 25)).map(dayKey)).toEqual([
       '2026-10-19',

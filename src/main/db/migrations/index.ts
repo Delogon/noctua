@@ -35,9 +35,9 @@ import m034 from './034_folder_delimiter.sql?raw'
 import m035 from './035_mail_threats.sql?raw'
 
 /**
- * Migrationen als ?raw-Importe, damit sie in das Main-Bundle eingebettet werden
- * (lose .sql-Dateien würden es nicht in die gepackte App schaffen).
- * Neue Migration: Datei anlegen, hier importieren, ans Ende anhängen.
+ * Migrations as ?raw imports so they get embedded into the main bundle
+ * (loose .sql files would not make it into the packaged app).
+ * New migration: create the file, import it here, append it at the end.
  */
 export const migrations: ReadonlyArray<{ version: number; name: string; sql: string }> = [
   { version: 1, name: 'init', sql: m001 },

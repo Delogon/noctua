@@ -64,7 +64,7 @@ function parseRecipients(json: string | null): Recipient[] {
   }
 }
 
-/** Entfernt Steuer- und Richtungszeichen, ohne sichtbare Headerdaten umzudeuten. */
+/** Removes control and direction characters without reinterpreting visible header data. */
 function safeHeaderText(value: string): string {
   return [...value]
     .map((character) => {
@@ -208,9 +208,9 @@ export function getMessageHeaderDetails(
   const authenticationHeaders = fields.filter((field) =>
     ['authentication-results', 'arc-authentication-results'].includes(field.name.toLowerCase())
   )
-  // Für die kompakte Ampel nur das oberste gemeldete Ergebnis verwenden.
-  // Untere Resultate können aus Weiterleitungen stammen oder selbst Teil der
-  // eingegangenen Nachricht sein. Alle Zeilen bleiben im Roh-Header einsehbar.
+  // For the compact traffic light, only use the topmost reported result.
+  // Lower results may come from forwardings or be part of the
+  // received message itself. All lines stay viewable in the raw header.
   const primaryAuthenticationValue = [
     fields.find((field) => field.name.toLowerCase() === 'authentication-results')?.value ??
       fields.find((field) => field.name.toLowerCase() === 'arc-authentication-results')?.value

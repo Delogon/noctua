@@ -17,25 +17,25 @@ export interface AdapterOptions {
   apiKey: string | null
 }
 
-/** OpenRouter-Zusatzheader (Attribution) — nur beim OpenRouter-Preset. */
+/** OpenRouter extra headers (attribution) — only for the OpenRouter preset. */
 export const OPENROUTER_HEADERS = {
   'HTTP-Referer': 'https://github.com/Schereo/noctua',
   'X-Title': 'Noctua'
 }
 
-/** Kosten nur bei OpenRouter (Preis-Fallback inklusive); sonst immer 0. */
+/** Costs only for OpenRouter (including price fallback); otherwise always 0. */
 export function mapUsage(usage: unknown, priced: boolean): LlmUsage {
   const u = extractUsage(usage)
   return priced ? u : { inputTokens: u.inputTokens, outputTokens: u.outputTokens, costUsd: 0 }
 }
 
-/** Fallback-Schätzung, falls ein Stream keine Usage liefert (~4 Zeichen/Token). */
+/** Fallback estimate if a stream returns no usage (~4 chars/token). */
 export function estimateStreamUsage(chars: number, priced: boolean): LlmUsage {
   const outputTokens = Math.ceil(chars / 4)
   return { inputTokens: 0, outputTokens, costUsd: priced ? (outputTokens * 25) / 1_000_000 : 0 }
 }
 
-/** Whisper-kompatibel: POST /audio/transcriptions (whisper.cpp, faster-whisper, LocalAI …). */
+/** Whisper-compatible: POST /audio/transcriptions (whisper.cpp, faster-whisper, LocalAI …). */
 export async function transcribeViaWhisper(
   client: ReturnType<typeof createOpenAiClient>,
   audioBase64: string,
@@ -52,7 +52,7 @@ export async function transcribeViaWhisper(
 const TRANSCRIBE_PROMPT =
   'Transkribiere diese Sprachaufnahme wortgetreu in ihrer Originalsprache. Gib AUSSCHLIESSLICH das Transkript aus — keine Anführungszeichen, keine Kommentare, keine Übersetzung. Ist keine oder nur unverständliche Sprache zu hören, gib exakt [LEER] aus.'
 
-/** Adapter für OpenAI Chat Completions (`chat.completions.create`). */
+/** Adapter for OpenAI Chat Completions (`chat.completions.create`). */
 export function createChatCompletionsClient({ profile, apiKey }: AdapterOptions): LlmClient {
   const openrouter = profile.preset === 'openrouter'
   const client = createOpenAiClient({
@@ -63,7 +63,7 @@ export function createChatCompletionsClient({ profile, apiKey }: AdapterOptions)
 
   function body(req: LlmRequest): Record<string, unknown> {
     return {
-      // ZDR-Routing (`provider`) ist eine OpenRouter-Erweiterung
+      // ZDR routing (`provider`) is an OpenRouter extension
       ...(openrouter ? providerBody() : {}),
       model: req.model,
       messages: req.messages,
@@ -78,7 +78,7 @@ export function createChatCompletionsClient({ profile, apiKey }: AdapterOptions)
       const response = await client.chat.completions.create(
         {
           ...body(req),
-          // OpenRouter: Kosten in der Response mitliefern
+          // OpenRouter: include costs in the response
           ...(openrouter ? { usage: { include: true } } : {})
         } as never,
         { signal: opts?.signal }
@@ -120,7 +120,7 @@ export function createChatCompletionsClient({ profile, apiKey }: AdapterOptions)
 
     async transcribe(audioBase64, format, model) {
       if (!openrouter) return transcribeViaWhisper(client, audioBase64, format, model)
-      // OpenRouter kennt kein /audio/transcriptions — Audio-Input-Chat wie bisher
+      // OpenRouter has no /audio/transcriptions — audio-input chat as before
       const completion = await client.chat.completions.create({
         ...providerBody(),
         model,

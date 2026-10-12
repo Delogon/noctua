@@ -2,9 +2,9 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import { davNamesForEmails, searchDavContacts } from '../../contacts/repo'
 
 /**
- * Baut contact_stats für ein Konto neu auf: sent_count aus den Empfängern des
- * Sent-Ordners (Prioritäts-Boost „hat Tim dem je geschrieben?" + Stilbeispiele),
- * received_count aus den Absendern der INBOX.
+ * Rebuilds contact_stats for an account: sent_count from the recipients of the
+ * Sent folder (priority boost "has Tim ever written to them?" + style examples),
+ * received_count from the senders in the INBOX.
  */
 export function rebuildContactStats(db: Database.Database, accountId: number): void {
   const tx = db.transaction(() => {
@@ -29,9 +29,9 @@ export function rebuildContactStats(db: Database.Database, accountId: number): v
          received_count = excluded.received_count,
          last_interaction = max(contact_stats.last_interaction, excluded.last_interaction)`
     ).run(accountId)
-    // Haeufigster Anzeigename je Adresse, damit die Empfaenger-Vorschlaege
-    // ihn nicht pro Tastendruck aus messages nachschlagen muessen. Laeuft mit
-    // idx_msg_from_addr_lower als indizierter Lookup je Kontakt.
+    // Most frequent display name per address, so the recipient suggestions
+    // don't have to look it up from messages on every keystroke. Runs as an
+    // indexed lookup per contact via idx_msg_from_addr_lower.
     db.prepare(
       `UPDATE contact_stats SET display_name = (
          SELECT m.from_name FROM messages m
@@ -55,7 +55,7 @@ function normalizeAddress(raw: string): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) ? address : null
 }
 
-/** Schreibt erfolgreiche SMTP-Empfaenger sofort in die lokale Historie. */
+/** Writes successful SMTP recipients to the local history right away. */
 export function recordSentContacts(
   db: Database.Database,
   accountId: number,
@@ -78,7 +78,7 @@ export function recordSentContacts(
   })()
 }
 
-/** Zuletzt genutztes Absenderkonto fuer einen bereits angeschriebenen Kontakt. */
+/** Most recently used sender account for a contact already written to. */
 export function preferredAccountForContact(db: Database.Database, address: string): number | null {
   const normalized = normalizeAddress(address)
   if (!normalized) return null
@@ -96,10 +96,10 @@ export function preferredAccountForContact(db: Database.Database, address: strin
 }
 
 /**
- * Empfänger-Vorschläge: zuerst die lokale Kontakt-Historie (bestehendes
- * Ranking), dann CardDAV-Kontakte. Dedupe nach Adresse; fehlt einem
- * Historien-Treffer der Name, kommt er aus dem Adressbuch. Eigene
- * Konto-Adressen erscheinen nie.
+ * Recipient suggestions: first the local contact history (existing
+ * ranking), then CardDAV contacts. Dedupe by address; if a history hit
+ * lacks a name, it comes from the address book. Own
+ * account addresses never appear.
  */
 export function suggestContacts(
   db: Database.Database,
@@ -111,7 +111,7 @@ export function suggestContacts(
   try {
     davRows = searchDavContacts(db, query, limit * 2 + local.length)
   } catch {
-    // Kontakt-Tabellen fehlen/sind gesperrt: Vorschläge bleiben ohne Adressbuch nutzbar
+    // Contact tables missing/locked: suggestions stay usable without the address book
   }
   if (davRows.length === 0) return local
 
@@ -145,10 +145,10 @@ function suggestFromHistory(
   limit: number
 ): ContactSuggestion[] {
   const like = `%${query.toLowerCase().replace(/[%_]/g, '')}%`
-  // Name und Adresse stehen beide in contact_stats (Migration 023), die Suche
-  // bleibt damit auf einer 3k-Zeilen-Tabelle. Vorher kostete jeder Tastendruck
-  // eine korrelierte Suche über alle Nachrichten — Sekunden bis Minuten, in
-  // denen der Main-Prozess keine IPC mehr beantwortet hat.
+  // Name and address both live in contact_stats (migration 023), so the search
+  // stays on a 3k-row table. Previously every keystroke cost a
+  // correlated search over all messages — seconds to minutes during
+  // which the main process no longer answered any IPC.
   return db
     .prepare(
       `SELECT cs.addr AS addr,

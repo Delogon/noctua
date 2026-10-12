@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { SpellEngine, editDistance, rankSuggestions } from '@main/spell/engine'
 
-// Integrationstest gegen die echten vendorten Wörterbücher — genau die
-// Kombination, die im Main-Prozess läuft (igerman98 DE + SCOWL EN).
+// Integration test against the real vendored dictionaries — exactly the
+// combination that runs in the main process (igerman98 DE + SCOWL EN).
 let engine: SpellEngine
 
 beforeAll(async () => {

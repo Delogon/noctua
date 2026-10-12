@@ -4,11 +4,11 @@ import { safeStorage } from 'electron'
 import { DbKeyError } from './encryption'
 
 /**
- * Schlüssel der SQLCipher-Datenbank. 32 Zufallsbytes, per Electron safeStorage
- * (macOS: Keychain-gestützt) verschlüsselt und als Datei NEBEN der DB abgelegt
- * (`userData/noctua.dbkey`, 0600) — bewusst nicht in der DB selbst. Ohne
- * safeStorage gibt es keinen Klartext-Fallback: lieber nicht starten als
- * unverschlüsselt speichern.
+ * Key of the SQLCipher database. 32 random bytes, encrypted via Electron safeStorage
+ * (macOS: Keychain-backed) and stored as a file NEXT TO the DB
+ * (`userData/noctua.dbkey`, 0600) — deliberately not in the DB itself. Without
+ * safeStorage there is no plaintext fallback: better not to start than to
+ * store unencrypted.
  */
 
 export const DB_KEY_FILENAME = 'noctua.dbkey'
@@ -24,10 +24,10 @@ export function assertKeyStorageAvailable(): void {
 }
 
 /**
- * Liefert den Schlüssel als Hex-String. Existiert die Schlüsseldatei nicht,
- * wird ein neuer erzeugt — aber nur, wenn `allowCreate` gilt (keine DB oder eine
- * Klartext-DB vorhanden). Eine verschlüsselte DB ohne Schlüsseldatei ist nicht
- * wiederherstellbar; dann NICHT still einen neuen Schlüssel erzeugen.
+ * Returns the key as a hex string. If the key file doesn't exist,
+ * a new one is created — but only if `allowCreate` holds (no DB or a
+ * plaintext DB present). An encrypted DB without a key file cannot be
+ * recovered; in that case do NOT silently create a new key.
  */
 export function loadOrCreateDbKey(keyPath: string, allowCreate: boolean): string {
   assertKeyStorageAvailable()
@@ -60,8 +60,8 @@ export function loadOrCreateDbKey(keyPath: string, allowCreate: boolean): string
 
   const hex = randomBytes(32).toString('hex')
   const ciphertext = safeStorage.encryptString(hex)
-  // Atomar schreiben: Schlüssel muss vollständig auf der Platte liegen, BEVOR
-  // die erste verschlüsselte DB entsteht.
+  // Write atomically: the key must be fully on disk BEFORE
+  // the first encrypted DB is created.
   const tmp = keyPath + '.tmp'
   try {
     writeFileSync(tmp, ciphertext, { mode: 0o600 })
@@ -71,7 +71,7 @@ export function loadOrCreateDbKey(keyPath: string, allowCreate: boolean): string
     try {
       unlinkSync(tmp)
     } catch {
-      // nichts aufzuräumen
+      // nothing to clean up
     }
     throw error
   }

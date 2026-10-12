@@ -48,8 +48,8 @@ interface ComposerFailure {
 }
 
 /**
- * Der neue Nachrichtenscreen und das Antwortfeld benutzen dieselbe Composer-
- * Oberflaeche. Empfaenger, Absenderwahl und Betreff bleiben hier als Adapter.
+ * The new-message screen and the reply field use the same composer
+ * surface. Recipients, sender choice and subject remain here as adapters.
  */
 export function ComposeSheet(): React.JSX.Element {
   const t = useT()
@@ -75,7 +75,7 @@ export function ComposeSheet(): React.JSX.Element {
   const [compositionResult, setCompositionResult] = useState<CompositionResult | null>(null)
   const [failure, setFailure] = useState<ComposerFailure | null>(null)
   const [sending, setSending] = useState(false)
-  // Akzent-Notiz, wenn die Konto-Automatik das VON-Konto gewechselt hat (Design 3a)
+  // Accent note when the account autopilot switched the FROM account (Design 3a)
   const [autoNote, setAutoNote] = useState<{ name: string; addr: string } | null>(null)
 
   const surfaceRef = useRef<MailComposerHandle>(null)
@@ -120,8 +120,8 @@ export function ComposeSheet(): React.JSX.Element {
   const voiceTag = useVoiceTag(account?.id ?? null, account?.accountName ?? null)
   const signature = useAccountSignature(account)
 
-  // Effektives Konto für den Autopiloten spiegeln — der Lookup ist asynchron
-  // und darf nicht mit einem veralteten Stand vergleichen
+  // Mirror the effective account for the autopilot — the lookup is async
+  // and must not compare against a stale state
   const effectiveAccountIdRef = useRef<number | null>(null)
   useEffect(() => {
     effectiveAccountIdRef.current = account?.id ?? null
@@ -130,7 +130,7 @@ export function ComposeSheet(): React.JSX.Element {
   const toList = useMemo(() => [...to, ...parseAddresses(toText)], [to, toText])
   const canSend = Boolean(account && toList.length > 0 && body.trim() && !sending)
 
-  // Aktuellen Stand als Entwurf mitführen — für entprelltes Sichern und den Unmount-Flush
+  // Carry the current state as a draft — for debounced saving and the unmount flush
   useEffect(() => {
     draftRef.current = {
       accountId: account?.id ?? null,
@@ -144,13 +144,13 @@ export function ComposeSheet(): React.JSX.Element {
     }
   })
 
-  // Gespeicherten Entwurf wiederherstellen (z. B. nach Klick auf eine Mail oder Rückgängig)
+  // Restore a saved draft (e.g. after clicking a mail or undo)
   useEffect(() => {
     void loadComposeDraft()
       .then((draft) => {
         if (!draft) return
         if (draft.accountId !== null) {
-          // Konto des Entwurfs behalten — nicht vom Empfänger-Autopiloten überstimmen lassen
+          // Keep the draft's account — don't let the recipient autopilot override it
           fromManuallySelectedRef.current = true
           setFromId(draft.accountId)
         }
@@ -167,7 +167,7 @@ export function ComposeSheet(): React.JSX.Element {
       })
   }, [replaceBody, toastNow, t])
 
-  // Entwurf fortlaufend sichern (entprellt) — Senden/Verwerfen löschen ihn explizit
+  // Save the draft continuously (debounced) — send/discard delete it explicitly
   useEffect(() => {
     if (!draftLoadedRef.current || skipDraftSaveRef.current) return
     const timer = setTimeout(() => {
@@ -178,7 +178,7 @@ export function ComposeSheet(): React.JSX.Element {
     return () => clearTimeout(timer)
   }, [to, toText, cc, ccText, bcc, bccText, subject, body, bodyHtml, fromId])
 
-  // Beim Schließen des Composers (Mail-Klick, Esc, Ansichtswechsel) sofort sichern
+  // On closing the composer (mail click, Esc, view switch) save immediately
   useEffect(
     () => () => {
       if (skipDraftSaveRef.current || !draftLoadedRef.current) return
@@ -191,16 +191,16 @@ export function ComposeSheet(): React.JSX.Element {
   const switchAccount = (id: number): void => {
     fromManuallySelectedRef.current = true
     setFromId(id)
-    // Manuelle Wahl gewinnt — und unterdrückt die Autopilot-Notiz (Design 3a)
+    // Manual choice wins — and suppresses the autopilot note (Design 3a)
     setAutoNote(null)
   }
 
-  // Neue Nachrichten folgen dem zuletzt fuer den ersten Empfaenger verwendeten
-  // Postfach. Wechselt die Automatik das sichtbare Konto, sagt sie es kurz an;
-  // eine manuelle Auswahl hat fuer diesen Entwurf Vorrang.
+  // New messages follow the mailbox last used for the first recipient.
+  // If the automation switches the visible account, it briefly announces it;
+  // a manual selection takes precedence for this draft.
   useEffect(() => {
-    // Nur plausible Adressen befragen — zweifelhafte Chips (jonas@web) haben
-    // keine Historie und würden an der IPC-E-Mail-Validierung scheitern
+    // Only query plausible addresses — dubious chips (jonas@web) have
+    // no history and would fail the IPC email validation
     const recipient = [...to, ...parseAddresses(toText)].find(
       (address) => classifyAddress(address) === 'ok'
     )
@@ -228,15 +228,15 @@ export function ComposeSheet(): React.JSX.Element {
     }
   }, [to, toText, accounts.data])
 
-  // Autopilot-Notiz nach ~4 s wieder ausblenden
+  // Hide the autopilot note again after ~4 s
   useEffect(() => {
     if (!autoNote) return
     const timer = setTimeout(() => setAutoNote(null), FROM_AUTOPILOT_NOTE_MS)
     return () => clearTimeout(timer)
   }, [autoNote])
 
-  // Esc legt den Entwurf ab und kehrt in den Posteingang zurück (Design 3a).
-  // Gesichert wird er vom Unmount-Flush oben — hier nur ehrlich Bescheid sagen.
+  // Esc files the draft away and returns to the inbox (Design 3a).
+  // It is saved by the unmount flush above — here we just say so honestly.
   useEffect(() => {
     const onComposeAction = (event: Event): void => {
       if ((event as CustomEvent).detail !== 'escape') return
@@ -248,8 +248,8 @@ export function ComposeSheet(): React.JSX.Element {
     return () => window.removeEventListener('paper:compose', onComposeAction)
   }, [setView, t, toastNow])
 
-  // AI-Ausgabe wird erst mit dem ersten echten Chunk in den Editor gesetzt.
-  // Bis dahin bleibt der Ausgangstext sichtbar und kann bei Fehlern zurueck.
+  // AI output is only put into the editor with the first real chunk.
+  // Until then the original text stays visible and can be restored on errors.
   useEffect(
     () =>
       onPush('ai:draftChunk', (payload) => {

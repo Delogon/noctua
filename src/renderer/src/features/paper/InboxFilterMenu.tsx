@@ -9,9 +9,9 @@ import {
 } from '@renderer/features/paper/inbox-filters'
 
 /**
- * Erweiterbares Filter-Menü der Posteingangs-Liste (Design Turn 7):
- * FILTER-Zeile mit Trichter, Chips je aktivem Filter und „zurücksetzen";
- * das Popover rendert Sektionen und Optionen aus der Registry.
+ * Extensible filter menu of the inbox list (Design Turn 7): FILTER row
+ * with funnel, chips per active filter and „zurücksetzen"; the popover
+ * renders sections and options from the registry.
  */
 export function InboxFilterMenu({
   counts,

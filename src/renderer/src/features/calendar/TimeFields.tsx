@@ -4,10 +4,10 @@ import { useT } from '@renderer/lib/i18n'
 import { parseTimeInput, systemTz } from './dates'
 import { withAllDay, withStart, type EventForm } from './event-form'
 
-// Gemeinsame Zeit-Felder von Editor und Schnell-Anlegen: 24-h-Zeitfeld (unabhängig
-// von der Systemlocale), Datum, Ganztägig-Schalter, optionale Zeitzone.
+// Shared time fields of editor and quick create: 24-h time field (independent
+// of the system locale), date, all-day toggle, optional time zone.
 
-/** 24-h-Textfeld; akzeptiert „9", „930", „9.30" und schreibt 'HH:mm' zurück. */
+/** 24-h text field; accepts "9", "930", "9.30" and writes back 'HH:mm'. */
 export function TimeField({
   value,
   onChange,
@@ -74,7 +74,7 @@ export function DateField({
   )
 }
 
-/** Kalender-Auswahl (nur beschreibbare); bei bestehenden Terminen deaktiviert. */
+/** Calendar picker (writable only); disabled for existing events. */
 export function CalendarSelect({
   calendars,
   value,

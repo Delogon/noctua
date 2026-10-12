@@ -1,12 +1,12 @@
-// 24 gelabelte Test-Mails. Kontoinhaberin: Lena Hartmann <lena.hartmann@example.org>.
-// gold.tasks = soll diese Mail (mind. eine) Aufgabe erzeugen?
-// gold.cats = akzeptable Kategorien; gold.addressed = ist Lena persönlich gemeint?
-// salut: 'named:X' | 'group' | 'none' — deterministische Vor-Analyse wie in prod.
+// 24 labeled test mails. Account owner: Lena Hartmann <lena.hartmann@example.org>.
+// gold.tasks = should this mail create (at least one) task?
+// gold.cats = acceptable categories; gold.addressed = is Lena personally addressed?
+// salut: 'named:X' | 'group' | 'none' — deterministic pre-analysis as in prod.
 
 export const OWNER = 'Lena Hartmann <lena.hartmann@example.org>'
 
 export const MAILS = [
-  // ── FALLEN: dürfen KEINE Aufgaben erzeugen ─────────────────────────────
+  // ── TRAPS: must NOT create tasks ───────────────────────────────────────
   {
     id: 'newsletter-webinar',
     from: 'Tech Weekly <news@techweekly.example>',
@@ -128,7 +128,7 @@ export const MAILS = [
     gold: { tasks: false, cats: ['promotions'], addressed: false }
   },
 
-  // ── ECHTE AUFGABEN: sollen Aufgaben erzeugen ───────────────────────────
+  // ── REAL TASKS: should create tasks ────────────────────────────────────
   {
     id: 'rechnung-frist',
     from: 'Hosting GmbH <billing@hosting.example>',

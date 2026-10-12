@@ -9,9 +9,9 @@ import { outputLanguageName } from './output-language'
 const STYLE_KEY = 'ai.styleProfile'
 
 /**
- * Unzerbrechlich statt streng (M8-Lektion): LLM-Output wird GEKAPPT und
- * gekürzt, nie abgelehnt — Opus liefert gern 8 Anreden statt 6, und das
- * darf kein Fehler sein.
+ * Unbreakable rather than strict (M8 lesson): LLM output is CAPPED and
+ * truncated, never rejected — Opus likes to return 8 salutations instead of 6, and
+ * that must not be an error.
  */
 const clippedList = (
   maxItems: number,
@@ -52,16 +52,16 @@ function styleKey(accountId?: number | null): string {
 }
 
 /**
- * Frische-Metadaten je Profil (Design 3e: „132 replies · updated today"):
- * wie viele gesendete Antworten die Eule zu diesem Konto kennt und wann das
- * Profil zuletzt gelernt wurde. Liegt neben dem Profil in den Settings.
+ * Freshness metadata per profile (design 3e: "132 replies · updated today"):
+ * how many sent replies the owl knows for this account and when the
+ * profile was last learned. Stored next to the profile in the settings.
  */
 export function styleMetaKey(accountId?: number | null): string {
   return accountId ? `ai.styleMeta.${accountId}` : 'ai.styleMeta'
 }
 
 export function getStyleProfile(accountId?: number | null): StyleProfile | null {
-  // Konto-Profil bevorzugt, globales als Fallback (Bestandsdaten aus M7b)
+  // Account profile preferred, global one as fallback (existing data from M7b)
   const raw = (accountId ? getSetting(styleKey(accountId)) : null) ?? getSetting(STYLE_KEY)
   if (!raw) return null
   try {
@@ -72,9 +72,9 @@ export function getStyleProfile(accountId?: number | null): StyleProfile | null 
 }
 
 /**
- * Lernt einmalig ein Schreibstil-Profil aus den gesendeten Mails (Sprache,
- * Anrede-/Grußmuster, Ton). Wird von den Drafts zusätzlich zu konkreten
- * Beispielen genutzt; Refresh über die Command-Palette.
+ * Learns a writing-style profile once from the sent mails (language,
+ * salutation/closing patterns, tone). Used by drafts in addition to concrete
+ * examples; refresh via the command palette.
  */
 export async function refreshStyleProfile(
   db: Database.Database,
@@ -110,8 +110,8 @@ Write formality and style_notes in ${outputLanguageName()}; copy greetings and c
       },
       { role: 'user', content: corpus }
     ],
-    // KEIN response_format: Anthropic-Modelle via OpenRouter lehnen es ab —
-    // JSON kommt per Instruktion, unten wird tolerant extrahiert.
+    // NO response_format: Anthropic models via OpenRouter reject it —
+    // JSON comes via instruction, extracted tolerantly below.
     temperature: 0.2,
     maxTokens: 600
   })
@@ -124,7 +124,7 @@ Write formality and style_notes in ${outputLanguageName()}; copy greetings and c
   try {
     parsed = JSON.parse(jsonText)
   } catch {
-    // Antwort enthält Auszüge aus gesendeten Mails — im Release nur die Länge
+    // Answer contains excerpts from sent mails — in release only the length
     console.warn(
       '[style] unparsebare Antwort:',
       !isDev ? `${raw.length} Zeichen` : raw.slice(0, 400)
@@ -134,8 +134,8 @@ Write formality and style_notes in ${outputLanguageName()}; copy greetings and c
   const profile = styleProfileSchema.parse(parsed)
   setSetting(styleKey(accountId), JSON.stringify(profile))
   setSetting('ai.styleProfile.updatedAt', String(Date.now()))
-  // Frische-Zeile der Voice-Card: Umfang des Antwort-Korpus (nicht nur die 15
-  // gelesenen Stichproben) + Lernzeitpunkt — die Karte zeigt beides ehrlich an.
+  // Freshness line of the voice card: size of the reply corpus (not just the 15
+  // sampled reads) + learning time — the card shows both honestly.
   const corpusCount = db
     .prepare(
       `SELECT count(*) n FROM messages m
@@ -152,7 +152,7 @@ Write formality and style_notes in ${outputLanguageName()}; copy greetings and c
   return profile
 }
 
-/** Zitat-Historie entfernen, damit fremde Mails nicht mit eigenem Text zählen. */
+/** Remove quote history so other people's mails don't count as own text. */
 export function stripQuoted(text: string): string {
   const cut = text.search(/^(Am|On) .{5,120}(schrieb|wrote)/m)
   const head = cut >= 0 ? text.slice(0, cut) : text
@@ -163,9 +163,9 @@ export function stripQuoted(text: string): string {
 }
 
 /**
- * Deterministische Du/Sie-Erkennung aus Mail-Texten. Satzinitiales „Sie" ist
- * ambig (sie/Sie) und zählt nicht; bei Gleichstand gewinnt das förmliche Sie
- * (der harmlosere Fehler). null = kein Signal.
+ * Deterministic du/Sie detection from mail texts. Sentence-initial "Sie" is
+ * ambiguous (sie/Sie) and doesn't count; on a tie the formal Sie wins
+ * (the more harmless mistake). null = no signal.
  */
 export function detectAddressForm(texts: string[]): 'sie' | 'du' | null {
   let sie = 0
@@ -186,7 +186,7 @@ export function detectAddressForm(texts: string[]): 'sie' | 'du' | null {
   return sie >= du ? 'sie' : 'du'
 }
 
-/** Deterministisch: wie redet der Nutzer DIESEN Kontakt üblicherweise an? */
+/** Deterministic: how does the user usually address THIS contact? */
 export function extractContactStyle(
   db: Database.Database,
   accountId: number,
@@ -211,7 +211,7 @@ export function extractContactStyle(
       .filter(Boolean)
     if (lines.length < 2) continue
     const salutation = lines[0].length <= 60 ? lines[0] : null
-    // Grußformel: letzte kurze Zeile vor evtl. Namen/Signatur
+    // Closing: last short line before a possible name/signature
     const shortTail = lines.slice(-3).filter((l) => l.length <= 40)
     const closing = shortTail.length > 0 ? shortTail.join(' ') : null
     if (salutation) return { salutation, closing }

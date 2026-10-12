@@ -5,10 +5,10 @@ import { useT } from '@renderer/lib/i18n'
 import { cleanIpcError } from '@renderer/features/paper/account-states'
 import type { AiProfile } from '@renderer/queries/intel'
 
-// Onboarding-Schritt 3 in einer Company Edition mit `hideOpenRouterOnboarding`:
-// statt der OpenRouter-Abfrage die von der Organisation bereitgestellten
-// KI-Profile (managed). Pro Profil lässt sich der Key hinterlegen; lokale
-// Profile brauchen keinen.
+// Onboarding step 3 in a Company Edition with `hideOpenRouterOnboarding`:
+// instead of the OpenRouter prompt, the AI profiles provided by the
+// organization (managed). A key can be stored per profile; local
+// profiles don't need one.
 
 function OrgProfileRow({ profile }: { profile: AiProfile }): React.JSX.Element {
   const t = useT()

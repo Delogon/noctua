@@ -5,9 +5,9 @@ import {
   visibleMailboxForSearchHit
 } from '../../src/renderer/src/features/search/palette-router'
 
-// Seit die Mailsuche in der Owl-View lebt, filtert der Router nur noch
-// Befehle: kein Mode-Routing, keine Suchsektion. `>` bleibt als bewusster
-// Nur-Befehle-Modus erhalten.
+// Since mail search lives in the Owl view, the router only filters
+// commands: no mode routing, no search section. `>` stays as a deliberate
+// commands-only mode.
 
 const commands = [
   { id: 'compose', label: 'Neue E-Mail' },

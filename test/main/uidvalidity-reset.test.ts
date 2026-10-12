@@ -48,7 +48,7 @@ describe('UIDVALIDITY-Reset (REL-3)', () => {
   })
 
   it('ist atomar: scheitert ein Schritt, bleibt alles unverändert', () => {
-    // Fehler beim letzten Schritt (UPDATE folders) erzwingen
+    // Force an error in the last step (UPDATE folders)
     db.exec(`
       CREATE TEMP TRIGGER fail_folder_update BEFORE UPDATE ON folders
       BEGIN SELECT RAISE(ABORT, 'boom'); END;

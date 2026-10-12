@@ -85,7 +85,7 @@ describe('citedSourceIndices', () => {
   })
 
   it('zählt nur, was das Rendering als Verweis zeigt', () => {
-    // Im Code-Span und als Nicht-Zahl bleibt [n] Klartext — wie beim Rendern.
+    // In a code span and as a non-number, [n] stays plain text — as when rendering.
     expect(citedSourceIndices('siehe `[3]` und [abc]')).toEqual([])
   })
 })

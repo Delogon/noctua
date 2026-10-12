@@ -37,10 +37,10 @@ import {
   wrapUntrusted
 } from './untrusted'
 
-// v6: Mail-Inhalt in Delimitern + „Daten, keine Anweisung" (SEC-15). Das Ausgabeformat
-// ist unverändert; bestehende Annotationen bleiben gültig. Die Erhöhung setzt beim Start
-// nur permanent gescheiterte Jobs zurück (requeueOnPromptChange) — erledigte Jobs bleiben
-// über UNIQUE(message_id, kind) gesperrt, es gibt KEINE Neu-Triage des 30-Tage-Fensters.
+// v6: mail content in delimiters + "data, not instructions" (SEC-15). The output format
+// is unchanged; existing annotations remain valid. On startup the bump only resets
+// permanently failed jobs (requeueOnPromptChange) — completed jobs stay
+// locked via UNIQUE(message_id, kind); there is NO re-triage of the 30-day window.
 export const PROMPT_VERSION = 6
 
 export const AI_CATEGORIES = [
@@ -53,7 +53,7 @@ export const AI_CATEGORIES = [
   'other'
 ] as const
 
-// Action-Items als Objekt mit optionaler Frist; v1-Strings werden toleriert.
+// Action items as an object with optional deadline; v1 strings are tolerated.
 const actionItemSchema = z.union([
   z.object({
     title: z.string().max(200),
@@ -75,15 +75,15 @@ const triageResultSchema = z.object({
   summary: z.string().max(300),
   action_items: z.array(actionItemSchema).max(5).default([]),
   needs_reply: z.boolean().default(false),
-  // Abwärtskompatibel: Alt-Antworten (Prompt v4) ohne das Feld gelten als adressiert.
+  // Backward compatible: legacy answers (prompt v4) without the field count as addressed.
   addressed_to_me: z.boolean().default(true),
   confidence: z.number().min(0).max(1).default(0.5)
 })
 
 /**
- * Aufgaben-Gate fürs On-Device-Modell (M88): eine einzige enge Frage. Die
- * Formulierung ist eval-getrieben (scripts/apple-triage-eval) — Änderungen
- * dort nachmessen, nicht nach Gefühl umtexten.
+ * Task gate for the on-device model (M88): a single narrow question. The
+ * wording is eval-driven (scripts/apple-triage-eval) — re-measure changes
+ * there, don't reword by gut feeling.
  */
 export const APPLE_GATE_PROMPT = `You check EXACTLY ONE question for an email client:
 Does a single human in this email ask the account owner named in the RECIPIENT block to do
@@ -190,8 +190,8 @@ function buildUserPrompt(
     ...extraSignals
   ].filter(Boolean)
 
-  // EMPFÄNGER-Block: Wer ist der Kontoinhaber, wo steht er im Envelope,
-  // wen spricht die Anrede an? Grundlage für addressed_to_me.
+  // RECIPIENT block: who is the account owner, where are they in the envelope,
+  // whom does the salutation address? Basis for addressed_to_me.
   const ownerName = row.account_display_name?.trim() || row.account_name?.trim() || null
   const placement = recipientPlacement(row.account_email, row.to_json, row.cc_json)
   const placementLabel = {
@@ -226,9 +226,9 @@ export type TriageOutcome = 'done' | 'skipped-no-client' | 'skipped-missing'
 type TriageVerdict = z.infer<typeof triageResultSchema>
 
 /**
- * Rohes Ergebnis des On-Device-Modells in die Schema-Form bringen: Guided
- * Generation garantiert die Struktur, aber Wertebereiche (Kategorie-Enum,
- * Prioritätsklemme, Datums-Format) klemmen wir hier deterministisch.
+ * Bring the on-device model's raw result into schema form: guided
+ * generation guarantees the structure, but we clamp value ranges (category enum,
+ * priority clamp, date format) deterministically here.
  */
 export function sanitizeAppleVerdict(raw: unknown): TriageVerdict {
   const value = (raw ?? {}) as Record<string, unknown>
@@ -260,8 +260,8 @@ export function sanitizeAppleVerdict(raw: unknown): TriageVerdict {
   })
 }
 
-/** Neutrales Urteil, wenn Apples Guardrails den Mail-Inhalt ablehnen —
- *  die Mail bleibt nutzbar (Kategorie other, keine Aufgaben, Zuversicht 0). */
+/** Neutral verdict when Apple's guardrails reject the mail content —
+ *  the mail stays usable (category other, no tasks, confidence 0). */
 function neutralVerdict(subject: string | null): TriageVerdict {
   return triageResultSchema.parse({
     category: 'other',
@@ -274,14 +274,14 @@ function neutralVerdict(subject: string | null): TriageVerdict {
   })
 }
 
-/** Klassifiziert eine Nachricht und schreibt die Annotation. Wirft bei API-Fehlern. */
+/** Classifies a message and writes the annotation. Throws on API errors. */
 export async function runTriage(db: Database.Database, messageId: number): Promise<TriageOutcome> {
   const provider = getTriageProvider()
-  // Aufgabe → Profil: bei Local only oder ohne Key/Modell pausiert die Triage
-  // wie bei „kein Key" (Job bleibt liegen, kein verbrannter Versuch)
+  // Task → profile: under Local only or without key/model, triage pauses
+  // as with "no key" (job stays queued, no burned attempt)
   const resolved = provider === 'openrouter' ? resolveTask('triage') : null
-  // Entscheidungsmodell (System One): entscheidet zuerst, das Textmodell schreibt nur bei Bedarf.
-  // Läuft auch ohne nutzbares Textmodell (dann extraktive Zusammenfassung, keine Aufgabentitel).
+  // Decision model (System One): decides first, the text model only writes when needed.
+  // Also runs without a usable text model (then extractive summary, no task titles).
   const decisionCfg = provider === 'openrouter' ? resolveDecision() : null
   if (provider === 'openrouter' && !resolved && !decisionCfg) return 'skipped-no-client'
 
@@ -303,20 +303,20 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
   if (decisionCfg) {
     const outcome = await runHybridTriage(db, row, messageId, decisionCfg, resolved)
     if (outcome) return outcome
-    // Konfigurationsfehler des Entscheidungsmodells: klassische Triage übernimmt
+    // Decision-model configuration error: classic triage takes over
   }
 
   const userPrompt = buildUserPrompt(db, row)
 
   if (provider === 'apple') {
     const status = await appleFmStatus()
-    // Modell lädt/It's off: Job ohne verbrannten Versuch zurücklegen (wie „kein Key")
+    // Model loading/it's off: put the job back without burning an attempt (like "no key")
     if (status.state !== 'available') return 'skipped-no-client'
-    // Zweistufig (M88): Erst die enge Gate-Frage („bittet ein Mensch den
-    // Kontoinhaber persönlich?"), dann das Gesamturteil. Das 3B-Modell
-    // beantwortet die isolierte Frage deutlich zuverlässiger, als es
-    // Aufgaben im Gesamturteil extrahiert — nur bei Gate=ja dürfen
-    // action_items und needs_reply Aufgaben erzeugen.
+    // Two-stage (M88): first the narrow gate question ("is a human asking the
+    // account owner personally?"), then the overall verdict. The 3B model
+    // answers the isolated question much more reliably than it
+    // extracts tasks in the overall verdict — only with gate=yes may
+    // action_items and needs_reply create tasks.
     const gateOpen = await appleGate(APPLE_GATE_PROMPT, userPrompt)
     let parsed: TriageVerdict
     try {
@@ -353,9 +353,9 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
       ],
       json: true,
       temperature: 0.1,
-      // Reasoning-Modelle (z. B. DeepSeek v4 Flash) verbrauchen max_tokens
-      // auch für Denk-Tokens — 500 schnitt Antworten ab (finish=length)
-      // und verbrannte Retries. Der Output selbst bleibt ~150 Tokens.
+      // Reasoning models (e.g. DeepSeek v4 Flash) spend max_tokens
+      // on thinking tokens too — 500 cut off answers (finish=length)
+      // and burned retries. The output itself stays ~150 tokens.
       maxTokens: 1200
     })
 
@@ -383,19 +383,19 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
   )
 }
 
-/** Erste {...}-Struktur eines Textmodell-Outputs (Codezäune/Umgebungstext tolerieren). */
+/** First {...} structure of a text model output (tolerate code fences/surrounding text). */
 function parseHybridWrite(raw: string): HybridWrite {
   const match = raw.match(/\{[\s\S]*\}/)
   return hybridWriteSchema.parse(JSON.parse(match?.[0] ?? raw))
 }
 
 /**
- * Hybrid-Triage: EIN System-One-Aufruf (Kategorie, Priorität, needs_reply,
- * addressed_to_me, has_request, proposes_meeting, phishing); das Textmodell
- * schreibt nur Aufgabentitel (has_request) und den Einzeiler (Priorität ≥ 3
- * oder needs_reply). Alles andere bekommt eine extraktive Zusammenfassung.
- * Gibt null zurück, wenn das Entscheidungsmodell falsch konfiguriert ist
- * (404/kein Entscheidungsmodell) – dann läuft die klassische Triage.
+ * Hybrid triage: ONE System One call (category, priority, needs_reply,
+ * addressed_to_me, has_request, proposes_meeting, phishing); the text model
+ * only writes task titles (has_request) and the one-liner (priority ≥ 3
+ * or needs_reply). Everything else gets an extractive summary.
+ * Returns null if the decision model is misconfigured
+ * (404/not a decision model) – then classic triage runs.
  */
 async function runHybridTriage(
   db: Database.Database,
@@ -473,7 +473,7 @@ async function runHybridTriage(
         lastError = error instanceof Error ? error.message.slice(0, 300) : 'parse error'
       }
     }
-    // Zweimal ungültig: nicht scheitern – Entscheidung steht, Text wird extraktiv
+    // Invalid twice: don't fail – the decision stands, text becomes extractive
   }
 
   const summary =
@@ -518,8 +518,8 @@ async function runHybridTriage(
   return 'done'
 }
 
-/** Deterministische Nachverarbeitung + Persistenz — für beide Provider gleich:
- *  Regeln schlagen Modell-Feinheiten, dann Annotation-Upsert und Task-Ableitung. */
+/** Deterministic post-processing + persistence — the same for both providers:
+ *  rules beat model subtleties, then annotation upsert and task derivation. */
 function persistVerdict(
   db: Database.Database,
   row: TriageRow,
@@ -556,7 +556,7 @@ function persistVerdict(
        prompt_version = excluded.prompt_version, input_tokens = excluded.input_tokens,
        output_tokens = excluded.output_tokens, cost_usd = excluded.cost_usd,
        created_at = excluded.created_at`
-    // user_override_category bleibt beim Upsert unangetastet erhalten.
+    // user_override_category is left untouched by the upsert.
   ).run(
     messageId,
     parsed.category,
@@ -574,9 +574,9 @@ function persistVerdict(
     Date.now()
   )
 
-  // Historische Mails — angekommen, bevor das Konto eingerichtet wurde
-  // (Erst-Sync-Backfill) — erzeugen keine Aufgaben. Triage, Prioritäten und
-  // Anzeige bleiben unberührt; nur der Aufgaben-Schritt wird übersprungen.
+  // Historical mails — arrived before the account was set up
+  // (initial-sync backfill) — create no tasks. Triage, priorities and
+  // display stay unaffected; only the task step is skipped.
   const arrivedAt = row.internal_date ?? row.date
   const historicalMail =
     arrivedAt !== null && row.account_created_at !== null && arrivedAt < row.account_created_at

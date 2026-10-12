@@ -10,8 +10,8 @@ import {
 
 describe('Homoglyphen und Schriftmischung', () => {
   it('erkennt lateinische Wörter mit kyrillischen/griechischen Ersatzzeichen', () => {
-    expect(isMixedScriptWord('Pаypal')).toBe(true) // kyrillisches а
-    expect(isMixedScriptWord('Αpple')).toBe(true) // griechisches Α
+    expect(isMixedScriptWord('Pаypal')).toBe(true) // Cyrillic а
+    expect(isMixedScriptWord('Αpple')).toBe(true) // Greek Α
     expect(findMixedScriptWords('Ihr Kоnto bei der Bаnk')).toEqual(['Kоnto', 'Bаnk'])
   })
 
@@ -35,7 +35,7 @@ describe('Homoglyphen und Schriftmischung', () => {
     expect(countInvisibleChars('👨‍👩‍👧 Familie')).toBe(0)
     expect(countInvisibleChars('﻿Hallo')).toBe(0)
     expect(countInvisibleChars('V‍erify')).toBe(1)
-    // Newsletter-Vorschautext: Nullbreite zwischen Leerzeichen zählt nur ohne insideWords
+    // Newsletter preview text: zero-width between spaces counts only without insideWords
     expect(countInvisibleChars(' ​ ​ ​ ', true)).toBe(0)
     expect(countInvisibleChars('Re​chnung', true)).toBe(1)
   })

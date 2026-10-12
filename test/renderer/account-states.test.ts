@@ -65,7 +65,7 @@ describe('freshnessOf (kalendertag-genaue Frische, Design 3e)', () => {
     expect(freshnessOf(new Date(2026, 6, 14, 23, 59).getTime(), noon)).toEqual({
       kind: 'yesterday'
     })
-    // 13 Stunden her, aber gleicher Tageswechsel dazwischen → gestern
+    // 13 hours ago, but a day boundary in between → yesterday
     expect(freshnessOf(new Date(2026, 6, 14, 23, 0).getTime(), noon)).toEqual({
       kind: 'yesterday'
     })

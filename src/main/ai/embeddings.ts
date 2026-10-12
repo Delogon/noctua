@@ -21,21 +21,21 @@ type Extractor = (
 let extractorPromise: Promise<Extractor> | null = null
 
 /**
- * Lokale Embeddings (multilingual-e5-small, quantisiert, ~120 MB einmaliger
- * Download in userData/models). Mail-Inhalte verlassen den Rechner fürs
- * Indexieren nicht. E5 verlangt "passage:"/"query:"-Präfixe.
+ * Local embeddings (multilingual-e5-small, quantized, ~120 MB one-time
+ * download into userData/models). Mail contents don't leave the machine for
+ * indexing. E5 requires "passage:"/"query:" prefixes.
  */
 
 function modelCacheDir(): string {
   return process.env.NOCTUA_MODEL_CACHE_DIR?.trim() || join(app.getPath('userData'), 'models')
 }
 
-/** Liegt das (quantisierte) Modell schon im lokalen Cache? Dann braucht es kein Netz. */
+/** Is the (quantized) model already in the local cache? Then it needs no network. */
 export function isEmbeddingModelCached(): boolean {
   return existsSync(join(modelCacheDir(), EMBEDDING_MODEL, 'onnx', 'model_quantized.onnx'))
 }
 
-/** Ohne Download-Erlaubnis (Local only) und ohne Cache steht das Modell nicht bereit. */
+/** Without download permission (Local only) and without cache the model is unavailable. */
 export class EmbeddingModelUnavailableError extends Error {
   constructor() {
     super('Suchmodell nicht geladen („Nur lokal“: Download nur auf Anfrage)')
@@ -51,19 +51,19 @@ async function getExtractor(allowDownload = !isLocalOnly()): Promise<Extractor> 
       env.cacheDir = modelCacheDir()
       const pipe = await pipeline('feature-extraction', EMBEDDING_MODEL, {
         dtype: 'q8',
-        // Ohne Download-Erlaubnis: nur Cache, keine Hugging-Face-Anfrage
+        // Without download permission: cache only, no Hugging Face request
         local_files_only: !allowDownload
       })
       return pipe as unknown as Extractor
     })()
     extractorPromise.catch(() => {
-      extractorPromise = null // Download fehlgeschlagen → nächster Versuch später
+      extractorPromise = null // download failed → retry later
     })
   }
   return extractorPromise
 }
 
-/** Entfernt URL-/Boilerplate-Rauschen, das Embeddings dominiert (Receipts!). */
+/** Removes URL/boilerplate noise that dominates embeddings (receipts!). */
 export function cleanForEmbedding(text: string): string {
   return text
     .replace(/\[image:[^\]]*\]/gi, ' ')
@@ -116,13 +116,13 @@ export interface EmbeddingIndexStatus {
   model: {
     id: typeof EMBEDDING_MODEL
     state: EmbeddingModelState
-    /** Modelldateien liegen lokal vor (Suche funktioniert ohne Netz) */
+    /** Model files are available locally (search works without network) */
     cached: boolean
     error: string | null
   }
 }
 
-/** Indexiert Message-Bodies im Hintergrund in die vec0-Tabelle. */
+/** Indexes message bodies in the background into the vec0 table. */
 export class EmbeddingIndexer {
   private db: Database.Database | null = null
   private timer: NodeJS.Timeout | null = null
@@ -174,7 +174,7 @@ export class EmbeddingIndexer {
     return this.modelState === 'ready'
   }
 
-  /** Wahrer lokaler Stand; zaehlt nur aktuelle Vektoren des aktiven Modells. */
+  /** True local state; counts only current vectors of the active model. */
   getStatus(): EmbeddingIndexStatus {
     if (!this.db) {
       return {
@@ -190,11 +190,11 @@ export class EmbeddingIndexer {
         }
       }
     }
-    // Der Zustand kommt allein aus message_embedding_state (indiziert). Ein
-    // `EXISTS (… message_vecs …)` pro Zeile wäre genauer, kostet auf einem
-    // 40k-Postfach aber ein bis drei Sekunden im Main-Prozess — und da vec0
-    // keinen Rowid-Index hat, wächst das quadratisch. Fehlende Vektoren fängt
-    // stattdessen reconcileMissingVectors() einmal pro Sitzung ab.
+    // The state comes solely from message_embedding_state (indexed). An
+    // `EXISTS (… message_vecs …)` per row would be more accurate, but costs one to
+    // three seconds in the main process on a 40k mailbox — and since vec0
+    // has no rowid index, it grows quadratically. Missing vectors are instead
+    // caught once per session by reconcileMissingVectors().
     const counts = this.db
       .prepare(
         `SELECT count(*) AS eligible,
@@ -239,9 +239,9 @@ export class EmbeddingIndexer {
   }
 
   /**
-   * Ausdrücklicher Download des Suchmodells (Einstellungen → „Suchmodell laden").
-   * Der einzige Weg, der bei Local only ins Netz darf — danach läuft die
-   * Indexierung wie gewohnt.
+   * Explicit download of the search model (Settings → "Load search model").
+   * The only path allowed onto the network under Local only — afterwards
+   * indexing runs as usual.
    */
   async downloadModel(): Promise<void> {
     this.modelState = 'loading'
@@ -257,7 +257,7 @@ export class EmbeddingIndexer {
     this.kick()
   }
 
-  /** Migrationen kennen keine SHA-256-Funktion; bestehende Bodies hier nachziehen. */
+  /** Migrations have no SHA-256 function; backfill existing bodies here. */
   private ensureSearchStates(): void {
     if (!this.db) return
     const missing = this.db
@@ -278,10 +278,10 @@ export class EmbeddingIndexer {
   }
 
   /**
-   * Eine Migration kann die vec0-Tabelle neu anlegen (022 hat das getan),
-   * während message_embedding_state die Nachrichten weiter als eingebettet
-   * führt. Zwei billige Zählungen erkennen das; nur dann wird der teure
-   * Zeilenabgleich fällig — statt bei jedem Poll.
+   * A migration can recreate the vec0 table (022 did that),
+   * while message_embedding_state still lists the messages as embedded.
+   * Two cheap counts detect this; only then is the expensive
+   * row reconciliation due — instead of on every poll.
    */
   private reconcileMissingVectors(): void {
     if (this.reconciled || !this.db) return
@@ -336,17 +336,17 @@ export class EmbeddingIndexer {
   }
 
   private async drain(): Promise<void> {
-    // Local only: ohne gecachtes Modell kein automatischer Download — die
-    // Suche läuft dann nur über FTS, bis der Nutzer das Modell ausdrücklich lädt.
+    // Local only: without a cached model no automatic download — search
+    // then runs via FTS only until the user explicitly loads the model.
     if (isLocalOnly() && !isEmbeddingModelCached()) {
       if (this.modelState !== 'loading') this.modelState = 'not_loaded'
       return
     }
     this.reconcileMissingVectors()
     let rows = this.pendingRows()
-    // Der Waisen-Abgleich scannt FTS- und Vektortabelle komplett. Im
-    // Normalfall (nichts zu indexieren) lohnt das nicht alle 60 Sekunden —
-    // init() räumt beim Start auf, danach nur noch bei echter Arbeit.
+    // The orphan reconciliation scans the FTS and vector tables completely. In
+    // the normal case (nothing to index) that's not worth it every 60 seconds —
+    // init() cleans up on start, afterwards only when there's real work.
     if (rows.length === 0) return
     metrics.time('ai.embed.cleanupOrphans', () => cleanupSearchOrphans(this.db!))
     const insert = this.db!.prepare('INSERT INTO message_vecs (rowid, embedding) VALUES (?, ?)')
@@ -379,7 +379,7 @@ export class EmbeddingIndexer {
         const tx = this.db!.transaction(() => {
           batch.forEach((row, index) => {
             const current = currentHash.get(row.id) as { content_hash: string } | undefined
-            // Body koennte sich waehrend der Modell-Inferenz geaendert haben.
+            // Body might have changed during model inference.
             if (!current || current.content_hash !== row.content_hash) return
             remove.run(BigInt(row.id))
             insert.run(BigInt(row.id), toBlob(vectors[index]))

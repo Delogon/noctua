@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { arch, cpus, platform, release, totalmem } from 'node:os'
 
-/** Versions- und Hardware-Angaben fürs Manifest — ohne Hostname, Nutzer oder Pfade. */
+/** Version and hardware info for the manifest — without hostname, user or paths. */
 export function diagnosticsAppInfo(): Record<string, string | number | boolean | null> {
   const cpu = cpus()
   return {

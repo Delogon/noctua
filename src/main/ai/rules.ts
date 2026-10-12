@@ -15,7 +15,7 @@ import { outputLanguage, outputLanguageName, type OutputLanguage } from './outpu
 
 type RuleActionExecutor = (messageIds: number[], action: 'archive' | 'markRead' | 'flag') => void
 let executeAction: RuleActionExecutor = () => {}
-/** Vom Bootstrap gesetzt (syncEngine.applyAction) — vermeidet Import-Zyklen. */
+/** Set by bootstrap (syncEngine.applyAction) — avoids import cycles. */
 export function setRuleActionExecutor(fn: RuleActionExecutor): void {
   executeAction = fn
 }
@@ -44,8 +44,8 @@ export const ruleJsonSchema = z.object({
       minPriority: z.number().int().min(1).max(5).optional(),
       maxPriority: z.number().int().min(1).max(5).optional(),
       /**
-       * Ja/Nein-Frage in natürlicher Sprache („Ist das eine Rechnung?"), vom
-       * Entscheidungsmodell beantwortet. Ohne Entscheidungsmodell trifft die Regel nie zu.
+       * Yes/no question in natural language ("Is this an invoice?"), answered by
+       * the decision model. Without a decision model the rule never matches.
        */
       aiCondition: z.string().trim().min(1).max(200).optional()
     })
@@ -73,7 +73,7 @@ export const ruleJsonSchema = z.object({
 
 export type RuleJson = z.infer<typeof ruleJsonSchema>
 
-/** KI-Bedingung aus gespeichertem rule_json (null bei keiner/kaputtem JSON). */
+/** AI condition from stored rule_json (null if none/broken JSON). */
 export function aiConditionOf(ruleJson: string): string | null {
   try {
     const parsed = ruleJsonSchema.safeParse(JSON.parse(ruleJson))
@@ -162,9 +162,9 @@ export interface MessageFacts {
 }
 
 /**
- * `aiProbability`: P(true) der KI-Bedingung dieser Regel (Entscheidungsmodell).
- * Fehlt sie (kein Entscheidungsmodell, Fehler), trifft eine Regel mit
- * aiCondition nie zu. `'skip'` ignoriert die KI-Bedingung (Vorfilter).
+ * `aiProbability`: P(true) of this rule's AI condition (decision model).
+ * If missing (no decision model, error), a rule with
+ * aiCondition never matches. `'skip'` ignores the AI condition (prefilter).
  */
 export function matches(
   rule: RuleJson,
@@ -214,16 +214,16 @@ function loadFacts(db: Database.Database, messageId: number): MessageFacts | und
     .get(messageId) as MessageFacts | undefined
 }
 
-/** Frage-Name einer Regel im gebündelten System-One-Aufruf. */
+/** Question name of a rule in the bundled System One call. */
 export const ruleQuestionName = (ruleId: number): string => `rule_${ruleId}`
 
 /**
- * KI-Bedingungen ALLER aktiven Regeln einer Mail in EINEM System-One-Aufruf
- * (eine noul-Frage je Regel, höchstens 64). Nur Regeln, deren übrige Kriterien
- * schon zutreffen, werden gefragt – das spart Kontext. Liefert P(true) je
- * Regel-ID; ohne Entscheidungsmodell oder bei Fehler leer (= Regeln pausieren).
- * Die Bedingung stammt vom Nutzer (vertrauenswürdig), die Mail steht als
- * unvertrauenswürdige Daten im state.
+ * AI conditions of ALL active rules for a mail in ONE System One call
+ * (one noul question per rule, at most 64). Only rules whose other criteria
+ * already match are asked – that saves context. Returns P(true) per
+ * rule ID; empty without a decision model or on error (= rules pause).
+ * The condition comes from the user (trusted), the mail is in the state as
+ * untrusted data.
  */
 export async function evaluateAiConditions(
   db: Database.Database,
@@ -303,7 +303,7 @@ export async function evaluateAiConditions(
   }
 }
 
-/** Post-Triage-Regeln inkl. KI-Bedingungen (asynchron, ein Entscheidungs-Aufruf je Mail). */
+/** Post-triage rules incl. AI conditions (asynchronous, one decision call per mail). */
 export async function applyRulesPostTriage(
   db: Database.Database,
   messageId: number
@@ -313,10 +313,10 @@ export async function applyRulesPostTriage(
 }
 
 /**
- * Wendet aktive Regeln auf eine Nachricht an. Phase 'ingest' läuft nach dem
- * Body-Ingest (nur deterministische Kriterien), 'post-triage' nach der
- * AI-Annotation (auch Kategorie/Priorität). Einmal ausgeführte Aktionen sind
- * durch die Optimistik der Engine idempotent genug (archive löscht die Zeile).
+ * Applies active rules to a message. Phase 'ingest' runs after the
+ * body ingest (deterministic criteria only), 'post-triage' after the
+ * AI annotation (also category/priority). Actions once executed are
+ * idempotent enough thanks to the engine's optimism (archive deletes the row).
  */
 export function applyRules(
   db: Database.Database,
@@ -367,7 +367,7 @@ export function applyRules(
     if (actions.markRead) executeAction([messageId], 'markRead')
     if (actions.archive) {
       executeAction([messageId], 'archive')
-      return // Zeile ist weg — weitere Regeln/Aktionen sind gegenstandslos
+      return // row is gone — further rules/actions are moot
     }
   }
 }

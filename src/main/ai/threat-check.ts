@@ -16,18 +16,18 @@ import { DECISION_STATE_NOTE, THREAT_QUESTIONS } from './decision-triage'
 import { logUsage } from './budget'
 import { sanitizeUntrusted, sanitizeUntrustedLine, wrapUntrusted } from './untrusted'
 
-// Spam- und Phishing-Erkennung: lokale Regeln (threat-signals) + Entscheidungsmodell.
-// Das Modell-Urteil kommt aus der Hybrid-Triage (ai_decisions) oder aus einer
-// eigenständigen Prüfung nur mit den beiden Sicherheitsfragen (mail_threat_checks).
-// Noctua verschiebt nur, wenn der Nutzer „Spam automatisch aussortieren" einschaltet.
+// Spam and phishing detection: local rules (threat-signals) + decision model.
+// The model verdict comes from hybrid triage (ai_decisions) or from a
+// standalone check with just the two security questions (mail_threat_checks).
+// Noctua only moves mail if the user turns on "Automatically filter spam".
 
 export const AUTO_JUNK_SETTING = 'security.autoJunk'
 
 export interface ThreatVerdict {
   level: ThreatLevel
-  /** Modell-Score 0..2, null ohne Entscheidungsmodell-Urteil */
+  /** Model score 0..2, null without a decision-model verdict */
   ai: number | null
-  /** Summe der lokalen Signalgewichte */
+  /** Sum of the local signal weights */
   heuristic: number
 }
 
@@ -35,11 +35,11 @@ export interface MailSecurityReport {
   phishing: ThreatVerdict
   spam: ThreatVerdict
   signals: string[]
-  /** Modell, das geurteilt hat (null = nur lokale Regeln) */
+  /** Model that gave the verdict (null = local rules only) */
   model: string | null
-  /** Eine eigenständige Modell-Prüfung ist möglich und steht noch aus */
+  /** A standalone model check is possible and still pending */
   canCheck: boolean
-  /** Die Mail liegt schon im Spam-Ordner */
+  /** The mail is already in the spam folder */
   inJunk: boolean
 }
 
@@ -71,7 +71,7 @@ function loadRow(db: Database.Database, messageId: number): ThreatRow | undefine
     .get(messageId) as ThreatRow | undefined
 }
 
-/** Alle Eingaben der lokalen Regeln aus der DB (Body, Anhänge, Kopfzeilen, Kontakt). */
+/** All inputs for the local rules from the DB (body, attachments, headers, contact). */
 export function loadThreatInput(
   db: Database.Database,
   messageId: number,
@@ -115,7 +115,7 @@ export function loadThreatInput(
   }
 }
 
-/** Signal-Zeilen als Block für den state-Text des Entscheidungsmodells. */
+/** Signal lines as a block for the decision model's state text. */
 export function signalStateBlock(signals: MailSignals): string {
   return signals.lines.length > 0
     ? `\nSecurity check (computed locally before the analysis):\n${signals.lines.map((l) => `- ${sanitizeUntrustedLine(l, 240)}`).join('\n')}`
@@ -132,7 +132,7 @@ function storedAiScores(
   const check = db
     .prepare('SELECT model, phishing, spam FROM mail_threat_checks WHERE message_id = ?')
     .get(messageId) as { model: string; phishing: number; spam: number } | undefined
-  // Eigenständige Prüfung ergänzt Lücken der Triage (z. B. Spam bei Alt-Entscheidungen)
+  // Standalone check fills triage gaps (e.g. spam for legacy decisions)
   if (triage && triage.phishing !== null) {
     return {
       model: triage.model,
@@ -143,7 +143,7 @@ function storedAiScores(
   return check ?? null
 }
 
-/** Sicherheitsbericht einer Mail: lokale Regeln jetzt berechnet + gespeichertes Modell-Urteil. */
+/** Security report of a mail: local rules computed now + stored model verdict. */
 export function getMailSecurity(
   db: Database.Database,
   messageId: number
@@ -178,10 +178,10 @@ export function getMailSecurity(
 }
 
 /**
- * Eigenständige Spam-/Phishing-Prüfung mit dem Entscheidungsmodell (System One):
- * ein Aufruf mit zwei score-Fragen, lokale Signale als Kontext im state. Für Mails,
- * die nie durch die Hybrid-Triage liefen. Gibt null zurück ohne Entscheidungsmodell,
- * ohne Body, bei deaktivierter KI fürs Konto oder Konfigurationsfehler.
+ * Standalone spam/phishing check with the decision model (System One):
+ * one call with two score questions, local signals as context in the state. For mails
+ * that never went through hybrid triage. Returns null without a decision model,
+ * without a body, with AI disabled for the account, or on configuration errors.
  */
 export async function runThreatCheck(
   db: Database.Database,
@@ -240,16 +240,16 @@ export async function runThreatCheck(
 
 type JunkExecutor = (messageIds: number[]) => void
 let moveToJunk: JunkExecutor = () => {}
-/** Vom Bootstrap gesetzt (syncEngine.applyAction(..., 'spam')) — vermeidet Import-Zyklen. */
+/** Set by bootstrap (syncEngine.applyAction(..., 'spam')) — avoids import cycles. */
 export function setJunkExecutor(fn: JunkExecutor): void {
   moveToJunk = fn
 }
 
 /**
- * Nach der Triage: bei eingeschaltetem „Spam automatisch aussortieren" landet eine
- * Mail im Spam-Ordner, wenn Spam ODER Phishing „hoch" ist UND das Modell selbst
- * mindestens „verdächtig" sagt (lokale Regeln allein verschieben nie), sie im Eingang liegt und der
- * Absender kein bekannter Kontakt ist. Gibt true zurück, wenn verschoben wurde.
+ * After triage: with "Automatically filter spam" on, a mail lands
+ * in the spam folder if spam OR phishing is "high" AND the model itself says
+ * at least "suspicious" (local rules alone never move), it is in the inbox and the
+ * sender is not a known contact. Returns true if it was moved.
  */
 export function maybeAutoJunk(db: Database.Database, messageId: number): boolean {
   const setting = db.prepare('SELECT value FROM settings WHERE key = ?').get(AUTO_JUNK_SETTING) as
@@ -263,7 +263,7 @@ export function maybeAutoJunk(db: Database.Database, messageId: number): boolean
     .prepare('SELECT sent_count FROM contact_stats WHERE account_id = ? AND addr = ?')
     .get(row.account_id, row.from_addr ?? '') as { sent_count: number } | undefined
   if ((known?.sent_count ?? 0) > 0) return false
-  // „hoch" UND das Modell selbst mindestens „verdächtig" – starke Regeln allein verschieben nie
+  // "high" AND the model itself at least "suspicious" – strong rules alone never move
   const confirmed = (v: ThreatVerdict): boolean =>
     v.level === 'high' && v.ai !== null && v.ai >= THREAT_SCORE_SUSPICIOUS
   if (!confirmed(report.spam) && !confirmed(report.phishing)) return false

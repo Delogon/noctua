@@ -2,10 +2,10 @@ import type { CalendarInstance } from '@shared/calendar-types'
 import { useT } from '@renderer/lib/i18n'
 import { dayTimeLabel, timeRange } from './format'
 
-// Darstellung einzelner Termine (Zeitraster-Block, Bandleiste, Monats-Chip). Gemeinsam:
-// Kalenderfarbe als linke Kante, ↻ für Serien, Punkt für „noch nicht übertragen",
-// durchgestrichen bei abgesagten Terminen. Schreibgeschützte Termine sehen gleich aus
-// (kein Bearbeiten-Affordance) und öffnen den Editor schreibgeschützt.
+// Rendering of single events (time grid block, band, month chip). Shared:
+// calendar color as left edge, ↻ for series, dot for "not yet synced",
+// struck through for cancelled events. Read-only events look the same
+// (no edit affordance) and open the editor read-only.
 
 interface BlockProps {
   event: CalendarInstance
@@ -15,7 +15,7 @@ interface BlockProps {
   onSelect: (e: CalendarInstance) => void
 }
 
-/** Unter dieser Blockbreite (px) bleibt nur der Titel, einzeilig mit Ellipse. */
+/** Below this block width (px) only the title remains, single line with ellipsis. */
 const TINY_BLOCK_PX = 96
 
 function Glyphs({ event }: { event: CalendarInstance }): React.JSX.Element | null {
@@ -35,7 +35,7 @@ function ariaLabelOf(event: CalendarInstance, noTitle: string, pending: string):
   return `${title}${when}${event.location ? `, ${event.location}` : ''}${event.pending ? `, ${pending}` : ''}`
 }
 
-/** Block im Zeitraster (absolut positioniert, Position per Style von außen). */
+/** Block in the time grid (absolutely positioned, position via style from outside). */
 export function TimedBlock({
   event,
   color,
@@ -49,9 +49,9 @@ export function TimedBlock({
 }: BlockProps & {
   style: React.CSSProperties
   compact: boolean
-  /** Tagesbeginn der Spalte (lokal, ms): Folgetage über Mitternacht zeigen „→ Ende" */
+  /** Start of the column's day (local, ms): following days past midnight show "→ end" */
   dayStart: number
-  /** Breite des Blocks in px: sehr schmale Blöcke zeigen nur den Titel (mit Ellipse) */
+  /** Block width in px: very narrow blocks show only the title (with ellipsis) */
   widthPx: number
 }): React.JSX.Element {
   const t = useT()
@@ -87,7 +87,7 @@ export function TimedBlock({
   )
 }
 
-/** Band in der Ganztagszeile bzw. mehrtägig (Gitter-Position von außen). */
+/** Band in the all-day row or multi-day (grid position from outside). */
 export function BannerBar({
   event,
   color,
@@ -124,7 +124,7 @@ export function BannerBar({
   )
 }
 
-/** Uhrzeit im Monatschip; Folgetag („→ 01:30"): in schmalen Zellen bleibt nur der Pfeil. */
+/** Time in the month chip; following day ("→ 01:30"): narrow cells keep only the arrow. */
 function ChipTime({ label }: { label: string }): React.JSX.Element {
   if (!label.startsWith('→')) return <span className="cal-chip__time">{label}</span>
   return (
@@ -134,7 +134,7 @@ function ChipTime({ label }: { label: string }): React.JSX.Element {
   )
 }
 
-/** Eintrag einer Monatszelle: Zeittermine mit Uhrzeit, Bänder gefüllt. */
+/** Entry of a month cell: timed events with time, bands filled. */
 export function MonthChip({
   event,
   color,

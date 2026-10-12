@@ -34,7 +34,7 @@ describe('layoutPanes', () => {
     const tiny = layoutPanes(panes(236, 400, 290), 900)
     expect(tiny.folders).toMatchObject({ visible: false, autoCollapsed: true })
     expect(tiny.list.visible).toBe(true)
-    // Die E-Mail behält ihre Mindestbreite
+    // The email keeps its minimum width
     expect(tiny.list.width + 2 * STRIP_WIDTH + MIN_CONTENT).toBeLessThanOrEqual(900)
   })
 

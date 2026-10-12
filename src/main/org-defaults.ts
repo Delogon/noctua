@@ -6,15 +6,15 @@ import { TASKS } from './ai/providers/registry'
 import { getOrgConfig } from './org-config'
 import { LOCAL_ONLY_KEY } from './privacy'
 
-// Org-Defaults und Profil-Seeding beim Start. Grundregel: nie eine Nutzerwahl
-// überschreiben — Defaults gelten nur, solange der Schlüssel NICHT gesetzt ist.
+// Org defaults and profile seeding at startup. Ground rule: never override a user
+// choice — defaults only apply as long as the key is NOT set.
 
-/** Org-Default für `ai_enabled` bei neuen Konten (Upstream: an). */
+/** Org default for `ai_enabled` on new accounts (upstream: on). */
 export function defaultAiEnabledForNewAccounts(config: OrgConfig | null = getOrgConfig()): 0 | 1 {
   return config?.defaults?.aiEnabledForNewAccounts === false ? 0 : 1
 }
 
-/** 'auto' folgt der Systemsprache (de → de, sonst en). */
+/** 'auto' follows the system language (de → de, otherwise en). */
 export function resolveLanguageDefault(
   language: 'de' | 'en' | 'auto',
   systemLocale: string
@@ -23,7 +23,7 @@ export function resolveLanguageDefault(
   return systemLocale.toLowerCase().startsWith('de') ? 'de' : 'en'
 }
 
-/** Setzt Einstellungen aus `defaults`, sofern noch nicht vorhanden. */
+/** Applies settings from `defaults` unless already present. */
 export function applyOrgDefaults(
   systemLocale: string,
   config: OrgConfig | null = getOrgConfig()
@@ -35,7 +35,7 @@ export function applyOrgDefaults(
   }
   if (defaults.localOnly !== undefined) setIfUnset(LOCAL_ONLY_KEY, defaults.localOnly ? '1' : '0')
   if (defaults.remoteImagesDefault !== undefined) {
-    // '1' lädt Remote-Bilder, '0' blockiert (siehe Datenschutz-Einstellung)
+    // '1' loads remote images, '0' blocks (see privacy setting)
     setIfUnset('mail.remoteImagesDefault', defaults.remoteImagesDefault === 'allow' ? '1' : '0')
   }
   if (defaults.language !== undefined) {
@@ -44,11 +44,11 @@ export function applyOrgDefaults(
 }
 
 /**
- * Legt die Profile der Organisation an (managed = 1) und hält URL/Stil/Name/
- * lokal-Flag bestehender managed-Profile synchron. Idempotent. Aufgaben
- * (`tasks`) werden nur beim allerersten Anlegen eines Profils zugewiesen —
- * spätere Nutzerwahl bleibt unangetastet. Eigene Profile des Nutzers mit
- * gleicher ID werden nie angefasst.
+ * Creates the organization's profiles (managed = 1) and keeps URL/style/name/
+ * local flag of existing managed profiles in sync. Idempotent. Tasks
+ * (`tasks`) are assigned only when a profile is first created —
+ * later user choices stay untouched. The user's own profiles with the
+ * same ID are never touched.
  */
 export function seedOrgProfiles(
   db: Database.Database = getDb(),
@@ -86,7 +86,7 @@ export function seedOrgProfiles(
   }
 }
 
-/** Beides in der Startreihenfolge: Defaults, dann Profile (Aufgaben brauchen die Profile). */
+/** Both in startup order: defaults, then profiles (tasks need the profiles). */
 export function applyOrgConfig(db: Database.Database, systemLocale: string): void {
   applyOrgDefaults(systemLocale)
   seedOrgProfiles(db)

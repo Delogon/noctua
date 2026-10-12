@@ -26,7 +26,7 @@ const SCAN_INTERVAL_MS = 30 * 60_000
 const MAX_AGE_DAYS = 21
 const CHECK_BATCH = 10
 
-/** Follow-up per Entscheidungsmodell: erwartet die GESENDETE Mail eine Antwort? */
+/** Follow-up via decision model: does the SENT mail expect a reply? */
 export const EXPECTS_REPLY_QUESTIONS: Questions = {
   expects_reply: {
     type: 'noul',
@@ -55,9 +55,9 @@ function waitDays(): number {
 }
 
 /**
- * Follow-up-Radar: findet gesendete Mails, auf die seit X Tagen keine Antwort
- * kam. Ein einmaliger AI-Check filtert Mails, die gar keine Antwort erwarten
- * (Bestellbestätigungs-Antworten, "Danke!"-Mails). Nachfassen bleibt manuell.
+ * Follow-up radar: finds sent mails that have had no reply for X days.
+ * A one-time AI check filters out mails that don't expect a reply at all
+ * (replies to order confirmations, "Thanks!" mails). Following up stays manual.
  */
 export class FollowupRadar {
   private db: Database.Database | null = null
@@ -96,7 +96,7 @@ export class FollowupRadar {
     }
   }
 
-  /** Bereits erzeugte Stupse aus Weiterleitungen ohne Auftrag sofort ausblenden. */
+  /** Immediately hide already created nudges from forwards without a request. */
   private dismissForwardsWithoutRequest(): boolean {
     if (!this.db) return false
     const rows = this.db
@@ -130,7 +130,7 @@ export class FollowupRadar {
     return changed
   }
 
-  /** waiting-Einträge auflösen, wenn inzwischen eine fremde Antwort da ist. */
+  /** Resolve waiting entries once a reply from someone else has arrived. */
   private resolveAnswered(): boolean {
     const result = this.db!.prepare(
       `UPDATE followups SET state = 'resolved', resolved_at = ?
@@ -173,7 +173,7 @@ export class FollowupRadar {
 
     let changed = false
     for (const candidate of candidates) {
-      // Reine Selbst-Mails (Tests, Notizen an sich selbst) überspringen
+      // Skip pure self-mails (tests, notes to oneself)
       const ownEmail = (
         db.prepare('SELECT email FROM accounts WHERE id = ?').get(candidate.account_id) as {
           email: string
@@ -185,7 +185,7 @@ export class FollowupRadar {
           .map((r) => r.address?.toLowerCase() ?? '')
           .filter(Boolean)
       } catch {
-        // leer lassen
+        // leave empty
       }
       const foreign = recipients.filter((r) => r !== ownEmail)
       if (foreign.length === 0) {
@@ -212,7 +212,7 @@ export class FollowupRadar {
     return changed
   }
 
-  /** Einmaliger, günstiger AI-Check: erwartet diese gesendete Mail eine Antwort? */
+  /** One-time, cheap AI check: does this sent mail expect a reply? */
   private async checkExpectsReply(candidate: CandidateRow): Promise<boolean> {
     if (candidate.body_state === 'none') {
       await syncEngine.fetchBody(candidate.id)
@@ -227,7 +227,7 @@ export class FollowupRadar {
     const text = textBeforeForwardedMessage(candidate.subject, fullText).slice(0, 2500)
     if (!text) return true
 
-    // Entscheidungsmodell: eine Ja/Nein-Wahrscheinlichkeit statt Textgenerierung
+    // Decision model: a yes/no probability instead of text generation
     const decision = resolveDecision()
     if (decision) {
       try {
@@ -241,12 +241,12 @@ export class FollowupRadar {
         logUsage(this.db!, decision.model, result.usage.inputTokens, result.usage.outputTokens, 0)
         return noulOf(result.answers, 'expects_reply') >= FOLLOWUP_EXPECTS_REPLY_THRESHOLD
       } catch {
-        return true // im Zweifel anzeigen
+        return true // show when in doubt
       }
     }
 
     const resolved = resolveTask('triage')
-    if (!resolved || budgetBlocks(this.db!, resolved)) return true // konservativ: anzeigen
+    if (!resolved || budgetBlocks(this.db!, resolved)) return true // conservative: show
 
     const { client, model } = resolved
     try {
@@ -261,7 +261,7 @@ export class FollowupRadar {
           },
           {
             role: 'user',
-            // Gesendete Mails zitieren oft fremden Text — gleiche Härtung wie oben (SEC-15)
+            // Sent mails often quote others' text — same hardening as above (SEC-15)
             content: `Subject: ${sanitizeUntrustedLine(candidate.subject, 300)}\n\n${wrapUntrusted('MAIL', sanitizeUntrusted(text, 2500))}`
           }
         ],
@@ -273,7 +273,7 @@ export class FollowupRadar {
       logUsage(this.db!, model, inputTokens, outputTokens, costUsd)
       return verdictSchema.parse(JSON.parse(result.text)).expects_reply
     } catch {
-      return true // im Zweifel anzeigen
+      return true // show when in doubt
     }
   }
 
@@ -321,7 +321,7 @@ export class FollowupRadar {
             .map((x) => x.address ?? '')
             .filter(Boolean)
         } catch {
-          // leer
+          // empty
         }
         return {
           messageId: r.message_id,

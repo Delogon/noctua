@@ -1,5 +1,5 @@
--- Vollständige Mail-Kopfdaten werden erst beim Aufklappen geladen und bleiben
--- ausschließlich lokal. So bläht der normale Thread-Read weder IPC noch Sync auf.
+-- Full mail header data is only loaded on expand and stays strictly
+-- local. That way the normal thread read bloats neither IPC nor sync.
 CREATE TABLE message_header_details (
   message_id INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
   from_json TEXT NOT NULL DEFAULT '[]',

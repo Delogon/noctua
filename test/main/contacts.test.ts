@@ -19,7 +19,7 @@ describe('suggestContacts', () => {
     const inbox = seedFolder(db, accountId, '\\Inbox', 'INBOX')
     const sent = seedFolder(db, accountId, '\\Sent', 'Sent')
 
-    // Empfangen: 3× Alice (mit Name), 1× Bob (ohne Name)
+    // Received: 3× Alice (with name), 1× Bob (without name)
     for (let i = 0; i < 3; i++) {
       upsertEnvelope(
         db,
@@ -39,14 +39,14 @@ describe('suggestContacts', () => {
       inbox,
       makeEnvelope({ uid: 20, messageId: '<b@test>', fromAddr: 'bob@web.de', fromName: null })
     )
-    // Self-Send in der INBOX: eigene Adresse darf nie vorgeschlagen werden
+    // Self-send in the INBOX: own address must never be suggested
     upsertEnvelope(
       db,
       accountId,
       inbox,
       makeEnvelope({ uid: 21, messageId: '<self@test>', fromAddr: 'tim@test.de', fromName: 'Tim' })
     )
-    // Gesendet: 2× an Carla — sent zählt dreifach, muss vor Alice ranken
+    // Sent: 2× to Carla — sent counts triple, must rank before Alice
     for (let i = 0; i < 2; i++) {
       upsertEnvelope(
         db,
@@ -83,8 +83,8 @@ describe('suggestContacts', () => {
   })
 
   it('haelt den Anzeigenamen in contact_stats, statt ihn pro Abfrage zu suchen', () => {
-    // Die Namenssuche darf messages nicht mehr anfassen: auf einem echten
-    // Postfach war das eine korrelierte Suche pro Kontakt (Sekunden bis Minuten).
+    // The name search must no longer touch messages: on a real
+    // mailbox that was a correlated search per contact (seconds to minutes).
     expect(
       db.prepare('SELECT display_name FROM contact_stats WHERE addr = ?').get('alice@firma.de')
     ).toEqual({ display_name: 'Alice Ammann' })
@@ -103,7 +103,7 @@ describe('suggestContacts', () => {
   })
 
   it('filtert eigene Konto-Adressen aus', () => {
-    // tim@test.de steht durch den Self-Send in contact_stats, darf aber nie kommen
+    // tim@test.de is in contact_stats via the self-send, but must never appear
     expect(suggestContacts(db, 'test.de', 8)).toEqual([])
     const all = suggestContacts(db, '@', 8).map((r) => r.addr)
     expect(all).toContain('bob@web.de')

@@ -136,7 +136,7 @@ describe('listEvents', () => {
     createEvent(
       input({ time: { allDay: true, start: '2099-03-23', end: '2099-03-24', tzid: null } })
     )
-    // Berliner Tag 23.3. = 22.3. 23:00Z … 23.3. 23:00Z
+    // Berlin day 23.3. = 22.3. 23:00Z … 23.3. 23:00Z
     const berlin = (from: string, to: string): ReturnType<typeof listEvents> =>
       listEvents({
         rangeStart: Date.parse(from),
@@ -144,11 +144,11 @@ describe('listEvents', () => {
         tz: 'Europe/Berlin'
       })
     expect(berlin('2099-03-22T23:00:00Z', '2099-03-23T23:00:00Z')).toHaveLength(1)
-    expect(berlin('2099-03-23T23:00:00Z', '2099-03-24T23:00:00Z')).toHaveLength(0) // 24.3. lokal
-    expect(berlin('2099-03-21T23:00:00Z', '2099-03-22T23:00:00Z')).toHaveLength(0) // 22.3. lokal
+    expect(berlin('2099-03-23T23:00:00Z', '2099-03-24T23:00:00Z')).toHaveLength(0) // 24.3. local
+    expect(berlin('2099-03-21T23:00:00Z', '2099-03-22T23:00:00Z')).toHaveLength(0) // 22.3. local
     const [e] = berlin('2099-03-22T23:00:00Z', '2099-03-23T23:00:00Z')
     expect([e.startDay, e.endDay, e.allDay]).toEqual(['2099-03-23', '2099-03-24', true])
-    // Betrachter in Los Angeles sieht ihn am selben Kalendertag
+    // Viewer in Los Angeles sees it on the same calendar day
     expect(
       listEvents({
         rangeStart: Date.parse('2099-03-23T07:00:00Z'),
@@ -177,7 +177,7 @@ describe('listEvents', () => {
     expect(inWin.every((e) => e.recurring && e.objectId === objectId)).toBe(true)
     const w = getInstanceWindow(db)
     expect(w.to).toBeGreaterThan(now + 500 * 86_400_000)
-    // Spanne weit hinter dem Fenster: wird live expandiert
+    // Span far beyond the window: expanded live
     const far = now + 800 * 86_400_000
     const live = listEvents({ rangeStart: far, rangeEnd: far + 14 * 86_400_000 })
     expect(live.length).toBeGreaterThanOrEqual(2)
@@ -236,7 +236,7 @@ describe('getEvent', () => {
     })
     expect(d.fields.rrule).toBe('FREQ=WEEKLY;COUNT=3')
     expect(d.fields.alarms[0].offsetSeconds).toBe(-900)
-    const second = getEvent(objectId, '2099-03-30T07:00:00Z') // nach der Umstellung (CEST)
+    const second = getEvent(objectId, '2099-03-30T07:00:00Z') // after the DST switch (CEST)
     expect(second.recurrenceId).toBe('2099-03-30T07:00:00Z')
     expect(second.fields.time.start).toBe('2099-03-30T09:00:00')
   })
@@ -256,7 +256,7 @@ describe('updateEvent / deleteEvent', () => {
     const id = series()
     updateEvent(id, 'all', null, { summary: 'Neu' })
     updateEvent(id, 'all', null, { location: null })
-    expect(listPendingOps(db, accountId)).toHaveLength(1) // create bleibt create
+    expect(listPendingOps(db, accountId)).toHaveLength(1) // create stays create
     const events = listEvents(range)
     expect(events).toHaveLength(5)
     expect(new Set(events.map((e) => e.summary))).toEqual(new Set(['Neu']))
@@ -309,7 +309,7 @@ describe('updateEvent / deleteEvent', () => {
     expect(listEvents(range)).toHaveLength(2)
     deleteEvent(id, 'all', null)
     expect(listEvents(range)).toHaveLength(0)
-    // nie übertragene Neuanlage verschwindet ersatzlos
+    // never-transferred new event disappears without a trace
     expect(listPendingOps(db, accountId)).toHaveLength(0)
     expect(() => getEvent(id)).toThrow()
   })

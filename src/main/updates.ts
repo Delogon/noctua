@@ -22,15 +22,15 @@ export function newer(latest: string, current: string): boolean {
 }
 
 /**
- * Update-Check gegen die konfigurierte Quelle (Org-Konfiguration, Default:
- * GitHub-Releases von Schereo/noctua, anonym). Modi: `github` (Releases-API),
- * `url` (JSON `{version, url, notes?}`), `off` (nie, auch nicht manuell).
- * Solange ein GitHub-Repo privat ist, liefert die API 404 — der Check bleibt
- * dann still. Vollautomatische Installation braucht eine Apple-Signatur und
- * ist bewusst nicht verbaut: es gibt nur Hinweis + Link.
+ * Update check against the configured source (org configuration, default:
+ * GitHub releases of Schereo/noctua, anonymous). Modes: `github` (releases API),
+ * `url` (JSON `{version, url, notes?}`), `off` (never, not even manually).
+ * While a GitHub repo is private, the API returns 404 — the check then stays
+ * silent. Fully automatic installation needs an Apple signature and is
+ * deliberately not built in: there is only a notice + link.
  *
- * Local only: automatische Checks entfallen komplett; nur ein ausdrücklicher
- * Aufruf (`manual: true`, Button in den Einstellungen) geht ins Netz.
+ * Local only: automatic checks are dropped entirely; only an explicit
+ * call (`manual: true`, button in settings) goes to the network.
  */
 export async function checkForUpdates(options: { manual?: boolean } = {}): Promise<{
   updateAvailable: boolean
@@ -106,10 +106,10 @@ export async function checkForUpdates(options: { manual?: boolean } = {}): Promi
 
 export function startUpdateChecks(pushFn: PushFn): void {
   push = pushFn
-  // Modus „off": gar kein Timer
+  // Mode "off": no timer at all
   if (resolveUpdateFeed().mode === 'off') return
-  // checkForUpdates() prüft Local only bei jedem Lauf selbst — der Schalter
-  // kann zur Laufzeit wechseln.
+  // checkForUpdates() checks Local only itself on every run — the switch
+  // can change at runtime.
   setTimeout(() => void checkForUpdates(), 60_000)
   timer = setInterval(() => void checkForUpdates(), CHECK_INTERVAL_MS)
 }

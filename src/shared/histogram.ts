@@ -1,6 +1,6 @@
-// Laufzeit-Histogramm mit festen Eimern (Main-Diagnose und Renderer teilen es).
+// Duration histogram with fixed buckets (shared by main diagnostics and renderer).
 
-/** Obergrenzen der Eimer in ms; der letzte Eimer ist „darüber". */
+/** Bucket upper bounds in ms; the last bucket is "above". */
 export const BUCKETS_MS = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 30_000]
 
 export interface Histogram {
@@ -34,7 +34,7 @@ export function observe(h: Histogram, ms: number): void {
   h.buckets[i] += 1
 }
 
-/** Perzentil aus dem Histogramm: Obergrenze des Eimers, gedeckelt durch das Maximum. */
+/** Percentile from the histogram: the bucket's upper bound, capped by the maximum. */
 export function percentile(h: Pick<Histogram, 'count' | 'maxMs' | 'buckets'>, q: number): number {
   if (h.count === 0) return 0
   const target = q * h.count

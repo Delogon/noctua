@@ -1,8 +1,8 @@
 /**
- * Spaltenbreiten (Ordner, Liste, Eulen-Leiste): vom Nutzer gezogen und
- * ein-/ausklappbar. Passt die Summe nicht ins Fenster, schrumpfen die Spalten
- * zuerst bis zum Minimum, dann klappen sie automatisch ein — die E-Mail selbst
- * behält immer MIN_CONTENT Platz. Reine Funktion, damit testbar.
+ * Column widths (folders, list, owl rail): dragged by the user and
+ * collapsible. If the sum doesn't fit the window, the columns first shrink
+ * to their minimum, then collapse automatically — the email itself always
+ * keeps MIN_CONTENT of space. Pure function, so it is testable.
  */
 
 export type PaneId = 'folders' | 'list' | 'rail'
@@ -13,12 +13,12 @@ export const PANE_LIMITS: Record<PaneId, { min: number; max: number; default: nu
   rail: { min: 240, max: 520, default: 290 }
 }
 
-/** Breite einer eingeklappten Spalte (Leiste mit Aufklapp-Knopf). */
+/** Width of a collapsed column (rail with expand button). */
 export const STRIP_WIDTH = 28
-/** Mindestbreite des E-Mail-Blatts samt Rand. */
+/** Minimum width of the email sheet including margin. */
 export const MIN_CONTENT = 520
 
-/** Reihenfolge beim Schrumpfen/Einklappen: zuerst die Eule, dann Ordner, zuletzt die Liste. */
+/** Order for shrinking/collapsing: first the owl, then folders, the list last. */
 const SQUEEZE_ORDER: PaneId[] = ['rail', 'folders', 'list']
 
 export function clampPaneWidth(id: PaneId, width: number): number {
@@ -28,23 +28,23 @@ export function clampPaneWidth(id: PaneId, width: number): number {
 
 export interface PaneInput {
   id: PaneId
-  /** Vom Nutzer aufgeklappt. */
+  /** Expanded by the user. */
   open: boolean
   width: number
 }
 
 export interface PaneOutput {
-  /** Wird als volle Spalte gezeigt (sonst als Leiste). */
+  /** Shown as a full column (otherwise as a rail). */
   visible: boolean
   width: number
-  /** Nur wegen Platzmangel eingeklappt — der Nutzer hat sie offen gelassen. */
+  /** Collapsed only for lack of space — the user left it open. */
   autoCollapsed: boolean
 }
 
 export function layoutPanes(
   panes: PaneInput[],
   available: number,
-  /** Spalten, die der Nutzer trotz Platzmangel offen haben will (Klick auf die Leiste). */
+  /** Columns the user wants open despite lack of space (click on the rail). */
   pinned: ReadonlySet<PaneId> = new Set()
 ): Record<PaneId, PaneOutput> {
   const out = {} as Record<PaneId, PaneOutput>
@@ -58,19 +58,19 @@ export function layoutPanes(
   }
 
   const order = SQUEEZE_ORDER.filter((id) => out[id] !== undefined)
-  // 1. Schrumpfen bis zum Minimum
+  // 1. Shrink down to the minimum
   for (const id of order) {
     const over = -budget()
     if (over <= 0) return out
     if (!out[id].visible) continue
     out[id].width = Math.max(PANE_LIMITS[id].min, out[id].width - over)
   }
-  // 2. Einklappen (gepinnte Spalten zuletzt nie)
+  // 2. Collapse (finally; pinned columns never)
   for (const id of order) {
     if (budget() >= 0) return out
     if (!out[id].visible || pinned.has(id)) continue
     out[id] = { visible: false, width: out[id].width, autoCollapsed: true }
-    // Frei gewordenen Platz an die verbliebenen Spalten zurückgeben
+    // Give freed-up space back to the remaining columns
     for (const other of order) {
       if (!out[other].visible) continue
       const wanted = clampPaneWidth(other, panes.find((p) => p.id === other)!.width)

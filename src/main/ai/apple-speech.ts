@@ -6,13 +6,13 @@ import { join } from 'node:path'
 import { app } from 'electron'
 
 /**
- * On-Device-Diktat über macOS-Spracherkennung (SpeechAnalyzer/SpeechTranscriber
- * ab macOS 26, Fallback SFSpeechRecognizer nur on-device). Spricht dieselbe
- * Binärdatei wie apple-fm.ts (`noctua-fm`), aber über Einmal-Prozesse:
+ * On-device dictation via macOS speech recognition (SpeechAnalyzer/SpeechTranscriber
+ * from macOS 26, fallback SFSpeechRecognizer on-device only). Talks to the same
+ * binary as apple-fm.ts (`noctua-fm`), but via one-shot processes:
  *   stt-check <locale> | stt-install <locale> | transcribe <wav> <locale>
- * Jede Antwort ist eine JSON-Zeile (siehe native/fm-helper/speech.swift).
- * Audio geht als temporäre WAV-Datei (0600, wird immer gelöscht) — robust für
- * mehrere Minuten, ohne base64-Aufblähung über die Pipe.
+ * Each answer is one JSON line (see native/fm-helper/speech.swift).
+ * Audio goes as a temporary WAV file (0600, always deleted) — robust for
+ * several minutes, without base64 bloat over the pipe.
  */
 
 export type AppleSpeechErrorCode =
@@ -31,7 +31,7 @@ const CHECK_TIMEOUT_MS = 15_000
 const TRANSCRIBE_TIMEOUT_MS = 180_000
 const INSTALL_TIMEOUT_MS = 600_000
 
-// Dupliziert aus apple-fm.ts (dort nicht exportiert) — bei Änderung dort mitziehen.
+// Duplicated from apple-fm.ts (not exported there) — keep in sync when changing it.
 function helperPath(): string | null {
   const candidates = [
     join(process.resourcesPath ?? '', 'noctua-fm'),
@@ -43,7 +43,7 @@ function helperPath(): string | null {
   return null
 }
 
-/** App-Sprache (`ui.language`: de/en/auto) → Locale-ID für die Erkennung. */
+/** App language (`ui.language`: de/en/auto) → locale ID for recognition. */
 export function appleSpeechLocale(language: string | null | undefined): string {
   const lang = (language ?? '').toLowerCase()
   if (lang.startsWith('de')) return 'de-DE'
@@ -61,7 +61,7 @@ interface HelperReply {
   detail?: string
 }
 
-/** Ein Helper-Aufruf; liefert die geparste JSON-Antwortzeile. */
+/** One helper call; returns the parsed JSON answer line. */
 function runHelper(binary: string, args: string[], timeoutMs: number): Promise<HelperReply> {
   return new Promise((resolve, reject) => {
     execFile(
@@ -73,7 +73,7 @@ function runHelper(binary: string, args: string[], timeoutMs: number): Promise<H
           reject(new AppleSpeechError('timeout', `Zeitüberschreitung (${timeoutMs / 1000} s)`))
           return
         }
-        // Letzte nicht-leere Zeile trägt die Antwort (Framework-Logs davor ignorieren)
+        // The last non-empty line carries the answer (ignore framework logs before it)
         const line = stdout
           .split('\n')
           .reverse()
@@ -108,9 +108,9 @@ function toError(reply: HelperReply): AppleSpeechError {
 }
 
 /**
- * Verfügbarkeit der On-Device-Erkennung für eine Locale. Lädt nichts nach und
- * zeigt keinen Dialog; `reason` ist 'assets-missing', 'permission-denied',
- * 'unavailable', 'helper-missing' oder eine Fehlermeldung.
+ * Availability of on-device recognition for a locale. Downloads nothing and
+ * shows no dialog; `reason` is 'assets-missing', 'permission-denied',
+ * 'unavailable', 'helper-missing' or an error message.
  */
 export async function isAppleSpeechAvailable(
   locale = 'en-US'
@@ -129,7 +129,7 @@ export async function isAppleSpeechAvailable(
   }
 }
 
-/** Lädt das Sprachpaket für die Locale (System-Download, auf Nutzerwunsch). */
+/** Downloads the language pack for the locale (system download, at user request). */
 export async function ensureAppleSpeechAssets(locale: string): Promise<void> {
   const binary = helperPath()
   if (!binary) throw new AppleSpeechError('helper-missing', 'noctua-fm fehlt — pnpm run build:fm')
@@ -137,7 +137,7 @@ export async function ensureAppleSpeechAssets(locale: string): Promise<void> {
   if (reply.ok === false) throw toError(reply)
 }
 
-/** Transkribiert WAV-Audio on-device. Wirft AppleSpeechError mit Fehlercode. */
+/** Transcribes WAV audio on-device. Throws AppleSpeechError with an error code. */
 export async function transcribeWithApple(
   audio: Buffer,
   format: 'wav',
@@ -149,7 +149,7 @@ export async function transcribeWithApple(
   if (!binary) throw new AppleSpeechError('helper-missing', 'noctua-fm fehlt — pnpm run build:fm')
 
   const file = join(app.getPath('temp'), `noctua-stt-${randomBytes(8).toString('hex')}.wav`)
-  // Nur der Nutzer darf die Aufnahme lesen; Löschen auch bei Fehler/Timeout.
+  // Only the user may read the recording; delete even on error/timeout.
   await writeFile(file, audio, { mode: 0o600 })
   try {
     const reply = await runHelper(binary, ['transcribe', file, locale], TRANSCRIBE_TIMEOUT_MS)

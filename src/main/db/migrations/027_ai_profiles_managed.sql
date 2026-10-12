@@ -1,10 +1,10 @@
--- Phase 1.5: von der Organisation bereitgestellte Profile (build/org-config.json).
--- managed = 1: URL, API-Stil, lokal-Flag und Name sind gesperrt, nur der Key
--- bleibt editierbar. Upstream-Installationen haben keine solchen Zeilen.
+-- Phase 1.5: profiles provided by the organization (build/org-config.json).
+-- managed = 1: URL, API style, local flag and name are locked, only the key
+-- stays editable. Upstream installations have no such rows.
 --
--- Als Tabellen-Neuaufbau statt ALTER TABLE ADD COLUMN: SQLite kennt kein
--- „ADD COLUMN IF NOT EXISTS", und die Migrationen müssen wie die übrigen
--- wiederholbar bleiben (Tests setzen user_version zurück).
+-- Table rebuild instead of ALTER TABLE ADD COLUMN: SQLite has no
+-- "ADD COLUMN IF NOT EXISTS", and the migrations must stay repeatable like
+-- the others (tests reset user_version).
 CREATE TABLE ai_profiles_new (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,

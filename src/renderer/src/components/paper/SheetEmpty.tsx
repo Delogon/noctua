@@ -1,8 +1,8 @@
 import { OwlGlyph } from '@renderer/components/paper/OwlGlyph'
 
 /**
- * Ruhiger Leerzustand fürs Center-Sheet: schlafender Eulen-Stempel über
- * kursiver Serif-Zeile + Mono-Sub auf Papiergrund — „nichts braucht dich".
+ * Quiet empty state for the center sheet: sleeping owl stamp above an
+ * italic serif line + mono sub on paper background — "nothing needs you".
  */
 export function SheetEmpty({ line, sub }: { line: string; sub: string }): React.JSX.Element {
   return (

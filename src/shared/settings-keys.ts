@@ -1,31 +1,31 @@
 /**
- * Allowlist der Einstellungs- und Secret-Schlüssel, die der Renderer über
- * settings:get/settings:set/secrets:* erreichen darf. Alles andere ist
- * ausschließlich Main-Prozess-intern (z. B. OAuth-Client-Konfiguration
- * `google.clientId`, `google.clientSecret`, `ms.clientId` — ein kompromittierter
- * Renderer könnte sie sonst auf einen fremden Client umbiegen; außerdem
- * Budgets, Benachrichtigungs-Schwellen und `images.allow.*`, die über eigene
- * Kanäle laufen).
+ * Allowlist of setting and secret keys the renderer may reach via
+ * settings:get/settings:set/secrets:*. Everything else is strictly
+ * main-process internal (e.g. OAuth client config `google.clientId`,
+ * `google.clientSecret`, `ms.clientId` — a compromised renderer could
+ * otherwise redirect them to a foreign client; also budgets,
+ * notification thresholds and `images.allow.*`, which go through their own
+ * channels).
  *
- * Dynamische Familien (pro Konto) folgen strikten Regexes; die Konto-ID ist
- * immer eine positive Ganzzahl ohne führende Null.
+ * Dynamic families (per account) follow strict regexes; the account ID is
+ * always a positive integer without a leading zero.
  */
 
 const ID = '[1-9][0-9]{0,9}'
 
-/** Keys, die der Renderer lesen UND schreiben darf. */
+/** Keys the renderer may read AND write. */
 const WRITABLE_EXACT = new Set([
   'ui.showList',
   'ui.showRail',
   'ui.language',
-  // Darstellung: 'letterpress' (Standard) | 'classic' (Outlook-nah)
+  // Appearance: 'letterpress' (default) | 'classic' (Outlook-like)
   'ui.layout',
   // 'light' | 'dark'
   'ui.theme',
-  // Spaltenbreiten als JSON {folders,list,rail}; Ordnerleiste ein/aus
+  // Column widths as JSON {folders,list,rail}; folder pane on/off
   'ui.paneWidths',
   'ui.showFolderPane',
-  // Ordneransicht + Sync eigener Ordner; '1' = an
+  // Folder view + sync of custom folders; '1' = on
   'mail.showFolders',
   'noctua.onboarded',
   'noctua.onboardingStarted',
@@ -37,12 +37,12 @@ const WRITABLE_EXACT = new Set([
   'ai.triageProvider',
   'followup.waitDays',
   'tasks.autoCreate',
-  // Entwürfe dürfen freie Zeitfenster (ohne Termindetails) nutzen; '0' = aus
+  // Drafts may use free time slots (without event details); '0' = off
   'ai.draftUseCalendar',
   'compose.draft',
-  // Benachrichtigungen ohne Absender/Betreff/Kurzfassung; Schwellen bleiben intern
+  // Notifications without sender/subject/summary; thresholds stay internal
   'notifications.hideContent',
-  // Spam/Phishing mit Modell-Bestätigung automatisch in den Spam-Ordner; '1' = an
+  // Spam/phishing confirmed by the model goes to the junk folder automatically; '1' = on
   'security.autoJunk'
 ])
 
@@ -52,12 +52,12 @@ const WRITABLE_PATTERNS = [
   new RegExp(`^ai\\.style\\.learn\\.${ID}$`)
 ]
 
-/** Zusätzlich nur lesbar: vom Main berechnete Stilprofile, Profil-Zuordnung, Local only. */
+/** Additionally read-only: style profiles computed by main, profile assignment, Local only. */
 const READONLY_EXACT = new Set([
   'ai.styleProfile',
   'ai.styleMeta',
-  // Profil-Zuordnung und Local only schreibt nur der Main über eigene Kanäle
-  // (ai:tasks:set, privacy:setLocalOnly) — der Renderer darf sie lesen.
+  // Profile assignment and Local only are written only by main via own channels
+  // (ai:tasks:set, privacy:setLocalOnly) — the renderer may read them.
   'ai.triageProfile',
   'ai.draftProfile',
   'ai.sttProfile',
@@ -69,7 +69,7 @@ const READONLY_PATTERNS = [
   new RegExp(`^ai\\.styleMeta\\.${ID}$`)
 ]
 
-/** Secrets, die der Renderer setzen/prüfen darf (nie lesen). Konto-Passwörter laufen über accounts:add. */
+/** Secrets the renderer may set/check (never read). Account passwords go through accounts:add. */
 const SECRET_EXACT = new Set(['openrouter.apiKey'])
 
 export function isRendererSettingWritable(key: string): boolean {
@@ -88,7 +88,7 @@ export function isRendererSecretKey(key: string): boolean {
   return SECRET_EXACT.has(key)
 }
 
-/** Abgelehnter Schlüssel — der IPC-Layer gibt nur diese Kurzmeldung zurück. */
+/** Rejected key — the IPC layer returns only this short message. */
 export class ForbiddenKeyError extends Error {
   constructor(kind: 'setting' | 'secret') {
     super(

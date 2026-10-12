@@ -45,7 +45,7 @@ import { OwlView } from '@renderer/features/owl/OwlView'
 import { useOwl } from '@renderer/stores/owl'
 import { AddAccountDialog } from '@renderer/features/onboarding/AddAccountDialog'
 
-/** Fensterbreite für die automatische Spaltenaufteilung (pane-layout.ts). */
+/** Window width for the automatic column split (pane-layout.ts). */
 function useWindowWidth(): number {
   const [width, setWidth] = useState(() => window.innerWidth)
   useEffect(() => {
@@ -56,7 +56,7 @@ function useWindowWidth(): number {
   return width
 }
 
-/** Breite der Classic-App-Leiste links (CSS .classic-rail). */
+/** Width of the Classic app bar on the left (CSS .classic-rail). */
 const CLASSIC_RAIL_WIDTH = 52
 
 function PanelGate(): React.JSX.Element {
@@ -159,8 +159,8 @@ function App(): React.JSX.Element {
   useEffect(() => {
     initLanguage()
     initPanelPrefs()
-    // Onboarding beim Erststart zeigen, nach Unterbrechung fortsetzen —
-    // nur echte Bestandskonten (Flow lief nie) zählen als onboarded.
+    // Show onboarding on first launch, resume it after an interruption —
+    // only real pre-existing accounts (flow never ran) count as onboarded.
     void invoke('settings:get', { key: 'noctua.onboarded' }).then(async (r) => {
       if (r.value === '1') return
       const [started, accs] = await Promise.all([
@@ -180,7 +180,7 @@ function App(): React.JSX.Element {
     })
   }, [])
 
-  // macOS-Ampel mittig zur Kopfzeile des aktiven Layouts setzen
+  // Center the macOS traffic lights on the header of the active layout
   const chromeLayout = onboarding ? 'letterpress' : layout
   useEffect(() => {
     void invoke('app:setWindowChrome', { layout: chromeLayout }).catch(() => {})
@@ -192,14 +192,14 @@ function App(): React.JSX.Element {
 
   useEffect(() => installPaperKeymap(() => accountIdsRef.current), [])
 
-  // Update-Hinweis: statt Banner eine persistente Info-Toast mit
-  // Download-Aktion (Design 1c) — der echte Kanal bleibt updates:available
-  // plus app:openExternal auf die Release-Seite.
+  // Update notice: instead of a banner, a persistent info toast with a
+  // download action (Design 1c) — the real channel stays updates:available
+  // plus app:openExternal to the release page.
   const updateToastRef = useRef<number | null>(null)
   useEffect(
     () =>
       onPush('updates:available', ({ latest, url }) => {
-        // Wiederholte Checks (alle 6h) ersetzen die vorhandene Toast, statt zu stapeln
+        // Repeated checks (every 6h) replace the existing toast instead of stacking
         if (updateToastRef.current !== null) toast.dismiss(updateToastRef.current)
         updateToastRef.current = toast.info(t('updateAvailable', { v: latest }), {
           dismiss: true,
@@ -212,7 +212,7 @@ function App(): React.JSX.Element {
     []
   )
 
-  // Dead-Letter der IMAP-Op-Queue: nie still verwerfen, sondern sichtbar melden
+  // Dead letters of the IMAP op queue: never drop silently, report them visibly
   useEffect(
     () =>
       onPush('sync:opsDead', ({ count, reason }) => {
@@ -229,7 +229,7 @@ function App(): React.JSX.Element {
     []
   )
 
-  // Kalender: abgelehnte lokale Änderungen (Konflikt, Server-Version gewinnt) nie still verwerfen
+  // Calendar: never silently drop rejected local changes (conflict, server version wins)
   useEffect(
     () =>
       onPush('calendar:conflict', ({ summary, reason }) => {
@@ -246,7 +246,7 @@ function App(): React.JSX.Element {
     []
   )
 
-  // Native Menü-Aktionen + Notification-Klick
+  // Native menu actions + notification click
   useEffect(() => {
     const offMenu = onPush('app:menuAction', ({ action }) => {
       const paper = usePaper.getState()
@@ -259,7 +259,7 @@ function App(): React.JSX.Element {
       else if (action === 'settings') paper.setView('settings')
       else if (action === 'shortcuts') paper.setHelpOpen(!paper.helpOpen)
       else if (action === 'search') {
-        // ⌘F: Suchen wohnt in der Owl-View — Feld gleich fokussieren
+        // ⌘F: search lives in the Owl view — focus the field right away
         paper.setView('chat')
         useOwl.getState().requestFocus()
       } else if (action === 'addAccount') ui.setAddAccountOpen(true)
@@ -280,7 +280,7 @@ function App(): React.JSX.Element {
       className="relative flex h-full flex-col overflow-hidden"
       data-layout={onboarding ? 'letterpress' : layout}
       data-theme={theme}
-      // Classic hat keine breite Kopfzeile: schmalere Fenster gehen, die Spalten weichen aus
+      // Classic has no wide header: narrower windows work, the columns make room
       style={{
         minWidth: layout === 'classic' && !onboarding ? 860 : 1180,
         background: 'var(--paper)',

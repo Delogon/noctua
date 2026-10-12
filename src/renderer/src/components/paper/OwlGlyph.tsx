@@ -1,20 +1,20 @@
 import { useState } from 'react'
 
-// Die Eule als Inline-SVG — eine Komponente, fünf Posen (Design-Handoff
-// Turn 4a). Kopf-Outline und Schnabel sind in allen Posen identisch, nur
-// die Augen wechseln. Strichstärken und Augen-Geometrie kommen als Lookup
-// aus den Specimens, nicht aus einer Formel.
+// The owl as inline SVG — one component, five poses (design handoff
+// Turn 4a). Head outline and beak are identical in all poses, only
+// the eyes change. Stroke widths and eye geometry come as a lookup
+// from the specimens, not from a formula.
 
 export type OwlPose = 'awake' | 'blink' | 'asleep' | 'scan' | 'listen'
 
 export interface OwlGlyphProps {
   pose: OwlPose
-  /** Breite in px; Höhe = size * 18/20. */
+  /** Width in px; height = size * 18/20. */
   size?: number
-  /** Nur awake (Blinzeln) und scan (Augenlauf) bewegen sich. */
+  /** Only awake (blinking) and scan (eye sweep) move. */
   live?: boolean
   color?: string
-  /** Einzige Ausnahme vom Ein-Farben-Gebot: linkes Auge in Akzent (OwlView-Empty). */
+  /** Sole exception to the one-color rule: left eye in accent (OwlView empty state). */
   accentLeftEye?: boolean
 }
 
@@ -33,7 +33,7 @@ interface Tier {
   sleep: { d: string; w: number }
 }
 
-// Werte je Größenstufe aus den Turn-4-Specimens (64/44/30/17 px).
+// Values per size step from the Turn 4 specimens (64/44/30/17 px).
 const TIERS: Tier[] = [
   {
     min: 64,
@@ -77,8 +77,8 @@ const TIERS: Tier[] = [
   }
 ]
 
-/** Exportiert für den Render-Test — bewusst Lookup statt Rechnung (4a „SCALES"). */
-// eslint-disable-next-line react-refresh/only-export-components -- Reine Funktion, vom Render-Test importiert; Fast Refresh der Komponente bleibt unberührt
+/** Exported for the render test — deliberately a lookup, not a calculation (4a "SCALES"). */
+// eslint-disable-next-line react-refresh/only-export-components -- pure function imported by the render test; Fast Refresh of the component is unaffected
 export function owlTier(size: number): Tier {
   return TIERS.find((tier) => size >= tier.min) ?? TIERS[TIERS.length - 1]
 }
@@ -90,7 +90,7 @@ export function OwlGlyph({
   color = 'var(--ink)',
   accentLeftEye = false
 }: OwlGlyphProps): React.JSX.Element {
-  // Blinzeldauer einmal pro Mount würfeln — nie zwei Eulen synchron
+  // Roll the blink duration once per mount — never two owls in sync
   const [blinkDur] = useState(() => 8 + Math.random() * 6)
   const tier = owlTier(size)
 

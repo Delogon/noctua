@@ -21,12 +21,12 @@ import { NetworkConnections } from '@renderer/features/settings/NetworkConnectio
 import { DiagnosticsPanel } from '@renderer/features/settings/DiagnosticsPanel'
 import { chipWidth } from '@renderer/features/settings/tech-metrics'
 
-// Technik-Seite: „Wie die Eule denkt" — jede Pipeline als kleine
-// Letterpress-Grafik, maximal zwei Sätze darunter. Jede Grafik ist gegen
-// den Main-Prozess-Code verifiziert (Stand M67); durchgezogen = lokal,
-// gestrichelt = API-Call über OpenRouter, ✦ = ein Sprachmodell.
+// Tech page: „Wie die Eule denkt" — each pipeline as a small
+// letterpress graphic, at most two sentences below. Each graphic is verified
+// against the main-process code (as of M67); solid = local,
+// dashed = API call via OpenRouter, ✦ = a language model.
 
-/** Eine Sektion: Nummer + Mono-Titel, Grafik, kurze Serif-Unterschrift. */
+/** A section: number + mono title, graphic, short serif caption. */
 function Fig({
   no,
   title,
@@ -72,7 +72,7 @@ function Fig({
   )
 }
 
-/** Legenden-Streifen: durchgezogen/gestrichelt/✦ — einmal erklärt, überall gültig. */
+/** Legend strip: solid/dashed/✦ — explained once, valid everywhere. */
 function Legend(): React.JSX.Element {
   const t = useT()
   return (
@@ -127,12 +127,12 @@ function Legend(): React.JSX.Element {
   )
 }
 
-/** 01 · Triage: Posteingang → Warteschlange → Budget-Tor → Scan-Modell → Annotation. */
+/** 01 · Triage: inbox → queue → budget gate → scan model → annotation. */
 function FigTriage(): React.JSX.Element {
   const t = useT()
   return (
     <g>
-      {/* Eingang: Umschlag-Stapel, nur Posteingang */}
+      {/* Inbox: envelope stack, inbox only */}
       <Envelope x={18} y={40} w={36} h={25} stroke={FAINT} />
       <Envelope x={24} y={46} w={36} h={25} stroke={MUTED} />
       <Envelope x={30} y={52} w={36} h={25} />
@@ -140,7 +140,7 @@ function FigTriage(): React.JSX.Element {
         {t('techTriageIn')}
       </L>
       <Arrow x1={70} y1={64} x2={102} y2={64} />
-      {/* Warteschlange: drei Plätze auf einer Linie */}
+      {/* Queue: three slots on a line */}
       <Sq x={108} y={59} s={9} fill="none" stroke={INK} />
       <Sq x={122} y={59} s={9} fill={INK} />
       <Sq x={136} y={59} s={9} fill={INK} />
@@ -149,7 +149,7 @@ function FigTriage(): React.JSX.Element {
         {t('techTriageQueue')}
       </L>
       <Arrow x1={150} y1={64} x2={178} y2={64} />
-      {/* Budget-Tor: zwei Ink-Linien, dazwischen der Wächter */}
+      {/* Budget gate: two ink lines, the guard in between */}
       <line x1={184} y1={40} x2={184} y2={88} stroke={INK} strokeWidth={1} />
       <line x1={190} y1={40} x2={190} y2={88} stroke={INK} strokeWidth={1} />
       <Sq x={183.5} y={60} s={7} />
@@ -163,7 +163,7 @@ function FigTriage(): React.JSX.Element {
         {t('techTriageBudgetNote2')}
       </L>
       <Arrow x1={194} y1={64} x2={222} y2={64} dashed />
-      {/* Default-Modell steht IM Kasten — die Legende erklärt bereits OpenRouter */}
+      {/* The default model sits IN the box — the legend already explains OpenRouter */}
       <ModelBox
         x={224}
         y={41}
@@ -173,7 +173,7 @@ function FigTriage(): React.JSX.Element {
         note={t('techTriageModelNote')}
       />
       <Arrow x1={348} y1={64} x2={376} y2={64} dashed />
-      {/* Annotation: das, was die Eule an die Mail heftet */}
+      {/* Annotation: what the owl attaches to the mail */}
       <L x={378} y={14} size={7.5} color={MUTED}>
         {t('techTriageCard')}
       </L>
@@ -205,7 +205,7 @@ function FigTriage(): React.JSX.Element {
       <L x={400} y={118} size={7} color={MUTED}>
         NEEDS_REPLY · ACTION_ITEMS
       </L>
-      {/* Spam bleibt draußen */}
+      {/* Spam stays outside */}
       <Envelope x={18} y={118} w={26} h={18} stroke={FAINT} />
       <Cross x={31} y={127} s={6} stroke={AC} />
       <L x={54} y={131} size={7.5} color={MUTED}>
@@ -215,19 +215,19 @@ function FigTriage(): React.JSX.Element {
   )
 }
 
-/** 02 · Adressat: Anrede schlägt Umschlag, Umschlag schlägt Modell. */
+/** 02 · Addressee: greeting beats envelope, envelope beats model. */
 function FigAddr(): React.JSX.Element {
   const t = useT()
   const create = t('techAddrCreate')
   const none = t('techAddrNone')
   const suggest = t('techAddrSuggest')
-  // Ergebnis-Chips linksbündig ab x=412 — Pfeile enden kurz davor
+  // Result chips left-aligned from x=412 — arrows end just before
   const cxCreate = 412 + chipWidth(create) / 2
   const cxNone = 412 + chipWidth(none) / 2
   const cxSuggest = 412 + chipWidth(suggest) / 2
   return (
     <g>
-      {/* Stufe 1 — Anrede */}
+      {/* Stage 1 — greeting */}
       <Box x={20} y={26} w={240} h={44} />
       <L x={32} y={44} size={8.5}>
         {t('techAddrS1')}
@@ -249,7 +249,7 @@ function FigAddr(): React.JSX.Element {
       <L x={148} y={92} size={7} color={MUTED}>
         {t('techAddrNoSal')}
       </L>
-      {/* Stufe 2 — Umschlag */}
+      {/* Stage 2 — envelope */}
       <Box x={20} y={110} w={240} h={44} />
       <L x={32} y={128} size={8.5}>
         {t('techAddrS2')}
@@ -266,7 +266,7 @@ function FigAddr(): React.JSX.Element {
       <L x={148} y={176} size={7} color={MUTED}>
         {t('techAddrTo')}
       </L>
-      {/* Stufe 3 — Modell-Urteil (aus der Triage) */}
+      {/* Stage 3 — model verdict (from triage) */}
       <Box x={20} y={192} w={240} h={44} dashed />
       <text x={32} y={214} fill={AC} fontSize={11}>
         ✦
@@ -286,7 +286,7 @@ function FigAddr(): React.JSX.Element {
         {t('techAddrNo')}
       </L>
       <Arrow x1={260} y1={224} x2={409} y2={224} />
-      {/* Ergebnisse */}
+      {/* Results */}
       <Chip cx={cxCreate} cy={40} text={create} tone="fill" />
       <Chip cx={cxNone} cy={134} text={none} tone="faint" />
       <Chip cx={cxSuggest} cy={224} text={suggest} tone="ac" />
@@ -294,7 +294,7 @@ function FigAddr(): React.JSX.Element {
   )
 }
 
-/** 03 · Aufgaben-Sieb: sechs Filter in Code-Reihenfolge, unten die Aufgabe. */
+/** 03 · Task sieve: six filters in code order, the task at the bottom. */
 function FigSieve(): React.JSX.Element {
   const t = useT()
   const top = 34
@@ -317,7 +317,7 @@ function FigSieve(): React.JSX.Element {
       <Sq x={250} y={20} s={7} fill="none" stroke={INK} />
       <Sq x={266} y={24} s={7} />
       <Sq x={282} y={19} s={7} fill="none" stroke={INK} />
-      {/* Trichterwände */}
+      {/* Funnel walls */}
       <line x1={140} y1={top} x2={238} y2={bottom} stroke={INK} strokeWidth={1} />
       <line x1={400} y1={top} x2={302} y2={bottom} stroke={INK} strokeWidth={1} />
       {levels.map(({ y, l1, l2 }) => {
@@ -334,7 +334,7 @@ function FigSieve(): React.JSX.Element {
               strokeWidth={1}
               strokeDasharray="7 5"
             />
-            {/* Aussortiertes fällt nach rechts raus */}
+            {/* Filtered-out items drop out to the right */}
             <Sq x={rx + 12} y={y - 12} s={6} fill={SHEET} stroke={MUTED} />
             <Cross x={rx + 27} y={y - 9} s={3.5} stroke={FAINT} />
             <L x={rx + 36} y={y - 6} size={7.5} ls={0.5}>
@@ -348,7 +348,7 @@ function FigSieve(): React.JSX.Element {
           </g>
         )
       })}
-      {/* Zweifel beim Adressat-Gate: Vorschlag verlässt das Sieb nach links */}
+      {/* Doubt at the addressee gate: the suggestion leaves the sieve to the left */}
       <Sq x={leftAt(176) - 20} y={165} s={6} fill={SHEET} stroke={AC} />
       <L x={20} y={171} size={7.5} color={AC}>
         {t('techSieveSuggest')}
@@ -356,7 +356,7 @@ function FigSieve(): React.JSX.Element {
       <L x={20} y={182} size={7} color={MUTED}>
         {t('techSieveSuggestB')}
       </L>
-      {/* Was durchfällt */}
+      {/* What falls through */}
       <line
         x1={270}
         y1={30}
@@ -380,7 +380,7 @@ function FigSieve(): React.JSX.Element {
   )
 }
 
-/** 04 · Suche: Volltext und Vektoren parallel, Fusion, alles lokal. */
+/** 04 · Search: full text and vectors in parallel, fusion, all local. */
 function FigSearch(): React.JSX.Element {
   const t = useT()
   const chip = t('techSearchChip')
@@ -394,7 +394,7 @@ function FigSearch(): React.JSX.Element {
       <S x={28} y={100} size={11}>
         {t('techSearchSample')}
       </S>
-      {/* Gabelung */}
+      {/* Fork */}
       <line x1={136} y1={88} x2={160} y2={88} stroke={INK} strokeWidth={1} />
       <line x1={160} y1={52} x2={160} y2={124} stroke={INK} strokeWidth={1} />
       <Arrow x1={160} y1={52} x2={186} y2={52} />
@@ -413,7 +413,7 @@ function FigSearch(): React.JSX.Element {
       <L x={200} y={136} size={7.5} color={MUTED}>
         {t('techSearchVecNote')}
       </L>
-      {/* Zusammenführung */}
+      {/* Merge */}
       <line x1={338} y1={52} x2={362} y2={52} stroke={INK} strokeWidth={1} />
       <line x1={338} y1={124} x2={362} y2={124} stroke={INK} strokeWidth={1} />
       <line x1={362} y1={52} x2={362} y2={124} stroke={INK} strokeWidth={1} />
@@ -426,7 +426,7 @@ function FigSearch(): React.JSX.Element {
         {t('techSearchFuseNote')}
       </L>
       <Arrow x1={478} y1={88} x2={500} y2={88} />
-      {/* Trefferliste */}
+      {/* Hit list */}
       {[70, 84, 98].map((y, i) => (
         <g key={y}>
           <Sq x={506} y={y} s={5} fill={i === 0 ? AC : INK} />
@@ -440,7 +440,7 @@ function FigSearch(): React.JSX.Element {
   )
 }
 
-/** 05 · Die Eule fragen: lokal belegen, dann streamt das Modell mit [n]-Zitaten. */
+/** 05 · Ask the owl: gather evidence locally, then the model streams with [n] citations. */
 function FigAsk(): React.JSX.Element {
   const t = useT()
   return (
@@ -460,7 +460,7 @@ function FigAsk(): React.JSX.Element {
         {t('techAskLocalNote')}
       </L>
       <Arrow x1={426} y1={48} x2={450} y2={48} />
-      {/* Quellen [1][2][3] */}
+      {/* Sources [1][2][3] */}
       {[26, 43, 60].map((y, i) => (
         <g key={y}>
           <rect x={452} y={y} width={22} height={15} fill={SHEET} stroke={INK} strokeWidth={1} />
@@ -472,7 +472,7 @@ function FigAsk(): React.JSX.Element {
       <L x={484} y={52} size={7.5} color={MUTED}>
         {t('techAskSources')}
       </L>
-      {/* Runter in die zweite Zeile: Frage + Quellen reisen zum Modell */}
+      {/* Down into the second row: question + sources travel to the model */}
       <line x1={463} y1={79} x2={463} y2={98} stroke={INK} strokeWidth={1} strokeDasharray={DASH} />
       <line x1={463} y1={98} x2={100} y2={98} stroke={INK} strokeWidth={1} strokeDasharray={DASH} />
       <Arrow x1={100} y1={98} x2={100} y2={116} dashed />
@@ -505,13 +505,13 @@ function FigAsk(): React.JSX.Element {
   )
 }
 
-/** 06 · Entwürfe & Stimme: drei Zuflüsse, ein Entwurf — gesendet wird von Hand. */
+/** 06 · Drafts & voice: three inflows, one draft — sending is done by hand. */
 function FigVoice(): React.JSX.Element {
   const t = useT()
   const send = t('techVoiceSend')
   return (
     <g>
-      {/* Zufluss 1: gesendete Mails → Stilprofil */}
+      {/* Inflow 1: sent mails → style profile */}
       <Envelope x={16} y={22} w={30} h={20} stroke={MUTED} />
       <Envelope x={24} y={28} w={30} h={20} />
       <L x={16} y={62} size={7} color={MUTED}>
@@ -528,7 +528,7 @@ function FigVoice(): React.JSX.Element {
       <L x={94} y={50} size={7} color={MUTED}>
         {t('techVoiceProfileNote')}
       </L>
-      {/* Zufluss 2: der Verlauf mit genau dieser Person → Du/Sie */}
+      {/* Inflow 2: the history with exactly this person → Du/Sie */}
       <rect x={16} y={86} width={26} height={13} fill={SHEET} stroke={MUTED} strokeWidth={1} />
       <rect x={28} y={102} width={26} height={13} fill={SHEET} stroke={INK} strokeWidth={1} />
       <L x={16} y={126} size={7} color={MUTED}>
@@ -548,7 +548,7 @@ function FigVoice(): React.JSX.Element {
       <L x={94} y={124} size={7} color={AC}>
         {t('techVoiceFormalNote2')}
       </L>
-      {/* Zufluss 3: Diktat → Transkription */}
+      {/* Inflow 3: dictation → transcription */}
       <rect x={24} y={148} width={12} height={17} fill={SHEET} stroke={INK} strokeWidth={1} />
       <line x1={30} y1={165} x2={30} y2={172} stroke={INK} strokeWidth={1} />
       <line x1={24} y1={172} x2={36} y2={172} stroke={INK} strokeWidth={1} />
@@ -557,7 +557,7 @@ function FigVoice(): React.JSX.Element {
       </L>
       <Arrow x1={44} y1={160} x2={64} y2={160} dashed />
       <ModelBox x={66} y={138} w={108} h={44} name={t('techVoiceStt')} />
-      {/* Zusammenfluss ins Entwurfs-Modell */}
+      {/* Confluence into the drafting model */}
       <line x1={216} y1={39} x2={252} y2={39} stroke={INK} strokeWidth={1} />
       <line x1={252} y1={39} x2={252} y2={102} stroke={INK} strokeWidth={1} />
       <Arrow x1={252} y1={102} x2={277} y2={102} />
@@ -567,7 +567,7 @@ function FigVoice(): React.JSX.Element {
       <Arrow x1={256} y1={134} x2={277} y2={134} />
       <ModelBox x={280} y={90} w={130} h={56} name={t('techVoiceModel')} />
       <Arrow x1={410} y1={118} x2={434} y2={118} dashed />
-      {/* Der Entwurf — und der Klick, der dir gehört */}
+      {/* The draft — and the click that belongs to you */}
       <Box x={436} y={84} w={108} h={68} />
       <L x={446} y={100} size={8}>
         {t('techVoiceDraft')}
@@ -586,7 +586,7 @@ function FigVoice(): React.JSX.Element {
   )
 }
 
-/** 07 · Rechtschreibung: echtes Hunspell als WASM, Wörterbücher an Bord. */
+/** 07 · Spelling: real Hunspell as WASM, dictionaries on board. */
 function FigSpell(): React.JSX.Element {
   const t = useT()
   const sample = t('techSpellSample')
@@ -605,7 +605,7 @@ function FigSpell(): React.JSX.Element {
       <L x={224} y={52} size={8.5}>
         {t('techSpellEngine')}
       </L>
-      {/* Zwei Wörterbücher — im Paket, nicht im Netz */}
+      {/* Two dictionaries — in the package, not on the network */}
       <rect x={224} y={60} width={22} height={16} fill={SHEET} stroke={INK} strokeWidth={1} />
       <L x={235} y={71} anchor="middle" size={7}>
         DE
@@ -637,7 +637,7 @@ function FigSpell(): React.JSX.Element {
   )
 }
 
-/** 08 · Regeln: oben der einmalige Entwurf, unten die deterministische Anwendung. */
+/** 08 · Rules: the one-time draft on top, the deterministic application below. */
 function FigRules(): React.JSX.Element {
   const t = useT()
   const acts = [t('techRulesAct1'), t('techRulesAct2'), t('techRulesAct3')]
@@ -656,7 +656,7 @@ function FigRules(): React.JSX.Element {
       <Arrow x1={178} y1={52} x2={204} y2={52} dashed />
       <ModelBox x={206} y={26} w={124} h={48} name={t('techRulesDraft')} />
       <Arrow x1={330} y1={52} x2={356} y2={52} dashed />
-      {/* Das Regel-JSON — ab hier bleibt alles deterministisch */}
+      {/* The rule JSON — from here on everything stays deterministic */}
       <Box x={358} y={22} w={186} h={58} />
       <L x={370} y={41} size={11} w={600} ls={0}>
         {'{ }'}
@@ -670,7 +670,7 @@ function FigRules(): React.JSX.Element {
       <L x={370} y={69} size={6.5} color={MUTED} ls={0.4}>
         {t('techRulesJsonThen')}
       </L>
-      {/* Die gespeicherte Regel speist die Prüfung jeder Mail */}
+      {/* The saved rule feeds the check of every mail */}
       <line x1={400} y1={80} x2={400} y2={104} stroke={INK} strokeWidth={1} />
       <line x1={400} y1={104} x2={160} y2={104} stroke={INK} strokeWidth={1} />
       <Arrow x1={160} y1={104} x2={160} y2={122} />
@@ -697,7 +697,7 @@ function FigRules(): React.JSX.Element {
   )
 }
 
-/** 09 · Follow-up-Radar: still gebliebene Mails, gezählte Tage, ein Stupser. */
+/** 09 · Follow-up radar: mails that stayed silent, counted days, a nudge. */
 function FigRadar(): React.JSX.Element {
   const t = useT()
   const list = t('techRadarList')
@@ -711,7 +711,7 @@ function FigRadar(): React.JSX.Element {
         {t('techRadarSent2')}
       </L>
       <Arrow x1={54} y1={52} x2={76} y2={52} />
-      {/* Tage-Zähler: drei stille Tage, der Rest offen */}
+      {/* Day counter: three silent days, the rest open */}
       {[0, 1, 2, 3, 4, 5, 6].map((i) => (
         <Sq
           key={i}
@@ -738,7 +738,7 @@ function FigRadar(): React.JSX.Element {
       </L>
       <Arrow x1={318} y1={52} x2={342} y2={52} />
       <Chip cx={344 + chipWidth(list) / 2} cy={52} text={list} tone="ink" />
-      {/* Zweite Zeile: beim Öffnen entsteht der Stupser — gesendet wird von dir */}
+      {/* Second row: on opening, the nudge is created — you do the sending */}
       <L x={16} y={128} size={7.5}>
         {t('techRadarOpen')}
       </L>
@@ -762,7 +762,7 @@ function FigRadar(): React.JSX.Element {
   )
 }
 
-/** 10 · Datenhaltung: ein Mac, eine Datei, drei ehrliche Leitungen nach draußen. */
+/** 10 · Data storage: one Mac, one file, three honest lines to the outside. */
 function FigData(): React.JSX.Element {
   const t = useT()
   const chips = [t('techDataChip1'), t('techDataChip2'), t('techDataChip3')]
@@ -772,7 +772,7 @@ function FigData(): React.JSX.Element {
         {t('techDataMac')}
       </L>
       <Box x={16} y={26} w={330} h={180} fill="none" />
-      {/* Die eine Datenbank */}
+      {/* The one database */}
       <Box x={32} y={44} w={180} h={64} />
       <L x={44} y={62} size={8.5}>
         {t('techDataDb')}
@@ -784,7 +784,7 @@ function FigData(): React.JSX.Element {
       <L x={44} y={96} size={7} color={MUTED}>
         {t('techDataDbRow2')}
       </L>
-      {/* Der Vault — Schlüsselbund-gestützt */}
+      {/* The vault — keychain-backed */}
       <Box x={32} y={124} w={180} h={64} />
       <rect x={44} y={136} width={9} height={9} fill="none" stroke={INK} strokeWidth={1} />
       <line x1={53} y1={140.5} x2={64} y2={140.5} stroke={INK} strokeWidth={1} />
@@ -799,14 +799,14 @@ function FigData(): React.JSX.Element {
       <L x={44} y={174} size={7} color={MUTED}>
         {t('techDataVaultRow2')}
       </L>
-      {/* Lokale Maschinerie an Bord */}
+      {/* Local machinery on board */}
       <L x={228} y={48} size={7.5} color={MUTED}>
         {t('techDataOnboard')}
       </L>
       {chips.map((c, i) => (
         <Chip key={c} cx={228 + chipWidth(c) / 2} cy={66 + i * 24} text={c} tone="ink" />
       ))}
-      {/* Nach draußen: die ehrliche, dynamische Liste steht darunter (Abschnitt 11) */}
+      {/* To the outside: the honest, dynamic list is below (section 11) */}
       <Arrow x1={346} y1={90} x2={406} y2={90} dashed />
       <Box x={408} y={62} w={136} h={56} dashed />
       <L x={420} y={82} size={7.5}>
@@ -815,7 +815,7 @@ function FigData(): React.JSX.Element {
       <L x={420} y={96} size={7} color={MUTED} ls={0.5}>
         {t('techDataNetNote')}
       </L>
-      {/* Und was draußen bleibt: Tracking-Pixel prallen an der Wand ab */}
+      {/* And what stays outside: tracking pixels bounce off the wall */}
       <line
         x1={544}
         y1={196}

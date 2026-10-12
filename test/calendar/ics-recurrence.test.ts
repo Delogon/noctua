@@ -158,7 +158,7 @@ END:VEVENT`)
     expect(occ.map((o) => iso(o.startUtc))).toEqual([
       '2025-03-21T08:00:00Z',
       '2025-03-28T08:00:00Z',
-      '2025-04-04T07:00:00Z', // nach der Umstellung (30.3.)
+      '2025-04-04T07:00:00Z', // after the DST switch (30.3.)
       '2025-04-11T07:00:00Z'
     ])
     expect(occ[2].endUtc - occ[2].startUtc).toBe(3600_000)
@@ -178,7 +178,7 @@ END:VEVENT`)
     const occ = expandResource(root, range('2025-03-01T00:00:00Z', '2025-05-01T00:00:00Z'))
     expect(occ.map((o) => iso(o.startUtc))).toEqual([
       '2025-03-29T01:30:00Z',
-      '2025-03-30T01:30:00Z', // 02:30 existiert nicht → 03:30 CEST
+      '2025-03-30T01:30:00Z', // 02:30 does not exist → 03:30 CEST
       '2025-03-31T00:30:00Z'
     ])
   })
