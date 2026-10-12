@@ -6,6 +6,10 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Freezes with large mailboxes**: rebuilding the contact statistics (after every send and every Sent sync) walked the whole sender index once per contact and blocked the app for seconds to minutes (33 s at 20,000 messages). It now seeks per contact and takes milliseconds. Ties between display names now go to the most recently used name.
+
 ### Security
 
 - Fixes from the strix audit: Proton Bridge connections now require STARTTLS and pin the Bridge certificate on first use. If the certificate changes, sync stops and asks for the password again. Deeply nested MIME structures and oversized `References` headers can no longer block mail sync. Owl chat treats mail content as untrusted data (SEC-15). The encrypted database keeps temp files in memory. Notifications no longer show sender, subject or summary by default; a new privacy switch turns the details back on. `nanoid` 2.x (via the spellchecker) is replaced by a crypto-backed drop-in. Removing a Microsoft account also removes its refresh token, and changing an AI provider's base URL discards its stored key.
