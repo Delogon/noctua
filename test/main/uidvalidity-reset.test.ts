@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { createTestDb, closeTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 import { upsertEnvelope } from '@main/mail/ingest'
-import { resetFolderForUidValidity } from '@main/sync/uidvalidity'
+import { DISCARD_UNSTAMPED_OPS_SQL, resetFolderForUidValidity } from '@main/sync/uidvalidity'
 
 describe('UIDVALIDITY-Reset (REL-3)', () => {
   let db: Database.Database
@@ -70,5 +70,28 @@ describe('UIDVALIDITY-Reset (REL-3)', () => {
     resetFolderForUidValidity(db, folderId, 2)
     const statuses = db.prepare('SELECT status FROM op_queue ORDER BY id').all()
     expect(statuses).toEqual([{ status: 'dead' }, { status: 'pending' }, { status: 'pending' }])
+  })
+
+  it('only parses the pending ops of the folder account, never the dead-letter backlog', () => {
+    const plan = (
+      db
+        .prepare(`EXPLAIN QUERY PLAN ${DISCARD_UNSTAMPED_OPS_SQL}`)
+        .all(folderId, folderId) as Array<{
+        detail: string
+      }>
+    )
+      .map((row) => row.detail)
+      .join('\n')
+    expect(plan).toMatch(
+      /SEARCH op_queue USING INDEX idx_op_queue_status \(account_id=\? AND status=\?\)/
+    )
+
+    // Another account's unstamped op for a folder with the same id stays untouched
+    const other = seedAccount(db, { email: 'other@test.de' })
+    db.prepare(
+      `INSERT INTO op_queue (account_id, kind, payload_json, created_at) VALUES (?, 'delete', ?, 1)`
+    ).run(other, JSON.stringify({ folderId, uids: [1] }))
+    resetFolderForUidValidity(db, folderId, 2)
+    expect(db.prepare('SELECT status FROM op_queue').pluck().all()).toEqual(['pending'])
   })
 })

@@ -17,6 +17,18 @@ import { cleanupSearchOrphans } from '../mail/ingest'
  * Not yet executed ops without a UIDVALIDITY stamp (enqueued before REL-5)
  * are discarded too; the op queue itself detects stamped ones by the mismatch.
  */
+/**
+ * Pending ops of the folder's account via idx_op_queue_status(account_id,
+ * status), so only those payloads are parsed, never a dead-letter backlog.
+ * Parameters: folder id (account lookup), folder id (payload match).
+ */
+export const DISCARD_UNSTAMPED_OPS_SQL = `UPDATE op_queue
+  SET status = 'dead', last_error = 'uidvalidity: Ordner zurückgesetzt'
+  WHERE account_id = (SELECT account_id FROM folders WHERE id = ?)
+    AND status = 'pending'
+    AND json_extract(payload_json, '$.folderId') = ?
+    AND json_extract(payload_json, '$.uidValidity') IS NULL`
+
 export function resetFolderForUidValidity(
   db: Database.Database,
   folderId: number,
@@ -31,12 +43,6 @@ export function resetFolderForUidValidity(
            envelope_backfill_since = NULL, body_backfill_since = NULL
        WHERE id = ?`
     ).run(newUidValidity, folderId)
-    db.prepare(
-      `UPDATE op_queue
-       SET status = 'dead', last_error = 'uidvalidity: Ordner zurückgesetzt'
-       WHERE status = 'pending'
-         AND json_extract(payload_json, '$.folderId') = ?
-         AND json_extract(payload_json, '$.uidValidity') IS NULL`
-    ).run(folderId)
+    db.prepare(DISCARD_UNSTAMPED_OPS_SQL).run(folderId, folderId)
   })()
 }
