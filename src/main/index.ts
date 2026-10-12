@@ -26,7 +26,7 @@ import { applyOrgConfig } from './org-defaults'
 import { stopAppleFm } from './ai/apple-fm'
 import { openExternalSafe } from './util/links'
 import { installAppMenu } from './menu'
-import { cleanupForwardTasksWithoutRequest } from './db/repos/tasks'
+import { cleanupForwardTasksOnce } from './db/repos/tasks'
 import { reindexHtmlOnlyMessages } from './mail/ingest'
 import { isDev } from './dev-mode'
 import { diagnostics } from './diagnostics/service'
@@ -219,7 +219,7 @@ app
     })
     // Org defaults + provisioned AI profiles (no-op without org configuration)
     applyOrgConfig(db, app.getLocale())
-    metrics.time('startup.cleanupForwardTasks', () => cleanupForwardTasksWithoutRequest(db))
+    metrics.time('startup.cleanupForwardTasks', () => cleanupForwardTasksOnce(db))
     metrics.time('startup.reindexHtmlOnly', () => reindexHtmlOnlyMessages(db))
     if (isDev) seedFromEnv(db)
     // Dev-only demo data (NOCTUA_DEMO_SEED=1): no IMAP/CalDAV sync for demo accounts

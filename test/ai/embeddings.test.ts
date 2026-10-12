@@ -168,3 +168,30 @@ describe('EmbeddingIndexer drain', () => {
     expect(plan).not.toMatch(/SCAN m\b/)
   })
 })
+
+describe('EmbeddingIndexer startup maintenance', () => {
+  let db: Database.Database
+  afterEach(() => {
+    vi.useRealTimers()
+    closeTestDb(db)
+  })
+
+  it('cleans orphans after startup, not in init', () => {
+    db = createTestDb()
+    // Orphan: FTS row without a message
+    db.prepare(
+      `INSERT INTO messages_fts (rowid, subject, sender, recipients, body) VALUES (999, 'x', '', '', '')`
+    ).run()
+    const ftsRows = (): number =>
+      db.prepare('SELECT count(*) FROM messages_fts_docsize WHERE id = 999').pluck().get() as number
+
+    vi.useFakeTimers()
+    const indexer = new EmbeddingIndexer()
+    indexer.init(db)
+    expect(ftsRows()).toBe(1)
+    indexer.start()
+    vi.advanceTimersByTime(5_000)
+    expect(ftsRows()).toBe(0)
+    indexer.stop()
+  })
+})
