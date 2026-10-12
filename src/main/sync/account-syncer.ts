@@ -685,7 +685,8 @@ export class AccountSyncer {
       } finally {
         lock.release()
       }
-      this.events.onMessagesChanged(folder.id, [...threadKeys])
+      // A batch where every fetch failed changed nothing: no refresh
+      if (threadKeys.size > 0) this.events.onMessagesChanged(folder.id, [...threadKeys])
     }
     endPass({ pending: pending.length, failed: failedIds.length })
 

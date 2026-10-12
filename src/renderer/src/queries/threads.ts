@@ -9,31 +9,47 @@ import {
 import { invoke, onPush } from '@renderer/lib/ipc'
 import type { InvokeOutput } from '@shared/ipc-contract'
 import type { AiCategory } from '@shared/types'
+import { createCoalescer } from '@shared/coalesce'
 
 /** Invalidates thread lists and open threads on push events from sync/AI. */
 export function useThreadInvalidation(): void {
   const queryClient = useQueryClient()
-  useEffect(
-    () =>
-      onPush('messages:changed', ({ threadKeys }) => {
+  useEffect(() => {
+    // Bursts of change events (backfill chunks, sync passes) refetch the list,
+    // counts and folders once per burst instead of once per event.
+    const changed = createCoalescer<string[]>(
+      (batches) => {
         void queryClient.invalidateQueries({ queryKey: ['threads'] })
         void queryClient.invalidateQueries({ queryKey: ['mboxCounts'] })
         void queryClient.invalidateQueries({ queryKey: ['folders'] })
-        for (const key of threadKeys) {
+        for (const key of new Set(batches.flat())) {
           void queryClient.invalidateQueries({ queryKey: ['thread', key] })
         }
-      }),
-    [queryClient]
-  )
-  useEffect(
-    () =>
-      onPush('ai:annotated', () => {
+      },
+      { delayMs: 250, maxWaitMs: 1000 }
+    )
+    const off = onPush('messages:changed', ({ threadKeys }) => changed.add(threadKeys))
+    return () => {
+      off()
+      changed.cancel()
+    }
+  }, [queryClient])
+  useEffect(() => {
+    // One ai:annotated per triaged mail: batch them while the queue drains
+    const annotated = createCoalescer<void>(
+      () => {
         void queryClient.invalidateQueries({ queryKey: ['threads'] })
         void queryClient.invalidateQueries({ queryKey: ['ai', 'usage'] })
         void queryClient.invalidateQueries({ queryKey: ['ai', 'decisions'] })
-      }),
-    [queryClient]
-  )
+      },
+      { delayMs: 500, maxWaitMs: 2000 }
+    )
+    const off = onPush('ai:annotated', () => annotated.add())
+    return () => {
+      off()
+      annotated.cancel()
+    }
+  }, [queryClient])
 }
 
 export function useThreads(

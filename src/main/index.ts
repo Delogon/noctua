@@ -39,6 +39,7 @@ import {
   safeDevRendererUrl,
   type TrustedAppPages
 } from './security'
+import { createCoalescer } from '@shared/coalesce'
 
 // Deliberately NO app.setName('Noctua'): that would change the existing userData/
 // safe-storage names. In dev, scripts/prepare-dev-app.mjs provides the Noctua
@@ -229,6 +230,16 @@ app
     const push: Parameters<typeof syncEngine.init>[1] = (channel, payload) => {
       if (mainWindow && !mainWindow.isDestroyed()) pushToWindow(mainWindow, channel, payload)
     }
+    // Side effects of new/changed mail run once per burst (backfill chunks,
+    // IDLE bursts), not once per event: each kick scans the mailbox.
+    const afterMessagesChanged = createCoalescer<void>(
+      () => {
+        aiQueue.kick()
+        embeddingIndexer.kick()
+        updateBadge()
+      },
+      { delayMs: 500, maxWaitMs: 2000 }
+    )
     syncEngine.init(db, (channel, payload) => {
       push(channel, payload)
       // New/updated messages may have become eligible for triage/indexing.
@@ -238,9 +249,7 @@ app
           'events.messagesChanged.threadKeys',
           (payload as { threadKeys?: string[] }).threadKeys?.length ?? 0
         )
-        aiQueue.kick()
-        embeddingIndexer.kick()
-        updateBadge()
+        afterMessagesChanged.add()
       }
     })
     if (!demo) syncEngine.startAll()
