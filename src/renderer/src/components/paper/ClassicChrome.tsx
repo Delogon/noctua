@@ -7,7 +7,6 @@ import { useTasks } from '@renderer/queries/tasks'
 import { useLocalOnly } from '@renderer/queries/intel'
 import { useThreads } from '@renderer/queries/threads'
 import { FolderTree } from '@renderer/features/paper/FolderTree'
-import type { PaneId } from '@renderer/features/paper/pane-layout'
 import { ThemeToggle } from './ThemeToggle'
 
 /**
@@ -35,50 +34,6 @@ function Icon({ name }: { name: keyof typeof ICONS }): React.JSX.Element {
   )
 }
 
-/** Spalten ein-/ausblenden (Ordner, Liste, Eule) — wie Outlooks Ansicht-Menü, nur direkt. */
-function PaneToggles(): React.JSX.Element {
-  const t = useT()
-  const view = usePaper((s) => s.view)
-  const folders = usePaper((s) => s.showFolderPane)
-  const list = usePaper((s) => s.showList)
-  const rail = usePaper((s) => s.showRail)
-  const open: Record<PaneId, boolean> = { folders, list, rail }
-  const expandPane = usePaper((s) => s.expandPane)
-  const collapsePane = usePaper((s) => s.collapsePane)
-  const items: Array<{ id: PaneId; label: string; fill: string }> = [
-    ...(view === 'inbox' || view === 'compose'
-      ? [{ id: 'folders' as const, label: t('foldersTreeAria'), fill: 'M2.5 2.5h3v11h-3z' }]
-      : []),
-    { id: 'list', label: t('paneList'), fill: 'M5.5 2.5h4v11h-4z' },
-    { id: 'rail', label: t('classicOwl'), fill: 'M10.5 2.5h3v11h-3z' }
-  ]
-  return (
-    <div className="classic-pane-toggles" role="group" aria-label={t('panesHead')}>
-      {items.map((item) => {
-        const label = open[item.id]
-          ? t('paneCollapseAria', { name: item.label })
-          : t('paneExpandAria', { name: item.label })
-        return (
-          <button
-            key={item.id}
-            type="button"
-            className="classic-topbar__btn"
-            aria-pressed={open[item.id]}
-            aria-label={label}
-            title={label}
-            onClick={() => (open[item.id] ? collapsePane(item.id) : expandPane(item.id, false))}
-          >
-            <svg viewBox="0 0 16 16" aria-hidden="true" className="classic-icon">
-              <path d="M1.5 2.5h13v11h-13z" />
-              <path d={item.fill} className="classic-pane-toggles__fill" />
-            </svg>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 export function ClassicTopBar(): React.JSX.Element {
   const t = useT()
   const setView = usePaper((s) => s.setView)
@@ -103,7 +58,6 @@ export function ClassicTopBar(): React.JSX.Element {
         <kbd>/</kbd>
       </button>
       <div className="classic-topbar__end titlebar-no-drag">
-        <PaneToggles />
         <ThemeToggle className="classic-topbar__btn" />
         {localOnly && (
           <button

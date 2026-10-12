@@ -1,4 +1,5 @@
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
+import { trafficLightPosition } from '../window-chrome'
 import { ImapFlow } from 'imapflow'
 import type { InvokeOutput, IpcHandlers } from '@shared/ipc-contract'
 import type { AccountSummary } from '@shared/types'
@@ -212,6 +213,15 @@ export const handlers: IpcHandlers = {
   }),
 
   'app:openExternal': ({ url }) => ({ ok: openExternalSafe(url) }),
+
+  'app:setWindowChrome': ({ layout }) => {
+    if (process.platform === 'darwin') {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.setWindowButtonPosition(trafficLightPosition(layout))
+      }
+    }
+    return { ok: true }
+  },
 
   // Allowlist hier nochmals erzwungen (nicht nur im zod-Schema): OAuth-Client-
   // Konfiguration und fremde Secrets bleiben für den Renderer unerreichbar.

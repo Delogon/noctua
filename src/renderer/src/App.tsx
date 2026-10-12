@@ -180,6 +180,12 @@ function App(): React.JSX.Element {
     })
   }, [])
 
+  // macOS-Ampel mittig zur Kopfzeile des aktiven Layouts setzen
+  const chromeLayout = onboarding ? 'letterpress' : layout
+  useEffect(() => {
+    void invoke('app:setWindowChrome', { layout: chromeLayout }).catch(() => {})
+  }, [chromeLayout])
+
   useEffect(() => {
     accountIdsRef.current = (accounts.data ?? []).map((account) => account.id)
   }, [accounts.data])

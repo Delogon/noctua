@@ -152,6 +152,11 @@ export const invokeContract = {
     input: z.object({ url: z.string().max(4000) }),
     output: z.object({ ok: z.boolean() })
   },
+  // macOS-Ampel an die Kopfzeile des gewählten Layouts anpassen (Classic ist niedriger)
+  'app:setWindowChrome': {
+    input: z.object({ layout: z.enum(['letterpress', 'classic']) }),
+    output: z.object({ ok: z.literal(true) })
+  },
   'accounts:add': {
     input: z.object({
       provider: z.enum(['gmail', 'imap']),

@@ -1553,8 +1553,8 @@ const table = {
   themeDark: { en: 'Dark', de: 'Dunkel' },
   panesHead: { en: 'Panes', de: 'Spalten' },
   panesHint: {
-    en: 'Drag a pane’s edge to resize it, double-click it to collapse. Narrow windows collapse panes automatically so the email keeps its room.',
-    de: 'Spaltenrand ziehen ändert die Breite, Doppelklick klappt ein. In schmalen Fenstern klappen Spalten automatisch ein, damit die E-Mail Platz behält.'
+    en: 'Drag a pane’s edge to resize it; the small tab on the edge collapses it. Narrow windows collapse panes automatically so the email keeps its room.',
+    de: 'Spaltenrand ziehen ändert die Breite, die kleine Lasche am Rand klappt ein. In schmalen Fenstern klappen Spalten automatisch ein, damit die E-Mail Platz behält.'
   },
   panesReset: { en: 'Reset widths', de: 'Breiten zurücksetzen' },
   barAria: { en: 'Email actions', de: 'E-Mail-Aktionen' },

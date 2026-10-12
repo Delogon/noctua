@@ -5109,6 +5109,11 @@ kbd,
   height: 17px;
 }
 
+.theme-toggle__icon {
+  width: 17px;
+  height: 17px;
+}
+
 .classic-pane-toggles {
   display: flex;
   gap: 2px;
@@ -5642,4 +5647,80 @@ body.pane-resizing iframe {
 [data-layout='classic'] .layout-option[aria-checked='true'] {
   border-color: var(--classic-accent);
   box-shadow: 0 0 0 1px var(--classic-accent);
+}
+
+/* Einklapp-Knopf: kleine Lasche mittig auf der Spaltenkante */
+.pane-collapse {
+  appearance: none;
+  position: absolute;
+  z-index: 6;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 40px;
+  margin-top: -20px;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  background: var(--sheet);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 120ms ease;
+}
+
+.pane-collapse[data-side='left'] {
+  right: -8px;
+}
+
+.pane-collapse[data-side='right'] {
+  left: -8px;
+}
+
+.pane:hover .pane-collapse,
+.pane-collapse:focus-visible {
+  opacity: 1;
+}
+
+.pane-collapse:hover {
+  background: var(--highlight);
+  color: var(--ink);
+}
+
+.pane-collapse:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 1px;
+}
+
+.pane-collapse svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+[data-layout='classic'] .pane-collapse {
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(31, 35, 40, 0.12);
+}
+
+/* „Nur lokal" auf der blauen Classic-Titelleiste: Akzentfarbe wäre dort unsichtbar */
+.classic-topbar .localonly-badge {
+  min-height: 24px;
+  border-color: rgba(255, 255, 255, 0.75);
+  border-radius: 4px !important;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font: 600 11px var(--serif);
+  letter-spacing: 0.2px;
+}
+
+.classic-topbar .localonly-badge:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.classic-topbar .localonly-badge__dot {
+  background: #ffffff;
 }
