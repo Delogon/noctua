@@ -338,18 +338,16 @@ export function listThreads(
  * Folder tree per account for the folder view: only folders with envelopes
  * (full sync). Trash/Drafts/"All Mail" stay out.
  */
+export const LIST_FOLDERS_SQL = `SELECT f.id, f.account_id, f.path, f.delimiter, f.special_use,
+       count(DISTINCT m.thread_key) AS threads,
+       count(DISTINCT CASE WHEN m.seen = 0 THEN m.thread_key END) AS unread
+  FROM folders f LEFT JOIN messages m ON m.folder_id = f.id
+  WHERE f.sync_mode = 'full'
+  GROUP BY f.id
+  ORDER BY f.account_id, f.path COLLATE NOCASE`
+
 export function listFolders(db: Database.Database): FolderListItem[] {
-  const rows = db
-    .prepare(
-      `SELECT f.id, f.account_id, f.path, f.delimiter, f.special_use,
-              count(DISTINCT m.thread_key) AS threads,
-              count(DISTINCT CASE WHEN m.seen = 0 THEN m.thread_key END) AS unread
-       FROM folders f LEFT JOIN messages m ON m.folder_id = f.id
-       WHERE f.sync_mode = 'full'
-       GROUP BY f.id
-       ORDER BY f.account_id, f.path COLLATE NOCASE`
-    )
-    .all() as Array<{
+  const rows = db.prepare(LIST_FOLDERS_SQL).all() as Array<{
     id: number
     account_id: number
     path: string
@@ -453,20 +451,21 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
   })
 }
 
-/** Thread counts per folder (for the segmented control), optionally per account. */
+/**
+ * Thread counts per folder (for the segmented control), optionally per account.
+ * Starts from the folders (a folder belongs to exactly one account) and counts
+ * from the covering index idx_msg_folder_thread, without reading message rows.
+ */
+export const MBOX_COUNT_SQL = `SELECT count(DISTINCT m.thread_key) n FROM folders f
+  CROSS JOIN messages m ON m.folder_id = f.id
+  WHERE f.special_use = ? AND (? IS NULL OR f.account_id = ?)`
+
 export function mboxCounts(
   db: Database.Database,
   accountId?: number
 ): { inbox: number; sent: number; spam: number } {
   const row = (special: string): number =>
-    (
-      db
-        .prepare(
-          `SELECT count(DISTINCT m.thread_key) n FROM messages m
-           JOIN folders f ON m.folder_id = f.id
-           WHERE f.special_use = ? AND (? IS NULL OR m.account_id = ?)`
-        )
-        .get(special, accountId ?? null, accountId ?? null) as { n: number }
-    ).n
+    (db.prepare(MBOX_COUNT_SQL).get(special, accountId ?? null, accountId ?? null) as { n: number })
+      .n
   return { inbox: row('\\Inbox'), sent: row('\\Sent'), spam: row('\\Junk') }
 }
