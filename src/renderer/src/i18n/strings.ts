@@ -2251,6 +2251,22 @@ const table = {
     en: 'The name claims to be a company, but it was sent from a free email address',
     de: 'Der Name gibt sich als Firma aus, die E-Mail kommt aber von einer Freemail-Adresse'
   },
+  threatReasonBrandOtherDomain: {
+    en: 'The name claims to be a well-known company, but the email comes from a domain that is not theirs',
+    de: 'Der Name gibt sich als bekannte Firma aus, die E-Mail kommt aber von einer fremden Domain'
+  },
+  threatReasonExecutiveFreemail: {
+    en: 'The name carries an executive title (e.g. CEO), but it was sent from a free email address',
+    de: 'Der Name trägt einen Chef-Titel (z. B. Geschäftsführer), die E-Mail kommt aber von einer Freemail-Adresse'
+  },
+  threatReasonSensitiveRequest: {
+    en: 'Asks for bank details, card data, a password or a fee',
+    de: 'Fragt nach Bankdaten, Kartendaten, einem Passwort oder einer Gebühr'
+  },
+  threatReasonConfidentialPayment: {
+    en: 'Asks for a payment or transfer to be kept confidential (typical of CEO fraud)',
+    de: 'Verlangt eine vertrauliche Zahlung oder Überweisung (typisch für Chef-Betrug)'
+  },
   threatReasonDmarcFail: {
     en: 'DMARC check failed — the sender domain did not authorize this email',
     de: 'DMARC-Prüfung fehlgeschlagen – die Absenderdomain hat die E-Mail nicht autorisiert'

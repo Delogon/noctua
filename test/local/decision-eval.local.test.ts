@@ -17,7 +17,9 @@ import {
   THREAT_SCORE_SUSPICIOUS
 } from '@shared/decision-thresholds'
 import { closeTestDb, createAiTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
-import { EVAL_MAILS, OWNER, type EvalMail } from './decision-eval.dataset'
+import { computeMailSignals } from '@main/mail/threat-signals'
+import { phishingLevel, spamLevel, type ThreatLevel } from '@shared/decision-thresholds'
+import { EVAL_MAILS, OWNER, signalInput, type EvalMail } from './decision-eval.dataset'
 
 // Decision-model eval: runs the app's real hybrid triage against a real Ollama
 // decision model (System One) in both modes, single call vs. one call per
@@ -138,6 +140,43 @@ function score(results: Array<{ mail: EvalMail; row: Row }>): Record<string, Que
   return stats
 }
 
+const rank: Record<ThreatLevel, 0 | 1 | 2> = { none: 0, suspicious: 1, high: 2 }
+
+/**
+ * Model + local rules as the app combines them: warning banners on legitimate
+ * emails, recall of any warning, and emails that "Move likely spam to junk"
+ * would move (high AND the model itself ≥ suspicious; no known contacts here).
+ */
+function securityReport(results: Array<{ mail: EvalMail; row: Row }>): Record<string, unknown> {
+  const rows = results.map(({ mail, row }) => {
+    const rules = computeMailSignals(signalInput(mail))
+    const phishing = rank[phishingLevel(row.phishing, rules.phishingScore)]
+    const spam = rank[spamLevel(row.spam, rules.spamScore)]
+    const autoJunk =
+      (phishing === 2 && row.phishing >= THREAT_SCORE_SUSPICIOUS) ||
+      (spam === 2 && row.spam >= THREAT_SCORE_SUSPICIOUS)
+    return { mail, phishing, spam, autoJunk }
+  })
+  const legit = rows.filter(({ mail }) => mail.labels.phishing === 0 && mail.labels.spam === 0)
+  const bad = rows.filter(({ mail }) => mail.labels.phishing === 2 || mail.labels.spam === 2)
+  return {
+    falseBanners: legit.filter((r) => r.phishing > 0 || r.spam > 0).map((r) => r.mail.id),
+    falseBannerRate: legit.length
+      ? legit.filter((r) => r.phishing > 0 || r.spam > 0).length / legit.length
+      : null,
+    newsletterBanners: rows
+      .filter((r) => ['newsletter', 'promotions'].includes(r.mail.labels.category))
+      .filter((r) => r.mail.labels.spam === 0 && r.mail.labels.phishing === 0)
+      .filter((r) => r.phishing > 0 || r.spam > 0)
+      .map((r) => r.mail.id),
+    warnedRecall: bad.length
+      ? bad.filter((r) => r.phishing > 0 || r.spam > 0).length / bad.length
+      : null,
+    autoJunkLegitimate: legit.filter((r) => r.autoJunk).map((r) => r.mail.id),
+    autoJunkMoved: rows.filter((r) => r.autoJunk).map((r) => r.mail.id)
+  }
+}
+
 localDescribe(`decision-model eval (${MODEL} at ${BASE_URL})`, () => {
   let db: Database.Database
   const report: Record<string, unknown> = {
@@ -213,6 +252,7 @@ localDescribe(`decision-model eval (${MODEL} at ${BASE_URL})`, () => {
             median: Math.round(latencies[Math.floor(latencies.length / 2)]),
             max: Math.round(latencies[latencies.length - 1])
           },
+          security: securityReport(results),
           misses: results
             .filter(({ mail, row }) => row.category !== mail.labels.category)
             .map(

@@ -1,3 +1,5 @@
+import type { MailSignalInput } from '@main/mail/threat-signals'
+
 // Labelled emails for the decision-model eval (test/local/decision-eval.local.test.ts).
 // Synthetic, German and English, owner "Lena Hartmann <lena@example.org>". Labels are
 // what a careful human would answer for each System One question.
@@ -34,6 +36,18 @@ export interface EvalMail {
 }
 
 export const OWNER = { name: 'Lena Hartmann', address: 'lena@example.org' }
+
+/** Input for the local threat rules (computeMailSignals) of an eval mail. */
+export function signalInput(mail: EvalMail): MailSignalInput {
+  return {
+    fromName: mail.fromName,
+    fromAddr: mail.fromAddr,
+    replyToJson: mail.replyTo ? JSON.stringify([{ name: null, address: mail.replyTo }]) : null,
+    html: mail.html ?? null,
+    subject: mail.subject,
+    text: mail.text
+  }
+}
 const ME = [{ name: 'Lena Hartmann', address: 'lena@example.org' }]
 
 const base = {

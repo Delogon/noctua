@@ -315,6 +315,30 @@ const SPAM_PHRASES = [
   /\bwire transfer\b|\bwestern union\b|\bmoneygram\b/i
 ]
 
+/**
+ * Requests for credentials, payment data or a small fee. Only phrased as a
+ * request ("send us your bank details"): invoices mention "Bankverbindung" or
+ * IBANs all the time.
+ */
+const SENSITIVE_REQUEST_PHRASES = [
+  /(?<!\p{L})(?:senden|schicken|übermitteln|bestätigen|nennen|geben) sie (?:uns )?(?:bitte )?(?:hier )?ihre (?:bankdaten|kontodaten|bankverbindung|kreditkarten(?:daten|nummer)|kartendaten|zugangsdaten|anmeldedaten|kennwort|passwort|pin|tan)(?!\p{L})/iu,
+  /(?<!\p{L})(?:zahlen|begleichen|überweisen) sie (?:die|eine|den) (?:\p{L}+ )?(?:zollgebühr|nachgebühr|bearbeitungsgebühr|zustellgebühr|gebühr)(?!\p{L})/iu,
+  /(?<!\p{L})(?:send|provide|confirm|enter|update|verify) (?:us )?(?:with )?your (?:bank (?:details|account(?: details)?)|(?:credit )?card (?:number|details)|login (?:details|credentials)|password|pin)(?!\p{L})/iu,
+  /(?<!\p{L})pay (?:the|a) (?:small )?(?:customs|delivery|shipping|redelivery|release|handling) fee(?!\p{L})/iu
+]
+
+/** Executive titles that CEO fraud puts into the display name. */
+const EXECUTIVE_TITLE =
+  /(?<!\p{L})(?:ceo|cfo|coo|geschäftsführer(?:in)?|vorstand|vorstandsvorsitzende[rn]?|managing director|president|präsident(?:in)?)(?!\p{L})/iu
+
+/** CEO fraud: a confidential payment or transfer. */
+const PAYMENT_WORD = String.raw`(?:überweisung|wire transfer|bank transfer|zahlung|payment)`
+const SECRECY_WORD = String.raw`(?:vertraulich|confidential|diskret|discreet)`
+const CONFIDENTIAL_PAYMENT = new RegExp(
+  String.raw`(?<!\p{L})(?:${PAYMENT_WORD}[\s\S]{0,120}${SECRECY_WORD}|${SECRECY_WORD}[\s\S]{0,120}${PAYMENT_WORD})(?!\p{L})`,
+  'iu'
+)
+
 function countMatches(text: string, patterns: RegExp[]): number {
   return patterns.filter((re) => re.test(text)).length
 }
@@ -425,6 +449,37 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       3,
       1,
       `The display name claims to be "${nameBrand}", but the email comes from a free email address (${fromDomain})`
+    )
+  }
+
+  if (
+    nameBrand &&
+    fromDomain &&
+    !FREEMAIL.has(baseDomain(fromDomain)) &&
+    !isOfficial(nameBrand, fromDomain) &&
+    !senderHomoglyph &&
+    !senderLookalike
+  ) {
+    add(
+      'brand_other_domain',
+      1,
+      2,
+      0,
+      `The display name claims to be "${nameBrand}", but the email comes from ${fromDomain}, which is not one of its known domains`
+    )
+  }
+  if (
+    fromName &&
+    EXECUTIVE_TITLE.test(fromName) &&
+    fromDomain &&
+    FREEMAIL.has(baseDomain(fromDomain))
+  ) {
+    add(
+      'executive_freemail',
+      1,
+      3,
+      0,
+      `The display name carries an executive title, but the email comes from a free email address (${fromDomain})`
     )
   }
 
@@ -613,6 +668,20 @@ export function computeMailSignals(input: MailSignalInput): MailSignals {
       urgency >= 2 ? 2 : 1,
       0,
       'Typical pressure phrases (account locked, confirm your data, deadline in hours) together with links'
+    )
+  }
+
+  const requestText = `${subject}\n${text}`
+  if (countMatches(requestText, SENSITIVE_REQUEST_PHRASES) > 0) {
+    add('sensitive_request', 1, 2, 1, 'Asks for bank details, card data, credentials or a fee')
+  }
+  if (CONFIDENTIAL_PAYMENT.test(requestText)) {
+    add(
+      'confidential_payment',
+      1,
+      2,
+      0,
+      'Asks for a payment or transfer to be handled confidentially (typical of CEO fraud)'
     )
   }
 
