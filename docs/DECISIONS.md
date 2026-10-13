@@ -105,6 +105,11 @@ decision model:
 NOCTUA_OLLAMA_URL=http://127.0.0.1:11434 NOCTUA_DECISION_MODEL=clef-flash pnpm test:decision-eval
 ```
 
+Only the local decision model is called; no text model and no cloud key are configured, so
+summaries stay extractive and nothing leaves the machine. `NOCTUA_EVAL_CONCURRENCY=4` triages
+several emails at once on servers that handle parallel requests (latency per email then includes
+queueing). A failing email is listed under `errors` instead of aborting the run.
+
 ### Thresholds
 
 All in `src/shared/decision-thresholds.ts`:
