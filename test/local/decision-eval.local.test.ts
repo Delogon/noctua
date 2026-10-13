@@ -5,7 +5,7 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { runTriage } from '@main/ai/triage'
 import { runThreatCheck } from '@main/ai/threat-check'
-import { createProfile, setTaskAssignment } from '@main/ai/providers/registry'
+import { createProfile, resolveTask, setTaskAssignment } from '@main/ai/providers/registry'
 import { storeBody, upsertEnvelope } from '@main/mail/ingest'
 import {
   ADDRESSED_TO_ME_THRESHOLD,
@@ -16,7 +16,7 @@ import {
   SPAM_SCORE_HIGH,
   THREAT_SCORE_SUSPICIOUS
 } from '@shared/decision-thresholds'
-import { closeTestDb, createAiTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
+import { closeTestDb, createTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 import { computeMailSignals } from '@main/mail/threat-signals'
 import { phishingLevel, spamLevel, type ThreatLevel } from '@shared/decision-thresholds'
 import { EVAL_MAILS, OWNER, signalInput, type EvalMail } from './decision-eval.dataset'
@@ -35,6 +35,8 @@ const enabled = process.env.NOCTUA_DECISION_EVAL === '1'
 const localDescribe = enabled ? describe : describe.skip
 const BASE_URL = process.env.NOCTUA_OLLAMA_URL ?? 'http://127.0.0.1:11434'
 const MODEL = process.env.NOCTUA_DECISION_MODEL ?? 'clef-flash'
+/** Emails triaged at the same time (servers that serve requests in parallel). */
+const CONCURRENCY = Math.max(1, Number(process.env.NOCTUA_EVAL_CONCURRENCY ?? 1) || 1)
 const MODES = ['single', 'per-question'] as const
 type Mode = (typeof MODES)[number]
 
@@ -182,11 +184,14 @@ localDescribe(`decision-model eval (${MODEL} at ${BASE_URL})`, () => {
   const report: Record<string, unknown> = {
     model: MODEL,
     baseUrl: BASE_URL,
-    mails: EVAL_MAILS.length
+    mails: EVAL_MAILS.length,
+    concurrency: CONCURRENCY
   }
 
   beforeAll(() => {
-    db = createAiTestDb()
+    // No cloud key: only the local decision model runs, never a text model
+    // (no mail leaves the machine; summaries stay extractive)
+    db = createTestDb()
     const profile = createProfile({
       name: 'Ollama (eval)',
       baseUrl: `${BASE_URL.replace(/\/+$/, '')}/v1`,
@@ -194,6 +199,9 @@ localDescribe(`decision-model eval (${MODEL} at ${BASE_URL})`, () => {
       isLocal: true
     })
     setTaskAssignment('decision', profile.id, MODEL)
+    if (resolveTask('triage') !== null) {
+      throw new Error('decision eval must not resolve a text model for triage')
+    }
   })
   afterAll(() => {
     const out = join(
@@ -221,16 +229,28 @@ localDescribe(`decision-model eval (${MODEL} at ${BASE_URL})`, () => {
         const mails = seed(db, EVAL_MAILS)
         const results: Array<{ mail: EvalMail; row: Row }> = []
         const latencies: number[] = []
-        for (const [messageId, mail] of mails) {
-          const t = performance.now()
-          await runTriage(db, messageId)
-          latencies.push(performance.now() - t)
-          const row = db
-            .prepare('SELECT * FROM ai_decisions WHERE message_id = ?')
-            .get(messageId) as Row | undefined
-          expect(row, `${mail.id}: no decision stored`).toBeDefined()
-          results.push({ mail, row: row! })
+        const errors: string[] = []
+        const queue = [...mails]
+        const worker = async (): Promise<void> => {
+          for (let next = queue.shift(); next; next = queue.shift()) {
+            const [messageId, mail] = next
+            const t = performance.now()
+            try {
+              await runTriage(db, messageId)
+            } catch (error) {
+              errors.push(`${mail.id}: ${error instanceof Error ? error.message : String(error)}`)
+              continue
+            }
+            latencies.push(performance.now() - t)
+            const row = db
+              .prepare('SELECT * FROM ai_decisions WHERE message_id = ?')
+              .get(messageId) as Row | undefined
+            if (row) results.push({ mail, row })
+            else errors.push(`${mail.id}: no decision stored`)
+          }
         }
+        await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+        results.sort((a, b) => EVAL_MAILS.indexOf(a.mail) - EVAL_MAILS.indexOf(b.mail))
         const stats = score(results)
         latencies.sort((a, b) => a - b)
         report[mode satisfies Mode] = {
@@ -253,6 +273,7 @@ localDescribe(`decision-model eval (${MODEL} at ${BASE_URL})`, () => {
             max: Math.round(latencies[latencies.length - 1])
           },
           security: securityReport(results),
+          errors,
           misses: results
             .filter(({ mail, row }) => row.category !== mail.labels.category)
             .map(
@@ -261,6 +282,7 @@ localDescribe(`decision-model eval (${MODEL} at ${BASE_URL})`, () => {
             )
         }
         console.log(`\n${mode}:`, JSON.stringify(report[mode], null, 2))
+        expect(errors).toEqual([])
       },
       30 * 60_000
     )

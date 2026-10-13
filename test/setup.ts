@@ -48,7 +48,6 @@ vi.mock('electron', () => {
     Notification: MockNotification,
     BrowserWindow: { getAllWindows: () => [] },
     shell: { openExternal: vi.fn() },
-    powerMonitor: { on: vi.fn() },
     ipcMain: { handle: vi.fn(), on: vi.fn() }
   }
 })
