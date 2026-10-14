@@ -32,7 +32,9 @@ const PURIFY_CONFIG: Config = {
     'audio'
   ],
   FORBID_ATTR: ['srcset', 'formaction', 'background', 'poster'],
-  ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|cid:|data:image\/)/i
+  // Keep the default's non-URI branch ([^a-z] | word without colon): values that
+  // are not URIs at all (width="1") stay allowed; only scheme checks get stricter.
+  ALLOWED_URI_REGEXP: /^(?:(?:https?:|mailto:|cid:|data:image\/)|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
 }
 
 // Inline styles must not trigger network requests or lay anything over the UI

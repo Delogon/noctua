@@ -64,10 +64,47 @@ function parseReferences(raw: string | undefined): string[] {
   return raw.match(/<[^<>]+>/g) ?? []
 }
 
+/** Elements whose entire content is dropped when extracting text (case-insensitive). */
+const DROP_CONTENT_TAGS = new Set(['style', 'script', 'head'])
+
+/**
+ * Removes <style>/<script>/<head> blocks with a linear tag scan. A regex with
+ * lazy wildcards (`[\s\S]*?<\/\1>`) backtracks quadratically when closing tags
+ * are missing — attacker mails with many unclosed tags then block the main
+ * process for minutes inside the ingest transaction.
+ */
+function stripScriptStyleHead(html: string): string {
+  let out = ''
+  let i = 0
+  while (i < html.length) {
+    const open = html.indexOf('<', i)
+    if (open < 0) {
+      out += html.slice(i)
+      break
+    }
+    out += html.slice(i, open)
+    const close = html.indexOf('>', open)
+    if (close < 0) break // rest is inside a tag: keep nothing of it
+    const name = /^\/?([a-zA-Z][\w:-]*)/.exec(html.slice(open + 1, close))?.[1]?.toLowerCase()
+    if (name && DROP_CONTENT_TAGS.has(name)) {
+      const closeTag = `</${name}`
+      const end = html.toLowerCase().indexOf(closeTag, close + 1)
+      if (end < 0) break // no closing tag: the rest of the document is style/script
+      const gt = html.indexOf('>', end)
+      out += ' '
+      i = gt < 0 ? html.length : gt + 1
+    } else {
+      out += html.slice(open, close + 1) // keep the tag for the later tag-stripping step
+      i = close + 1
+    }
+  }
+  return out
+}
+
 /** Rough text extract from HTML — only for snippets, not for rendering. */
 export function htmlToText(html: string): string {
-  return html
-    .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, ' ')
+  return stripScriptStyleHead(html)
+    .replace(/<[^>]+>/g, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')

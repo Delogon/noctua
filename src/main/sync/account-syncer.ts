@@ -134,7 +134,9 @@ export function structureHasAttachments(root: unknown): boolean {
     const n = node as { disposition?: string; childNodes?: unknown[] }
     if (typeof n.disposition === 'string' && n.disposition.toLowerCase() === 'attachment')
       return true
-    if (Array.isArray(n.childNodes)) stack.push(...n.childNodes)
+    if (Array.isArray(n.childNodes)) {
+      for (const child of n.childNodes) stack.push(child)
+    }
   }
   return false
 }

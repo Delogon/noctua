@@ -101,9 +101,14 @@ export function baseDomain(host: string): string {
 function domainOfAddr(addr: string | null | undefined): string | null {
   const at = (addr ?? '').lastIndexOf('@')
   if (at < 0) return null
+  // Only the host part counts: everything from the first whitespace or
+  // structuring character on is trailing garbage from a malformed address and
+  // must never become "domain" text that flows into the decision model's
+  // security block (prompt-injection hardening, SEC-15).
   const d = (addr ?? '')
     .slice(at + 1)
     .trim()
+    .split(/[\s<>()"';\\,]/)[0]
     .toLowerCase()
   return d || null
 }
@@ -344,14 +349,38 @@ const SHORTENERS = new Set([
 
 // --- Links -------------------------------------------------------------------------------------
 
-/** href/link text pairs from HTML (regex, no DOM in the main process). */
+/** Max. characters scanned per anchor's inner text (quadratic-scan guard). */
+const MAX_LINK_TEXT_SCAN = 2_000
+
+/** href/link text pairs from HTML (index scan, no DOM in the main process). */
 export function extractLinks(html: string): Array<{ text: string; href: string }> {
   const out: Array<{ text: string; href: string }> = []
-  const re = /<a\s[^>]*?href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi
-  let m: RegExpExecArray | null
-  while ((m = re.exec(html)) !== null && out.length < 300) {
-    const href = (m[1] ?? m[2] ?? m[3] ?? '').trim().replace(/&amp;/g, '&')
-    const text = m[4]
+  const lower = html.toLowerCase()
+  let pos = 0
+  while (out.length < 300) {
+    const open = lower.indexOf('<a', pos)
+    if (open < 0) break
+    // only real anchor tags (`<a `, `<a>`, `<a/`) — not `<abbr>`, `<article>`…
+    const after = html[open + 2]
+    if (after !== undefined && !/[\s/>]/.test(after)) {
+      pos = open + 2
+      continue
+    }
+    const tagEnd = html.indexOf('>', open)
+    if (tagEnd < 0) break
+    const tag = html.slice(open, tagEnd)
+    const hrefMatch = /\shref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag)
+    const close = lower.indexOf('</a', tagEnd)
+    pos = close < 0 ? html.length : close + 3
+    if (!hrefMatch) continue
+    const href = (hrefMatch[1] ?? hrefMatch[2] ?? hrefMatch[3] ?? '')
+      .trim()
+      .replace(/&amp;/g, '&')
+    const rawText = html.slice(
+      tagEnd + 1,
+      close < 0 ? Math.min(html.length, tagEnd + 1 + MAX_LINK_TEXT_SCAN) : close
+    )
+    const text = rawText
       .replace(/<[^>]*>/g, ' ')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
