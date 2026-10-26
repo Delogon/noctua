@@ -17,6 +17,15 @@ describe('linear-time HTML parsing on unclosed tags', () => {
     expect(ms).toBeLessThan(2_000) // quadratic predecessor: >160 s
   })
 
+  it('htmlToText handles 100k closed <style></style> pairs quickly', () => {
+    const html = '<STYLE>a</Style>'.repeat(100_000) + 'tail'
+    const t0 = process.hrtime.bigint()
+    const text = htmlToText(html)
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6
+    expect(text).toBe('tail')
+    expect(ms).toBeLessThan(1_000) // per-tag toLowerCase predecessor: minutes
+  })
+
   it('extractLinks handles 17k unclosed anchors in 400KB quickly', () => {
     const n = Math.floor(400_000 / ANCHOR.length)
     const html = ANCHOR.repeat(n)

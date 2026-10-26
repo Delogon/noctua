@@ -4,7 +4,12 @@ import { invoke } from '@renderer/lib/ipc'
 import { t, useT } from '@renderer/lib/i18n'
 import { toast } from '@renderer/stores/toast'
 import { linkHostMismatch } from '@shared/link-check'
-import { buildMailSrcdoc, isTrackingPixel, sanitizeInlineStyle } from '@renderer/lib/mail-sanitize'
+import {
+  buildMailSrcdoc,
+  isTrackingPixel,
+  MAIL_URI_REGEXP,
+  sanitizeInlineStyle
+} from '@renderer/lib/mail-sanitize'
 
 /**
  * Renders mail HTML after strict sanitizing. Lines of defense:
@@ -32,9 +37,7 @@ const PURIFY_CONFIG: Config = {
     'audio'
   ],
   FORBID_ATTR: ['srcset', 'formaction', 'background', 'poster'],
-  // Keep the default's non-URI branch ([^a-z] | word without colon): values that
-  // are not URIs at all (width="1") stay allowed; only scheme checks get stricter.
-  ALLOWED_URI_REGEXP: /^(?:(?:https?:|mailto:|cid:|data:image\/)|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
+  ALLOWED_URI_REGEXP: MAIL_URI_REGEXP
 }
 
 // Inline styles must not trigger network requests or lay anything over the UI

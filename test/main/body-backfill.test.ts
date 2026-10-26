@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { closeTestDb, createTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 import { upsertEnvelope } from '@main/mail/ingest'
-import { AccountSyncer, MAX_BODY_ATTEMPTS, pendingBodiesSql } from '@main/sync/account-syncer'
+import {
+  AccountSyncer,
+  MAX_BACKFILL_BODY_BYTES,
+  MAX_BODY_ATTEMPTS,
+  pendingBodiesSql
+} from '@main/sync/account-syncer'
 import type { AccountRow } from '@main/auth/providers'
 
 const source = (uid: number): Buffer =>
@@ -129,6 +134,22 @@ describe('body backfill', () => {
     expect(last.fetch).not.toHaveBeenCalled()
     expect(attempts()).toEqual([MAX_BODY_ATTEMPTS, MAX_BODY_ATTEMPTS])
     // Only given-up messages remain: the folder counts as backfilled
+    expect(
+      db.prepare('SELECT body_backfill_since FROM folders WHERE id = ?').pluck().get(inbox)
+    ).not.toBeNull()
+  })
+
+  it('leaves oversized messages to on-demand fetch and still finishes the folder', async () => {
+    db.prepare('UPDATE messages SET size = ? WHERE uid = 5').run(MAX_BACKFILL_BODY_BYTES + 1)
+    const ranges: string[] = []
+    // Enough passes for the two failing fetches (7, 19) to hit the attempt limit
+    for (let pass = 0; pass < MAX_BODY_ATTEMPTS; pass++) {
+      const syncer = makeSyncer()
+      await syncer.run()
+      ranges.push(...syncer.fetch.mock.calls.map((call) => String(call[0])))
+    }
+    expect(ranges.join(',').split(',')).not.toContain('5')
+    expect(bodyStates()).toEqual({ full: 22, none: 3 })
     expect(
       db.prepare('SELECT body_backfill_since FROM folders WHERE id = ?').pluck().get(inbox)
     ).not.toBeNull()

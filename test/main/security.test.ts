@@ -16,6 +16,7 @@ import {
 import {
   assertSecretKey,
   assertSettingReadable,
+  assertSettingValue,
   assertSettingWritable,
   ForbiddenKeyError
 } from '@shared/settings-keys'
@@ -166,5 +167,13 @@ describe('Handler-seitige Schlüssel-Prüfung (SEC-2)', () => {
     expect(() => assertSettingWritable('sig.5')).not.toThrow()
     expect(() => assertSettingWritable('ai.styleMeta')).toThrow(ForbiddenKeyError)
     expect(() => assertSettingReadable('ai.styleMeta')).not.toThrow()
+  })
+
+  it('prüft bei Enum-Einstellungen auch den Wert', () => {
+    expect(() => assertSettingValue('ai.triageProvider', 'apple')).not.toThrow()
+    expect(() => assertSettingValue('ai.triageProvider', '<script>')).toThrow(ForbiddenKeyError)
+    expect(() => assertSettingValue('ui.layout', 'classic')).not.toThrow()
+    expect(() => assertSettingValue('security.autoJunk', 'yes')).toThrow(ForbiddenKeyError)
+    expect(() => assertSettingValue('sig.5', 'beliebiger Text')).not.toThrow()
   })
 })

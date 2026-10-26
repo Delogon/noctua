@@ -208,6 +208,10 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
     expect(user).toContain('RECIPIENT (account owner)')
     expect(user).toContain('lena.hartmann@example.org')
     expect(user).toContain('neither in To nor CC')
-    expect(user).toContain('names: Jannik')
+    expect(user).toContain('names: "Jannik"')
+    // Sender-controlled header lines sit inside untrusted delimiters (SEC-15)
+    expect(user).toMatch(
+      /<<<BEGIN HEADER \(UNTRUSTED DATA\)>>>\nFrom: Marie[^\n]*\nSubject: [^\n]*\n<<<END HEADER>>>/
+    )
   })
 })

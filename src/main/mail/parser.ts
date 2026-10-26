@@ -87,8 +87,11 @@ function stripScriptStyleHead(html: string): string {
     if (close < 0) break // rest is inside a tag: keep nothing of it
     const name = /^\/?([a-zA-Z][\w:-]*)/.exec(html.slice(open + 1, close))?.[1]?.toLowerCase()
     if (name && DROP_CONTENT_TAGS.has(name)) {
-      const closeTag = `</${name}`
-      const end = html.toLowerCase().indexOf(closeTag, close + 1)
+      // Case-insensitive search from here on — lowercasing the whole document
+      // per dropped tag was quadratic for many <style></style> pairs.
+      const closeTag = new RegExp(`</${name}`, 'gi')
+      closeTag.lastIndex = close + 1
+      const end = closeTag.exec(html)?.index ?? -1
       if (end < 0) break // no closing tag: the rest of the document is style/script
       const gt = html.indexOf('>', end)
       out += ' '
@@ -101,9 +104,15 @@ function stripScriptStyleHead(html: string): string {
   return out
 }
 
+/**
+ * HTML beyond this is ignored by htmlToText: callers keep at most ~100k chars
+ * of text, and the cap bounds the main-thread time per mail (DoS defense).
+ */
+export const MAX_HTML_TO_TEXT = 2_000_000
+
 /** Rough text extract from HTML — only for snippets, not for rendering. */
 export function htmlToText(html: string): string {
-  return stripScriptStyleHead(html)
+  return stripScriptStyleHead(html.slice(0, MAX_HTML_TO_TEXT))
     .replace(/<[^>]+>/g, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')

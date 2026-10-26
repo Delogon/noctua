@@ -373,9 +373,7 @@ export function extractLinks(html: string): Array<{ text: string; href: string }
     const close = lower.indexOf('</a', tagEnd)
     pos = close < 0 ? html.length : close + 3
     if (!hrefMatch) continue
-    const href = (hrefMatch[1] ?? hrefMatch[2] ?? hrefMatch[3] ?? '')
-      .trim()
-      .replace(/&amp;/g, '&')
+    const href = (hrefMatch[1] ?? hrefMatch[2] ?? hrefMatch[3] ?? '').trim().replace(/&amp;/g, '&')
     const rawText = html.slice(
       tagEnd + 1,
       close < 0 ? Math.min(html.length, tagEnd + 1 + MAX_LINK_TEXT_SCAN) : close
