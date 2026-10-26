@@ -6,6 +6,7 @@ import { sanitizeComposerHtml } from './composer-html'
 import { ComposerSpellcheck } from './ComposerSpellcheck'
 import {
   composerShortcut,
+  escapeHtml,
   estimateTranscriptSkeleton,
   textToComposerHtml,
   type ComposerActivity
@@ -184,7 +185,7 @@ export const MailComposerSurface = forwardRef<MailComposerHandle, MailComposerSu
         document.execCommand(
           'insertHTML',
           false,
-          `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`
+          `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
         )
       } else {
         document.execCommand('createLink', false, href)

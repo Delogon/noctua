@@ -113,6 +113,7 @@ import { getSpellEngine } from '../spell'
 import {
   assertSecretKey,
   assertSettingReadable,
+  assertSettingValue,
   assertSettingWritable
 } from '@shared/settings-keys'
 import type { PushChannel, PushPayload } from '@shared/ipc-contract'
@@ -239,6 +240,7 @@ export const handlers: IpcHandlers = {
 
   'settings:set': ({ key, value }) => {
     assertSettingWritable(key)
+    assertSettingValue(key, value)
     setSetting(key, value)
     return { ok: true }
   },

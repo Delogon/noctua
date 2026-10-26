@@ -52,6 +52,19 @@ const WRITABLE_PATTERNS = [
   new RegExp(`^ai\\.style\\.learn\\.${ID}$`)
 ]
 
+/**
+ * Enum-shaped settings: the value is checked too, not only the key. These land
+ * verbatim in the diagnostics export (PERF_SETTINGS) and in main-side branches.
+ */
+const BOOL = ['0', '1']
+const ALLOWED_VALUES: Record<string, string[]> = {
+  'ui.layout': ['letterpress', 'classic'],
+  'ai.triageProvider': ['apple', 'openrouter'],
+  'mail.showFolders': BOOL,
+  'tasks.autoCreate': BOOL,
+  'security.autoJunk': BOOL
+}
+
 /** Additionally read-only: style profiles computed by main, profile assignment, Local only. */
 const READONLY_EXACT = new Set([
   'ai.styleProfile',
@@ -104,6 +117,12 @@ export function assertSettingReadable(key: string): void {
 
 export function assertSettingWritable(key: string): void {
   if (!isRendererSettingWritable(key)) throw new ForbiddenKeyError('setting')
+}
+
+/** Value outside a setting's allowed set — same short message as a forbidden key. */
+export function assertSettingValue(key: string, value: string): void {
+  const allowed = ALLOWED_VALUES[key]
+  if (allowed && !allowed.includes(value)) throw new ForbiddenKeyError('setting')
 }
 
 export function assertSecretKey(key: string): void {

@@ -29,6 +29,8 @@ const BODY_CHUNK = 10
 const BODY_PASS_LIMIT = 50
 /** After this many failed fetches the backfill skips a message (opening it still fetches). */
 export const MAX_BODY_ATTEMPTS = 3
+/** Larger messages are skipped by the background backfill (parser DoS defense); opening one still fetches it. */
+export const MAX_BACKFILL_BODY_BYTES = 64 * 1024 * 1024
 const FLAG_RESYNC_WINDOW = 500
 const BACKOFF_BASE_MS = 5_000
 const BACKOFF_MAX_MS = 5 * 60_000
@@ -96,6 +98,7 @@ export function pendingBodiesSql(excludedCount: number): string {
   return `SELECT id, uid, thread_key FROM messages
     WHERE folder_id = ? AND body_state = 'none' AND body_attempts < ?
       AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
+      AND coalesce(size, 0) <= ${MAX_BACKFILL_BODY_BYTES}
       ${exclusion}
     ORDER BY coalesce(date, internal_date) DESC, id DESC
     LIMIT ?`
@@ -134,7 +137,9 @@ export function structureHasAttachments(root: unknown): boolean {
     const n = node as { disposition?: string; childNodes?: unknown[] }
     if (typeof n.disposition === 'string' && n.disposition.toLowerCase() === 'attachment')
       return true
-    if (Array.isArray(n.childNodes)) stack.push(...n.childNodes)
+    if (Array.isArray(n.childNodes)) {
+      for (const child of n.childNodes) stack.push(child)
+    }
   }
   return false
 }
@@ -429,6 +434,25 @@ export class AccountSyncer {
     return run
   }
 
+  /**
+   * Stored UIDs are only valid for the UIDVALIDITY they were synced under. If
+   * the locked mailbox reports another one, a UID fetch would return a different
+   * message — skip it and let the folder sync run the reset.
+   */
+  private uidValidityChanged(folderId: number, expected: number | null): boolean {
+    const mailbox = this.cmd?.mailbox
+    const live = mailbox && typeof mailbox !== 'boolean' ? Number(mailbox.uidValidity) : null
+    if (expected === null || live === null || live === expected) return false
+    console.warn(`[sync:${this.account.email}] UIDVALIDITY ${expected} → ${live}, fetch skipped`)
+    const folder = this.folders.find((f) => f.id === folderId)
+    if (folder) {
+      void this.enqueueFolderSync(folder).catch((error) =>
+        console.warn(`[sync:${this.account.email}] Resync ${folder.path}:`, error)
+      )
+    }
+    return true
+  }
+
   /** Have the folder re-reconciled after a discarded op (full backfill dedupes). */
   invalidateFolder(folderId: number): void {
     const folder = this.folders.find((f) => f.id === folderId)
@@ -523,6 +547,14 @@ export class AccountSyncer {
         folder.body_backfill_since = null
       }
 
+      if (folder.uidvalidity === null) {
+        // Stamp before the first backfill: ops on messages ingested now carry it
+        this.db
+          .prepare('UPDATE folders SET uidvalidity = ? WHERE id = ?')
+          .run(uidValidity, folder.id)
+        folder.uidvalidity = uidValidity
+      }
+
       if (folder.uidnext === null) {
         await this.backfillFolder(folder)
       } else {
@@ -567,10 +599,20 @@ export class AccountSyncer {
 
   private ingestBatch(folder: FolderRow, messages: FetchMessageObject[]): string[] {
     const threadKeys = new Set<string>()
+    // Per-message savepoint: one poison message is skipped instead of rolling
+    // back the batch — otherwise UIDNEXT never advances and the folder stalls.
+    const ingestOne = this.db.transaction((msg: FetchMessageObject) =>
+      upsertEnvelope(this.db, this.account.id, folder.id, toEnvelopeData(msg))
+    )
     const tx = this.db.transaction(() => {
       for (const msg of messages) {
-        const result = upsertEnvelope(this.db, this.account.id, folder.id, toEnvelopeData(msg))
-        if (result) threadKeys.add(result.threadKey)
+        try {
+          const result = ingestOne(msg)
+          if (result) threadKeys.add(result.threadKey)
+        } catch (error) {
+          console.warn(`[sync:${this.account.email}] envelope uid ${msg.uid} skipped:`, error)
+          metrics.count('sync.envelopesSkipped', 1)
+        }
       }
     })
     metrics.time('sync.ingestBatch', tx, { messages: messages.length })
@@ -691,6 +733,7 @@ export class AccountSyncer {
       const sources = new Map<number, Buffer>()
       const lock = await this.cmd!.getMailboxLock(folder.path)
       try {
+        if (this.uidValidityChanged(folder.id, folder.uidvalidity)) return
         await metrics.timeAsync(
           'sync.bodies.fetchChunk',
           async () => {
@@ -752,7 +795,8 @@ export class AccountSyncer {
       .prepare(
         `SELECT count(*) AS count FROM messages
          WHERE folder_id = ? AND body_state = 'none' AND body_attempts < ?
-           AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)`
+           AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
+      AND coalesce(size, 0) <= ${MAX_BACKFILL_BODY_BYTES}`
       )
       .get(folder.id, MAX_BODY_ATTEMPTS, cutoff) as { count: number }
     if (remaining.count === 0) {
@@ -769,6 +813,7 @@ export class AccountSyncer {
           `SELECT count(*) AS count FROM messages
            WHERE folder_id = ? AND body_state = 'none' AND body_attempts < ?
              AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
+      AND coalesce(size, 0) <= ${MAX_BACKFILL_BODY_BYTES}
              ${nextExclusionSql}`
         )
         .get(folder.id, MAX_BODY_ATTEMPTS, cutoff, ...nextExcluded) as { count: number }
@@ -829,12 +874,15 @@ export class AccountSyncer {
     return this.enqueue(async () => {
       const row = this.db
         .prepare(
-          `SELECT m.uid, f.path FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
+          `SELECT m.uid, f.id folder_id, f.path, f.uidvalidity
+           FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
         )
-        .get(messageId) as { uid: number; path: string } | undefined
+        .get(messageId) as
+        { uid: number; folder_id: number; path: string; uidvalidity: number | null } | undefined
       if (!row || !this.cmd) return null
       const lock = await this.cmd.getMailboxLock(row.path)
       try {
+        if (this.uidValidityChanged(row.folder_id, row.uidvalidity)) return null
         const msg = await this.cmd.fetchOne(String(row.uid), { source: true }, { uid: true })
         return msg && msg.source ? msg.source : null
       } finally {
@@ -848,12 +896,15 @@ export class AccountSyncer {
     return this.enqueue(async () => {
       const row = this.db
         .prepare(
-          `SELECT m.uid, f.path FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
+          `SELECT m.uid, f.id folder_id, f.path, f.uidvalidity
+           FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
         )
-        .get(messageId) as { uid: number; path: string } | undefined
+        .get(messageId) as
+        { uid: number; folder_id: number; path: string; uidvalidity: number | null } | undefined
       if (!row || !this.cmd) return null
       const lock = await this.cmd.getMailboxLock(row.path)
       try {
+        if (this.uidValidityChanged(row.folder_id, row.uidvalidity)) return null
         const msg = await this.cmd.fetchOne(
           String(row.uid),
           { headers: true, envelope: true },
@@ -881,12 +932,15 @@ export class AccountSyncer {
     return this.enqueue(async () => {
       const row = this.db
         .prepare(
-          `SELECT f.path FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
+          `SELECT f.id folder_id, f.path, f.uidvalidity
+           FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
         )
-        .get(messageId) as { path: string } | undefined
+        .get(messageId) as
+        { folder_id: number; path: string; uidvalidity: number | null } | undefined
       if (!row) return null
       const lock = await this.cmd!.getMailboxLock(row.path)
       try {
+        if (this.uidValidityChanged(row.folder_id, row.uidvalidity)) return null
         return await this.fetchBodyInSelectedMailbox(messageId)
       } finally {
         lock.release()

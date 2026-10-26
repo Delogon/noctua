@@ -1,5 +1,6 @@
 import { existsSync, statSync } from 'node:fs'
 import type Database from 'better-sqlite3-multiple-ciphers'
+import { folderRole } from '@shared/folder-roles'
 
 // Size and shape of the mailbox — counts only. Accounts appear as
 // "Account 1, 2, …" with provider type, without address or name.
@@ -100,11 +101,11 @@ export function collectDatasetStats(db: Database.Database, dbPath: string | null
   const foldersByRole: Record<string, number> = {}
   try {
     for (const row of db
-      .prepare(
-        `SELECT coalesce(special_use, 'none') role, sync_mode mode, count(*) n FROM folders GROUP BY 1, 2`
-      )
-      .all() as Array<{ role: string; mode: string; n: number }>) {
-      foldersByRole[`${row.role.replace(/^\\/, '').toLowerCase()}:${row.mode}`] = row.n
+      .prepare(`SELECT special_use role, sync_mode mode, count(*) n FROM folders GROUP BY 1, 2`)
+      .all() as Array<{ role: string | null; mode: string; n: number }>) {
+      // Mapped through folderRole: raw SPECIAL-USE strings come from the server
+      const key = `${folderRole(row.role)}:${row.mode}`
+      foldersByRole[key] = (foldersByRole[key] ?? 0) + row.n
     }
   } catch {
     // older schemas

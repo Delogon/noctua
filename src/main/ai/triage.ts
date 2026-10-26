@@ -215,7 +215,11 @@ function buildPromptBlocks(
   const salutation = salutationTarget(bodyText)
   const salutationLabel =
     salutation.kind === 'named'
-      ? `names: ${salutation.names.join(', ')}`
+      ? // Names come from the mail body: quoted and capped (SEC-15)
+        `names: ${salutation.names
+          .slice(0, 5)
+          .map((name) => JSON.stringify(sanitizeUntrustedLine(name, 60)))
+          .join(', ')}`
       : salutation.kind === 'group'
         ? 'group salutation (e.g. "Hello everyone")'
         : 'no recognisable salutation'
@@ -225,16 +229,25 @@ function buildPromptBlocks(
     const list = JSON.parse(row.reply_to ?? '[]') as Array<{ address?: string }>
     const addresses = list.map((r) => r.address).filter((a): a is string => !!a)
     if (addresses.length > 0) {
-      replyTo = `Reply-To: ${sanitizeUntrustedLine(addresses.join(', '), 300)}`
+      replyTo = wrapUntrusted(
+        'REPLY-TO',
+        `Reply-To: ${sanitizeUntrustedLine(addresses.join(', '), 300)}`
+      )
     }
   } catch {
     // broken JSON: no Reply-To line
   }
 
   return {
+    // From/Subject are sender-controlled: delimited like the body (SEC-15)
     header: [
-      `From: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unknown', 200)}>`,
-      `Subject: ${sanitizeUntrustedLine(row.subject, 300) || '(no subject)'}`,
+      wrapUntrusted(
+        'HEADER',
+        [
+          `From: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unknown', 200)}>`,
+          `Subject: ${sanitizeUntrustedLine(row.subject, 300) || '(no subject)'}`
+        ].join('\n')
+      ),
       `Date: ${row.date ? localStamp(row.date) : 'unknown'}`
     ].join('\n'),
     replyTo,

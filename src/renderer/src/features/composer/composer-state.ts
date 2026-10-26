@@ -55,7 +55,7 @@ export function appendTranscription(currentText: string, transcript: string): st
   return current ? `${current}\n\n${spoken}` : spoken
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

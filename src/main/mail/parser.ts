@@ -64,10 +64,56 @@ function parseReferences(raw: string | undefined): string[] {
   return raw.match(/<[^<>]+>/g) ?? []
 }
 
+/** Elements whose entire content is dropped when extracting text (case-insensitive). */
+const DROP_CONTENT_TAGS = new Set(['style', 'script', 'head'])
+
+/**
+ * Removes <style>/<script>/<head> blocks with a linear tag scan. A regex with
+ * lazy wildcards (`[\s\S]*?<\/\1>`) backtracks quadratically when closing tags
+ * are missing — attacker mails with many unclosed tags then block the main
+ * process for minutes inside the ingest transaction.
+ */
+function stripScriptStyleHead(html: string): string {
+  let out = ''
+  let i = 0
+  while (i < html.length) {
+    const open = html.indexOf('<', i)
+    if (open < 0) {
+      out += html.slice(i)
+      break
+    }
+    out += html.slice(i, open)
+    const close = html.indexOf('>', open)
+    if (close < 0) break // rest is inside a tag: keep nothing of it
+    const name = /^\/?([a-zA-Z][\w:-]*)/.exec(html.slice(open + 1, close))?.[1]?.toLowerCase()
+    if (name && DROP_CONTENT_TAGS.has(name)) {
+      // Case-insensitive search from here on — lowercasing the whole document
+      // per dropped tag was quadratic for many <style></style> pairs.
+      const closeTag = new RegExp(`</${name}`, 'gi')
+      closeTag.lastIndex = close + 1
+      const end = closeTag.exec(html)?.index ?? -1
+      if (end < 0) break // no closing tag: the rest of the document is style/script
+      const gt = html.indexOf('>', end)
+      out += ' '
+      i = gt < 0 ? html.length : gt + 1
+    } else {
+      out += html.slice(open, close + 1) // keep the tag for the later tag-stripping step
+      i = close + 1
+    }
+  }
+  return out
+}
+
+/**
+ * HTML beyond this is ignored by htmlToText: callers keep at most ~100k chars
+ * of text, and the cap bounds the main-thread time per mail (DoS defense).
+ */
+export const MAX_HTML_TO_TEXT = 2_000_000
+
 /** Rough text extract from HTML — only for snippets, not for rendering. */
 export function htmlToText(html: string): string {
-  return html
-    .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, ' ')
+  return stripScriptStyleHead(html.slice(0, MAX_HTML_TO_TEXT))
+    .replace(/<[^>]+>/g, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')

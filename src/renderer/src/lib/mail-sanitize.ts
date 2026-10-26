@@ -92,6 +92,15 @@ export function buildMailSrcdoc(bodyHtml: string, remoteAllowed: boolean): strin
   )
 }
 
+/**
+ * DOMPurify ALLOWED_URI_REGEXP for mail HTML. Keeps the default's non-URI branch
+ * ([^a-z] | word without colon): values that are not URIs at all (width="1") stay
+ * allowed — otherwise isTrackingPixel never sees them (vuln-0003). Only scheme
+ * checks get stricter.
+ */
+export const MAIL_URI_REGEXP =
+  /^(?:(?:https?:|mailto:|cid:|data:image\/)|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
+
 /** Tiny or hidden images (1x1, ≤2px, display:none) are tracking pixels. */
 export function isTrackingPixel(attrs: {
   width?: string | null

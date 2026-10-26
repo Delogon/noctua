@@ -19,4 +19,20 @@ describe('structureHasAttachments (vuln-0008)', () => {
     expect(structureHasAttachments(deep)).toBe(true)
     expect(structureHasAttachments(nested(200_000, {}))).toBe(false)
   })
+
+  it('wide fan-out: single node with 200k children', () => {
+    const wide = {
+      type: 'multipart/mixed',
+      childNodes: Array.from({ length: 200_000 }, () => ({ disposition: 'inline' }))
+    }
+    expect(structureHasAttachments(wide)).toBe(false)
+
+    const wideWithAttachment = {
+      type: 'multipart/mixed',
+      childNodes: Array.from({ length: 200_000 }, (_, i) =>
+        i === 199_999 ? { disposition: 'attachment' } : { disposition: 'inline' }
+      )
+    }
+    expect(structureHasAttachments(wideWithAttachment)).toBe(true)
+  })
 })

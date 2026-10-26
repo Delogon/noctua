@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildMailSrcdoc,
   isTrackingPixel,
+  MAIL_URI_REGEXP,
   mailFrameCsp,
   sanitizeInlineStyle
 } from '@renderer/lib/mail-sanitize'
@@ -32,6 +33,29 @@ describe('sanitizeInlineStyle', () => {
     expect(sanitizeInlineStyle('background: ur/**/l(x)')).toBe('')
     expect(sanitizeInlineStyle('background: u\\72l(https://t)')).toBe('')
     expect(sanitizeInlineStyle('background: url("a;b"); color: red')).toBe('color: red')
+  })
+})
+
+describe('MAIL_URI_REGEXP (vuln-0003)', () => {
+  it('keeps non-URI size attributes so the pixel check still sees them', () => {
+    for (const value of ['1', '0', '1px', '100%', 'auto']) {
+      expect(MAIL_URI_REGEXP.test(value)).toBe(true)
+    }
+    expect(isTrackingPixel({ width: '1', height: '1' })).toBe(true)
+  })
+
+  it('still rejects foreign schemes', () => {
+    for (const value of [
+      'javascript:alert(1)',
+      'vbscript:x',
+      'data:text/html,<b>',
+      'file:///etc'
+    ]) {
+      expect(MAIL_URI_REGEXP.test(value)).toBe(false)
+    }
+    for (const value of ['https://t.example/x.gif', 'cid:img1', 'mailto:a@b.de']) {
+      expect(MAIL_URI_REGEXP.test(value)).toBe(true)
+    }
   })
 })
 
