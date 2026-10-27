@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { runTriage } from '@main/ai/triage'
 import { runThreatCheck } from '@main/ai/threat-check'
 import { createProfile, resolveTask, setTaskAssignment } from '@main/ai/providers/registry'
+import { decide } from '@main/ai/providers/systemone'
 import { storeBody, upsertEnvelope } from '@main/mail/ingest'
 import {
   ADDRESSED_TO_ME_THRESHOLD,
@@ -188,7 +189,7 @@ localDescribe(`decision-model eval (${MODEL} at ${BASE_URL})`, () => {
     concurrency: CONCURRENCY
   }
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // No cloud key: only the local decision model runs, never a text model
     // (no mail leaves the machine; summaries stay extractive)
     db = createTestDb()
@@ -202,7 +203,18 @@ localDescribe(`decision-model eval (${MODEL} at ${BASE_URL})`, () => {
     if (resolveTask('triage') !== null) {
       throw new Error('decision eval must not resolve a text model for triage')
     }
-  })
+    // Warm-up: load the model into memory before measuring, so the load time
+    // is reported on its own instead of inflating the first mail's latency
+    const t = performance.now()
+    await decide({
+      baseUrl: BASE_URL,
+      model: MODEL,
+      state: 'Warm-up.',
+      questions: { ready: { type: 'noul', instructions: 'Is this a warm-up message?' } },
+      timeoutMs: 10 * 60_000
+    })
+    report.loadMs = Math.round(performance.now() - t)
+  }, 10 * 60_000)
   afterAll(() => {
     const out = join(
       process.cwd(),
