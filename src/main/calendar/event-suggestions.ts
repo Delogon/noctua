@@ -7,18 +7,18 @@ import { createEvent } from './service'
 import { systemTimeZone } from './tz'
 
 /**
- * Terminvorschläge aus Mails (2.4): Speicherung, Anzeige und Übernahme.
- * Wie bei Aufgaben-Vorschlägen gilt: nichts landet ohne Klick im Kalender.
- * Der Inhalt stammt aus Mails (unvertrauenswürdig) und wird als Klartext genutzt.
+ * Event suggestions from mails (2.4): storage, display and acceptance.
+ * As with task suggestions: nothing lands in the calendar without a click.
+ * The content comes from mails (untrusted) and is used as plain text.
  */
 
-/** Ergebnis der Extraktion nach Validierung/Auflösung (siehe ai/events.ts). */
+/** Extraction result after validation/resolution (see ai/events.ts). */
 export interface ResolvedEvent {
   title: string
   allDay: boolean
-  /** 'YYYY-MM-DDTHH:mm:ss' bzw. 'YYYY-MM-DD' */
+  /** 'YYYY-MM-DDTHH:mm:ss' or 'YYYY-MM-DD' */
   startLocal: string
-  /** Ganztägig exklusiv */
+  /** All-day exclusive */
   endLocal: string
   tzid: string | null
   location: string | null
@@ -46,10 +46,10 @@ interface SuggestionRow {
 }
 
 /**
- * Speichert Vorschläge einer Mail. Dedupe über den Thread: derselbe Start
- * (gleicher Tag/gleiche Uhrzeit) in derselben Unterhaltung ist derselbe
- * Termin — ein bereits abgelehnter bleibt abgelehnt, ein Vorschlag wird bei
- * späterer Bestätigung zu „confirmed". Gibt die Zahl neu angelegter Zeilen zurück.
+ * Stores a mail's suggestions. Dedupe via the thread: the same start
+ * (same day/same time) in the same conversation is the same
+ * event — an already dismissed one stays dismissed, a suggestion becomes
+ * "confirmed" on later confirmation. Returns the number of newly created rows.
  */
 export function storeEventSuggestions(
   db: Database.Database,
@@ -120,8 +120,8 @@ function toView(row: SuggestionRow, calendarId: number | null): EventSuggestionV
 }
 
 /**
- * Vorschläge, die an dieser Mail hängen. Vergangene, noch offene Vorschläge
- * werden nicht mehr gezeigt; abgelehnte nie.
+ * Suggestions attached to this mail. Past suggestions that are still open
+ * are no longer shown; dismissed ones never.
  */
 export function listEventSuggestions(
   db: Database.Database,
@@ -146,7 +146,7 @@ function localDay(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** Backend-Felder für den neuen Termin (zeitzonen- und ganztagsgenau). */
+/** Backend fields for the new event (exact for time zone and all-day). */
 export function eventInputFromSuggestion(
   row: Pick<
     SuggestionRow,
@@ -191,7 +191,7 @@ export interface AcceptDeps {
   createEvent?: typeof createEvent
 }
 
-/** „Hinzufügen": legt den Termin im Standard-Kalender an. Wirft ohne beschreibbaren Kalender. */
+/** "Add": creates the event in the default calendar. Throws without a writable calendar. */
 export function acceptEventSuggestion(
   db: Database.Database,
   id: number,
@@ -214,19 +214,19 @@ export function acceptEventSuggestion(
   return { objectId }
 }
 
-/** „Verwerfen": merkt die Ablehnung, damit der Vorschlag nicht wiederkommt. */
+/** "Dismiss": remembers the rejection so that the suggestion does not come back. */
 export function dismissEventSuggestion(db: Database.Database, id: number): void {
   db.prepare(`UPDATE event_suggestions SET state = 'dismissed' WHERE id = ?`).run(id)
 }
 
-/** „Bearbeiten…": der Editor übernimmt — der Vorschlag gilt als erledigt. */
+/** "Edit…": the editor takes over — the suggestion counts as done. */
 export function markEventSuggestionEditing(db: Database.Database, id: number): void {
   db.prepare(`UPDATE event_suggestions SET state = 'accepted' WHERE id = ? AND state = 'new'`).run(
     id
   )
 }
 
-/** Gibt es in dieser Unterhaltung einen (nicht abgelehnten) Terminvorschlag? */
+/** Is there a (non-dismissed) event suggestion in this conversation? */
 export function threadHasEventSuggestion(
   db: Database.Database = getDb(),
   threadKey: string

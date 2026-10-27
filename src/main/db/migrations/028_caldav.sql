@@ -1,7 +1,7 @@
--- Phase 2.1: CalDAV-Kern. Kalender-Konten sind eigenständig (nicht an Mail-
--- Konten gekoppelt); das Passwort liegt im Vault unter `cal:<id>:password`.
--- Server-URLs und Collection-URLs sind absolut, Objekt-Hrefs normalisierte Pfade
--- relativ zum Origin der Kalender-URL.
+-- Phase 2.1: CalDAV core. Calendar accounts are standalone (not tied to mail
+-- accounts); the password lives in the vault under `cal:<id>:password`.
+-- Server URLs and collection URLs are absolute, object hrefs normalized paths
+-- relative to the origin of the calendar URL.
 CREATE TABLE IF NOT EXISTS cal_accounts (
   id                   INTEGER PRIMARY KEY AUTOINCREMENT,
   name                 TEXT NOT NULL,
@@ -9,9 +9,9 @@ CREATE TABLE IF NOT EXISTS cal_accounts (
   principal_url        TEXT,
   home_url             TEXT NOT NULL,
   username             TEXT NOT NULL,
-  -- Mail-Konto, aus dem Host/Zugangsdaten vorbelegt wurden (nur Hinweis)
+  -- Mail account the host/credentials were prefilled from (informational only)
   mail_account_id      INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
-  -- Scheduling (RFC 6638): für spätere Pakete (Einladungen, Free/Busy)
+  -- Scheduling (RFC 6638): for later packages (invitations, free/busy)
   schedule_inbox_url   TEXT,
   schedule_outbox_url  TEXT,
   user_addresses       TEXT NOT NULL DEFAULT '[]',
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS calendars (
   url               TEXT NOT NULL,
   display_name      TEXT NOT NULL,
   color             TEXT,
-  -- Komma-getrennt, z. B. 'VEVENT,VTODO'
+  -- Comma-separated, e.g. 'VEVENT,VTODO'
   components        TEXT NOT NULL DEFAULT 'VEVENT',
   read_only         INTEGER NOT NULL DEFAULT 0,
   supports_sync     INTEGER NOT NULL DEFAULT 0,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS calendars (
   sync_token        TEXT,
   visible           INTEGER NOT NULL DEFAULT 1,
   sort_order        INTEGER NOT NULL DEFAULT 0,
-  -- Vom Nutzer gesetzte Farbe überschreibt die Server-Farbe beim Sync nicht
+  -- A user-set color is not overwritten by the server color on sync
   color_user_set    INTEGER NOT NULL DEFAULT 0,
   UNIQUE (account_id, url)
 );
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS cal_objects (
   href           TEXT NOT NULL,
   etag           TEXT,
   uid            TEXT NOT NULL,
-  -- VEVENT | VTODO | VJOURNAL | INVALID (nicht parsebar, Rohtext bleibt erhalten)
+  -- VEVENT | VTODO | VJOURNAL | INVALID (not parseable, raw text is kept)
   component      TEXT NOT NULL DEFAULT 'VEVENT',
   ics            TEXT NOT NULL,
   summary        TEXT,
@@ -64,21 +64,21 @@ CREATE TABLE IF NOT EXISTS cal_objects (
   organizer      TEXT,
   sequence       INTEGER NOT NULL DEFAULT 0,
   last_modified  INTEGER,
-  -- Lokale, noch nicht übertragene Änderung ('create' | 'update' | 'delete')
+  -- Local change not yet transmitted ('create' | 'update' | 'delete')
   pending_op     TEXT CHECK (pending_op IN ('create', 'update', 'delete')),
   UNIQUE (calendar_id, href)
 );
 CREATE INDEX IF NOT EXISTS idx_cal_objects_uid ON cal_objects(calendar_id, uid);
 CREATE INDEX IF NOT EXISTS idx_cal_objects_recurring ON cal_objects(calendar_id, has_rrule);
 
--- Materialisierte Vorkommen. Nicht-wiederkehrende Objekte immer, wiederkehrende
--- für ein rollendes Fenster. Ganztägige Einträge tragen
--- zusätzlich Kalendertage (start_day inklusiv, end_day exklusiv, 'YYYY-MM-DD').
+-- Materialized occurrences. Non-recurring objects always, recurring ones
+-- for a rolling window. All-day entries additionally
+-- carry calendar days (start_day inclusive, end_day exclusive, 'YYYY-MM-DD').
 CREATE TABLE IF NOT EXISTS cal_instances (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   object_id      INTEGER NOT NULL REFERENCES cal_objects(id) ON DELETE CASCADE,
   calendar_id    INTEGER NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,
-  -- Ursprünglicher Start des Vorkommens als UTC-ISO ('YYYY-MM-DDTHH:mm:ssZ') bzw. Datum; NULL = nicht wiederkehrend
+  -- Original occurrence start as UTC ISO ('YYYY-MM-DDTHH:mm:ssZ') or date; NULL = not recurring
   recurrence_id  TEXT,
   start_utc      INTEGER NOT NULL,
   end_utc        INTEGER NOT NULL,
@@ -95,8 +95,8 @@ CREATE INDEX IF NOT EXISTS idx_cal_instances_time ON cal_instances(start_utc, en
 CREATE INDEX IF NOT EXISTS idx_cal_instances_day ON cal_instances(all_day, start_day, end_day);
 CREATE INDEX IF NOT EXISTS idx_cal_instances_object ON cal_instances(object_id);
 
--- Offline-first: lokale Änderungen warten hier auf die Übertragung. Wie die
--- Mail-Op-Queue: Versuche zählen, danach 'dead' (mit Grund) statt stilles Löschen.
+-- Offline-first: local changes wait here for transmission. Like the
+-- mail op queue: attempts are counted, then 'dead' (with reason) instead of silent deletion.
 CREATE TABLE IF NOT EXISTS cal_pending_ops (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id   INTEGER NOT NULL REFERENCES cal_accounts(id) ON DELETE CASCADE,
@@ -105,9 +105,9 @@ CREATE TABLE IF NOT EXISTS cal_pending_ops (
   kind         TEXT NOT NULL CHECK (kind IN ('create', 'update', 'delete')),
   href         TEXT NOT NULL,
   uid          TEXT NOT NULL,
-  -- ETag, auf dem die lokale Änderung aufbaut (If-Match); NULL bei 'create'
+  -- ETag the local change is based on (If-Match); NULL for 'create'
   base_etag    TEXT,
-  -- Beim Verwerfen (Konflikt) bleibt die lokale Fassung hier erhalten
+  -- On discard (conflict) the local version is kept here
   ics          TEXT,
   summary      TEXT,
   status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'dead')),
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS cal_pending_ops (
 );
 CREATE INDEX IF NOT EXISTS idx_cal_pending_ops_account ON cal_pending_ops(account_id, status, id);
 
--- Bereits ausgelöste Erinnerungen (kein doppeltes Feuern nach Neustart)
+-- Reminders already fired (no double firing after restart)
 CREATE TABLE IF NOT EXISTS cal_reminders_fired (
   object_id      INTEGER NOT NULL REFERENCES cal_objects(id) ON DELETE CASCADE,
   recurrence_id  TEXT NOT NULL DEFAULT '',

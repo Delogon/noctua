@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { openDb, closeDb } from './db'
+import { startDbMaintenance } from './db/optimize'
 import { DatabaseTooNewError } from './db/migrate'
 import { DbKeyError } from './db/encryption'
 import { registerIpcHandlers, pushToWindow } from './ipc/register'
@@ -18,15 +19,20 @@ import { initCalendar, stopCalendar } from './calendar'
 import { setItipMailer } from './calendar/mailer'
 import { calendarSync } from './calendar/sync'
 import { setRuleActionExecutor } from './ai/rules'
+import { setJunkExecutor } from './ai/threat-check'
 import { startUpdateChecks, stopUpdateChecks } from './updates'
 import { appId, packagedAppName, productName } from './org-config'
 import { applyOrgConfig } from './org-defaults'
 import { stopAppleFm } from './ai/apple-fm'
 import { openExternalSafe } from './util/links'
 import { installAppMenu } from './menu'
-import { cleanupForwardTasksWithoutRequest } from './db/repos/tasks'
+import { cleanupForwardTasksOnce } from './db/repos/tasks'
 import { reindexHtmlOnlyMessages } from './mail/ingest'
 import { isDev } from './dev-mode'
+import { diagnostics } from './diagnostics/service'
+import { diagnosticsAppInfo } from './diagnostics/app-info'
+import { metrics } from './diagnostics/metrics'
+import { trafficLightPosition } from './window-chrome'
 import {
   APP_CSP,
   isPermissionAllowed,
@@ -34,27 +40,28 @@ import {
   safeDevRendererUrl,
   type TrustedAppPages
 } from './security'
+import { createCoalescer } from '@shared/coalesce'
 
-// Bewusst KEIN app.setName('Noctua'): das würde den bestehenden userData-/
-// Safe-Storage-Namen verändern. Im Dev liefert scripts/prepare-dev-app.mjs die
-// Noctua-Identität für macOS, ohne den internen Paketnamen umzubiegen.
+// Deliberately NO app.setName('Noctua'): that would change the existing userData/
+// safe-storage names. In dev, scripts/prepare-dev-app.mjs provides the Noctua
+// identity for macOS without bending the internal package name.
 
-// Dev-Erkennung (isDev) liegt in dev-mode.ts; ELECTRON_RENDERER_URL zählt nur
-// im Dev-Modus und nur für Loopback-Hosts — ein Produktions-Build lädt nie
-// einen entfernten Renderer.
+// Dev detection (isDev) lives in dev-mode.ts; ELECTRON_RENDERER_URL only counts
+// in dev mode and only for loopback hosts — a production build never loads
+// a remote renderer.
 const devRendererUrl = isDev ? safeDevRendererUrl(process.env['ELECTRON_RENDERER_URL']) : null
 
-/** Vertrauenswürdige App-Seiten: gebaute index.html bzw. der Dev-Server. */
+/** Trusted app pages: the built index.html or the dev server. */
 const trustedPages = (): TrustedAppPages => ({
   indexPath: join(__dirname, '../renderer/index.html'),
   devUrl: devRendererUrl
 })
 
-// Die verpackte App bekommt ein EIGENES Datenverzeichnis (+ eigenen Safe-
-// Storage-Schlüssel): Dev belegt bereits „noctua", und da macOS-Dateisysteme
-// Groß-/Kleinschreibung ignorieren, würde auch „Noctua" dieselbe DB treffen —
-// zwei Instanzen auf einer DB heißt Lock-Konflikte und doppelter IMAP-Sync.
-// Eine Company Edition (Org-Konfiguration) bekommt wiederum einen eigenen Namen.
+// The packaged app gets its OWN data directory (+ its own safe-storage key):
+// dev already uses "noctua", and since macOS file systems are case-insensitive,
+// "Noctua" would hit the same DB — two instances on one DB means lock
+// conflicts and duplicate IMAP sync.
+// A Company Edition (org configuration) in turn gets its own name.
 if (!isDev) app.setName(packagedAppName())
 
 let mainWindow: BrowserWindow | null = null
@@ -63,25 +70,25 @@ function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1320,
     height: 860,
-    // Letterpress-Design: Layout ist für >=1180px gebaut (README Handoff)
+    // Letterpress design: layout is built for >=1180px (README handoff)
     minWidth: 1180,
     minHeight: 760,
     show: false,
     title: productName(),
     backgroundColor: '#F4F1EA',
     titleBarStyle: 'hiddenInset',
-    // Traffic lights vertically centered on the masthead wordmark: its box
-    // spans 18–42px (center 30), the buttons are 12px tall → top at 24.
-    trafficLightPosition: { x: 16, y: 24 },
+    // Start with the Letterpress position; the renderer reports a different layout
+    // via app:setWindowChrome (window-chrome.ts explains the values).
+    trafficLightPosition: trafficLightPosition('letterpress'),
     ...(process.platform !== 'darwin' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      // Security-Baseline: Renderer ist vollständig isoliert, kein Node-Zugriff.
+      // Security baseline: renderer is fully isolated, no Node access.
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: true,
-      // <webview> wäre eine zweite, schwer abzusichernde Renderer-Ebene
+      // <webview> would be a second renderer layer that is hard to secure
       webviewTag: false
     }
   })
@@ -92,20 +99,20 @@ function createWindow(): BrowserWindow {
   })
 
   if (isDev) {
-    // Renderer-Konsole ins Terminal spiegeln — Fehler im sandboxed Renderer
-    // wären sonst nur in den DevTools sichtbar.
+    // Mirror the renderer console to the terminal — errors in the sandboxed renderer
+    // would otherwise only be visible in DevTools.
     win.webContents.on('console-message', (event) => {
       console.log(`[renderer:${event.level}] ${event.message}`)
     })
   }
 
-  // Renderer darf nie navigieren oder Fenster öffnen; externe Links gehen
-  // ausschließlich über den System-Browser (nur https/mailto).
+  // The renderer may never navigate or open windows; external links go
+  // exclusively through the system browser (https/mailto only).
   win.webContents.setWindowOpenHandler((details) => {
     openExternalSafe(details.url)
     return { action: 'deny' }
   })
-  // Navigation und Redirects nur innerhalb der eigenen App-Seite (Reload, HMR)
+  // Navigation and redirects only within our own app page (reload, HMR)
   const guardNavigation = (event: { preventDefault: () => void }, url: string): void => {
     if (!isTrustedAppUrl(url, trustedPages())) event.preventDefault()
   }
@@ -123,9 +130,9 @@ function createWindow(): BrowserWindow {
 }
 
 /**
- * Session-Härtung: Berechtigungen standardmäßig verboten (nur Mikrofon für das
- * Diktat, nur für die eigene App-Seite) und CSP zusätzlich als Response-Header
- * für die App-Seiten — die Meta-CSP in index.html bleibt als zweite Schicht.
+ * Session hardening: permissions denied by default (only the microphone for
+ * dictation, only for our own app page) and CSP additionally as a response header
+ * for the app pages — the meta CSP in index.html remains as a second layer.
  */
 function installSessionSecurity(): void {
   const ses = session.defaultSession
@@ -145,7 +152,7 @@ function installSessionSecurity(): void {
     )
   })
   ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
-    // Check-Requests tragen mediaType statt mediaTypes
+    // Check requests carry mediaType instead of mediaTypes
     const mediaType = (details as { mediaType?: string }).mediaType
     return isPermissionAllowed({
       permission,
@@ -157,9 +164,9 @@ function installSessionSecurity(): void {
   })
 
   ses.webRequest.onHeadersReceived((details, callback) => {
-    // Nur für die gebaute App (file://). Der Vite-Dev-Server injiziert ein Inline-Skript
-    // (React-Refresh-Preamble) vor dem <meta>-CSP — ein Header-CSP würde es blockieren;
-    // im Dev-Modus gilt daher wie bisher nur die <meta>-CSP aus index.html.
+    // Only for the built app (file://). The Vite dev server injects an inline script
+    // (React Refresh preamble) before the <meta> CSP — a header CSP would block it;
+    // so in dev mode only the <meta> CSP from index.html applies, as before.
     if (
       details.resourceType === 'mainFrame' &&
       details.url.startsWith('file:') &&
@@ -174,16 +181,16 @@ function installSessionSecurity(): void {
   })
 }
 
-// Zweite Instanz der installierten App: erste fokussieren, neue beendet sich.
-// Im Dev-Modus kein Lock — dort ersetzt scripts/dev.sh alte Instanzen bewusst.
+// Second instance of the installed app: focus the first, the new one quits.
+// No lock in dev mode — there scripts/dev.sh deliberately replaces old instances.
 if (!isDev) {
   if (!app.requestSingleInstanceLock()) {
     app.quit()
   } else {
     app.on('second-instance', () => {
-      // Nach dem Schließen des Fensters (macOS: App lebt weiter) ist mainWindow
-      // zerstört — dann öffnet der zweite Start ein neues Fenster statt mit
-      // „Object has been destroyed" zu sterben.
+      // After the window is closed (macOS: app keeps running) mainWindow is
+      // destroyed — then the second launch opens a new window instead of dying
+      // with "Object has been destroyed".
       const win = mainWindow
       if (win && !win.isDestroyed()) {
         if (win.isMinimized()) win.restore()
@@ -202,12 +209,20 @@ app
     electronApp.setAppUserModelId(appId())
 
     const db = openDb()
-    // Org-Defaults + bereitgestellte AI-Profile (No-op ohne Org-Konfiguration)
+    // Local performance diagnostics (on-device only; ZIP export on request)
+    diagnostics.init({
+      db,
+      dbPath: join(app.getPath('userData'), 'noctua.sqlite'),
+      dir: join(app.getPath('userData'), 'diagnostics'),
+      appInfo: diagnosticsAppInfo,
+      getAppMetrics: () => app.getAppMetrics()
+    })
+    // Org defaults + provisioned AI profiles (no-op without org configuration)
     applyOrgConfig(db, app.getLocale())
-    cleanupForwardTasksWithoutRequest(db)
-    reindexHtmlOnlyMessages(db)
+    metrics.time('startup.cleanupForwardTasks', () => cleanupForwardTasksOnce(db))
+    metrics.time('startup.reindexHtmlOnly', () => reindexHtmlOnlyMessages(db))
     if (isDev) seedFromEnv(db)
-    // Dev-only Demo-Daten (NOCTUA_DEMO_SEED=1): kein IMAP-/CalDAV-Sync für Demo-Konten
+    // Dev-only demo data (NOCTUA_DEMO_SEED=1): no IMAP/CalDAV sync for demo accounts
     const demo = isDev && process.env.NOCTUA_DEMO_SEED === '1'
     if (demo) await (await import('./dev/demo-seed')).seedDemoData(db)
     installSessionSecurity()
@@ -216,23 +231,38 @@ app
     const push: Parameters<typeof syncEngine.init>[1] = (channel, payload) => {
       if (mainWindow && !mainWindow.isDestroyed()) pushToWindow(mainWindow, channel, payload)
     }
-    syncEngine.init(db, (channel, payload) => {
-      push(channel, payload)
-      // Neue/aktualisierte Nachrichten können triage-/index-fähig geworden sein.
-      if (channel === 'messages:changed') {
+    // Side effects of new/changed mail run once per burst (backfill chunks,
+    // IDLE bursts), not once per event: each kick scans the mailbox.
+    const afterMessagesChanged = createCoalescer<void>(
+      () => {
         aiQueue.kick()
         embeddingIndexer.kick()
         updateBadge()
+      },
+      { delayMs: 500, maxWaitMs: 2000 }
+    )
+    syncEngine.init(db, (channel, payload) => {
+      push(channel, payload)
+      // New/updated messages may have become eligible for triage/indexing.
+      if (channel === 'messages:changed') {
+        metrics.count('events.messagesChanged')
+        metrics.count(
+          'events.messagesChanged.threadKeys',
+          (payload as { threadKeys?: string[] }).threadKeys?.length ?? 0
+        )
+        afterMessagesChanged.add()
       }
     })
     if (!demo) syncEngine.startAll()
+    // Planner statistics (sqlite_stat1): first run a minute after startup
+    startDbMaintenance(db)
 
     aiQueue.init(db, push)
     if (!demo) aiQueue.start()
     setHandlerPush(push)
     installAppMenu(push, () => mainWindow)
     if (isDev && process.platform === 'darwin') {
-      // Fallback während der Dev-Bundle-Cache neu aufgebaut wird.
+      // Fallback while the dev bundle cache is being rebuilt.
       app.dock?.setIcon(icon)
     }
 
@@ -246,7 +276,7 @@ app
     outboxWorker.start()
     initNotifications(db, push)
     initCalendar(db, push, notifyCalendarReminder, { startSync: !demo })
-    // iMIP (Einladungen/Antworten) läuft über die Outbox, ohne Undo-Fenster
+    // iMIP (invitations/replies) goes through the outbox, without an undo window
     setItipMailer((accountId, mail) => {
       outboxWorker.enqueue(
         accountId,
@@ -261,6 +291,7 @@ app
       )
     })
     setRuleActionExecutor((ids, action) => syncEngine.applyAction(ids, action))
+    setJunkExecutor((ids) => syncEngine.applyAction(ids, 'spam'))
     if (!demo) startUpdateChecks(push)
 
     if (isDev && process.env.NOCTUA_TEST_SELF_SEND === '1') {
@@ -330,7 +361,7 @@ app
       setTimeout(() => {
         void (async () => {
           const { startDraftReply } = await import('./ai/drafts')
-          // Thread, in dem Tim gesiezt wird (Stadt Oldenburg / Grossflaechentafeln)
+          // Thread in which Tim is addressed formally (Stadt Oldenburg / Grossflaechentafeln)
           const row = db
             .prepare(
               `SELECT m.thread_key k FROM messages m JOIN message_bodies b ON b.message_id = m.id
@@ -374,8 +405,8 @@ app
     })
   })
   .catch((error: unknown) => {
-    // Ohne diesen Catch bliebe die App bei Startfehlern fensterlos im Dock
-    // hängen (unhandled rejection) — so bekommt der Fehler ein Gesicht.
+    // Without this catch the app would hang windowless in the Dock on startup errors
+    // (unhandled rejection) — this way the error gets a face.
     dialog.showErrorBox(
       'Noctua kann nicht starten',
       error instanceof DatabaseTooNewError || error instanceof DbKeyError
@@ -394,6 +425,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('quit', () => {
+  diagnostics.persist()
+  diagnostics.stop()
   aiQueue.stop()
   followupRadar.stop()
   embeddingIndexer.stop()

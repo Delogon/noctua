@@ -1,18 +1,19 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type -- Eval-Tooling in .mjs */
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- eval tooling in .mjs */
 import { spawn } from 'node:child_process'
 import { MAILS, OWNER } from './dataset.mjs'
 
-// Eval-Harness für die On-Device-Triage (M88): misst Prompt-/Pipeline-
-// Varianten gegen die Gold-Labels in dataset.mjs. Nutzung:
+// Eval harness for on-device triage (M88): measures prompt/pipeline
+// variants against the gold labels in dataset.mjs. Usage:
 //   pnpm run build:fm && node scripts/apple-triage-eval/run.mjs [v0|v5|alle]
-// Die Prompts V0/GATE sind Kopien aus src/main/ai/triage.ts — bei Änderungen
-// dort hier nachziehen und NEU MESSEN (drei Läufe, das Modell streut).
-// V5 (Gate + Prod-Prompt) ist die produktive Pipeline: P100/R90 auf diesem Set.
+// The V0/GATE prompts are copies from src/main/ai/triage.ts — when they change
+// there, update them here and RE-MEASURE (three runs, the model varies).
+// EVAL_PROMPT_LANG=de measures the earlier German prompts for comparison.
+// V5 (gate + prod prompt) is the production pipeline: P100/R90 on this set.
 
 const HELPER = new URL('../../native/fm-helper/bin/noctua-fm', import.meta.url).pathname
 
-// V0 = exakter Produktions-Prompt aus src/main/ai/triage.ts
-const PROMPT_V0 = `Du bist der Triage-Klassifikator eines persönlichen E-Mail-Clients.
+// V0 = exact production prompt from src/main/ai/triage.ts
+const PROMPT_V0_DE = `Du bist der Triage-Klassifikator eines persönlichen E-Mail-Clients.
 Analysiere die E-Mail und antworte AUSSCHLIESSLICH mit einem JSON-Objekt, exakt in dieser Form:
 {
   "category": "personal" | "work" | "newsletter" | "promotions" | "notifications" | "transactional" | "other",
@@ -58,8 +59,8 @@ Sicherheitsvorfall), 4 = Dienst-Warnungen, die bei Ignorieren zu Einschränkunge
 needs_reply nur bei echten Menschen mit Antworterwartung.
 summary nennt den Kern (wer will was), keine Floskeln.`
 
-// Gate-Prompt für die zweistufige Variante V2
-const PROMPT_GATE = `Du prüfst für einen E-Mail-Client GENAU EINE Frage:
+// Gate prompt for the two-stage variant V2
+const PROMPT_GATE_DE = `Du prüfst für einen E-Mail-Client GENAU EINE Frage:
 Bittet in dieser Mail ein einzelner Mensch den im EMPFÄNGER-Block genannten
 Kontoinhaber PERSÖNLICH um etwas, existiert eine echte Frist für IHN
 (zahlen, Formular abgeben, buchen), oder wartet der Absender erkennbar auf
@@ -71,7 +72,93 @@ automatischen Erinnerungen, Rundmails mit Gruppenanrede, Mails deren Anrede
 eine andere Person nennt, reinen Infos ohne Bitte.
 Im Zweifel: NEIN.`
 
+// English prompts (current production, src/main/ai/triage.ts; output German).
+// EVAL_PROMPT_LANG=de measures the earlier German prompts for comparison.
+const PROMPT_V0_EN = `You are the triage classifier of a personal email client.
+Analyse the email and reply ONLY with a JSON object, exactly in this form:
+{
+  "category": "personal" | "work" | "newsletter" | "promotions" | "notifications" | "transactional" | "other",
+  "priority": 1-5,
+  "summary": "one line in German, max. 140 characters, factual",
+  "action_items": [{"title": "concrete task for the recipient, in German", "due": "YYYY-MM-DD or null"}],
+  "needs_reply": true|false,
+  "addressed_to_me": true|false,
+  "confidence": 0.0-1.0
+}
+
+addressed_to_me: true ONLY if the account owner named in the RECIPIENT block is meant personally
+(addressed by name, addressed directly, or clearly the person the request is for). false if the
+salutation or request is aimed at someone else (e.g. a salutation with another name, a mailing-list
+email meant for someone else, an email sent for information only).
+action_items ONLY if a human asks the named account owner personally to do something, or there is
+a real deadline for THEM (pay, reply, book, cancel, prepare). If the salutation or request is aimed
+at another person: NO action_items and needs_reply=false.
+NEVER create action_items from: sign-in notifications ("new sign-in", "security alert", 2FA or
+verification codes), password emails, system notifications, newsletters, advertising or pure
+information — even if the text contains calls to action such as "check/change your password";
+such standard security notices are NOT tasks for the user.
+Set due only if a concrete deadline is recognisable (convert it to an absolute date relative to the
+email's date), otherwise null.
+
+Categories:
+- personal: real people, private communication
+- work: professional communication from real people
+- newsletter: editorial mailings, digests
+- promotions: advertising, offers, marketing — including product announcements and feature
+  marketing from services the recipient already uses
+- notifications: automatic notifications from services (social, tools, calendar)
+- transactional: invoices, orders, shipping, security codes, contracts
+- other: none of these
+
+Priority: 5 = urgent/important for the recipient (a human is waiting for a reply, hard deadline,
+security incident), 4 = service warnings that lead to restrictions if ignored (storage full, payment
+failed, account suspension pending), 3 = normal, 1 = ignorable (mass advertising, small-talk
+duplicates).
+needs_reply only for real people who expect a reply.
+summary states the core (who wants what), no filler phrases.`
+
+const PROMPT_GATE_EN = `You check EXACTLY ONE question for an email client:
+Does a single human in this email ask the account owner named in the RECIPIENT block to do
+something PERSONALLY, is there a real deadline for THEM (pay, submit a form, book), or is the
+sender clearly waiting for a personal reply from the account owner (e.g. a direct question to them)?
+
+Answer NO for: newsletters, advertising (even with a deadline such as "only until Sunday"),
+service notifications, security notices and codes, reports, automatic reminders, mass mailings
+with a group salutation, emails whose salutation names a different person, and pure information
+without a request.
+When in doubt: NO.`
+
+const LANG = process.env.EVAL_PROMPT_LANG === 'de' ? 'de' : 'en'
+const PROMPT_V0 = LANG === 'de' ? PROMPT_V0_DE : PROMPT_V0_EN
+const PROMPT_GATE = LANG === 'de' ? PROMPT_GATE_DE : PROMPT_GATE_EN
+
 function userPrompt(mail) {
+  if (LANG === 'de') return userPromptDe(mail)
+  const placementLabel = {
+    to: 'is in To',
+    cc: 'is only in CC',
+    absent: 'is neither in To nor CC (mailing list / Bcc delivery)'
+  }[mail.placement]
+  const salutationLabel = mail.salut.startsWith('named:')
+    ? `names: ${mail.salut.slice(6)}`
+    : mail.salut === 'group'
+      ? 'group salutation (e.g. "Hello everyone")'
+      : 'no recognisable salutation'
+  return [
+    `From: ${mail.from}`,
+    `Subject: ${mail.subject}`,
+    `Date: 2026-07-16 15:00`,
+    `RECIPIENT (account owner): ${OWNER}; ${placementLabel}; salutation of the email: ${salutationLabel}`,
+    mail.unsub ? 'Signals: List-Unsubscribe header present (bulk mail signal)' : null,
+    '',
+    'Content:',
+    mail.body
+  ]
+    .filter((l) => l !== null)
+    .join('\n')
+}
+
+function userPromptDe(mail) {
   const placementLabel = {
     to: 'steht im An',
     cc: 'steht nur im CC',
@@ -96,7 +183,7 @@ function userPrompt(mail) {
     .join('\n')
 }
 
-// Prod-Code-Gates (createTasksFromTriage) nachgebildet
+// Replicates the prod code gates (createTasksFromTriage)
 const TASK_CATEGORIES = new Set(['personal', 'work', 'transactional'])
 const SECURITY_RE =
   /anmeldung|sicherheit|verifizierung|bestätigungscode|passwort|security|verification/i
@@ -254,8 +341,8 @@ if (variant === 'alle' || variant === 'v5') {
   })
 }
 
-// DeepSeek-Vergleich (Cloud-Pfad wie in prod: ein Aufruf, kein Gate).
-// Braucht OPENROUTER_API_KEY in der Umgebung; kostet ~1–2 Cent pro Lauf.
+// DeepSeek comparison (cloud path as in prod: one call, no gate).
+// Needs OPENROUTER_API_KEY in the environment; costs ~1–2 cents per run.
 async function askDeepseek(systemPrompt, prompt) {
   const started = Date.now()
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -272,7 +359,7 @@ async function askDeepseek(systemPrompt, prompt) {
       ],
       response_format: { type: 'json_object' },
       temperature: 0.1,
-      // Hybrid-Reasoner: Denk-Tokens zählen mit — 500 schneidet Antworten ab
+      // Hybrid reasoner: thinking tokens count too — 500 truncates answers
       max_tokens: 1200,
       usage: { include: true }
     })

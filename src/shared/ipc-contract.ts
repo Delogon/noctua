@@ -13,7 +13,8 @@ import {
   semanticSearchHitSchema,
   semanticSearchIndexSchema,
   taskItemSchema,
-  threadListItemSchema
+  threadListItemSchema,
+  folderListItemSchema
 } from './types'
 import {
   calendarAccountStateSchema,
@@ -46,20 +47,20 @@ import {
 } from './settings-keys'
 
 /**
- * Der zentrale IPC-Vertrag zwischen Main und Renderer.
+ * The central IPC contract between main and renderer.
  *
- * - `invokeContract`: Request/Response (Renderer → Main via ipcRenderer.invoke).
- *   Input UND Output werden main-seitig mit zod validiert — der Renderer gilt
- *   als weniger vertrauenswürdig, und der Main-Prozess soll nie ungeprüfte
- *   Formen zurückgeben.
- * - `pushContract`: Events (Main → Renderer via webContents.send).
+ * - `invokeContract`: request/response (renderer → main via ipcRenderer.invoke).
+ *   Input AND output are validated with zod on the main side — the renderer is
+ *   considered less trustworthy, and the main process should never return
+ *   unchecked shapes.
+ * - `pushContract`: events (main → renderer via webContents.send).
  *
- * Neue Kanäle ausschließlich hier ergänzen; Preload-Whitelist, Main-Registrar
- * und Renderer-Typen leiten sich automatisch ab.
+ * Add new channels only here; the preload whitelist, main registrar
+ * and renderer types are derived automatically.
  */
 
-// Schlüssel-Allowlists (settings-keys.ts) greifen schon im Schema; die Handler
-// prüfen zusätzlich selbst (Defense in Depth).
+// Key allowlists (settings-keys.ts) already apply in the schema; the handlers
+// additionally check themselves (defense in depth).
 const readableSettingKey = z
   .string()
   .max(200)
@@ -70,7 +71,7 @@ const writableSettingKey = z
   .refine(isRendererSettingWritable, 'Schlüssel nicht erlaubt')
 const secretKey = z.string().max(200).refine(isRendererSecretKey, 'Schlüssel nicht erlaubt')
 
-// --- AI-Provider-Profile (Phase 1.1) -----------------------------------------
+// --- AI provider profiles (phase 1.1) ----------------------------------------
 const profileIdSchema = z.string().regex(/^[a-z0-9_-]{1,40}$/)
 
 export const aiProfileSchema = z.object({
@@ -102,27 +103,120 @@ const modelInfoSchema = z.object({
 })
 
 const taskAssignmentSchema = z.object({
-  /** Profil-ID oder 'apple' (On-Device, nur Triage) */
+  /** Profile ID or 'apple' (on-device, triage only) */
   profileId: z.string().max(40),
-  /** gewähltes Modell; leer = Default (nur OpenRouter) */
+  /** chosen model; empty = default (OpenRouter only) */
   model: z.string().max(200),
-  /** Warum die Aufgabe gerade nicht läuft — null, wenn sie läuft */
+  /** Why the task isn't running right now — null if it is running */
   blocked: z.enum(['local-only', 'no-key', 'no-profile', 'no-model']).nullable()
 })
 
-// --- Kalender (Phase 2.1) ------------------------------------------------------------
+// --- Calendar (phase 2.1) ------------------------------------------------------------
 const calendarCredentialsSchema = z.object({
-  /** Server-URL, Domain oder Mail-Adresse (Discovery nach RFC 6764) */
+  /** Server URL, domain or mail address (discovery per RFC 6764) */
   serverInput: z.string().trim().min(1).max(500),
   username: z.string().trim().min(1).max(320),
-  /** Leer erlaubt, wenn das Passwort des Mail-Kontos übernommen wird */
+  /** Empty allowed if the mail account's password is reused */
   password: z.string().max(1000).optional(),
   mailAccountId: z.number().int().optional(),
   reuseMailPassword: z.boolean().optional()
 })
 
-/** Sync-Zeitraum in Tagen: 0 = alles, null = Standard (90 Tage Liste / 183 Suche). */
+/** Sync range in days: 0 = everything, null = default (90 days list / 183 search). */
 const syncDaysSchema = z.union([z.literal(0), z.number().int().min(7).max(3650)]).nullable()
+
+const timingSummarySchema = z.object({
+  name: z.string().max(600),
+  count: z.number(),
+  totalMs: z.number(),
+  meanMs: z.number(),
+  maxMs: z.number(),
+  p50Ms: z.number(),
+  p95Ms: z.number(),
+  p99Ms: z.number()
+})
+const benchmarkResultSchema = z.object({
+  startedAt: z.number(),
+  durationMs: z.number(),
+  cases: z
+    .array(
+      z.object({
+        name: z.string().max(120),
+        runs: z.number(),
+        minMs: z.number(),
+        medianMs: z.number(),
+        maxMs: z.number(),
+        statements: z.number(),
+        error: z.string().max(300).nullable()
+      })
+    )
+    .max(40),
+  plans: z
+    .array(
+      z.object({
+        sql: z.string().max(600),
+        usedBy: z.array(z.string().max(120)).max(40),
+        plan: z.array(z.string().max(400)).max(100),
+        fullScans: z.array(z.string().max(120)).max(40),
+        indexScans: z.array(z.string().max(120)).max(40),
+        tempBtrees: z.number()
+      })
+    )
+    .max(100)
+})
+/** Values measured by the renderer for the export (channel names and numbers only). */
+const rendererDiagnosticsSchema = z.object({
+  ipc: z.array(timingSummarySchema.extend({ name: z.string().regex(/^[\w.:-]{1,80}$/) })).max(300),
+  longTasks: z.object({
+    count: z.number(),
+    totalMs: z.number(),
+    maxMs: z.number(),
+    recent: z.array(z.object({ at: z.number(), ms: z.number() })).max(100)
+  }),
+  heapUsedMb: z.number().nullable()
+})
+const diagnosticsStatusSchema = z.object({
+  enabled: z.boolean(),
+  startedAt: z.number(),
+  sampleCount: z.number(),
+  storedSessions: z.number(),
+  latest: z
+    .object({
+      t: z.number(),
+      mainCpuPct: z.number(),
+      rssMb: z.number(),
+      heapUsedMb: z.number(),
+      loopP99Ms: z.number(),
+      loopMaxMs: z.number(),
+      appCpuPct: z.number().nullable(),
+      appMemMb: z.number().nullable(),
+      sqlCalls: z.number(),
+      sqlMs: z.number()
+    })
+    .nullable(),
+  topOperations: z.array(timingSummarySchema).max(20),
+  topQueries: z.array(timingSummarySchema).max(20),
+  slow: z.array(z.object({ name: z.string().max(200), ms: z.number(), at: z.number() })).max(20),
+  benchmark: benchmarkResultSchema.nullable()
+})
+
+const threatLevelSchema = z.enum(['none', 'suspicious', 'high'])
+const threatVerdictSchema = z.object({
+  level: threatLevelSchema,
+  /** Model score 0 (inconspicuous) … 2, null without a decision model */
+  ai: z.number().nullable(),
+  /** Sum of the local signal weights */
+  heuristic: z.number()
+})
+const mailSecuritySchema = z.object({
+  phishing: threatVerdictSchema,
+  spam: threatVerdictSchema,
+  /** local signals, e.g. "reply_to_differs", "link_mismatch:2", "homoglyph_sender" */
+  signals: z.array(z.string().max(60)).max(30),
+  model: z.string().max(200).nullable(),
+  canCheck: z.boolean(),
+  inJunk: z.boolean()
+})
 
 export const invokeContract = {
   'app:version': {
@@ -137,8 +231,8 @@ export const invokeContract = {
     input: z.object({ key: writableSettingKey, value: z.string().max(100_000) }),
     output: z.object({ ok: z.literal(true) })
   },
-  // Secrets sind write-only für den Renderer: setzen und prüfen — nie lesen.
-  // Entschlüsselte Werte bleiben ausschließlich im Main-Prozess.
+  // Secrets are write-only for the renderer: set and check — never read.
+  // Decrypted values stay strictly in the main process.
   'secrets:set': {
     input: z.object({ key: secretKey, value: z.string().max(100_000) }),
     output: z.object({ ok: z.literal(true) })
@@ -150,6 +244,11 @@ export const invokeContract = {
   'app:openExternal': {
     input: z.object({ url: z.string().max(4000) }),
     output: z.object({ ok: z.boolean() })
+  },
+  // Adapt the macOS traffic lights to the header of the chosen layout (classic is lower)
+  'app:setWindowChrome': {
+    input: z.object({ layout: z.enum(['letterpress', 'classic']) }),
+    output: z.object({ ok: z.literal(true) })
   },
   'accounts:add': {
     input: z.object({
@@ -197,13 +296,13 @@ export const invokeContract = {
     }),
     output: z.object({ ok: z.literal(true), accountName: z.string().optional() })
   },
-  // Neues Passwort für ein Passwort-/Bridge-Konto (needs-reauth): Login wird
-  // geprüft, bevor das Vault-Geheimnis überschrieben und der Syncer neu gestartet wird.
+  // New password for a password/bridge account (needs-reauth): the login is
+  // checked before the vault secret is overwritten and the syncer restarted.
   'accounts:updatePassword': {
     input: z.object({ accountId: z.number().int(), password: z.string().min(1).max(1000) }),
     output: z.object({ ok: z.literal(true) })
   },
-  // Erneute Browser-Anmeldung für Google-/Microsoft-Konten (gleiche Adresse Pflicht).
+  // Browser sign-in again for Google/Microsoft accounts (same address required).
   'accounts:reauthorize': {
     input: z.object({ accountId: z.number().int() }),
     output: z.object({ ok: z.literal(true), email: z.string() })
@@ -212,18 +311,18 @@ export const invokeContract = {
     input: z.object({ accountId: z.number() }),
     output: z.object({ ok: z.literal(true) })
   },
-  // Bricht einen wartenden Browser-Login ab (Design 3b: CANCEL beendet den
-  // OAuth-Roundtrip wirklich — Loopback-Server zu, invoke-Promise verworfen).
+  // Cancels a pending browser login (design 3b: CANCEL really ends the
+  // OAuth round trip — loopback server closed, invoke promise discarded).
   'accounts:cancelOAuth': {
     input: z.object({ provider: z.enum(['gmail', 'microsoft']) }),
     output: z.object({ canceled: z.boolean() })
   },
-  // --- Kalender (CalDAV, Phase 2.1) -----------------------------------------------
+  // --- Calendar (CalDAV, phase 2.1) -----------------------------------------------
   'calendar:accounts:list': {
     input: z.void(),
     output: z.object({ accounts: z.array(calendarAccountSummarySchema) })
   },
-  // Vorbelegung aus einem Mail-Konto (Benutzername = Adresse, Server aus der Domain)
+  // Prefill from a mail account (username = address, server from the domain)
   'calendar:accounts:suggest': {
     input: z.object({ mailAccountId: z.number().int() }),
     output: z.object({
@@ -232,7 +331,7 @@ export const invokeContract = {
       canReusePassword: z.boolean()
     })
   },
-  // Verbindung prüfen und Kalender auflisten, ohne etwas zu speichern
+  // Check the connection and list calendars without saving anything
   'calendar:accounts:discover': {
     input: calendarCredentialsSchema,
     output: z.object({
@@ -253,7 +352,7 @@ export const invokeContract = {
     input: z.object({ accountId: z.number().int(), name: z.string().trim().min(1).max(60) }),
     output: z.object({ ok: z.literal(true) })
   },
-  // Neues Passwort für ein Kalender-Konto (needs-reauth): erst prüfen, dann speichern
+  // New password for a calendar account (needs-reauth): check first, then save
   'calendar:accounts:updatePassword': {
     input: z.object({ accountId: z.number().int(), password: z.string().min(1).max(1000) }),
     output: z.object({ ok: z.literal(true) })
@@ -289,7 +388,7 @@ export const invokeContract = {
       rangeStart: z.number(),
       rangeEnd: z.number(),
       calendarIds: z.array(z.number().int()).max(200).optional(),
-      /** IANA-Zone für ganztägige Einträge (Default: Systemzone) */
+      /** IANA zone for all-day entries (default: system zone) */
       tz: z.string().max(100).optional()
     }),
     output: z.object({ events: z.array(calendarInstanceSchema) })
@@ -304,7 +403,7 @@ export const invokeContract = {
   'calendar:events:create': {
     input: z.object({
       event: calendarEventInputSchema,
-      /** Teilnehmer benachrichtigen (Standard: ja, wenn Teilnehmer vorhanden und der Nutzer Organisator ist) */
+      /** Notify attendees (default: yes, if there are attendees and the user is the organizer) */
       notifyAttendees: z.boolean().optional()
     }),
     output: z.object({ objectId: z.number() })
@@ -328,12 +427,12 @@ export const invokeContract = {
     }),
     output: z.object({ ok: z.literal(true) })
   },
-  // Einladungskarten (iMIP) einer Mail
+  // Invitation cards (iMIP) of a mail
   'calendar:invitations:get': {
     input: z.object({ messageId: z.number().int() }),
     output: z.object({ invitations: z.array(invitationViewSchema) })
   },
-  // Terminvorschläge aus Mails (AI, 2.4): nie automatisch angelegt
+  // Event suggestions from mails (AI, 2.4): never created automatically
   'calendar:eventSuggestions:get': {
     input: z.object({ messageId: z.number().int() }),
     output: z.object({ suggestions: z.array(eventSuggestionViewSchema) })
@@ -346,37 +445,37 @@ export const invokeContract = {
     input: z.object({ id: z.number().int() }),
     output: z.object({ ok: z.literal(true) })
   },
-  // Editor übernimmt den Vorschlag (Bearbeiten…): gilt als erledigt
+  // Editor takes over the suggestion (Edit…): counts as done
   'calendar:eventSuggestions:edit': {
     input: z.object({ id: z.number().int() }),
     output: z.object({ ok: z.literal(true) })
   },
-  // RSVP: Server-Scheduling (nur PARTSTAT-PUT) oder iMIP-REPLY per Outbox
+  // RSVP: server scheduling (PARTSTAT PUT only) or iMIP REPLY via outbox
   'calendar:invitations:respond': {
     input: invitationRespondInputSchema,
     output: invitationRespondOutputSchema
   },
-  // Absage übernehmen: Termin aus dem Kalender entfernen
+  // Apply cancellation: remove the event from the calendar
   'calendar:invitations:removeCancelled': {
     input: z.object({ invitationId: z.number().int() }),
     output: z.object({ ok: z.literal(true) })
   },
-  // Free/Busy anderer Teilnehmer (Scheduling-Outbox), „ich" aus den eigenen Kalendern
+  // Free/busy of other attendees (scheduling outbox), "me" from own calendars
   'calendar:freebusy': {
     input: freeBusyInputSchema,
     output: z.object({ results: z.array(freeBusyResultSchema) })
   },
-  // Eigene Belegung aus der lokalen DB (z. B. für KI-Entwürfe)
+  // Own busy times from the local DB (e.g. for AI drafts)
   'calendar:freebusy:self': {
     input: freeBusySelfInputSchema,
     output: z.object({ busy: z.array(busyIntervalSchema) })
   },
-  // Scheduling-Kontext für den Editor (Organisator?, eigene Adressen, Einladung zum Termin)
+  // Scheduling context for the editor (organizer?, own addresses, invitation for the event)
   'calendar:scheduling:info': {
     input: schedulingInfoInputSchema,
     output: schedulingInfoSchema
   },
-  // Sofortiger Abgleich (ein Konto oder alle); hebt needs-reauth-Wartezeiten auf
+  // Immediate sync (one account or all); lifts needs-reauth waiting times
   'calendar:refresh': {
     input: z.object({ accountId: z.number().int().optional() }),
     output: z.object({ ok: z.literal(true) })
@@ -385,9 +484,15 @@ export const invokeContract = {
     input: z.object({
       limit: z.number().int().min(1).max(500).default(200),
       accountId: z.number().int().optional(),
-      mbox: z.enum(['inbox', 'sent', 'spam']).default('inbox')
+      mbox: z.enum(['inbox', 'sent', 'spam']).default('inbox'),
+      // Folder view: a specific folder instead of the unified view
+      folderId: z.number().int().positive().optional()
     }),
     output: z.object({ threads: z.array(threadListItemSchema) })
+  },
+  'folders:list': {
+    input: z.void(),
+    output: z.object({ folders: z.array(folderListItemSchema) })
   },
   'threads:mboxCounts': {
     input: z.object({ accountId: z.number().int().optional() }),
@@ -400,6 +505,35 @@ export const invokeContract = {
   'messages:details': {
     input: z.object({ messageId: z.number().int().positive() }),
     output: messageHeaderDetailsSchema
+  },
+  // Performance diagnostics (local): status, on/off, benchmark, ZIP export, delete
+  'diagnostics:status': {
+    input: z.void(),
+    output: diagnosticsStatusSchema
+  },
+  'diagnostics:setEnabled': {
+    input: z.object({ enabled: z.boolean() }),
+    output: z.object({ ok: z.literal(true) })
+  },
+  'diagnostics:benchmark': {
+    input: z.void(),
+    output: benchmarkResultSchema
+  },
+  // Main shows the save dialog; only the file name comes back
+  'diagnostics:export': {
+    input: z.object({
+      renderer: rendererDiagnosticsSchema.nullable(),
+      withBenchmark: z.boolean()
+    }),
+    output: z.object({
+      saved: z.boolean(),
+      fileName: z.string().max(255).nullable(),
+      bytes: z.number()
+    })
+  },
+  'diagnostics:clear': {
+    input: z.void(),
+    output: z.object({ ok: z.literal(true) })
   },
   'messages:action': {
     input: z.object({
@@ -421,7 +555,7 @@ export const invokeContract = {
     })
   },
   'sync:trigger': {
-    // Ohne accountId: alle Konten; mit: nur eines (RETRY im Fehlerzustand, 3b)
+    // Without accountId: all accounts; with: just one (RETRY in error state, 3b)
     input: z.object({ accountId: z.number().int().optional() }).optional(),
     output: z.object({ ok: z.literal(true) })
   },
@@ -432,7 +566,7 @@ export const invokeContract = {
   'ai:testModel': {
     input: z.object({
       profileId: profileIdSchema,
-      /** Modell-ID des Profils, z. B. moonshotai/kimi-k2 oder llama3.2:latest */
+      /** The profile's model ID, e.g. moonshotai/kimi-k2 or llama3.2:latest */
       model: z.string().trim().min(1).max(200)
     }),
     output: z.object({
@@ -442,12 +576,12 @@ export const invokeContract = {
       detail: z.string().nullable()
     })
   },
-  // Modellliste eines Profils (OpenRouter: Live-Katalog, sonst GET /models).
-  // Bei Local only holt ein externes Profil sie nur auf ausdrückliche Anfrage
-  // (`manual`) — sonst `skipped: true` und keine Netzverbindung.
+  // A profile's model list (OpenRouter: live catalog, otherwise GET /models).
+  // Under Local only an external profile fetches it only on explicit request
+  // (`manual`) — otherwise `skipped: true` and no network connection.
   'ai:profileModels': {
-    // kind: 'chat' (Standard) schließt reine Entscheidungsmodelle aus (sie antworten im Chat mit
-    // Fehlern); 'decision' liefert nur Modelle mit Fähigkeit `decision` (Ollama /api/tags, /api/show)
+    // kind: 'chat' (default) excludes pure decision models (they answer chat with
+    // errors); 'decision' returns only models with capability `decision` (Ollama /api/tags, /api/show)
     input: z.object({
       profileId: profileIdSchema,
       manual: z.boolean().default(false),
@@ -455,7 +589,7 @@ export const invokeContract = {
     }),
     output: z.object({ models: z.array(modelInfoSchema), skipped: z.boolean() })
   },
-  // Funktions-Test eines Entscheidungsmodells: zwei Mini-Fragen, Antworten + Latenz
+  // Function test of a decision model: two mini questions, answers + latency
   'ai:decisions:test': {
     input: z.object({ profileId: profileIdSchema, model: z.string().trim().min(1).max(200) }),
     output: z.object({
@@ -465,24 +599,19 @@ export const invokeContract = {
       answers: z.array(z.object({ name: z.string(), text: z.string() })).max(8)
     })
   },
-  // Phishing-Einschätzung einer Mail (nur mit Entscheidungsmodell berechnet)
-  'ai:decisions:get': {
+  // Spam/phishing assessment of a mail: local rules (always) + decision model (if present)
+  'security:get': {
     input: z.object({ messageId: z.number().int() }),
-    output: z.object({
-      phishing: z
-        .object({
-          /** 0 (unauffällig) … 2 (wahrscheinlich Phishing) */
-          score: z.number(),
-          high: z.boolean(),
-          /** lokale Signale, z. B. "reply_to_differs", "link_mismatch:2" */
-          signals: z.array(z.string().max(60)).max(10)
-        })
-        .nullable()
-    })
+    output: z.object({ security: mailSecuritySchema.nullable() })
   },
-  // Lokale KI-Server erkennen (Onboarding): Main sondiert nur fest verdrahtete
-  // Loopback-Adressen (Ollama, LM Studio, llama.cpp, LocalAI/vLLM) — erlaubt auch
-  // unter Local only, da nie ein Nicht-Loopback-Host angefragt wird.
+  // Standalone check with the decision model (local only, decision model only)
+  'security:check': {
+    input: z.object({ messageId: z.number().int() }),
+    output: z.object({ security: mailSecuritySchema.nullable() })
+  },
+  // Detect local AI servers (onboarding): main probes only hard-wired
+  // loopback addresses (Ollama, LM Studio, llama.cpp, LocalAI/vLLM) — allowed even
+  // under Local only, since a non-loopback host is never queried.
   'ai:detectLocal': {
     input: z.void(),
     output: z.object({
@@ -492,7 +621,7 @@ export const invokeContract = {
             kind: z.enum(['ollama', 'lmstudio', 'llamacpp', 'localai']),
             baseUrl: z.string().max(200),
             models: z.array(z.string().max(200)).max(200),
-            /** nur Ollama: Modelle mit Fähigkeit `decision` (nicht in `models` enthalten) */
+            /** Ollama only: models with capability `decision` (not included in `models`) */
             decisionModels: z.array(z.string().max(200)).max(50).default([])
           })
         )
@@ -515,7 +644,7 @@ export const invokeContract = {
     input: z.object({ id: profileIdSchema }),
     output: z.object({ ok: z.literal(true) })
   },
-  // Profil-Keys: write-only über einen eigenen Kanal (nicht über secrets:set)
+  // Profile keys: write-only via a dedicated channel (not via secrets:set)
   'ai:profiles:setKey': {
     input: z.object({ id: profileIdSchema, key: z.string().trim().min(1).max(500) }),
     output: z.object({ ok: z.literal(true) })
@@ -550,7 +679,7 @@ export const invokeContract = {
     }),
     output: z.object({ ok: z.literal(true) })
   },
-  // Local only (privacy.localOnly): weicher Schalter, siehe src/main/privacy.ts
+  // Local only (privacy.localOnly): soft switch, see src/main/privacy.ts
   'privacy:getLocalOnly': {
     input: z.void(),
     output: z.object({ localOnly: z.boolean() })
@@ -559,22 +688,22 @@ export const invokeContract = {
     input: z.object({ localOnly: z.boolean() }),
     output: z.object({ localOnly: z.boolean() })
   },
-  // Alle Netzwerkverbindungen der App (Technik-Seite), live aus Konten/Profilen/Konfiguration
+  // All network connections of the app (technical page), live from accounts/profiles/config
   'privacy:networkConnections': {
     input: z.void(),
     output: networkConnectionsSchema
   },
-  // Branding/Onboarding-Hinweise aus der Org-Konfiguration (Upstream: Defaults)
+  // Branding/onboarding hints from the org config (upstream: defaults)
   'org:info': {
     input: z.void(),
     output: z.object({
       productName: z.string().max(60),
-      /** true: Onboarding bietet statt OpenRouter die Profile der Organisation an */
+      /** true: onboarding offers the organization's profiles instead of OpenRouter */
       hideOpenRouterOnboarding: z.boolean(),
       edition: z.enum(['upstream', 'organisation'])
     })
   },
-  // Update-Check auf Anforderung (bei Local only der einzige Weg)
+  // Update check on demand (the only way under Local only)
   'updates:checkNow': {
     input: z.void(),
     output: z.object({
@@ -584,7 +713,7 @@ export const invokeContract = {
       note: z.string().nullable()
     })
   },
-  // Lokales Suchmodell (Embeddings): Status + ausdrücklicher Download
+  // Local search model (embeddings): status + explicit download
   'embeddings:status': {
     input: z.void(),
     output: z.object({
@@ -599,7 +728,7 @@ export const invokeContract = {
     input: z.void(),
     output: z.object({ ok: z.literal(true) })
   },
-  // Verfügbarkeit des On-Device-Modells (Apple Intelligence) für die Triage
+  // Availability of the on-device model (Apple Intelligence) for triage
   'ai:appleFm': {
     input: z.object({ force: z.boolean().default(false) }).optional(),
     output: z.object({
@@ -620,14 +749,14 @@ export const invokeContract = {
   },
   'ai:transcribe': {
     input: z.object({
-      // WAV (PCM16 mono), base64 — der Renderer nimmt auf und kodiert
+      // WAV (PCM16 mono), base64 — the renderer records and encodes
       audioBase64: z.string().max(20_000_000),
       format: z.enum(['wav', 'mp3'])
     }),
     output: z.object({ text: z.string() })
   },
-  // Bewusst schlank: der Renderer braucht nur Key-Status und aktive Modelle
-  // (Kosten/Job-Zähler zeigt keine Oberfläche mehr an).
+  // Deliberately lean: the renderer only needs key status and active models
+  // (no UI shows costs/job counters anymore).
   'ai:usage': {
     input: z.void(),
     output: z.object({
@@ -708,7 +837,7 @@ export const invokeContract = {
           description: z.string().nullable(),
           enabled: z.boolean(),
           hits: z.number(),
-          /** KI-Bedingung der Regel (Entscheidungsmodell), sonst null */
+          /** AI condition of the rule (decision model), otherwise null */
           aiCondition: z.string().nullable()
         })
       )
@@ -731,12 +860,12 @@ export const invokeContract = {
       contacts: z.array(z.object({ addr: z.string(), name: z.string().nullable() }))
     })
   },
-  // CardDAV-Kontakte (Phase 3.1, nur lesend) je Kalender-Konto
+  // CardDAV contacts (phase 3.1, read-only) per calendar account
   'contacts:dav:status': {
     input: z.object({ accountId: z.number().int() }),
     output: davContactsStatusSchema
   },
-  // „Kontakte synchronisieren" ein/aus; ein = Discovery gegen den Server des Kontos
+  // "Sync contacts" on/off; on = discovery against the account's server
   'contacts:dav:setSync': {
     input: z.object({ accountId: z.number().int(), enabled: z.boolean() }),
     output: z.object({ addressBookCount: z.number() })
@@ -837,8 +966,8 @@ export const invokeContract = {
     output: z.object({ ok: z.literal(true) })
   },
   'followups:draftNudge': {
-    // idea: bearbeiteter Text/Diktat aus dem Stups-Composer — die Eule formt
-    // daraus den Nachfass neu (⌘J), ohne den Wortsinn zu verlieren.
+    // idea: edited text/dictation from the nudge composer — the owl reworks
+    // the follow-up from it (⌘J) without losing the meaning.
     input: z.object({ messageId: z.number().int(), idea: z.string().max(10_000).optional() }),
     output: z.object({ draftId: z.string() })
   },
@@ -856,8 +985,8 @@ export const invokeContract = {
     }),
     output: z.object({ chatId: z.string() })
   },
-  // Eulen-Gespräche (Owl-View): Verläufe überleben den Neustart.
-  // Gespeichert wird nur nach einer vollständigen Antwort — nie leere Fragen.
+  // Owl conversations (owl view): histories survive a restart.
+  // Saved only after a complete answer — never empty questions.
   'owl:list': {
     input: z.void(),
     output: z.object({ conversations: z.array(owlConversationListItemSchema) })
@@ -882,8 +1011,8 @@ export const invokeContract = {
     input: z.object({ accountId: z.number().int().optional() }).optional(),
     output: z.object({ ok: z.boolean() })
   },
-  // Rechtschreibprüfung (Hunspell DE+EN im Main-Prozess): batch-Check plus
-  // Vorschläge für ein einzelnes Wort — der Renderer cached beides.
+  // Spell checking (Hunspell DE+EN in the main process): batch check plus
+  // suggestions for a single word — the renderer caches both.
   'spell:check': {
     input: z.object({ words: z.array(z.string().min(1).max(120)).max(2000) }),
     output: z.object({ misspelled: z.array(z.string().max(120)) })
@@ -906,7 +1035,7 @@ export const pushContract = {
     chunk: z.string(),
     done: z.boolean(),
     error: z.string().nullable().default(null),
-    // Betreff-Vorschlag bei neuen Mails (BETREFF-Protokoll in drafts.ts)
+    // Subject suggestion for new mails (SUBJECT protocol in drafts.ts)
     subject: z.string().nullable().default(null),
     compositionMode: z.enum(['dictation', 'idea']).nullable().optional()
   }),
@@ -915,21 +1044,21 @@ export const pushContract = {
     state: z.enum(['idle', 'connecting', 'syncing', 'error', 'needs-reauth', 'off']),
     detail: z.string().nullable()
   }),
-  // Op-Queue: IMAP-Aktionen, die endgültig nicht ausgeführt werden konnten
-  // (Dead-Letter) — der Renderer zeigt eine Toast statt stillem Verlust.
+  // Op queue: IMAP actions that permanently could not be executed
+  // (dead letter) — the renderer shows a toast instead of silent loss.
   'sync:opsDead': z.object({
     accountId: z.number(),
     count: z.number(),
     reason: z.enum(['attempts', 'uidvalidity', 'no-target-folder', 'no-trash', 'folder-gone'])
   }),
-  // Kalender: Daten haben sich geändert (calendarIds leer = Kalenderliste/Sichtbarkeit)
+  // Calendar: data has changed (calendarIds empty = calendar list/visibility)
   'calendar:changed': z.object({ accountId: z.number(), calendarIds: z.array(z.number()) }),
   'calendar:accountState': z.object({
     accountId: z.number(),
     state: calendarAccountStateSchema,
     detail: z.string().nullable()
   }),
-  // Lokale Änderung wurde nicht übernommen (Konflikt: Server-Version gewinnt, nie stilles Überschreiben)
+  // Local change was not applied (conflict: server version wins, never silent overwrite)
   'calendar:conflict': z.object({
     accountId: z.number(),
     calendarId: z.number(),
@@ -938,9 +1067,9 @@ export const pushContract = {
     kind: z.enum(['create', 'update', 'delete']),
     reason: z.enum(['conflict', 'deleted-on-server', 'forbidden', 'attempts'])
   }),
-  // CardDAV-Kontakte (Phase 3.1): Adressbücher/Karten eines Kontos wurden abgeglichen
+  // CardDAV contacts (phase 3.1): an account's address books/cards were synced
   'contacts:changed': z.object({ accountId: z.number() }),
-  // Klick auf eine Erinnerung
+  // Click on a reminder
   'calendar:openEvent': z.object({
     objectId: z.number(),
     recurrenceId: z.string().nullable()
@@ -993,9 +1122,9 @@ export type IpcHandlers = {
 export const INVOKE_CHANNELS = Object.keys(invokeContract) as InvokeChannel[]
 export const PUSH_CHANNELS = Object.keys(pushContract) as PushChannel[]
 
-/** Öffentliche API, die der Preload unter window.noctua bereitstellt. */
+/** Public API that the preload exposes under window.noctua. */
 export interface NoctuaApi {
   invoke<C extends InvokeChannel>(channel: C, input: InvokeInput<C>): Promise<InvokeOutput<C>>
-  /** Abonniert ein Push-Event; Rückgabewert ist die Unsubscribe-Funktion. */
+  /** Subscribes to a push event; the return value is the unsubscribe function. */
   on<C extends PushChannel>(channel: C, callback: (payload: PushPayload<C>) => void): () => void
 }

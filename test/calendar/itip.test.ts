@@ -64,7 +64,7 @@ describe('parseItip', () => {
 
   it('Windows-Zonenname ohne VTIMEZONE wird über die Tabelle aufgelöst', () => {
     const p = parseItip(outlookNoVtimezone)!
-    // Pacific Standard Time im Oktober = PDT (UTC-7)
+    // Pacific Standard Time in October = PDT (UTC-7)
     expect(p.startUtc).toBe(Date.UTC(2026, 9, 21, 16, 0))
   })
 
@@ -171,7 +171,7 @@ describe('buildReplyIcs', () => {
       'mailto:dieter.chef@corp.example.com'
     )
     expect(ev.getFirstPropertyValue('comment')).toBe('Komme später')
-    // Zeiten als UTC, damit kein VTIMEZONE nötig ist
+    // Times as UTC so no VTIMEZONE is needed
     expect(String(ev.getFirstPropertyValue('dtstart'))).toBe('2026-10-21T12:00:00Z')
     expect(ev.hasProperty('recurrence-id')).toBe(false)
     expect(new ICAL.Component(ICAL.parse(ics)).getAllSubcomponents('vtimezone')).toHaveLength(0)
@@ -251,7 +251,7 @@ describe('buildStoredCopy / setAttendeePartstat', () => {
         .find((p) => String(p.getFirstValue()).includes('bob@'))!
         .getParameter('partstat')
     ).toBe('DECLINED')
-    // Stamm bleibt unverändert
+    // Master stays unchanged
     const master = events.find((e) => !e.hasProperty('recurrence-id'))!
     expect(
       master
@@ -312,12 +312,12 @@ describe('Organisator-Nachrichten', () => {
     const base = nextcloudRequest
       .replace('METHOD:REQUEST\r\n', '')
       .replace('PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=Carla', 'PARTSTAT=ACCEPTED;CN=Carla')
-    // Nur Beschreibung geändert, aber (wie updateIcs) SEQUENCE bereits erhöht
+    // Only description changed, but (like updateIcs) SEQUENCE already bumped
     const minor = base.replace('SEQUENCE:0', 'SEQUENCE:1').replace('Agenda:', 'Neue Agenda:')
     const r1 = normalizeSequence(base, minor, 'alice@cloud.example.org')
     expect(r1.significant).toBe(false)
     expect(vevent(r1.ics).getFirstPropertyValue('sequence')).toBe(0)
-    // Verschoben
+    // Moved
     const moved = base
       .replace('SEQUENCE:0', 'SEQUENCE:1')
       .replace(

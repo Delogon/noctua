@@ -6,7 +6,7 @@ import { countOpenTasks } from '@main/db/repos/tasks'
 import { listThreads } from '@main/db/repos/threads'
 import { createAiTestDb, closeTestDb, seedAccount, seedFolder, makeEnvelope } from '../helpers/db'
 
-// OpenRouter wird gemockt — echte LLM-Antworten sind ohne API-Key nicht testbar.
+// OpenRouter is mocked — real LLM responses cannot be tested without an API key.
 const { fakeCreate } = vi.hoisted(() => ({ fakeCreate: vi.fn() }))
 
 vi.mock('@main/ai/providers/openai-factory', () => ({
@@ -101,12 +101,12 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
       to: ['verteiler@verein.de'],
       body: 'Hallo Jannik,\n\nanbei die Infos zu Plakaten und Sponsoren.\nViele Grüße, Marie'
     })
-    // Modell irrt und behauptet addressed_to_me=true — Stufe 1+2 blocken trotzdem.
+    // Model is wrong and claims addressed_to_me=true — stages 1+2 still block.
     modelReply({ ...baseReply, addressed_to_me: true })
 
     expect(await runTriage(db, msgId)).toBe('done')
     expect(countOpenTasks(db)).toBe(0)
-    // Auch der Vorschlags-Streifen bleibt aus.
+    // The suggestion strip stays off too.
     expect(listThreads(db, 200)[0]?.taskState).toBe('none')
   })
 
@@ -131,7 +131,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
       to: ['lena.hartmann@example.org'],
       body: 'bitte kurz freigeben.'
     })
-    modelReply(baseReply) // kein addressed_to_me-Feld (Prompt-v4-Antwort)
+    modelReply(baseReply) // no addressed_to_me field (prompt v4 response)
 
     expect(await runTriage(db, msgId)).toBe('done')
     expect(annotation(db, msgId)?.addressed_to_me).toBe(1)
@@ -150,7 +150,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
     expect(await runTriage(db, msgId)).toBe('done')
     expect(countOpenTasks(db)).toBe(0)
     expect(annotation(db, msgId)?.addressed_to_me).toBe(0)
-    // Action-Items bleiben erhalten — der Streifen bietet den Task nur an.
+    // Action items are kept — the strip only offers the task.
     expect(listThreads(db, 200)[0]?.taskState).toBe('suggested')
   })
 
@@ -169,7 +169,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
 
   it('historische Mails (vor Konto-Einrichtung) erzeugen keine Aufgaben', async () => {
     const db = createAiTestDb()
-    // Konto JETZT eingerichtet — die Mail trägt das alte Default-Datum (2023)
+    // Account set up NOW — the mail carries the old default date (2023)
     const messageId = seedMail(db, {
       accountEmail: 'lena.hartmann@example.org',
       to: ['lena.hartmann@example.org'],
@@ -179,7 +179,7 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
     modelReply({ ...baseReply, addressed_to_me: true })
 
     expect(await runTriage(db, messageId)).toBe('done')
-    // Triage/Annotation existiert — nur der Aufgaben-Schritt wurde übersprungen
+    // Triage/annotation exists — only the task step was skipped
     const annotation = db
       .prepare('SELECT category FROM ai_annotations WHERE message_id = ?')
       .get(messageId)
@@ -205,9 +205,13 @@ describe('runTriage (Adressat-Erkennung, Modell gemockt)', () => {
     const system = call.messages.find((m) => m.role === 'system')!.content
     const user = call.messages.find((m) => m.role === 'user')!.content
     expect(system).toContain('addressed_to_me')
-    expect(user).toContain('EMPFÄNGER (Kontoinhaber)')
+    expect(user).toContain('RECIPIENT (account owner)')
     expect(user).toContain('lena.hartmann@example.org')
-    expect(user).toContain('weder in An noch CC')
-    expect(user).toContain('nennt namentlich: Jannik')
+    expect(user).toContain('neither in To nor CC')
+    expect(user).toContain('names: "Jannik"')
+    // Sender-controlled header lines sit inside untrusted delimiters (SEC-15)
+    expect(user).toMatch(
+      /<<<BEGIN HEADER \(UNTRUSTED DATA\)>>>\nFrom: Marie[^\n]*\nSubject: [^\n]*\n<<<END HEADER>>>/
+    )
   })
 })

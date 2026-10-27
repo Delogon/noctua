@@ -19,21 +19,21 @@ import {
 } from './todo'
 
 /**
- * Zwei-Wege-Abgleich Noctua-Aufgaben <-> VTODOs einer gewählten CalDAV-Liste
- * (Phase 3.2). Reiner DB-Abgleich: Netzwerk machen weiterhin die Kalender-
- * Sync-Engine und cal_pending_ops (If-Match, 412 → Server-Fassung gewinnt).
+ * Two-way sync of Noctua tasks <-> VTODOs of a selected CalDAV list
+ * (phase 3.2). Pure DB reconciliation: networking is still done by the calendar
+ * sync engine and cal_pending_ops (If-Match, 412 → server version wins).
  *
- * Idee: Je Aufgabe merkt `task_caldav` Hash und ETag des zuletzt abgeglichenen
- * Stands. Änderte sich nur die lokale Seite → Update einreihen; nur die
- * Serverseite (ETag und Hash weichen ab) → Aufgabe übernehmen; beides → Server
- * gewinnt und der Nutzer bekommt den Konflikt-Toast.
+ * Idea: per task, `task_caldav` remembers the hash and ETag of the last reconciled
+ * state. If only the local side changed → queue an update; only the
+ * server side (ETag and hash differ) → apply it to the task; both → the server
+ * wins and the user gets the conflict toast.
  */
 
 export const TASKS_CALENDAR_KEY = 'tasks.caldavCalendar'
 const DEAD_OP_WINDOW_MS = 24 * 3600_000
 
 export interface TasksSyncEvents {
-  /** Lokale Aufgaben wurden durch den Abgleich verändert (Push `tasks:changed`). */
+  /** Local tasks were changed by the sync (push `tasks:changed`). */
   onTasksChanged(): void
   onConflict(info: {
     accountId: number
@@ -49,7 +49,7 @@ export function initTasksSync(e: TasksSyncEvents): void {
   events = e
 }
 
-// --- Einstellung -------------------------------------------------------------------------------
+// --- Setting -----------------------------------------------------------------------------------
 
 function readSetting(db: Database.Database, key: string): string | null {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
@@ -57,7 +57,7 @@ function readSetting(db: Database.Database, key: string): string | null {
   return row?.value ?? null
 }
 
-/** Gewählte Aufgabenliste; null, wenn aus, gelöscht, schreibgeschützt oder ohne VTODO. */
+/** Selected task list; null if off, deleted, read-only or without VTODO. */
 export function targetCalendar(db: Database.Database): CalendarRow | null {
   const raw = readSetting(db, TASKS_CALENDAR_KEY)
   const id = raw ? Number(raw) : NaN
@@ -74,7 +74,7 @@ export interface TaskListChoice {
   name: string
 }
 
-/** Alle Kalender, die als Aufgabenliste taugen (VTODO, schreibbar). */
+/** All calendars usable as a task list (VTODO, writable). */
 export function listTaskLists(db: Database.Database): TaskListChoice[] {
   const rows = db
     .prepare(
@@ -99,7 +99,7 @@ export function listTaskLists(db: Database.Database): TaskListChoice[] {
     }))
 }
 
-/** Liste wählen (null = aus). Beim Wechsel der Liste werden die Zuordnungen verworfen. */
+/** Select a list (null = off). Switching lists discards the mappings. */
 export function setTasksSyncCalendar(db: Database.Database, calendarId: number | null): void {
   if (calendarId !== null) {
     const cal = getCalendar(db, calendarId)
@@ -117,7 +117,7 @@ export function setTasksSyncCalendar(db: Database.Database, calendarId: number |
         `INSERT INTO settings (key, value) VALUES (?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value`
       ).run(TASKS_CALENDAR_KEY, String(calendarId))
-      // Andere Liste: alte Zuordnungen gelten dort nicht (Aufgaben bleiben lokal)
+      // Different list: old mappings don't apply there (tasks stay local)
       if (previous !== null && previous !== String(calendarId))
         db.prepare('DELETE FROM task_caldav WHERE calendar_id <> ?').run(calendarId)
     }
@@ -133,7 +133,7 @@ function kickAccount(db: Database.Database, calendarId: number): void {
   if (cal) calendarSync.kick(cal.account_id)
 }
 
-// --- Abgleich ------------------------------------------------------------------------------------
+// --- Reconciliation ------------------------------------------------------------------------------
 
 interface TaskRow {
   id: number
@@ -162,7 +162,7 @@ const taskFieldsOf = (t: TaskRow): TaskFields => ({
 
 export interface ReconcileResult {
   tasksChanged: boolean
-  /** Es wurden Pushes eingereiht (Sync-Engine anstoßen). */
+  /** Pushes were queued (trigger the sync engine). */
   queued: boolean
 }
 
@@ -196,7 +196,7 @@ function objectByUid(
     .get(calendarId, uid) as CalObjectRow | undefined
 }
 
-/** Gleichnamiges, noch nicht zugeordnetes VTODO (Dedupe, wenn die Zuordnung verloren ging). */
+/** Same-named VTODO not yet mapped (dedupe if the mapping was lost). */
 function unmappedObjectByTitle(
   db: Database.Database,
   calendarId: number,
@@ -233,7 +233,7 @@ function messageIdHeader(db: Database.Database, t: TaskRow): string | null {
   return row?.message_id ?? null
 }
 
-/** Aufgabe aus Server-VTODO anlegen; mit Rück-Link zur Mail, wenn sie lokal bekannt ist. */
+/** Create a task from a server VTODO; with a back link to the mail if it is known locally. */
 function insertTaskFromTodo(db: Database.Database, f: TodoFields, now: number): number {
   let source: { id: number; accountId: number } | null = null
   if (f.messageId) {
@@ -270,8 +270,8 @@ function insertTaskFromTodo(db: Database.Database, f: TodoFields, now: number): 
 }
 
 /**
- * Gleicht Aufgaben und VTODOs der gewählten Liste ab. Idempotent; reine DB-
- * Operationen in einer Transaktion.
+ * Reconciles tasks and VTODOs of the selected list. Idempotent; pure DB
+ * operations in a single transaction.
  */
 export function reconcileTasks(
   db: Database.Database,
@@ -294,7 +294,7 @@ export function reconcileTasks(
   const dropMapping = db.prepare('DELETE FROM task_caldav WHERE task_id = ?')
 
   db.transaction(() => {
-    // 1. Bestehende Zuordnungen
+    // 1. Existing mappings
     const mappings = db
       .prepare('SELECT * FROM task_caldav WHERE calendar_id = ?')
       .all(cal.id) as MappingRow[]
@@ -303,7 +303,7 @@ export function reconcileTasks(
         TaskRow | undefined
       const obj = objectByUid(db, cal.id, m.uid)
 
-      // Lokal gelöscht oder verworfen → serverseitig löschen
+      // Deleted or discarded locally → delete on the server
       if (!task || task.status === 'dismissed') {
         if (obj && obj.pending_op !== 'delete') {
           enqueueDelete(db, obj, cal)
@@ -312,7 +312,7 @@ export function reconcileTasks(
         dropMapping.run(m.task_id)
         continue
       }
-      // Server hat gelöscht (nur wenn der Stand dort je bestätigt war)
+      // The server deleted it (only if the state there was ever confirmed)
       if (!obj || obj.pending_op === 'delete') {
         if (!obj && m.synced_etag !== null) {
           db.prepare('DELETE FROM tasks WHERE id = ?').run(task.id)
@@ -326,7 +326,7 @@ export function reconcileTasks(
       try {
         server = readTodo(obj.ics)
       } catch {
-        continue // nicht lesbares VTODO nie überschreiben
+        continue // never overwrite an unreadable VTODO
       }
       const local = taskFieldsOf(task)
       const hLocal = fieldsHash(local)
@@ -349,12 +349,12 @@ export function reconcileTasks(
         queued = true
         setMapping.run(task.id, cal.id, m.uid, hLocal, m.synced_etag, now)
       } else if (!pending && (obj.etag !== m.synced_etag || hLocal !== m.synced_hash)) {
-        // eigener Push bestätigt bzw. nur unabgebildete Properties geändert
+        // own push confirmed, or only unmapped properties changed
         setMapping.run(task.id, cal.id, m.uid, hLocal, obj.etag, now)
       }
     }
 
-    // 2. Aktive Aufgaben ohne Zuordnung → anlegen (oder per UID übernehmen)
+    // 2. Active tasks without a mapping → create (or adopt by UID)
     const unmapped = db
       .prepare(
         `SELECT t.* FROM tasks t LEFT JOIN task_caldav tc ON tc.task_id = t.id
@@ -365,7 +365,7 @@ export function reconcileTasks(
       const uid = taskUid(task.id)
       const existing = objectByUid(db, cal.id, uid) ?? unmappedObjectByTitle(db, cal.id, task.title)
       if (existing) {
-        // Bereits auf dem Server (z. B. nach erneutem Aktivieren): übernehmen, nicht doppeln
+        // Already on the server (e.g. after re-enabling): adopt, don't duplicate
         try {
           const server = readTodo(existing.ics)
           if (existing.pending_op === null) {
@@ -374,7 +374,7 @@ export function reconcileTasks(
           }
           setMapping.run(task.id, cal.id, existing.uid, fieldsHash(server), existing.etag, now)
         } catch {
-          // nicht lesbar: nichts tun
+          // unreadable: do nothing
         }
         continue
       }
@@ -386,7 +386,7 @@ export function reconcileTasks(
       setMapping.run(task.id, cal.id, uid, fieldsHash(fields), null, now)
     }
 
-    // 3. Server-VTODOs ohne Aufgabe → als Aufgabe anlegen
+    // 3. Server VTODOs without a task → create as a task
     const objects = db
       .prepare(
         `SELECT o.* FROM cal_objects o
@@ -415,9 +415,9 @@ export function reconcileTasks(
   return { tasksChanged, queued }
 }
 
-// --- Auslöser ------------------------------------------------------------------------------------
+// --- Triggers ------------------------------------------------------------------------------------
 
-/** Nach einem Kalender-Sync (Hook aus calendar/index.ts); leere Liste = Kalenderliste geändert. */
+/** After a calendar sync (hook from calendar/index.ts); empty list = calendar list changed. */
 export function afterCalendarChanged(
   db: Database.Database,
   accountId: number,
@@ -437,7 +437,7 @@ export function afterCalendarChanged(
   }
 }
 
-/** Nach lokaler Änderung an Aufgaben (Repo-Hook); tut nichts, solange der Abgleich aus ist. */
+/** After a local change to tasks (repo hook); does nothing while the sync is off. */
 export function afterLocalTaskChange(db: Database.Database): void {
   try {
     const cal = targetCalendar(db)
@@ -452,11 +452,11 @@ export function afterLocalTaskChange(db: Database.Database): void {
   }
 }
 
-// --- Status-Glyphe ---------------------------------------------------------------------------------
+// --- Status glyph ----------------------------------------------------------------------------------
 
 export type TaskSyncState = 'pending' | 'synced' | 'conflict'
 
-/** Sync-Zustand je Aufgaben-ID (nur zugeordnete Aufgaben). */
+/** Sync state per task ID (mapped tasks only). */
 export function loadTaskSyncStates(
   db: Database.Database,
   hashes: Map<number, string>,

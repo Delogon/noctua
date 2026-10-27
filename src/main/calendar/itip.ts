@@ -16,10 +16,10 @@ import {
 } from './ics'
 
 /**
- * iTIP/iMIP (RFC 5546/6047): eingehende Einladungen parsen, Antworten
- * (REPLY) und Organisator-Nachrichten (REQUEST/CANCEL) erzeugen, Free/Busy
- * lesen. Reine Funktionen ohne DB/Netz. Eingehende Daten sind nicht
- * vertrauenswürdig: Größen werden begrenzt, Text bleibt Klartext.
+ * iTIP/iMIP (RFC 5546/6047): parse incoming invitations, create replies
+ * (REPLY) and organizer messages (REQUEST/CANCEL), read
+ * free/busy. Pure functions without DB/network. Incoming data is not
+ * trusted: sizes are limited, text stays plain text.
  */
 
 export const MAX_ICS_BYTES = 256 * 1024
@@ -53,7 +53,7 @@ export interface ItipMessage {
   organizer: { email: string; name: string | null } | null
   summary: string | null
   location: string | null
-  /** Klartext, gekürzt */
+  /** Plain text, truncated */
   description: string | null
   startUtc: number | null
   endUtc: number | null
@@ -62,11 +62,11 @@ export interface ItipMessage {
   endDay: string | null
   tzid: string | null
   rrule: string | null
-  /** Kanonische Vorkommens-ID (siehe ics.ts), null = ganze Serie / Einzeltermin */
+  /** Canonical occurrence ID (see ics.ts), null = whole series / single event */
   recurrenceId: string | null
   status: string | null
   attendees: CalendarAttendee[]
-  /** Roh-ICS (begrenzt) */
+  /** Raw ICS (limited) */
   ics: string
 }
 
@@ -77,7 +77,7 @@ function str(comp: ICAL.Component, name: string, max: number): string | null {
   return t === '' ? null : t.slice(0, max)
 }
 
-/** Komponente, die die Einladung beschreibt: Stamm, sonst erste Ausnahme. */
+/** Component describing the invitation: the master, otherwise the first exception. */
 function pickComponent(root: ICAL.Component): ICAL.Component | null {
   const { master, overrides } = splitComponents(root, 'vevent')
   return master ?? overrides[0] ?? null
@@ -92,9 +92,9 @@ function icsTimeMs(
 }
 
 /**
- * Parst ein iTIP-Objekt. `methodHint` = method-Parameter des MIME-Teils (nur
- * Rückfall, wenn das ICS selbst kein METHOD trägt). null bei Unbrauchbarem
- * (kein VEVENT, keine UID, zu groß, kaputt).
+ * Parses an iTIP object. `methodHint` = method parameter of the MIME part (only a
+ * fallback if the ICS itself carries no METHOD). null if unusable
+ * (no VEVENT, no UID, too large, broken).
  */
 export function parseItip(text: string, methodHint?: string | null): ItipMessage | null {
   if (text.length > MAX_ICS_BYTES) return null
@@ -151,7 +151,7 @@ export function parseItip(text: string, methodHint?: string | null): ItipMessage
   }
 }
 
-/** Positiv, wenn `a` neuer ist als `b` (höhere SEQUENCE, bei Gleichstand späterer DTSTAMP). */
+/** Positive if `a` is newer than `b` (higher SEQUENCE, on a tie the later DTSTAMP). */
 export function compareRevision(
   a: { sequence: number; dtstamp: number | null },
   b: { sequence: number; dtstamp: number | null }
@@ -160,7 +160,7 @@ export function compareRevision(
   return (a.dtstamp ?? 0) - (b.dtstamp ?? 0)
 }
 
-/** Das ATTENDEE-Objekt des Nutzers (erste passende Adresse), sonst undefined. */
+/** The user's ATTENDEE object (first matching address), otherwise undefined. */
 export function findMyAttendee(
   attendees: readonly CalendarAttendee[],
   myAddresses: ReadonlySet<string>
@@ -168,7 +168,7 @@ export function findMyAttendee(
   return attendees.find((a) => myAddresses.has(a.email.toLowerCase()))
 }
 
-// --- Kleine ICS-Bausteine ----------------------------------------------------------------
+// --- Small ICS building blocks -----------------------------------------------------------
 
 function cloneComp(comp: ICAL.Component): ICAL.Component {
   return new ICAL.Component(JSON.parse(JSON.stringify(comp.toJSON())))
@@ -190,7 +190,7 @@ function mailto(email: string): string {
   return `mailto:${email}`
 }
 
-/** Zeitwert einer Quellkomponente als UTC-/Datums-Property (ohne VTIMEZONE-Bedarf). */
+/** Time value of a source component as a UTC/date property (no VTIMEZONE needed). */
 function portableTimeProp(
   name: string,
   src: ICAL.Property | null,
@@ -215,7 +215,7 @@ function portableTimeProp(
   )
 }
 
-// --- REPLY (Teilnehmer → Organisator) -----------------------------------------------------------
+// --- REPLY (attendee → organizer) ---------------------------------------------------------------
 
 export interface ReplyOptions {
   attendeeEmail: string
@@ -226,10 +226,10 @@ export interface ReplyOptions {
 }
 
 /**
- * METHOD:REPLY nach RFC 5546 §3.2.3: genau EIN ATTENDEE (der Nutzer) mit dem
- * neuen PARTSTAT, ORGANIZER, UID, DTSTAMP, SEQUENCE der Einladung und — bei
- * einer Einzeleinladung zu einem Vorkommen — RECURRENCE-ID. Zeiten gehen in
- * UTC raus, damit kein VTIMEZONE mitgeschickt werden muss.
+ * METHOD:REPLY per RFC 5546 §3.2.3: exactly ONE ATTENDEE (the user) with the
+ * new PARTSTAT, ORGANIZER, UID, DTSTAMP, SEQUENCE of the invitation and — for
+ * a single invitation to one occurrence — RECURRENCE-ID. Times go out in
+ * UTC so that no VTIMEZONE has to be sent along.
  */
 export function buildReplyIcs(sourceIcs: string, opts: ReplyOptions): string {
   const src = parseCalendar(sourceIcs)
@@ -267,15 +267,15 @@ export function buildReplyIcs(sourceIcs: string, opts: ReplyOptions): string {
   return serializeCalendar(root)
 }
 
-// --- Kopie für den eigenen Kalender --------------------------------------------------------------------------
+// --- Copy for the own calendar -------------------------------------------------------------------------------
 
 export interface StoredCopyOptions {
   myAddresses: ReadonlySet<string>
-  /** Wenn gesetzt: PARTSTAT des Nutzers (sonst unverändert) */
+  /** If set: the user's PARTSTAT (otherwise unchanged) */
   partstat?: Partstat
   /**
-   * SCHEDULE-AGENT=CLIENT am ORGANIZER (RFC 6638 §7.1): der Client verschickt die
-   * Antwort selbst, der Server darf sie nicht zusätzlich senden (Doppelversand).
+   * SCHEDULE-AGENT=CLIENT on the ORGANIZER (RFC 6638 §7.1): the client sends the
+   * reply itself, the server must not send it as well (double sending).
    */
   scheduleAgentClient: boolean
 }
@@ -297,7 +297,7 @@ function setMyPartstat(
     const cur = String(prop.getParameter('partstat') ?? '').toUpperCase()
     if (cur !== partstat) changed = true
     prop.setParameter('partstat', partstat)
-    // Antwort ist gegeben: keine weitere RSVP-Aufforderung
+    // Reply has been given: no further RSVP request
     prop.removeParameter('rsvp')
     if (prop.getParameter('schedule-status')) prop.removeParameter('schedule-status')
   }
@@ -305,8 +305,8 @@ function setMyPartstat(
 }
 
 /**
- * Wandelt ein empfangenes Einladungs-ICS in eine Kalenderressource um:
- * METHOD, VALARM und ATTACH fliegen raus (untrusted), nur VEVENT/VTIMEZONE bleiben.
+ * Converts a received invitation ICS into a calendar resource:
+ * METHOD, VALARM and ATTACH are dropped (untrusted), only VEVENT/VTIMEZONE remain.
  */
 export function buildStoredCopy(sourceIcs: string, opts: StoredCopyOptions): string {
   const root = parseCalendar(sourceIcs)
@@ -331,9 +331,9 @@ export function ridKey(comp: ICAL.Component, vtz: ReturnType<typeof vtimezonesOf
 }
 
 /**
- * Führt eine (bereits bereinigte) Einladung mit einer vorhandenen Ressource
- * zusammen: Enthält sie den Stamm, ersetzt sie die Ressource; enthält sie nur
- * Ausnahmen (Einladung zu einzelnen Vorkommen), werden diese eingesetzt.
+ * Merges an (already sanitized) invitation with an existing resource:
+ * if it contains the master, it replaces the resource; if it contains only
+ * exceptions (invitation to individual occurrences), these are inserted.
  */
 export function mergeInvitation(existingIcs: string | null, incomingIcs: string): string {
   if (!existingIcs) return incomingIcs
@@ -356,21 +356,21 @@ export function mergeInvitation(existingIcs: string | null, incomingIcs: string)
   return serializeCalendar(target)
 }
 
-// --- PARTSTAT in einer vorhandenen Ressource ändern ---------------------------------------------------
+// --- Change PARTSTAT in an existing resource ----------------------------------------------------------
 
 export interface PartstatResult {
   ics: string
-  /** ATTENDEE kommt in der Ressource (bzw. dem Vorkommen) vor */
+  /** ATTENDEE occurs in the resource (or the occurrence) */
   matched: boolean
-  /** Wert hat sich tatsächlich geändert */
+  /** Value actually changed */
   changed: boolean
 }
 
 /**
- * Setzt den PARTSTAT der ATTENDEE-Einträge mit einer der Adressen. Ohne
- * `recurrenceId` für alle Komponenten (Stamm + Ausnahmen), mit `recurrenceId`
- * nur für dieses Vorkommen (Ausnahme wird bei Bedarf angelegt). Andere
- * Parameter der ATTENDEE-Zeile bleiben erhalten.
+ * Sets the PARTSTAT of the ATTENDEE entries with one of the addresses. Without
+ * `recurrenceId` for all components (master + exceptions), with `recurrenceId`
+ * only for this occurrence (the exception is created if needed). Other
+ * parameters of the ATTENDEE line are preserved.
  */
 export function setAttendeePartstat(
   ics: string,
@@ -420,7 +420,7 @@ export function setAttendeePartstat(
   }
   const { master } = splitComponents(root, 'vevent')
   if (!master || !has(master)) return { ics, matched: false, changed: false }
-  // Noch keine Ausnahme: über den Standard-Editor anlegen (this-Scope)
+  // No exception yet: create it via the standard editor (this scope)
   const attendees = readAttendees(master).map((a) =>
     addresses.has(a.email.toLowerCase()) ? { ...a, partstat, rsvp: false } : a
   )
@@ -428,7 +428,7 @@ export function setAttendeePartstat(
   return { ics: result.ics, matched: true, changed: true }
 }
 
-// --- Organisator: REQUEST / CANCEL ----------------------------------------------------------------------------
+// --- Organizer: REQUEST / CANCEL ------------------------------------------------------------------------------
 
 function stripForSending(ev: ICAL.Component): void {
   for (const alarm of ev.getAllSubcomponents('valarm')) ev.removeSubcomponent(alarm)
@@ -444,7 +444,7 @@ function sendRoot(storedIcs: string, method: string): ICAL.Component {
   return root
 }
 
-/** METHOD:REQUEST aus der gespeicherten Ressource (Alarme des Organisators bleiben privat). */
+/** METHOD:REQUEST from the stored resource (the organizer's alarms stay private). */
 export function buildRequestIcs(storedIcs: string, now: number): string {
   const root = sendRoot(storedIcs, 'REQUEST')
   for (const ev of root.getAllSubcomponents('vevent')) {
@@ -455,8 +455,8 @@ export function buildRequestIcs(storedIcs: string, now: number): string {
 }
 
 /**
- * METHOD:CANCEL für die ganze Ressource. `only` beschränkt die ATTENDEE-Liste
- * (entfernte Teilnehmer). SEQUENCE wird gegenüber dem letzten Stand erhöht
+ * METHOD:CANCEL for the whole resource. `only` restricts the ATTENDEE list
+ * (removed attendees). SEQUENCE is incremented relative to the last state
  * (RFC 5546 §3.2.5).
  */
 export function buildCancelIcs(storedIcs: string, now: number, only?: ReadonlySet<string>): string {
@@ -476,7 +476,7 @@ export function buildCancelIcs(storedIcs: string, now: number, only?: ReadonlySe
   return serializeCalendar(root)
 }
 
-/** CANCEL für ein einzelnes Vorkommen (bzw. dieses und alle folgenden). */
+/** CANCEL for a single occurrence (or this and all following). */
 export function buildOccurrenceCancelIcs(
   storedIcs: string,
   recurrenceId: string,
@@ -538,7 +538,7 @@ export function buildOccurrenceCancelIcs(
   return serializeCalendar(root)
 }
 
-// --- SEQUENCE nach Bearbeitung (Organisator) ----------------------------------------------------------------
+// --- SEQUENCE after editing (organizer) ---------------------------------------------------------------------
 
 function propText(c: ICAL.Component, name: string): string {
   return c
@@ -548,32 +548,32 @@ function propText(c: ICAL.Component, name: string): string {
     .join('|')
 }
 
-/** Zeitplan-Felder: eine Änderung verschiebt den Termin (Teilnehmer müssen neu antworten). */
+/** Schedule fields: a change reschedules the event (attendees must reply again). */
 function scheduleHash(c: ICAL.Component): string {
   return ['dtstart', 'dtend', 'duration', 'due', 'rrule', 'rdate', 'exdate']
     .map((n) => propText(c, n))
     .join('\n')
 }
 
-/** „Wesentliche" Änderung nach RFC 5546 §2.1.4: Zeitplan, Status, Ort. */
+/** "Significant" change per RFC 5546 §2.1.4: schedule, status, location. */
 function significantHash(c: ICAL.Component): string {
   return `${scheduleHash(c)}\n${propText(c, 'status')}\n${propText(c, 'location')}`
 }
 
 export interface SequenceResult {
   ics: string
-  /** Mindestens eine Komponente wesentlich geändert (→ REQUEST mit höherer SEQUENCE) */
+  /** At least one component changed significantly (→ REQUEST with higher SEQUENCE) */
   significant: boolean
-  /** Zeitplan geändert (PARTSTAT der Teilnehmer wurde zurückgesetzt) */
+  /** Schedule changed (the attendees' PARTSTAT was reset) */
   rescheduled: boolean
 }
 
 /**
- * Bringt die SEQUENCE einer bearbeiteten Ressource mit Teilnehmern in Ordnung:
- * unveränderte Komponenten behalten ihre SEQUENCE, wesentlich geänderte sind
- * garantiert höher als zuvor. Bei Terminverschiebung gehen die Antworten der
- * Teilnehmer auf NEEDS-ACTION zurück (RFC 5546 §2.1.4). Der Organisator
- * (`organizer`) bleibt unberührt.
+ * Fixes up the SEQUENCE of an edited resource with attendees:
+ * unchanged components keep their SEQUENCE, significantly changed ones are
+ * guaranteed to be higher than before. When an event is rescheduled, the attendees'
+ * replies revert to NEEDS-ACTION (RFC 5546 §2.1.4). The organizer
+ * (`organizer`) is left untouched.
  */
 export function normalizeSequence(
   oldIcs: string,
@@ -615,13 +615,13 @@ export function normalizeSequence(
   return { ics: serializeCalendar(newRoot), significant, rescheduled }
 }
 
-// --- Teilnehmer für den Versand ------------------------------------------------------------------------------------
+// --- Attendees for sending -----------------------------------------------------------------------------------------
 
 /**
- * Empfänger einer Organisator-Nachricht: alle ATTENDEEs außer dem Organisator;
- * Räume/Ressourcen und Einträge mit SCHEDULE-AGENT≠SERVER (Client versendet
- * dort nichts / bewusst unterdrückt) bleiben außen vor. Alle Komponenten
- * (Stamm + Ausnahmen) zählen.
+ * Recipients of an organizer message: all ATTENDEEs except the organizer;
+ * rooms/resources and entries with SCHEDULE-AGENT≠SERVER (the client sends
+ * nothing there / deliberately suppressed) are left out. All components
+ * (master + exceptions) count.
  */
 export function inviteRecipients(ics: string, organizer: string | null): string[] {
   const root = parseCalendar(ics)
@@ -640,7 +640,7 @@ export function inviteRecipients(ics: string, organizer: string | null): string[
   return [...out]
 }
 
-/** Organisator der Ressource (kleingeschrieben) oder null. */
+/** Organizer of the resource (lowercase) or null. */
 export function organizerOf(ics: string): string | null {
   try {
     const comp = pickComponent(parseCalendar(ics))
@@ -650,7 +650,7 @@ export function organizerOf(ics: string): string | null {
   }
 }
 
-/** Alle ATTENDEE-Adressen (kleingeschrieben) über alle Komponenten. */
+/** All ATTENDEE addresses (lowercase) across all components. */
 export function attendeeAddresses(ics: string): Set<string> {
   const out = new Set<string>()
   try {
@@ -661,7 +661,7 @@ export function attendeeAddresses(ics: string): Set<string> {
       }
     }
   } catch {
-    // unlesbar → leer
+    // unreadable → empty
   }
   return out
 }
@@ -674,7 +674,7 @@ export interface BusyInterval {
   type: 'BUSY' | 'BUSY-TENTATIVE' | 'BUSY-UNAVAILABLE'
 }
 
-/** Sortiert und verschmilzt überlappende Intervalle desselben Typs. */
+/** Sorts and merges overlapping intervals of the same type. */
 export function mergeBusy(list: BusyInterval[]): BusyInterval[] {
   const sorted = [...list]
     .filter((b) => b.endUtc > b.startUtc)
@@ -689,7 +689,7 @@ export function mergeBusy(list: BusyInterval[]): BusyInterval[] {
   return out
 }
 
-/** FREEBUSY-Perioden eines VFREEBUSY (FREE wird ignoriert). */
+/** FREEBUSY periods of a VFREEBUSY (FREE is ignored). */
 export function parseFreeBusy(text: string): BusyInterval[] {
   const out: BusyInterval[] = []
   let root: ICAL.Component
@@ -713,7 +713,7 @@ export function parseFreeBusy(text: string): BusyInterval[] {
             out.push({ startUtc: start, endUtc: end, type })
           }
         } catch {
-          // kaputte Periode überspringen
+          // skip broken period
         }
       }
     }
@@ -721,7 +721,7 @@ export function parseFreeBusy(text: string): BusyInterval[] {
   return mergeBusy(out)
 }
 
-/** VFREEBUSY-Anfrage (METHOD:REQUEST) für den Scheduling-Outbox (RFC 6638 §5.1). */
+/** VFREEBUSY request (METHOD:REQUEST) for the scheduling outbox (RFC 6638 §5.1). */
 export function buildFreeBusyRequest(opts: {
   organizer: string
   attendees: string[]

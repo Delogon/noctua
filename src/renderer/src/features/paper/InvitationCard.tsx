@@ -11,10 +11,9 @@ import {
 } from '@renderer/features/paper/invitation-format'
 
 /**
- * Einladungskarte (iMIP) über dem Mailtext. Inhalt kommt aus der Mail und ist
- * unvertrauenswürdig: alles wird als Klartext gesetzt, Links in der
- * Beschreibung sind nicht klickbar, nichts wird ohne Klick in den Kalender
- * übernommen.
+ * Invitation card (iMIP) above the mail text. Content comes from the mail and
+ * is untrusted: everything is set as plain text, links in the description
+ * are not clickable, nothing is added to the calendar without a click.
  */
 
 const S = {
@@ -479,7 +478,7 @@ function Note({
   )
 }
 
-/** Mount-Punkt in EmailSheet: rendert nichts, solange die Mail keine Einladung enthält. */
+/** Mount point in EmailSheet: renders nothing as long as the mail contains no invitation. */
 export function InvitationCards({ messageId }: { messageId: number }): React.JSX.Element | null {
   const q = useQuery({
     queryKey: ['invitations', messageId],

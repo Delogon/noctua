@@ -2,9 +2,9 @@ import { ImapFlow, type FetchMessageObject, type MessageAddressObject } from 'im
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { isTlsPinMismatch } from '../auth/loopback-tls'
 import { imapConnectOptions, type AccountRow, type MailCredentials } from '../auth/providers'
-import { parseMail } from '../mail/parser'
+import { parseMail, type ParsedMail } from '../mail/parser'
 import {
-  applyFlagUpdate,
+  applyFlagUpdates,
   deleteByUids,
   storeBody,
   upsertEnvelope,
@@ -19,32 +19,38 @@ import {
 } from '../db/repos/message-headers'
 import { OpDeadError } from './op-queue'
 import { resetFolderForUidValidity } from './uidvalidity'
+import { inferSpecialUses } from '@shared/folder-roles'
+import { metrics } from '../diagnostics/metrics'
 
 const DEFAULT_ENVELOPE_BACKFILL_DAYS = 90
 export const SEARCH_BACKFILL_DAYS = 183
 const ENVELOPE_CHUNK = 200
 const BODY_CHUNK = 10
 const BODY_PASS_LIMIT = 50
+/** After this many failed fetches the backfill skips a message (opening it still fetches). */
+export const MAX_BODY_ATTEMPTS = 3
+/** Larger messages are skipped by the background backfill (parser DoS defense); opening one still fetches it. */
+export const MAX_BACKFILL_BODY_BYTES = 64 * 1024 * 1024
 const FLAG_RESYNC_WINDOW = 500
 const BACKOFF_BASE_MS = 5_000
 const BACKOFF_MAX_MS = 5 * 60_000
-// Falls IDLE still stirbt: INBOX zusätzlich regelmäßig abfragen
+// In case IDLE dies silently: additionally poll INBOX regularly
 const INBOX_WATCHDOG_MS = 5 * 60_000
 
 export type SyncState = 'idle' | 'connecting' | 'syncing' | 'error' | 'needs-reauth' | 'off'
 
 /**
- * Login vom Server abgelehnt (imapflow setzt `authenticationFailed`)? Dann
- * hilft kein Reconnect-Loop — der Nutzer muss neue Zugangsdaten liefern.
+ * Login rejected by the server (imapflow sets `authenticationFailed`)? Then
+ * no reconnect loop helps — the user has to provide new credentials.
  */
 export function isAuthFailure(error: unknown): boolean {
   const e = error as { authenticationFailed?: unknown; serverResponseCode?: unknown } | null
   return (
     e?.authenticationFailed === true ||
     e?.serverResponseCode === 'AUTHENTICATIONFAILED' ||
-    // OAuth-Refresh gescheitert (invalid_grant / interaction_required)
+    // OAuth refresh failed (invalid_grant / interaction_required)
     isReauthError(error) ||
-    // Bridge-Zertifikat geändert: kein Retry-Loop, Nutzer bestätigt per Passwort
+    // Bridge certificate changed: no retry loop, user confirms via password
     isTlsPinMismatch(error)
   )
 }
@@ -63,7 +69,7 @@ export interface QueuedOp {
     add?: string[]
     remove?: string[]
     targetSpecialUse?: string
-    /** UIDVALIDITY des Ordners beim Einreihen — bei Abweichung sind die UIDs ungültig. */
+    /** The folder's UIDVALIDITY at enqueue — if it differs, the UIDs are invalid. */
     uidValidity?: number
   }
 }
@@ -81,15 +87,32 @@ interface FolderRow {
 
 const SEARCHABLE_SPECIAL_USES = new Set(['\\Inbox', '\\Sent', '\\Archive'])
 
+/**
+ * Next messages for the body backfill (parameters: folder id,
+ * MAX_BODY_ATTEMPTS, cutoff, excluded ids, limit). Walks the partial index
+ * idx_msg_body_pending (only messages without a body) newest first.
+ */
+export function pendingBodiesSql(excludedCount: number): string {
+  const exclusion =
+    excludedCount > 0 ? `AND id NOT IN (${Array(excludedCount).fill('?').join(',')})` : ''
+  return `SELECT id, uid, thread_key FROM messages
+    WHERE folder_id = ? AND body_state = 'none' AND body_attempts < ?
+      AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
+      AND coalesce(size, 0) <= ${MAX_BACKFILL_BODY_BYTES}
+      ${exclusion}
+    ORDER BY coalesce(date, internal_date) DESC, id DESC
+    LIMIT ?`
+}
+
 function isSearchableFolder(folder: Pick<FolderRow, 'special_use'>): boolean {
   return folder.special_use !== null && SEARCHABLE_SPECIAL_USES.has(folder.special_use)
 }
 
 /**
- * Backfill-Grenze eines Kontos als Epoch-Millisekunden: ein gesetzter
- * Sync-Zeitraum (accounts.sync_days) gilt für Liste UND Suche, 0 heißt
- * „alles synchronisieren" (Grenze 0). Ohne Einstellung gelten die
- * Standardfenster (90 Tage Liste, 183 Tage Suche).
+ * An account's backfill limit as epoch milliseconds: a set
+ * sync period (accounts.sync_days) applies to list AND search, 0 means
+ * "sync everything" (limit 0). Without a setting the
+ * default windows apply (90 days list, 183 days search).
  */
 export function backfillCutoff(
   syncDays: number | null | undefined,
@@ -102,9 +125,9 @@ export function backfillCutoff(
 }
 
 /**
- * Iterativ statt rekursiv: BODYSTRUCTURE kommt vom Server — eine tief
- * verschachtelte Struktur darf keinen Stack-Overflow auslösen, der die
- * Ingest-Transaktion bei jedem Sync erneut abbricht (SEC, vuln-0008).
+ * Iterative instead of recursive: BODYSTRUCTURE comes from the server — a deeply
+ * nested structure must not trigger a stack overflow that aborts the
+ * ingest transaction again on every sync (SEC, vuln-0008).
  */
 export function structureHasAttachments(root: unknown): boolean {
   const stack: unknown[] = [root]
@@ -114,7 +137,9 @@ export function structureHasAttachments(root: unknown): boolean {
     const n = node as { disposition?: string; childNodes?: unknown[] }
     if (typeof n.disposition === 'string' && n.disposition.toLowerCase() === 'attachment')
       return true
-    if (Array.isArray(n.childNodes)) stack.push(...n.childNodes)
+    if (Array.isArray(n.childNodes)) {
+      for (const child of n.childNodes) stack.push(child)
+    }
   }
   return false
 }
@@ -125,7 +150,7 @@ function extractHeader(headers: Buffer | undefined, name: string): string | null
   return headers.toString('binary').match(pattern)?.[1] ?? null
 }
 
-/** Obergrenze für References — die jüngsten (letzten) Einträge reichen fürs Threading. */
+/** Upper limit for References — the newest (last) entries suffice for threading. */
 const MAX_REFERENCES = 100
 
 function extractReferences(headers: Buffer | undefined): string[] {
@@ -183,8 +208,8 @@ function toEnvelopeData(msg: FetchMessageObject): EnvelopeData {
 }
 
 /**
- * Synchronisiert ein Konto: Kommando-Verbindung (Backfill, Fetches, Ops) plus
- * dedizierte IDLE-Verbindung auf INBOX. Reconnect mit Exponential-Backoff.
+ * Syncs an account: command connection (backfill, fetches, ops) plus
+ * a dedicated IDLE connection on INBOX. Reconnect with exponential backoff.
  */
 export class AccountSyncer {
   private cmd: ImapFlow | null = null
@@ -197,7 +222,7 @@ export class AccountSyncer {
   private pollTimer: NodeJS.Timeout | null = null
   private watchdogTimer: NodeJS.Timeout | null = null
   private needsReauth = false
-  // Noch nicht gestartete Ordner-Syncs — gleiche Anforderungen teilen sich einen Lauf
+  // Folder syncs not yet started — identical requests share one run
   private pendingFolderSyncs = new Map<number, Promise<void>>()
   private folders: FolderRow[] = []
 
@@ -225,16 +250,16 @@ export class AccountSyncer {
   }
 
   /**
-   * Bricht einen laufenden Backoff-Wait ab (z. B. nach System-Wakeup). Im
-   * needs-reauth-Zustand bewusst wirkungslos: Wiederholte falsche Logins
-   * können das Konto beim Anbieter sperren.
+   * Aborts a running backoff wait (e.g. after system wakeup). Deliberately
+   * ineffective in the needs-reauth state: repeated wrong logins
+   * can get the account locked at the provider.
    */
   wake(): void {
     if (this.needsReauth) return
     this.wakeReconnect?.()
   }
 
-  /** Nutzer-Aktion (RETRY, neue Zugangsdaten): beendet auch needs-reauth. */
+  /** User action (RETRY, new credentials): also ends needs-reauth. */
   retryNow(): void {
     this.needsReauth = false
     this.wakeReconnect?.()
@@ -244,7 +269,7 @@ export class AccountSyncer {
     return !!this.cmd?.usable
   }
 
-  /** Serialisiert Arbeit auf der Kommando-Verbindung. */
+  /** Serializes work on the command connection. */
   private enqueue<T>(fn: () => Promise<T>): Promise<T> {
     const next = this.chain.then(fn, fn)
     this.chain = next.catch(() => undefined)
@@ -264,8 +289,8 @@ export class AccountSyncer {
         const message = error instanceof Error ? error.message : String(error)
         console.warn(`[sync:${this.account.email}] error: ${message}`)
         if (isAuthFailure(error)) {
-          // Kein Backoff-Loop gegen falsche Zugangsdaten: warten, bis der Nutzer
-          // RETRY drückt oder die Zugangsdaten ändert (retryNow / Neustart).
+          // No backoff loop against wrong credentials: wait until the user
+          // presses RETRY or changes the credentials (retryNow / restart).
           this.needsReauth = true
           this.backoffAttempt = 0
           this.events.onState('needs-reauth', message)
@@ -310,11 +335,15 @@ export class AccountSyncer {
     for (const folder of folders) {
       if (folder.sync_mode !== 'full') continue
       await this.enqueue(() => this.syncFolder(folder))
-      if (folder.special_use === '\\Sent') rebuildContactStats(this.db, this.account.id)
+      if (folder.special_use === '\\Sent') {
+        metrics.time('db.contacts.rebuildStats', () =>
+          rebuildContactStats(this.db, this.account.id)
+        )
+      }
     }
     const inbox = folders.find((f) => f.special_use === '\\Inbox')
-    // IDLE zuerst starten; der progressive Body-Backfill darf neue Mails nicht
-    // fuer Minuten blockieren.
+    // Start IDLE first; the progressive body backfill must not block new mails
+    // for minutes.
     if (inbox) await this.startIdle(inbox)
 
     for (const folder of folders.filter(isSearchableFolder)) {
@@ -322,7 +351,7 @@ export class AccountSyncer {
         console.warn(`[sync:${this.account.email}] Body-Backfill ${folder.path}:`, error)
       )
     }
-    // Nicht-INBOX-Ordner haben kein IDLE — alle 10 Minuten inkrementell nachziehen.
+    // Non-INBOX folders have no IDLE — catch up incrementally every 10 minutes.
     if (this.pollTimer) clearInterval(this.pollTimer)
     this.pollTimer = setInterval(() => {
       for (const folder of this.folders) {
@@ -333,8 +362,8 @@ export class AccountSyncer {
         }
       }
     }, 10 * 60_000)
-    // Watchdog: IDLE kann ohne close-Event sterben — dann würde die INBOX nie
-    // wieder syncen. Scheitert der Poll, greift der normale Reconnect.
+    // Watchdog: IDLE can die without a close event — then the INBOX would never
+    // sync again. If the poll fails, the normal reconnect kicks in.
     if (this.watchdogTimer) clearInterval(this.watchdogTimer)
     this.watchdogTimer = null
     if (inbox) {
@@ -347,53 +376,84 @@ export class AccountSyncer {
   }
 
   /**
-   * Manueller Refresh (Refresh-Button/⌘K): alle Voll-Sync-Ordner sofort
-   * inkrementell nachziehen, statt auf IDLE bzw. den 10-Minuten-Poll zu
-   * warten — für Ordner ohne IDLE (v. a. Spam) der einzige schnelle Weg.
+   * Manual refresh (refresh button/⌘K): catch up all full-sync folders
+   * incrementally right away instead of waiting for IDLE or the 10-minute
+   * poll — the only fast path for folders without IDLE (esp. spam).
    */
   refreshNow(): void {
-    // Getrennt/Backoff: aufwecken reicht — der Reconnect synct ohnehin alles.
+    // Disconnected/backoff: waking up is enough — the reconnect syncs everything anyway.
     this.retryNow()
     if (!this.cmd) return
-    for (const folder of this.folders) {
-      if (folder.sync_mode !== 'full') continue
-      void this.enqueueFolderSync(folder).catch((error) =>
-        console.warn(`[sync:${this.account.email}] Refresh ${folder.path}:`, error)
-      )
-    }
+    // Re-read the folder list: new folders and a toggled folder sync
+    // (mail.showFolders) take effect without a reconnect.
+    void this.enqueue(async () => {
+      this.folders = await this.syncFolderList()
+    })
+      .catch((error) => console.warn(`[sync:${this.account.email}] Ordnerliste:`, error))
+      .then(() => {
+        for (const folder of this.folders) {
+          if (folder.sync_mode !== 'full') continue
+          void this.enqueueFolderSync(folder).catch((error) =>
+            console.warn(`[sync:${this.account.email}] Refresh ${folder.path}:`, error)
+          )
+        }
+      })
   }
 
-  /** Gezielter Resync eines Ordners (z. B. Sent direkt nach dem Senden). */
+  /** Targeted resync of a folder (e.g. Sent right after sending). */
   resyncSpecialUse(specialUse: string): Promise<void> {
     const folder = this.folders.find((f) => f.special_use === specialUse)
     if (!folder || !this.cmd) return Promise.resolve()
     return this.enqueueFolderSync(folder).then(() => {
-      if (specialUse === '\\Sent') rebuildContactStats(this.db, this.account.id)
+      if (specialUse === '\\Sent') {
+        metrics.time('db.contacts.rebuildStats', () =>
+          rebuildContactStats(this.db, this.account.id)
+        )
+      }
     })
   }
 
   /**
-   * Reiht einen Ordner-Sync (+ Body-Backfill) ein. Ist für den Ordner schon
-   * einer eingereiht, der noch nicht läuft, teilen sich beide Anforderungen
-   * diesen Lauf — IDLE-Bursts, Poll und Refresh stauen sich nicht mehr auf.
+   * Enqueues a folder sync (+ body backfill). If one is already queued for the
+   * folder and not yet running, both requests share
+   * that run — IDLE bursts, poll and refresh no longer pile up.
    */
   private enqueueFolderSync(folder: FolderRow): Promise<void> {
     const pending = this.pendingFolderSyncs.get(folder.id)
     if (pending) return pending
     const run = this.enqueue(async () => {
-      this.pendingFolderSyncs.delete(folder.id) // ab jetzt zählt eine neue Anforderung wieder
+      this.pendingFolderSyncs.delete(folder.id) // from now on a new request counts again
       await this.syncFolder(folder)
       if (isSearchableFolder(folder)) await this.backfillBodies(folder)
     })
     this.pendingFolderSyncs.set(folder.id, run)
-    // Scheitert der Lauf, bevor er startete, darf der Eintrag nicht hängen bleiben
+    // If the run fails before it started, the entry must not get stuck
     void run.catch(() => {
       if (this.pendingFolderSyncs.get(folder.id) === run) this.pendingFolderSyncs.delete(folder.id)
     })
     return run
   }
 
-  /** Ordner nach verworfener Op neu abgleichen lassen (voller Backfill dedupliziert). */
+  /**
+   * Stored UIDs are only valid for the UIDVALIDITY they were synced under. If
+   * the locked mailbox reports another one, a UID fetch would return a different
+   * message — skip it and let the folder sync run the reset.
+   */
+  private uidValidityChanged(folderId: number, expected: number | null): boolean {
+    const mailbox = this.cmd?.mailbox
+    const live = mailbox && typeof mailbox !== 'boolean' ? Number(mailbox.uidValidity) : null
+    if (expected === null || live === null || live === expected) return false
+    console.warn(`[sync:${this.account.email}] UIDVALIDITY ${expected} → ${live}, fetch skipped`)
+    const folder = this.folders.find((f) => f.id === folderId)
+    if (folder) {
+      void this.enqueueFolderSync(folder).catch((error) =>
+        console.warn(`[sync:${this.account.email}] Resync ${folder.path}:`, error)
+      )
+    }
+    return true
+  }
+
+  /** Have the folder re-reconciled after a discarded op (full backfill dedupes). */
   invalidateFolder(folderId: number): void {
     const folder = this.folders.find((f) => f.id === folderId)
     this.db
@@ -423,19 +483,27 @@ export class AccountSyncer {
     const list = await this.cmd!.list()
     const rows: FolderRow[] = []
     const upsert = this.db.prepare(
-      `INSERT INTO folders (account_id, path, special_use, sync_mode)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO folders (account_id, path, special_use, sync_mode, delimiter)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(account_id, path) DO UPDATE SET
-         special_use = excluded.special_use, sync_mode = excluded.sync_mode
+         special_use = excluded.special_use, sync_mode = excluded.sync_mode,
+         delimiter = excluded.delimiter
        RETURNING id, path, special_use, uidvalidity, uidnext, sync_mode,
                  envelope_backfill_since, body_backfill_since`
     )
-    for (const box of list) {
-      let specialUse = box.specialUse ?? null
-      if (box.path.toUpperCase() === 'INBOX') specialUse = '\\Inbox'
+    // Folder view on: sync own folders too (envelopes in the backfill window)
+    const userFolders =
+      (
+        this.db.prepare("SELECT value FROM settings WHERE key = 'mail.showFolders'").get() as
+          { value: string } | undefined
+      )?.value === '1'
+    // Server without SPECIAL-USE: fill in roles by name — esp. Junk
+    const specialUses = inferSpecialUses(list)
+    list.forEach((box, i) => {
+      const specialUse = specialUses[i]
       let syncMode = 'off'
-      // Junk voll syncen: der SPAM-Ordner-Filter braucht die Envelopes.
-      // Triage/Embeddings/Badge bleiben auf \Inbox begrenzt — Spam kostet nichts.
+      // Sync Junk fully: the SPAM folder filter needs the envelopes.
+      // Triage/embeddings/badge stay limited to \Inbox — spam costs nothing.
       if (
         specialUse === '\\Inbox' ||
         specialUse === '\\Sent' ||
@@ -444,14 +512,25 @@ export class AccountSyncer {
       )
         syncMode = 'full'
       else if (specialUse === '\\Trash') syncMode = 'flags'
-      // Gmail "Alle Nachrichten" ist die Duplikat-Falle — nie synchronisieren.
+      else if (specialUse === null && userFolders && !box.flags?.has('\\Noselect'))
+        syncMode = 'full'
+      // Gmail "All Mail" is the duplicate trap — never sync it.
       if (specialUse === '\\All' || specialUse === '\\Flagged') syncMode = 'off'
-      rows.push(upsert.get(this.account.id, box.path, specialUse, syncMode) as FolderRow)
-    }
+      rows.push(
+        upsert.get(
+          this.account.id,
+          box.path,
+          specialUse,
+          syncMode,
+          box.delimiter ?? null
+        ) as FolderRow
+      )
+    })
     return rows
   }
 
   private async syncFolder(folder: FolderRow): Promise<void> {
+    const endSpan = metrics.span('sync.folder')
     const lock = await this.cmd!.getMailboxLock(folder.path)
     try {
       const mailbox = this.cmd!.mailbox
@@ -460,7 +539,7 @@ export class AccountSyncer {
 
       if (folder.uidvalidity !== null && folder.uidvalidity !== uidValidity) {
         console.warn(`[sync:${this.account.email}] UIDVALIDITY changed for ${folder.path} — reset`)
-        // Atomar (REL-3): löschen + neue UIDVALIDITY + Cursor-Reset in einer Transaktion
+        // Atomic (REL-3): delete + new UIDVALIDITY + cursor reset in one transaction
         resetFolderForUidValidity(this.db, folder.id, uidValidity)
         folder.uidvalidity = uidValidity
         folder.uidnext = null
@@ -468,12 +547,20 @@ export class AccountSyncer {
         folder.body_backfill_since = null
       }
 
+      if (folder.uidvalidity === null) {
+        // Stamp before the first backfill: ops on messages ingested now carry it
+        this.db
+          .prepare('UPDATE folders SET uidvalidity = ? WHERE id = ?')
+          .run(uidValidity, folder.id)
+        folder.uidvalidity = uidValidity
+      }
+
       if (folder.uidnext === null) {
         await this.backfillFolder(folder)
       } else {
         await this.incrementalSync(folder)
-        // M13: bestehende Konten hatten bereits uidnext, aber nur 90 Tage.
-        // Der Cursor zieht die fehlende Historie genau einmal nach.
+        // M13: existing accounts already had uidnext, but only 90 days.
+        // The cursor catches up on the missing history exactly once.
         if (isSearchableFolder(folder)) await this.backfillFolder(folder)
       }
 
@@ -484,6 +571,7 @@ export class AccountSyncer {
       folder.uidnext = mailbox.uidNext ?? folder.uidnext
     } finally {
       lock.release()
+      endSpan()
     }
   }
 
@@ -511,13 +599,24 @@ export class AccountSyncer {
 
   private ingestBatch(folder: FolderRow, messages: FetchMessageObject[]): string[] {
     const threadKeys = new Set<string>()
+    // Per-message savepoint: one poison message is skipped instead of rolling
+    // back the batch — otherwise UIDNEXT never advances and the folder stalls.
+    const ingestOne = this.db.transaction((msg: FetchMessageObject) =>
+      upsertEnvelope(this.db, this.account.id, folder.id, toEnvelopeData(msg))
+    )
     const tx = this.db.transaction(() => {
       for (const msg of messages) {
-        const result = upsertEnvelope(this.db, this.account.id, folder.id, toEnvelopeData(msg))
-        if (result) threadKeys.add(result.threadKey)
+        try {
+          const result = ingestOne(msg)
+          if (result) threadKeys.add(result.threadKey)
+        } catch (error) {
+          console.warn(`[sync:${this.account.email}] envelope uid ${msg.uid} skipped:`, error)
+          metrics.count('sync.envelopesSkipped', 1)
+        }
       }
     })
-    tx()
+    metrics.time('sync.ingestBatch', tx, { messages: messages.length })
+    metrics.count('sync.envelopesIngested', messages.length)
     return [...threadKeys]
   }
 
@@ -547,6 +646,7 @@ export class AccountSyncer {
     for (let i = 0; i < missing.length; i += ENVELOPE_CHUNK) {
       if (this.stopped) return
       const chunk = missing.slice(i, i + ENVELOPE_CHUNK)
+      const endChunk = metrics.span('sync.backfill.envelopeChunk')
       const messages: FetchMessageObject[] = []
       for await (const msg of this.cmd!.fetch(chunk.join(','), this.fetchOptions(), {
         uid: true
@@ -554,6 +654,7 @@ export class AccountSyncer {
         messages.push(msg)
       }
       const threadKeys = this.ingestBatch(folder, messages)
+      endChunk({ messages: messages.length })
       this.events.onMessagesChanged(folder.id, threadKeys)
     }
     if (isSearchableFolder(folder)) {
@@ -565,89 +666,139 @@ export class AccountSyncer {
   }
 
   private async incrementalSync(folder: FolderRow): Promise<void> {
-    // 1) Neue Nachrichten ab bekanntem UIDNEXT
+    // 1) New messages from the known UIDNEXT
+    const endNew = metrics.span('sync.incremental.newMessages')
     const messages: FetchMessageObject[] = []
     for await (const msg of this.cmd!.fetch(`${folder.uidnext}:*`, this.fetchOptions(), {
       uid: true
     })) {
       if (msg.uid >= (folder.uidnext ?? 0)) messages.push(msg)
     }
+    endNew({ messages: messages.length })
     if (messages.length > 0) {
       const threadKeys = this.ingestBatch(folder, messages)
       this.events.onMessagesChanged(folder.id, threadKeys)
     }
 
-    // 2) Flags + Expunge im jüngsten Fenster (CONDSTORE-unabhängig, robust)
+    // 2) Flags + expunge in the most recent window (CONDSTORE-independent, robust)
     const known = this.db
       .prepare('SELECT uid FROM messages WHERE folder_id = ? ORDER BY uid DESC LIMIT ?')
       .all(folder.id, FLAG_RESYNC_WINDOW) as Array<{ uid: number }>
     if (known.length === 0) return
     const minUid = known[known.length - 1].uid
+    const endFlags = metrics.span('sync.incremental.flags')
     const serverUids = new Set<number>()
-    const changedThreads = new Set<string>()
+    const updates: Array<{ uid: number; flags: Set<string> }> = []
     for await (const msg of this.cmd!.fetch(
       `${minUid}:*`,
       { uid: true, flags: true },
       { uid: true }
     )) {
       serverUids.add(msg.uid)
-      const id = applyFlagUpdate(this.db, folder.id, msg.uid, msg.flags ?? new Set())
-      if (id !== null) {
-        const row = this.db.prepare('SELECT thread_key FROM messages WHERE id = ?').get(id) as
-          { thread_key: string } | undefined
-        if (row) changedThreads.add(row.thread_key)
-      }
+      updates.push({ uid: msg.uid, flags: msg.flags ?? new Set() })
     }
+    // Only real changes count: an unchanged window must not refresh ~500 threads
+    const changedThreads = applyFlagUpdates(this.db, folder.id, updates)
     const vanished = known.filter((k) => !serverUids.has(k.uid)).map((k) => k.uid)
     if (vanished.length > 0) deleteByUids(this.db, folder.id, vanished)
-    if (vanished.length > 0 || changedThreads.size > 0) {
-      this.events.onMessagesChanged(folder.id, [...changedThreads])
+    endFlags({
+      uids: serverUids.size,
+      changedThreads: changedThreads.length,
+      vanished: vanished.length
+    })
+    if (vanished.length > 0 || changedThreads.length > 0) {
+      this.events.onMessagesChanged(folder.id, changedThreads)
     }
   }
 
   private async backfillBodies(folder: FolderRow, skippedIds: number[] = []): Promise<void> {
     if (!isSearchableFolder(folder)) return
+    const endPass = metrics.span('sync.bodies.pass')
     const cutoff = backfillCutoff(this.account.sync_days, true)
     const excluded = [...new Set(skippedIds)]
-    const exclusionSql =
-      excluded.length > 0 ? `AND id NOT IN (${excluded.map(() => '?').join(',')})` : ''
     const pending = this.db
-      .prepare(
-        `SELECT id FROM messages
-         WHERE folder_id = ? AND body_state = 'none'
-           AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
-           ${exclusionSql}
-         ORDER BY coalesce(date, internal_date) DESC, id DESC
-         LIMIT ?`
-      )
-      .all(folder.id, cutoff, ...excluded, BODY_PASS_LIMIT) as Array<{ id: number }>
+      .prepare(pendingBodiesSql(excluded.length))
+      .all(folder.id, MAX_BODY_ATTEMPTS, cutoff, ...excluded, BODY_PASS_LIMIT) as Array<{
+      id: number
+      uid: number
+      thread_key: string
+    }>
 
     const failedIds: number[] = []
     for (let i = 0; i < pending.length; i += BODY_CHUNK) {
       if (this.stopped) return
       const batch = pending.slice(i, i + BODY_CHUNK)
-      const threadKeys = new Set<string>()
-      // Ein Lock pro Batch — garantiert die richtige selektierte Mailbox.
+      // One FETCH per batch instead of one round trip per message. The lock
+      // guarantees the right selected mailbox.
+      const sources = new Map<number, Buffer>()
       const lock = await this.cmd!.getMailboxLock(folder.path)
       try {
-        for (const { id } of batch) {
-          const key = await this.fetchBodyInSelectedMailbox(id)
-          if (key) threadKeys.add(key)
-          else failedIds.push(id)
-        }
+        if (this.uidValidityChanged(folder.id, folder.uidvalidity)) return
+        await metrics.timeAsync(
+          'sync.bodies.fetchChunk',
+          async () => {
+            for await (const msg of this.cmd!.fetch(
+              batch.map((row) => row.uid).join(','),
+              { source: true },
+              { uid: true }
+            )) {
+              if (msg.source) sources.set(msg.uid, msg.source)
+            }
+          },
+          { messages: batch.length }
+        )
       } finally {
         lock.release()
       }
-      this.events.onMessagesChanged(folder.id, [...threadKeys])
+
+      const stored: Array<{ id: number; threadKey: string; source: Buffer; parsed: ParsedMail }> =
+        []
+      for (const row of batch) {
+        const source = sources.get(row.uid)
+        if (!source) {
+          failedIds.push(row.id)
+          continue
+        }
+        metrics.count('sync.bodies.bytes', source.length)
+        try {
+          const parsed = await metrics.timeAsync('mail.parse', () => parseMail(source), {
+            kb: Math.round(source.length / 1024)
+          })
+          stored.push({ id: row.id, threadKey: row.thread_key, source, parsed })
+        } catch (error) {
+          console.warn(`[sync:${this.account.email}] parse failed:`, error)
+          failedIds.push(row.id)
+        }
+      }
+      const batchFailed = batch.filter((row) => !stored.some((s) => s.id === row.id))
+      metrics.time(
+        'sync.bodies.store',
+        () =>
+          this.db.transaction(() => {
+            for (const s of stored) this.storeFetchedBody(s.id, s.source, s.parsed)
+            const countAttempt = this.db.prepare(
+              'UPDATE messages SET body_attempts = body_attempts + 1 WHERE id = ?'
+            )
+            for (const row of batchFailed) countAttempt.run(row.id)
+          })(),
+        { messages: stored.length }
+      )
+      for (const s of stored) this.applyIngestRules(s.id)
+      // A batch where every fetch failed changed nothing: no refresh
+      if (stored.length > 0) {
+        this.events.onMessagesChanged(folder.id, [...new Set(stored.map((s) => s.threadKey))])
+      }
     }
+    endPass({ pending: pending.length, failed: failedIds.length })
 
     const remaining = this.db
       .prepare(
         `SELECT count(*) AS count FROM messages
-         WHERE folder_id = ? AND body_state = 'none'
-           AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)`
+         WHERE folder_id = ? AND body_state = 'none' AND body_attempts < ?
+           AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
+      AND coalesce(size, 0) <= ${MAX_BACKFILL_BODY_BYTES}`
       )
-      .get(folder.id, cutoff) as { count: number }
+      .get(folder.id, MAX_BODY_ATTEMPTS, cutoff) as { count: number }
     if (remaining.count === 0) {
       this.db
         .prepare('UPDATE folders SET body_backfill_since = ? WHERE id = ?')
@@ -660,29 +811,23 @@ export class AccountSyncer {
       const untried = this.db
         .prepare(
           `SELECT count(*) AS count FROM messages
-           WHERE folder_id = ? AND body_state = 'none'
+           WHERE folder_id = ? AND body_state = 'none' AND body_attempts < ?
              AND (coalesce(date, internal_date) IS NULL OR coalesce(date, internal_date) >= ?)
+      AND coalesce(size, 0) <= ${MAX_BACKFILL_BODY_BYTES}
              ${nextExclusionSql}`
         )
-        .get(folder.id, cutoff, ...nextExcluded) as { count: number }
+        .get(folder.id, MAX_BODY_ATTEMPTS, cutoff, ...nextExcluded) as { count: number }
       if (untried.count === 0) return
-      // Naechsten kleinen Durchlauf hinten anstellen. So erreicht der Backfill
-      // mehr als 500 Bodies, ohne Senden/Archivieren minutenlang zu blockieren.
+      // Queue the next small pass at the back. That way the backfill reaches
+      // more than 500 bodies without blocking sending/archiving for minutes.
       void this.enqueue(() => this.backfillBodies(folder, nextExcluded)).catch((error) =>
         console.warn(`[sync:${this.account.email}] Body-Backfill ${folder.path}:`, error)
       )
     }
   }
 
-  /** Setzt voraus, dass die Mailbox der Nachricht bereits gelockt/selektiert ist. */
-  private async fetchBodyInSelectedMailbox(messageId: number): Promise<string | null> {
-    const row = this.db
-      .prepare('SELECT uid, thread_key FROM messages WHERE id = ?')
-      .get(messageId) as { uid: number; thread_key: string } | undefined
-    if (!row) return null
-    const msg = await this.cmd!.fetchOne(String(row.uid), { source: true }, { uid: true })
-    if (!msg || !msg.source) return null
-    const parsed = await parseMail(msg.source)
+  /** Body, attachments, search index and header details of a fetched message. */
+  private storeFetchedBody(messageId: number, source: Buffer, parsed: ParsedMail): void {
     storeBody(this.db, messageId, parsed)
     storeMessageHeaderDetails(this.db, messageId, {
       from: parsed.from ? [parsed.from] : [],
@@ -691,27 +836,53 @@ export class AccountSyncer {
       cc: parsed.cc,
       bcc: parsed.bcc ?? [],
       replyTo: parsed.replyTo,
-      rawHeaders: rawHeaderBlock(msg.source)
+      rawHeaders: rawHeaderBlock(source)
     })
+  }
+
+  private applyIngestRules(messageId: number): void {
     try {
       applyRules(this.db, messageId, 'ingest')
     } catch (error) {
       console.warn('[rules]', error)
     }
+  }
+
+  /** Assumes the message's mailbox is already locked/selected. */
+  private async fetchBodyInSelectedMailbox(messageId: number): Promise<string | null> {
+    const row = this.db
+      .prepare('SELECT uid, thread_key FROM messages WHERE id = ?')
+      .get(messageId) as { uid: number; thread_key: string } | undefined
+    if (!row) return null
+    const msg = await metrics.timeAsync('sync.bodies.fetchOne', () =>
+      this.cmd!.fetchOne(String(row.uid), { source: true }, { uid: true })
+    )
+    if (!msg || !msg.source) return null
+    metrics.count('sync.bodies.bytes', msg.source.length)
+    const parsed = await metrics.timeAsync('mail.parse', () => parseMail(msg.source!), {
+      kb: Math.round(msg.source.length / 1024)
+    })
+    metrics.time('sync.bodies.store', () =>
+      this.db.transaction(() => this.storeFetchedBody(messageId, msg.source!, parsed))()
+    )
+    this.applyIngestRules(messageId)
     return row.thread_key
   }
 
-  /** Roher RFC822-Source einer Nachricht (Attachment-Extraktion). */
+  /** Raw RFC822 source of a message (attachment extraction). */
   fetchRawSource(messageId: number): Promise<Buffer | null> {
     return this.enqueue(async () => {
       const row = this.db
         .prepare(
-          `SELECT m.uid, f.path FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
+          `SELECT m.uid, f.id folder_id, f.path, f.uidvalidity
+           FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
         )
-        .get(messageId) as { uid: number; path: string } | undefined
+        .get(messageId) as
+        { uid: number; folder_id: number; path: string; uidvalidity: number | null } | undefined
       if (!row || !this.cmd) return null
       const lock = await this.cmd.getMailboxLock(row.path)
       try {
+        if (this.uidValidityChanged(row.folder_id, row.uidvalidity)) return null
         const msg = await this.cmd.fetchOne(String(row.uid), { source: true }, { uid: true })
         return msg && msg.source ? msg.source : null
       } finally {
@@ -720,17 +891,20 @@ export class AccountSyncer {
     })
   }
 
-  /** Nur Envelope + vollständige Header; lädt keine oft großen Bodies/Anhänge. */
+  /** Only envelope + full headers; doesn't load often large bodies/attachments. */
   fetchMessageHeaders(messageId: number): Promise<FetchedMessageHeaderData | null> {
     return this.enqueue(async () => {
       const row = this.db
         .prepare(
-          `SELECT m.uid, f.path FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
+          `SELECT m.uid, f.id folder_id, f.path, f.uidvalidity
+           FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
         )
-        .get(messageId) as { uid: number; path: string } | undefined
+        .get(messageId) as
+        { uid: number; folder_id: number; path: string; uidvalidity: number | null } | undefined
       if (!row || !this.cmd) return null
       const lock = await this.cmd.getMailboxLock(row.path)
       try {
+        if (this.uidValidityChanged(row.folder_id, row.uidvalidity)) return null
         const msg = await this.cmd.fetchOne(
           String(row.uid),
           { headers: true, envelope: true },
@@ -753,17 +927,20 @@ export class AccountSyncer {
     })
   }
 
-  /** On-demand Body-Fetch (Reader öffnet eine Mail ohne gecachten Inhalt). */
+  /** On-demand body fetch (reader opens a mail without cached content). */
   fetchBody(messageId: number): Promise<string | null> {
     return this.enqueue(async () => {
       const row = this.db
         .prepare(
-          `SELECT f.path FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
+          `SELECT f.id folder_id, f.path, f.uidvalidity
+           FROM messages m JOIN folders f ON m.folder_id = f.id WHERE m.id = ?`
         )
-        .get(messageId) as { path: string } | undefined
+        .get(messageId) as
+        { folder_id: number; path: string; uidvalidity: number | null } | undefined
       if (!row) return null
       const lock = await this.cmd!.getMailboxLock(row.path)
       try {
+        if (this.uidValidityChanged(row.folder_id, row.uidvalidity)) return null
         return await this.fetchBodyInSelectedMailbox(messageId)
       } finally {
         lock.release()
@@ -791,7 +968,7 @@ export class AccountSyncer {
     this.idleConn.on('flags', trigger)
   }
 
-  /** Führt eine Queue-Operation auf der Kommando-Verbindung aus. */
+  /** Runs a queue operation on the command connection. */
   executeOp(op: QueuedOp): Promise<void> {
     return this.enqueue(async () => {
       const { payload } = op
@@ -802,8 +979,8 @@ export class AccountSyncer {
       if (!folder) throw new OpDeadError('folder-gone', 'Ordner existiert nicht mehr')
       const range = payload.uids.join(',')
 
-      // Zielordner VOR dem Lock auflösen: fehlt er, ist die Op dauerhaft
-      // unausführbar — nie still als Erfolg werten (Mail wäre lokal weg, serverseitig nicht).
+      // Resolve the target folder BEFORE the lock: if it's missing, the op is permanently
+      // unexecutable — never count it as silent success (mail gone locally, not on server).
       let moveTarget: string | null = null
       if (op.kind === 'move') {
         moveTarget = this.resolveSpecialUse(payload.targetSpecialUse)
@@ -816,7 +993,7 @@ export class AccountSyncer {
       }
       let deleteTrash: string | null = null
       if (op.kind === 'delete' && this.account.provider !== 'gmail') {
-        // Ohne Papierkorb NICHT hart löschen — Datenverlust wäre unumkehrbar
+        // Without a trash folder do NOT hard-delete — data loss would be irreversible
         deleteTrash = this.resolveSpecialUse('\\Trash')
         if (!deleteTrash) throw new OpDeadError('no-trash', 'Kein Papierkorb-Ordner vorhanden')
       }
@@ -839,8 +1016,8 @@ export class AccountSyncer {
           await this.cmd!.messageMove(range, moveTarget!, { uid: true })
         } else if (op.kind === 'delete') {
           if (this.account.provider === 'gmail') {
-            // Gmail: \Deleted + Expunge in INBOX = Archivieren (Label weg);
-            // echtes Löschen läuft als move nach \Trash.
+            // Gmail: \Deleted + expunge in INBOX = archive (label removed);
+            // real deletion runs as a move to \Trash.
             await this.cmd!.messageDelete(range, { uid: true })
           } else {
             await this.cmd!.messageMove(range, deleteTrash!, { uid: true })

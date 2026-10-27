@@ -143,7 +143,7 @@ describe('Sync: Lesen', () => {
     await syncAccount(ctxFor(), account)
 
     expect(localObjects().map((o) => o.summary)).toEqual(['a'])
-    // erst mit altem Token versucht (403), dann mit leerem Token
+    // first tried with the old token (403), then with an empty token
     const reports = server.callsOfKind('sync-collection')
     expect(reports).toHaveLength(2)
     expect(reports[0].body).toContain('tok-')
@@ -250,7 +250,7 @@ describe('Sync: Lesen', () => {
     )
     await syncAccount(ctxFor(), seedAccount())
     const n = (db.prepare('SELECT count(*) n FROM cal_instances').get() as { n: number }).n
-    // ~18 Monate Fenster
+    // ~18 month window
     expect(n).toBeGreaterThan(500)
     expect(n).toBeLessThan(600)
   })
@@ -284,7 +284,7 @@ describe('Sync: lokale Änderungen (offline-first)', () => {
       organizer: null
     })
     enqueueCreate(db, cal()!, uid, text)
-    // optimistisch lokal vorhanden, noch nicht auf dem Server
+    // optimistically present locally, not yet on the server
     const local = getObjectByHref(db, cal()!.id, `/dav/calendars/anna/personal/${uid}.ics`)!
     expect(local.pending_op).toBe('create')
     expect(local.etag).toBeNull()
@@ -364,7 +364,7 @@ describe('Sync: lokale Änderungen (offline-first)', () => {
       patch: { summary: 'meine Änderung' }
     }).ics
     enqueueUpdate(db, obj, cal()!, mine)
-    // anderer Client ändert zwischenzeitlich
+    // another client changes it in the meantime
     server.put('personal', 'a.ics', ev('a', 'Änderung vom Server'))
 
     await pushPendingOps(ctxFor(), account)
@@ -419,12 +419,12 @@ describe('Sync: lokale Änderungen (offline-first)', () => {
       updateIcs(obj.ics, { scope: 'all', recurrenceId: null, patch: { summary: 'lokal' } }).ics
     )
     server.put('personal', 'a.ics', ev('a', 'server'))
-    // Netz weg: Push scheitert, Lesen darf lokal nichts überschreiben
+    // Network down: push fails, reading must not overwrite anything locally
     const offline = new FakeCalDavServer()
     offline.throwNetwork = true
     await expect(syncAccount(ctxFor(offline), account)).rejects.toBeInstanceOf(DavTransportError)
     expect(getObjectByHref(db, cal()!.id, obj.href)!.summary).toBe('lokal')
-    expect(listPendingOps(db, account.id)[0].attempts).toBe(0) // Netzfehler zählt nicht
+    expect(listPendingOps(db, account.id)[0].attempts).toBe(0) // network error does not count
   })
 
   it('PUT ohne ETag im Response: Server-Fassung wird nachgeladen', async () => {
@@ -464,7 +464,7 @@ describe('Sync: lokale Änderungen (offline-first)', () => {
     await pushPendingOps(ctxFor(), account)
     expect(listDeadOps(db, account.id)).toHaveLength(1)
     expect(conflicts[0].reason).toBe('forbidden')
-    // etag zurückgesetzt → nächster Sync lädt die Server-Fassung
+    // etag reset → next sync loads the server version
     expect(getObjectByHref(db, cal()!.id, obj.href)!.etag).toBeNull()
     server.failWrites = null
     await syncAccount(ctxFor(), account)

@@ -6,7 +6,7 @@ import {
   type ComposeDraft
 } from '@renderer/lib/composeDraft'
 
-// Simulierter settings-Store hinter der Preload-Brücke
+// Simulated settings store behind the preload bridge
 const settings = new Map<string, string>()
 vi.stubGlobal('window', {
   noctua: {

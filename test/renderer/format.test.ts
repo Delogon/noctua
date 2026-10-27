@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { formatListDate, formatFullDate } from '@renderer/lib/format'
 
-// Fester „jetzt"-Zeitpunkt für deterministische Datums-Ausgaben
+// Fixed „now" timestamp for deterministic date output
 const NOW = new Date('2026-07-03T12:00:00')
 
 beforeAll(() => vi.setSystemTime(NOW))

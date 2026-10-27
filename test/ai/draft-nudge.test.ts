@@ -5,9 +5,9 @@ import { upsertEnvelope } from '@main/mail/ingest'
 import { setSetting } from '@main/db'
 import { closeTestDb, createAiTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 
-// Stups-Entwurf (M75): Der Prompt verhält sich zur Signatur wie der
-// Antwort-Prompt — mit eingerichteter Signatur schreibt das Modell keine
-// Grußformel, und eine trotzdem erzeugte wird vor der Anzeige gestrippt.
+// Nudge draft (M75): the prompt treats the signature like the
+// reply prompt — with a signature configured, the model writes no
+// sign-off, and one generated anyway is stripped before display.
 
 const { fakeCreate } = vi.hoisted(() => ({ fakeCreate: vi.fn() }))
 
@@ -15,7 +15,7 @@ vi.mock('@main/ai/providers/openai-factory', () => ({
   createOpenAiClient: () => ({ chat: { completions: { create: fakeCreate } } })
 }))
 
-/** Simulierter Streaming-Response: jedes Element ein Delta-Chunk. */
+/** Simulated streaming response: each element is a delta chunk. */
 function modelStreams(...chunks: string[]): void {
   fakeCreate.mockResolvedValueOnce(
     (async function* () {
@@ -29,7 +29,7 @@ interface DraftResult {
   error: string | null
 }
 
-/** Startet den Stups-Entwurf und sammelt alle Chunks bis done. */
+/** Starts the nudge draft and collects all chunks until done. */
 function collectNudge(
   db: Database.Database,
   input: { messageId: number; idea?: string }
@@ -104,14 +104,14 @@ describe('startDraftNudge — Signatur & Idee', () => {
     const result = await collectNudge(db, { messageId })
 
     expect(result.error).toBeNull()
-    // Grußformel + Namenszeile des Modells fliegen raus — die Signatur hängt
-    // erst der Versand-Pfad (sendMail) genau einmal an.
+    // The model's sign-off + name line are removed — only the send path
+    // (sendMail) appends the signature, exactly once.
     expect(result.text).toBe(
       'Hallo Heike,\n\nwollte kurz nachhaken, ob du meine Mail gesehen hast.'
     )
     const systemPrompt = fakeCreate.mock.calls[0][0].messages[0].content as string
-    expect(systemPrompt).toContain('KEINE Grußformel')
-    expect(systemPrompt).not.toContain('Grußformel des Nutzers')
+    expect(systemPrompt).toContain('NO sign-off')
+    expect(systemPrompt).not.toContain("the user's sign-off")
   })
 
   it('ohne Signatur: Grußformel des Nutzers bleibt erlaubt und erhalten', async () => {
@@ -123,7 +123,7 @@ describe('startDraftNudge — Signatur & Idee', () => {
     expect(result.error).toBeNull()
     expect(result.text).toBe('Hallo Heike,\n\nkurzer Stups.\n\nViele Grüße\nTim')
     const systemPrompt = fakeCreate.mock.calls[0][0].messages[0].content as string
-    expect(systemPrompt).toContain('Grußformel des Nutzers')
+    expect(systemPrompt).toContain("the user's sign-off")
   })
 
   it('reicht eine Nutzer-Idee (bearbeiteter Stups/Diktat) in den Prompt durch', async () => {
@@ -134,7 +134,7 @@ describe('startDraftNudge — Signatur & Idee', () => {
 
     const userPrompt = fakeCreate.mock.calls[0][0].messages[1].content as string
     expect(userPrompt).toContain('Bitte deutlich dringlicher, Frist Freitag.')
-    expect(userPrompt).not.toContain('Schreibe den Nachfass.')
+    expect(userPrompt).not.toContain('Write the follow-up.')
   })
 
   it('ohne Idee bleibt der klassische Auftrag bestehen', async () => {
@@ -144,6 +144,6 @@ describe('startDraftNudge — Signatur & Idee', () => {
     await collectNudge(db, { messageId })
 
     const userPrompt = fakeCreate.mock.calls[0][0].messages[1].content as string
-    expect(userPrompt).toContain('Schreibe den Nachfass.')
+    expect(userPrompt).toContain('Write the follow-up.')
   })
 })

@@ -1,5 +1,5 @@
-// Tastenbelegung der Kalenderansicht (nur aktiv, wenn die Ansicht offen ist).
-// Rein, damit die Keymap sie ohne DOM testen kann.
+// Key bindings of the calendar view (only active while the view is open).
+// Pure, so the keymap can test them without a DOM.
 
 export type CalendarAction =
   'day' | 'week' | 'month' | 'today' | 'prev' | 'next' | 'new' | 'open' | 'edit' | 'delete'

@@ -1,13 +1,13 @@
 /**
- * Adressat-Erkennung für die Aufgaben-Extraktion: Aufgaben dürfen nur
- * entstehen, wenn der Kontoinhaber wirklich gemeint ist — nicht bei
- * Verteiler-Zustellung an andere („Hallo Jannik" via Mailingliste).
+ * Addressee detection for task extraction: tasks may only be
+ * created if the account owner is really meant — not for
+ * distribution-list delivery to others ("Hallo Jannik" via mailing list).
  *
- * Drei Stufen, hier als pure Funktionen:
- *   1. Envelope: Wo steht die Konto-Adresse (An/CC/gar nicht)?
- *   2. Anrede: Wen spricht die erste Zeile namentlich an?
- *   3. LLM: addressed_to_me aus der Triage (probabilistisch, default true).
- * `taskAddresseeVerdict` bündelt alles zu 'create' | 'suggest' | 'none'.
+ * Three stages, here as pure functions:
+ *   1. Envelope: where is the account address (To/CC/not at all)?
+ *   2. Salutation: whom does the first line address by name?
+ *   3. LLM: addressed_to_me from triage (probabilistic, default true).
+ * `taskAddresseeVerdict` combines everything into 'create' | 'suggest' | 'none'.
  */
 
 export type RecipientPlacement = 'to' | 'cc' | 'absent'
@@ -35,10 +35,10 @@ function parseAddressList(json: string | null | undefined): string[] | null {
 }
 
 /**
- * Stufe 1 — Platzierung der Konto-Adresse im Envelope.
- * 'absent' = weder An noch CC (Verteiler-/Bcc-Zustellung).
- * Ohne Konto-Adresse oder ohne verwertbare Envelope-Daten neutral 'to',
- * damit unvollständige Altdaten nichts fälschlich unterdrücken.
+ * Stage 1 — placement of the account address in the envelope.
+ * 'absent' = neither To nor CC (distribution-list/Bcc delivery).
+ * Without an account address or usable envelope data, neutral 'to',
+ * so incomplete legacy data doesn't wrongly suppress anything.
  */
 export function recipientPlacement(
   accountEmail: string | null | undefined,
@@ -55,15 +55,15 @@ export function recipientPlacement(
   return 'absent'
 }
 
-// Grußformeln am Zeilenanfang („Hallo", „Sehr geehrte Frau …", „Dear …").
+// Greetings at the start of a line ("Hallo", "Sehr geehrte Frau …", "Dear …").
 const GREETING =
   /^(?:hallo|hall(?:ö|o)chen|hi|hey|hej|huhu|moin(?:\s+moin)?|servus|gr(?:ü|u)(?:ß|ss)\s+(?:dich|euch|gott)|guten\s+(?:morgen|tag|abend)|liebste[rs]?|liebe[rs]?|sehr\s+geehrte[rs]?|werte[rs]?|dear|hello|good\s+(?:morning|afternoon|evening))\b/i
 
-// Anreden an eine Gruppe oder direkt an „dich, den Leser" — kein Namens-Signal.
+// Salutations to a group or directly to "you, the reader" — no name signal.
 const GROUP_TARGET =
   /^(?:ihr\s+lieben|damen\s+und\s+herren|kolleg\p{L}*(?:\s+und\s+kolleg\p{L}*)?|team\p{L}*|zusammen|alle(?:rseits)?|miteinander|leute|freunde|folks|everyone|everybody|all|guys|ihr|du|sie)\b/iu
 
-// Titel vor Namen, die beim Vergleich nichts beitragen.
+// Titles before names that contribute nothing to the comparison.
 const TITLE = /^(?:herrn?|frau|fr(?:ä|a)ulein|dr|prof|mr|mrs|ms|miss|sir|madam)\.?$/i
 
 function firstUnquotedLine(text: string): string | null {
@@ -80,18 +80,18 @@ function cleanNameToken(token: string): string {
   return token.replace(/^[("'„“”«»]+/, '').replace(/[.,!?:;)"'„“”«»]+$/, '')
 }
 
-// Namens-Token: großgeschrieben, nur Buchstaben/Bindestrich/Apostroph.
-// Die Großschreibungs-Pflicht ist bewusst: Ein falsches „fremder Name" wäre
-// ein hartes Nein — im Zweifel lieber neutral bleiben.
+// Name token: capitalized, only letters/hyphen/apostrophe.
+// Requiring capitalization is deliberate: a wrong "foreign name" would be
+// a hard no — when in doubt, better stay neutral.
 function isNameToken(token: string): boolean {
   if (token.length < 2 || token.length > 30) return false
   return /^\p{Lu}[\p{L}'’-]*$/u.test(token)
 }
 
 /**
- * Stufe 2 — Wen spricht die erste nicht-zitierte Zeile an?
- * 'named' mit den erkannten Namen, 'group' bei „zusammen"/„alle"/„Team"/…,
- * 'none' ohne (verwertbare) Anrede.
+ * Stage 2 — whom does the first non-quoted line address?
+ * 'named' with the detected names, 'group' for "zusammen"/"alle"/"Team"/…,
+ * 'none' without a (usable) salutation.
  */
 export function salutationTarget(bodyText: string | null | undefined): SalutationTarget {
   const line = firstUnquotedLine(bodyText ?? '')
@@ -105,8 +105,8 @@ export function salutationTarget(bodyText: string | null | undefined): Salutatio
   if (!rest) return { kind: 'none' }
   if (GROUP_TARGET.test(rest)) return { kind: 'group' }
 
-  // „Hallo Tim und Anna," / „Liebe Marie, lieber Tom, hier …" — Segmente bis
-  // zum ersten Nicht-Namen (dort beginnt der Satz).
+  // "Hallo Tim und Anna," / "Liebe Marie, lieber Tom, hier …" — segments up to
+  // the first non-name (that's where the sentence begins).
   const names: string[] = []
   for (const segment of rest.split(/\s*(?:,|;|\bund\b|\band\b|&|\+|\/)\s*/i)) {
     if (!segment) continue
@@ -115,14 +115,14 @@ export function salutationTarget(bodyText: string | null | undefined): Salutatio
       .split(/\s+/)
       .map(cleanNameToken)
       .filter((t) => t.length > 0 && !TITLE.test(t))
-    if (tokens.length === 0) continue // reines Titel-Segment
+    if (tokens.length === 0) continue // pure title segment
     if (tokens.length > 3 || !tokens.every(isNameToken)) break
     names.push(tokens.join(' '))
   }
   return names.length > 0 ? { kind: 'named', names } : { kind: 'none' }
 }
 
-// Case- und diakritik-tolerante Normalisierung (Jörg → jorg, Groß → gross).
+// Case- and diacritic-tolerant normalization (Jörg → jorg, Groß → gross).
 function normalizeName(value: string): string {
   return value
     .toLowerCase()
@@ -138,9 +138,9 @@ function nameTokens(value: string): string[] {
 }
 
 /**
- * Stufe 2b — Nennt eine Anrede den Kontoinhaber? Verglichen wird gegen
- * Namens-Tokens aus display_name, account_name und dem Local-Part der
- * Adresse (lena.hartmann → lena, hartmann; lena.hartmann12 zusätzlich ohne Ziffern).
+ * Stage 2b — does a salutation name the account owner? Compared against
+ * name tokens from display_name, account_name and the local part of the
+ * address (lena.hartmann → lena, hartmann; lena.hartmann12 also without digits).
  */
 export function namesMatchOwner(names: string[], owner: OwnerIdentity): boolean {
   const ownerTokens = new Set<string>()
@@ -164,22 +164,22 @@ export interface AddresseeContext {
   accountName?: string | null
   toJson?: string | null
   ccJson?: string | null
-  /** Eigener Mailtext (ohne weitergeleiteten Block) für die Anrede-Analyse. */
+  /** Own mail text (without forwarded block) for the salutation analysis. */
   bodyText?: string | null
-  /** LLM-Einschätzung addressed_to_me; fehlend/null = true (Alt-Annotationen). */
+  /** LLM assessment addressed_to_me; missing/null = true (legacy annotations). */
   addressedToMe?: boolean | null
 }
 
 /**
- * Gesamtpolitik: Ist der Kontoinhaber gemeint?
- *   - Anrede nennt den Inhaber (allein oder unter mehreren) ⇒ 'create' —
- *     überstimmt auch 'absent' (via Verteiler persönlich angesprochen).
- *   - Anrede nennt AUSSCHLIESSLICH fremde Namen ⇒ 'none' (auch bei An).
- *   - Weder An noch CC (Verteiler/Bcc) ⇒ 'none'; nur CC ⇒ 'none' (wie bisher).
- *   - Sonst (An + neutrale Anrede): addressed_to_me=false ⇒ nur Vorschlag
- *     ('suggest'), andernfalls 'create'.
- * 'create' heißt „darf automatisch angelegt werden" — der M50-Toggle
- * (tasks.autoCreate) liegt weiterhin ÜBER dieser Politik.
+ * Overall policy: is the account owner meant?
+ *   - Salutation names the owner (alone or among several) ⇒ 'create' —
+ *     also overrides 'absent' (personally addressed via distribution list).
+ *   - Salutation names EXCLUSIVELY other names ⇒ 'none' (even when in To).
+ *   - Neither To nor CC (distribution list/Bcc) ⇒ 'none'; CC only ⇒ 'none' (as before).
+ *   - Otherwise (To + neutral salutation): addressed_to_me=false ⇒ suggestion only
+ *     ('suggest'), otherwise 'create'.
+ * 'create' means "may be created automatically" — the M50 toggle
+ * (tasks.autoCreate) still sits ABOVE this policy.
  */
 export function taskAddresseeVerdict(ctx: AddresseeContext): AddresseeVerdict {
   const owner: OwnerIdentity = {

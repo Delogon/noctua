@@ -4,6 +4,7 @@ import { upsertEnvelope, storeBody } from '@main/mail/ingest'
 import { listThreads, getThreadMessages } from '@main/db/repos/threads'
 import {
   createTasksFromTriage,
+  cleanupForwardTasksOnce,
   cleanupForwardTasksWithoutRequest,
   listTasks,
   countOpenTasks,
@@ -77,9 +78,9 @@ describe('threads-repo', () => {
     )
 
     const threads = listThreads(db, 200)
-    expect(threads).toHaveLength(2) // A+Reply = ein Thread, B = einer
+    expect(threads).toHaveLength(2) // A+Reply = one thread, B = one
     const threadA = threads.find((t) => t.messageCount === 2)
-    expect(threadA?.unread).toBe(true) // mind. eine ungelesen
+    expect(threadA?.unread).toBe(true) // at least one unread
     const threadB = threads.find((t) => t.flagged)
     expect(threadB?.subject).toBe('Thema B')
   })
@@ -137,10 +138,10 @@ describe('threads-repo', () => {
     seedSuggestion(5, 'Verteiler unsicher', 'verteiler@verein.de', 'Hallo zusammen,\n\nInfos.', 0)
 
     const bySubject = new Map(listThreads(db, 200).map((t) => [t.subject, t.taskState]))
-    expect(bySubject.get('Verteiler fremd')).toBe('none') // fremde Anrede via Verteiler
+    expect(bySubject.get('Verteiler fremd')).toBe('none') // someone else addressed via mailing list
     expect(bySubject.get('An mich Gruppe')).toBe('suggested')
-    expect(bySubject.get('An mich unsicher')).toBe('suggested') // Vorschlag statt Auto-Task
-    expect(bySubject.get('Verteiler Inhaber')).toBe('suggested') // Inhaber-Anrede überstimmt absent
+    expect(bySubject.get('An mich unsicher')).toBe('suggested') // suggestion instead of auto task
+    expect(bySubject.get('Verteiler Inhaber')).toBe('suggested') // owner salutation overrides absent
     expect(bySubject.get('Verteiler unsicher')).toBe('none')
   })
 
@@ -331,7 +332,7 @@ describe('tasks-repo', () => {
     db.prepare(`INSERT INTO settings (key, value) VALUES ('tasks.autoCreate', '0')`).run()
     expect(createTasksFromTriage(db, args)).toBe(0)
     expect(countOpenTasks(db)).toBe(0)
-    // Wieder einschalten: dieselbe Mail erzeugt die Aufgaben nun regulär
+    // Re-enable: the same mail now creates the tasks normally
     db.prepare(`UPDATE settings SET value = '1' WHERE key = 'tasks.autoCreate'`).run()
     expect(createTasksFromTriage(db, args)).toBeGreaterThan(0)
   })
@@ -440,7 +441,7 @@ describe('tasks-repo', () => {
       toJson: JSON.stringify([{ name: null, address: 'verteiler@verein.de' }]),
       ccJson: '[]',
       bodyText: 'Hallo Jannik,\n\nanbei die Infos zu Plakaten und Sponsoren.',
-      addressedToMe: true // selbst wenn das Modell irrt: Stufe 1+2 blocken
+      addressedToMe: true // even if the model is wrong: stages 1+2 block
     })
     expect(n).toBe(0)
     expect(countOpenTasks(db)).toBe(0)
@@ -602,6 +603,31 @@ describe('tasks-repo', () => {
 
     expect(cleanupForwardTasksWithoutRequest(db)).toBe(1)
     expect(countOpenTasks(db)).toBe(0)
+  })
+
+  it('runs the forward cleanup at startup only once per database', () => {
+    db = createTestDb()
+    const accountId = seedAccount(db)
+    const inbox = seedFolder(db, accountId, '\\Inbox')
+    const messageId = insertWithBody(
+      db,
+      accountId,
+      inbox,
+      { uid: 54, messageId: '<fyi-once@test>', subject: 'Fwd: Nur zur Information' },
+      { text: 'FYI\n\nAnfang der weitergeleiteten Nachricht:\nVon: Alice\nBitte antworten.' }
+    )
+    const addTask = (): void => {
+      db.prepare(
+        `INSERT INTO tasks (source_kind, source_id, account_id, title, status, created_at)
+         VALUES ('mail', ?, ?, 'Aufgabe', 'open', 1)`
+      ).run(messageId, accountId)
+    }
+    addTask()
+    expect(cleanupForwardTasksOnce(db)).toBe(1)
+    // A task the user creates later from the same forward stays
+    addTask()
+    expect(cleanupForwardTasksOnce(db)).toBe(0)
+    expect(db.prepare('SELECT count(*) FROM tasks').pluck().get()).toBe(1)
   })
 
   it('updateTaskStatus erledigt und entfernt aus der offenen Liste', () => {

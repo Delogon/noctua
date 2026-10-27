@@ -6,9 +6,9 @@ import { calendarSync } from '../calendar/sync'
 import { getContactsAccount, listAddressBookSummaries, type AddressBookSummary } from './repo'
 
 /**
- * Kontakte (CardDAV) als Option eines Kalender-Kontos: gleicher Server, gleiche
- * Zugangsdaten (Vault `cal:<id>:password`). Ein-/Ausschalten, Adressbuch-
- * Auswahl und Status für die Einstellungen.
+ * Contacts (CardDAV) as an option of a calendar account: same server, same
+ * credentials (vault `cal:<id>:password`). Enable/disable, address book
+ * selection and status for the settings.
  */
 
 export interface ContactsDeps {
@@ -35,9 +35,9 @@ export function contactsStatus(db: Database.Database, accountId: number): Contac
 }
 
 /**
- * Kontakt-Sync ein-/ausschalten. Einschalten sucht den CardDAV-Dienst (gleicher
- * Server, Principal des Kalender-Kontos als erster Kandidat) und legt die
- * Adressbücher an; Ausschalten entfernt Adressbücher und Karten lokal.
+ * Turn contact sync on/off. Turning it on looks for the CardDAV service (same
+ * server, the calendar account's principal as first candidate) and creates the
+ * address books; turning it off removes address books and cards locally.
  */
 export async function setContactsSync(
   db: Database.Database,
@@ -66,12 +66,12 @@ export async function setContactsSync(
     `INSERT INTO contacts_accounts (account_id, enabled, home_url) VALUES (?, 1, ?)
      ON CONFLICT(account_id) DO UPDATE SET enabled = 1, home_url = excluded.home_url, error = NULL`
   ).run(accountId, found.homeUrl)
-  // Adressbücher und Karten lädt der nächste Lauf der Konto-Schleife
+  // Address books and cards are loaded by the next run of the account loop
   calendarSync.refresh(accountId, true)
   return { addressBookCount: found.addressBooks.length }
 }
 
-/** Einzelnes Adressbuch aktivieren/deaktivieren; Deaktivieren verwirft die lokalen Karten. */
+/** Enable/disable a single address book; disabling discards the local cards. */
 export function setAddressBookEnabled(
   db: Database.Database,
   addressBookId: number,
@@ -88,7 +88,7 @@ export function setAddressBookEnabled(
     )
     if (!enabled) {
       db.prepare('DELETE FROM dav_contacts WHERE addressbook_id = ?').run(addressBookId)
-      // Token/ctag zurücksetzen: Wiedereinschalten lädt vollständig neu
+      // Reset token/ctag: re-enabling reloads everything
       db.prepare('UPDATE addressbooks SET ctag = NULL, sync_token = NULL WHERE id = ?').run(
         addressBookId
       )

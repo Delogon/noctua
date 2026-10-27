@@ -9,39 +9,63 @@ import {
 import { invoke, onPush } from '@renderer/lib/ipc'
 import type { InvokeOutput } from '@shared/ipc-contract'
 import type { AiCategory } from '@shared/types'
+import { createCoalescer } from '@shared/coalesce'
 
-/** Invalidiert Thread-Listen und offene Threads bei Push-Events vom Sync/AI. */
+/** Invalidates thread lists and open threads on push events from sync/AI. */
 export function useThreadInvalidation(): void {
   const queryClient = useQueryClient()
-  useEffect(
-    () =>
-      onPush('messages:changed', ({ threadKeys }) => {
+  useEffect(() => {
+    // Bursts of change events (backfill chunks, sync passes) refetch the list,
+    // counts and folders once per burst instead of once per event.
+    const changed = createCoalescer<string[]>(
+      (batches) => {
         void queryClient.invalidateQueries({ queryKey: ['threads'] })
         void queryClient.invalidateQueries({ queryKey: ['mboxCounts'] })
-        for (const key of threadKeys) {
+        void queryClient.invalidateQueries({ queryKey: ['folders'] })
+        for (const key of new Set(batches.flat())) {
           void queryClient.invalidateQueries({ queryKey: ['thread', key] })
         }
-      }),
-    [queryClient]
-  )
-  useEffect(
-    () =>
-      onPush('ai:annotated', () => {
+      },
+      { delayMs: 250, maxWaitMs: 1000 }
+    )
+    const off = onPush('messages:changed', ({ threadKeys }) => changed.add(threadKeys))
+    return () => {
+      off()
+      changed.cancel()
+    }
+  }, [queryClient])
+  useEffect(() => {
+    // One ai:annotated per triaged mail: batch them while the queue drains
+    const annotated = createCoalescer<void>(
+      () => {
         void queryClient.invalidateQueries({ queryKey: ['threads'] })
         void queryClient.invalidateQueries({ queryKey: ['ai', 'usage'] })
         void queryClient.invalidateQueries({ queryKey: ['ai', 'decisions'] })
-      }),
-    [queryClient]
-  )
+      },
+      { delayMs: 500, maxWaitMs: 2000 }
+    )
+    const off = onPush('ai:annotated', () => annotated.add())
+    return () => {
+      off()
+      annotated.cancel()
+    }
+  }, [queryClient])
 }
 
 export function useThreads(
   accountId: number | null,
-  mbox: 'inbox' | 'sent' | 'spam'
+  mbox: 'inbox' | 'sent' | 'spam',
+  folderId: number | null = null
 ): UseQueryResult<InvokeOutput<'threads:list'>['threads']> {
   return useQuery({
-    queryKey: ['threads', accountId, mbox],
-    queryFn: () => invoke('threads:list', { limit: 300, accountId: accountId ?? undefined, mbox }),
+    queryKey: ['threads', accountId, mbox, folderId],
+    queryFn: () =>
+      invoke('threads:list', {
+        limit: 300,
+        accountId: accountId ?? undefined,
+        mbox,
+        folderId: folderId ?? undefined
+      }),
     select: (data) => data.threads,
     staleTime: 5_000
   })
@@ -78,5 +102,18 @@ export function useMboxCounts(
     queryKey: ['mboxCounts', accountId],
     queryFn: () => invoke('threads:mboxCounts', { accountId: accountId ?? undefined }),
     staleTime: 10_000
+  })
+}
+
+/** Folder tree of all accounts (fully synced folders only). */
+export function useFolders(
+  enabled = true
+): UseQueryResult<InvokeOutput<'folders:list'>['folders']> {
+  return useQuery({
+    queryKey: ['folders'],
+    queryFn: () => invoke('folders:list', undefined),
+    select: (data) => data.folders,
+    staleTime: 10_000,
+    enabled
   })
 }

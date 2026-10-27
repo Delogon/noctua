@@ -6,8 +6,8 @@ import {
   type ReplyMessage
 } from '@renderer/lib/reply-recipients'
 
-// M80: Empfänger-Berechnung für r (Absender) und a (alle). Die eigenen
-// Adressen kommen aus accounts:list — der Nutzer kann mehrere Konten haben.
+// M80: recipient computation for r (sender) and a (all). Own
+// addresses come from accounts:list — the user can have multiple accounts.
 
 const ME = 'tim@noctua.test'
 const ME2 = 'tim@zweitkonto.test'
@@ -55,7 +55,7 @@ describe('buildReplyRecipients — Absender (r)', () => {
     ]
     const result = buildReplyRecipients(thread, [ME, ME2], 'sender')
     expect(result?.to).toEqual(['alice@firma.test'])
-    // Antwort hängt threading-technisch an der letzten Nachricht des Threads
+    // For threading, the reply attaches to the thread's last message
     expect(result?.replyToMessageId).toBe(thread[2].id)
   })
 
@@ -176,7 +176,7 @@ describe('buildReplyRecipients — Alle (a)', () => {
     ]
     const result = buildReplyRecipients(thread, [ME], 'all')
     expect(result?.to).toEqual(['a@firma.test', 'b@firma.test'])
-    // a@ ist schon AN — taucht nicht zusätzlich im CC auf
+    // a@ is already TO — does not also appear in CC
     expect(result?.cc).toEqual([])
   })
 

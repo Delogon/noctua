@@ -12,7 +12,7 @@ import {
 import { effectiveScope } from './scope'
 import { ScopeChoice } from './ScopeChoice'
 
-// Löschen per Taste (Backspace/Entf) mit Bestätigung; Serien fragen nach dem Bereich.
+// Delete via key (Backspace/Del) with confirmation; series ask for the scope.
 
 export function DeleteDialog({ target }: { target: DeleteTarget }): React.JSX.Element {
   const t = useT()
@@ -21,7 +21,7 @@ export function DeleteDialog({ target }: { target: DeleteTarget }): React.JSX.El
   const actions = useCalendarEventActions()
   const [busy, setBusy] = useState(false)
   const [notify, setNotify] = useState(true)
-  // Mit Teilnehmern (und wir organisieren, der Server versendet nicht selbst): Rückfrage „benachrichtigen?"
+  // With attendees (and we organize, the server doesn't send itself): ask "notify?"
   const detail = useCalendarEventDetail(target.objectId, target.recurrenceId).data
   const info = useSchedulingInfo(detail?.calendarId ?? null, target.objectId).data
   const attendeeCount = detail?.fields.attendees.length ?? 0
@@ -37,7 +37,7 @@ export function DeleteDialog({ target }: { target: DeleteTarget }): React.JSX.El
         notifyAttendees: askNotify ? notify : undefined
       })
       .then(() => {
-        // War der gelöschte Termin im Editor offen, schließt dieser mit
+        // If the deleted event was open in the editor, close it too
         const editor = useCalendar.getState().editor
         if (editor?.kind === 'existing' && editor.objectId === target.objectId) closeEditor()
         setDeleteTarget(null)

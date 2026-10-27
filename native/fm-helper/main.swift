@@ -1,20 +1,20 @@
 import Foundation
 import FoundationModels
 
-// Noctua-Helper für Apple Foundation Models (macOS 26+, Apple Silicon).
-// Zwei Modi:
-//   noctua-fm check  → eine JSON-Zeile mit der Verfügbarkeit
-//   noctua-fm serve  → Zeilenprotokoll auf stdin/stdout:
-//     Anfrage : {"id":1,"instructions":"…","prompt":"…"}
-//     Antwort : {"id":1,"ok":true,"result":{…}} | {"id":1,"ok":false,"error":"…"}
-// Guided Generation garantiert die Struktur; die Wertebereiche (Kategorie-
-// Enum, Prioritätsklemme) validiert der TypeScript-Aufrufer.
+// Noctua helper for Apple Foundation Models (macOS 26+, Apple Silicon).
+// Two modes:
+//   noctua-fm check  → one JSON line with the availability
+//   noctua-fm serve  → line protocol on stdin/stdout:
+//     Request : {"id":1,"instructions":"…","prompt":"…"}
+//     Response: {"id":1,"ok":true,"result":{…}} | {"id":1,"ok":false,"error":"…"}
+// Guided generation guarantees the structure; the value ranges (category
+// enum, priority clamp) are validated by the TypeScript caller.
 
 @Generable
 struct FMActionItem {
-  @Guide(description: "Konkrete Aufgabe für den Empfänger, kurz")
+  @Guide(description: "Concrete task for the recipient, short, in the language the instructions ask for")
   var title: String
-  @Guide(description: "Frist als YYYY-MM-DD, sonst leerer String")
+  @Guide(description: "Deadline as YYYY-MM-DD, otherwise an empty string")
   var due: String
 }
 
@@ -22,10 +22,10 @@ struct FMActionItem {
 struct FMGate {
   @Guide(
     description:
-      "true NUR wenn ein Mensch den Kontoinhaber PERSÖNLICH um etwas bittet, eine echte Frist für IHN existiert oder er erkennbar auf eine persönliche Antwort wartet. false bei Newslettern, Werbung, Benachrichtigungen, Rundmails, Sicherheitshinweisen"
+      "true ONLY if a human asks the account owner PERSONALLY to do something, there is a real deadline for THEM, or the sender is clearly waiting for a personal reply. false for newsletters, advertising, notifications, mass mailings, security notices"
   )
   var isPersonalRequest: Bool
-  @Guide(description: "Begründung in einem kurzen Satz")
+  @Guide(description: "Reason in one short sentence")
   var reason: String
 }
 
@@ -33,20 +33,20 @@ struct FMGate {
 struct FMTriage {
   @Guide(
     description:
-      "Genau eine von: personal, work, newsletter, promotions, notifications, transactional, other"
+      "Exactly one of: personal, work, newsletter, promotions, notifications, transactional, other"
   )
   var category: String
-  @Guide(description: "Priorität als Ganzzahl von 1 (ignorierbar) bis 5 (dringend)")
+  @Guide(description: "Priority as an integer from 1 (ignorable) to 5 (urgent)")
   var priority: Int
-  @Guide(description: "Ein sachlicher Satz auf Deutsch, maximal 140 Zeichen")
+  @Guide(description: "One factual sentence in the language the instructions ask for, at most 140 characters")
   var summary: String
-  @Guide(description: "Aufgaben NUR bei persönlicher Bitte an den Kontoinhaber, sonst leer")
+  @Guide(description: "Tasks ONLY for a personal request to the account owner, otherwise empty")
   var actionItems: [FMActionItem]
-  @Guide(description: "true nur bei echten Menschen mit Antworterwartung")
+  @Guide(description: "true only for real people who expect a reply")
   var needsReply: Bool
-  @Guide(description: "true nur, wenn der Kontoinhaber persönlich gemeint ist")
+  @Guide(description: "true only if the account owner is meant personally")
   var addressedToMe: Bool
-  @Guide(description: "Zuversicht von 0.0 bis 1.0")
+  @Guide(description: "Confidence from 0.0 to 1.0")
   var confidence: Double
 }
 
@@ -88,8 +88,8 @@ func triagePayload(_ result: FMTriage) -> [String: Any] {
   ]
 }
 
-/// Dispatcher für die stt-Modi; Fehler werden strukturiert gemeldet (Exit 0,
-/// damit der Aufrufer die JSON-Zeile auswertet statt den Exit-Code).
+/// Dispatcher for the stt modes; errors are reported structured (exit 0,
+/// so the caller evaluates the JSON line instead of the exit code).
 func runSpeech(mode: String, args: [String]) async {
   do {
     switch mode {
@@ -121,7 +121,7 @@ struct Helper {
       return
     }
 
-    // Spracherkennung (speech.swift): Einmal-Prozesse, unabhängig vom FM-Modell
+    // Speech recognition (speech.swift): one-shot processes, independent of the FM model
     if ["stt-check", "stt-install", "transcribe"].contains(mode) {
       await runSpeech(mode: mode, args: Array(CommandLine.arguments.dropFirst(2)))
       return
@@ -152,7 +152,7 @@ struct Helper {
       let mode = request["mode"] as? String ?? "triage"
 
       do {
-        // Frische Session je Anfrage: kein Kontextwachstum über Mails hinweg.
+        // Fresh session per request: no context growth across mails.
         let session = LanguageModelSession(instructions: instructions)
         if mode == "gate" {
           let response = try await session.respond(to: prompt, generating: FMGate.self)

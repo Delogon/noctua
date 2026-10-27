@@ -8,9 +8,9 @@ type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => vo
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 /**
- * Dev-only (NOCTUA_TEST_SHOTS=1): klappert alle Views ab und legt PNGs in
- * NOCTUA_SHOT_DIR ab — Selbst-Review des UI ohne Bildschirmzugriff. Views
- * schalten über app:menuAction, Tasten (Enter/Escape/⌘K) via sendInputEvent.
+ * Dev-only (NOCTUA_TEST_SHOTS=1): goes through all views and saves PNGs to
+ * NOCTUA_SHOT_DIR — self-review of the UI without screen access. Views
+ * switch via app:menuAction, keys (Enter/Escape/⌘K) via sendInputEvent.
  */
 export function runScreenshotTour(win: () => BrowserWindow | null, push: PushFn): void {
   const outDir = process.env.NOCTUA_SHOT_DIR || join(app.getPath('temp'), 'noctua-shots')
@@ -58,7 +58,7 @@ export function runScreenshotTour(win: () => BrowserWindow | null, push: PushFn)
         await wait(1800)
         await shot('01-inbox')
 
-        // Ordner-Filter: GESENDET-Segment anklicken (Segmented Control oben links)
+        // Folder filter: click the SENT segment (segmented control top left)
         click(198, 104)
         await wait(2600)
         await shot('01b-sent')
@@ -68,7 +68,7 @@ export function runScreenshotTour(win: () => BrowserWindow | null, push: PushFn)
         click(75, 104)
         await wait(900)
 
-        // Diktat-Strip (v) — Listening-Zustand
+        // Dictation strip (v) — listening state
         key('V')
         await wait(900)
         await shot('02-listening')
@@ -83,7 +83,7 @@ export function runScreenshotTour(win: () => BrowserWindow | null, push: PushFn)
         await wait(1200)
         await shot('04-tasks')
 
-        // Space-Toggle: erste Aufgabe anwählen, abhaken und zur nächsten springen
+        // Space toggle: select the first task, check it off and jump to the next
         click(198, 110)
         await wait(600)
         key('Space')

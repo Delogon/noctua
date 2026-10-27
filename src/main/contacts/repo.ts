@@ -2,8 +2,8 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import { normalizeEmail, parseVCard, stripBinaryProperties } from './vcard'
 
 /**
- * DB-Zugriff der CardDAV-Kontakte (nur lesend gespiegelt): Adressbücher,
- * Karten, normalisierter E-Mail-Index und die Suche für Empfänger-Vorschläge.
+ * DB access for CardDAV contacts (read-only mirror): address books,
+ * cards, normalized email index and the search for recipient suggestions.
  */
 
 export interface ContactsAccountRow {
@@ -34,13 +34,13 @@ export interface AddressBookRow {
   last_sync: number | null
 }
 
-/** Rohtext einer Karte wird nur bis zu dieser Größe behalten (nach Entfernen von Fotos). */
+/** A card's raw text is only kept up to this size (after removing photos). */
 export const MAX_RAW_VCARD_CHARS = 64 * 1024
 
 /**
- * Karte parsen und speichern. Nicht parsebare Karten (oder ohne Namen/Nummer/
- * Adresse) werden übersprungen und eine ältere Fassung entfernt.
- * Rückgabe: true, wenn eine Zeile geschrieben wurde.
+ * Parse and store a card. Unparseable cards (or ones without name/number/
+ * address) are skipped and an older version is removed.
+ * Returns: true if a row was written.
  */
 export function upsertContact(
   db: Database.Database,
@@ -115,17 +115,17 @@ export interface DavContactMatch {
   name: string | null
 }
 
-/** LIKE-Muster aus Nutzereingabe: Platzhalter und Escape-Zeichen neutralisieren. */
+/** LIKE pattern from user input: neutralize wildcards and escape characters. */
 function likePattern(query: string, prefix: boolean): string {
   const escaped = query.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)
   return prefix ? `${escaped}%` : `%${escaped}%`
 }
 
 /**
- * Treffer in aktivierten Adressbüchern für Empfänger-Vorschläge: Teilstring in
- * Name/Organisation oder E-Mail. Reihenfolge: Präfix-Treffer (Name-, Vor-/
- * Nachnamen-, Adressanfang) vor Teilstring-Treffern, dann bevorzugte Adresse,
- * dann alphabetisch. Mehrere Adressen eines Kontakts erscheinen einzeln.
+ * Matches in enabled address books for recipient suggestions: substring in
+ * name/organization or email. Order: prefix matches (name, first/last
+ * name, address start) before substring matches, then the preferred address,
+ * then alphabetical. Multiple addresses of a contact appear individually.
  */
 export function searchDavContacts(
   db: Database.Database,
@@ -155,11 +155,11 @@ export function searchDavContacts(
        LIMIT @limit`
     )
     .all({ sub, pre, word, limit }) as Array<{ addr: string; name: string }>
-  // Name nur, wenn er mehr ist als die Adresse selbst
+  // Name only if it is more than the address itself
   return rows.map((r) => ({ addr: r.addr, name: r.name && r.name !== r.addr ? r.name : null }))
 }
 
-/** Anzeigenamen für Adressen (Kleinschreibung) aus aktivierten Adressbüchern. */
+/** Display names for addresses (lowercase) from enabled address books. */
 export function davNamesForEmails(db: Database.Database, emails: string[]): Map<string, string> {
   const out = new Map<string, string>()
   const wanted = [...new Set(emails.map(normalizeEmail).filter((e): e is string => !!e))]

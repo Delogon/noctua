@@ -145,7 +145,7 @@ describe('systemone: Request', () => {
 describe('systemone: Größenlimit', () => {
   it('kürzt einen riesigen state, sodass der Body unter dem Limit bleibt', async () => {
     const f = fetchReturning(200, okBody)
-    const huge = 'Ä„"\n'.repeat(60_000) // viele Mehrbyte- und Escape-Zeichen
+    const huge = 'Ä„"\n'.repeat(60_000) // many multi-byte and escape characters
     const result = await call(f, { state: huge })
     const [, init] = f.mock.calls[0] as [string, RequestInit]
     expect(new TextEncoder().encode(init.body as string).length).toBeLessThanOrEqual(MAX_BODY_BYTES)
@@ -163,7 +163,7 @@ describe('systemone: Größenlimit', () => {
     const emoji = '😀'.repeat(30_000)
     const out = fitState(emoji, (s) => buildRequestBody('m', s, questions), 4000)
     expect(out.truncated).toBe(true)
-    // gültiges UTF-16: keine einzelnen Surrogate
+    // valid UTF-16: no lone surrogates
     expect(out.state).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/)
     expect(
       new TextEncoder().encode(buildRequestBody('m', out.state, questions)).length

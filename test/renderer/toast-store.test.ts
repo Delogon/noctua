@@ -40,7 +40,7 @@ describe('Toast-Queue — reine Regeln (pushToast/advanceQueue)', () => {
     expect(s.current?.kind).toBe('error')
     s = pushToast(s, mk('countdown', { countdown: cd() }), NOW)
     expect(s.current?.kind).toBe('countdown')
-    // alle Verdrängten warten
+    // all displaced ones wait
     expect(s.queue.map((t) => t.kind)).toEqual(['error', 'action', 'info'])
   })
 
@@ -60,10 +60,10 @@ describe('Toast-Queue — reine Regeln (pushToast/advanceQueue)', () => {
   it('verdrängte Info kommt zurück, solange sie jünger als 8s ist', () => {
     let s = pushToast(empty, mk('info', { text: 'gist' }), NOW)
     s = pushToast(s, mk('error'), NOW + 1000)
-    // Fehler nach 5s geschlossen → Info ist 5s alt und noch frisch
+    // Error closed after 5s → info is 5s old and still fresh
     s = dismissToast(s, s.current!.id, NOW + 5000)
     expect(s.current?.text).toBe('gist')
-    // frisches Ablaufdatum ab dem Wieder-Zeigen
+    // fresh expiry from when it is shown again
     expect(s.current?.expiresAt).toBe(NOW + 5000 + INFO_TOAST_MS)
   })
 
@@ -79,11 +79,11 @@ describe('Toast-Queue — reine Regeln (pushToast/advanceQueue)', () => {
     const offer = mk('action', { expiresAt: NOW + 5000 })
     let s = pushToast(empty, offer, NOW)
     s = pushToast(s, mk('error'), NOW + 1000)
-    // Innerhalb des Fensters kommt das Angebot zurück …
+    // Within the window the offer comes back …
     expect(toastAlive(offer, NOW + 4999)).toBe(true)
     const back = dismissToast(s, s.current!.id, NOW + 4000)
     expect(back.current?.id).toBe(offer.id)
-    // … nach Ablauf nicht mehr
+    // … after expiry it does not
     expect(toastAlive(offer, NOW + 5000)).toBe(false)
     const gone = dismissToast(s, s.current!.id, NOW + 5000)
     expect(gone.current).toBeNull()
@@ -105,7 +105,7 @@ describe('Toast-Queue — reine Regeln (pushToast/advanceQueue)', () => {
     const state: ToastQueueState = {
       current: null,
       queue: [
-        mk('info', { createdAt: NOW - RESHOW_FRESH_MS }), // zu alt
+        mk('info', { createdAt: NOW - RESHOW_FRESH_MS }), // too old
         mk('action', { expiresAt: NOW + 1000 }),
         mk('error')
       ]
@@ -150,7 +150,7 @@ describe('Toast-Store — Timer und Auto-Swap', () => {
     expect(swapped?.id).toBe(id)
     expect(swapped?.kind).toBe('info')
     expect(swapped?.text).toBe('Geht gerade raus…')
-    // die Aktion erlischt mit dem Fenster
+    // the action expires with the window
     expect(swapped?.action).toBeUndefined()
     vi.advanceTimersByTime(INFO_TOAST_MS)
     expect(useToast.getState().current).toBeNull()
@@ -173,7 +173,7 @@ describe('Toast-Store — Timer und Auto-Swap', () => {
       action: { label: 'Rückgängig', run: () => {} }
     })
     expect(useToast.getState().current?.kind).toBe('countdown')
-    // Countdown wird storniert → die frische Info (4s alt) kommt zurück
+    // Countdown is cancelled → the fresh info (4s old) comes back
     vi.advanceTimersByTime(4000)
     toast.dismiss(useToast.getState().current!.id)
     expect(useToast.getState().current?.text).toBe('gist')

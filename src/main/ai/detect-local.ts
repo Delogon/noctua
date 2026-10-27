@@ -1,6 +1,6 @@
-// Erkennung lokal laufender KI-Server (Onboarding). Sondiert AUSSCHLIESSLICH
-// fest verdrahtete Loopback-Adressen — kein Host aus Nutzereingaben, keine
-// Zugangsdaten, keine Redirects. Daher auch unter „Local only" erlaubt.
+// Detection of locally running AI servers (onboarding). Probes EXCLUSIVELY
+// hardwired loopback addresses — no host from user input, no
+// credentials, no redirects. Hence also allowed under "Local only".
 
 import { isDecisionCapable, isDecisionOnly, listOllamaModelCaps } from './providers/ollama-caps'
 
@@ -8,10 +8,10 @@ export type LocalServerKind = 'ollama' | 'lmstudio' | 'llamacpp' | 'localai'
 
 export interface DetectedLocalServer {
   kind: LocalServerKind
-  /** Basis-URL für ein Profil, inkl. /v1 */
+  /** Base URL for a profile, incl. /v1 */
   baseUrl: string
   models: string[]
-  /** nur Ollama: Entscheidungsmodelle (Fähigkeit `decision`), nicht in `models` enthalten */
+  /** Ollama only: decision models (capability `decision`), not included in `models` */
   decisionModels: string[]
 }
 
@@ -20,7 +20,7 @@ interface Probe {
   base: string
 }
 
-/** Hartcodierte Kandidaten; Ollama zusätzlich unter „localhost". */
+/** Hardcoded candidates; Ollama additionally under "localhost". */
 const PROBES: readonly Probe[] = [
   { kind: 'ollama', base: 'http://127.0.0.1:11434/v1' },
   { kind: 'ollama', base: 'http://localhost:11434/v1' },
@@ -32,7 +32,7 @@ const PROBES: readonly Probe[] = [
 const PROBE_TIMEOUT_MS = 800
 const MAX_MODELS = 200
 const MAX_ID_LEN = 200
-/** Fähigkeiten-Abfrage beim Onboarding: kurz halten, die Erkennung soll flott bleiben */
+/** Capability query during onboarding: keep it short, detection should stay snappy */
 const CAPS_SHOW_LIMIT = 12
 
 async function probeOne(probe: Probe): Promise<DetectedLocalServer | null> {
@@ -59,8 +59,8 @@ async function probeOne(probe: Probe): Promise<DetectedLocalServer | null> {
     let models = [...seen].sort()
     let decisionModels: string[] = []
     if (probe.kind === 'ollama') {
-      // Entscheidungsmodelle (clef-flash, nimble …) melden nur `decision` und gehören nicht in
-      // die Chat-Auswahl; fehlt `capabilities` in /api/tags, fragt /api/show kurz nach.
+      // Decision models (clef-flash, nimble …) only report `decision` and don't belong in
+      // the chat selection; if `capabilities` is missing in /api/tags, briefly ask /api/show.
       const caps = await listOllamaModelCaps(probe.base, {
         tagsTimeoutMs: PROBE_TIMEOUT_MS,
         showTimeoutMs: 600,
@@ -81,13 +81,13 @@ async function probeOne(probe: Probe): Promise<DetectedLocalServer | null> {
   }
 }
 
-/** Alle Kandidaten parallel sondieren; Treffer in fester Reihenfolge, je Port einmal. */
+/** Probe all candidates in parallel; hits in fixed order, once per port. */
 export async function detectLocalServers(): Promise<{ found: DetectedLocalServer[] }> {
   const results = await Promise.all(PROBES.map(probeOne))
   const found: DetectedLocalServer[] = []
   for (const r of results) {
     if (!r) continue
-    // localhost und 127.0.0.1 desselben Ports sind derselbe Server
+    // localhost and 127.0.0.1 on the same port are the same server
     const port = new URL(r.baseUrl).port
     if (!found.some((f) => new URL(f.baseUrl).port === port)) found.push(r)
   }

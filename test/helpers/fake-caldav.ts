@@ -1,9 +1,9 @@
 import type { FetchLike } from '@main/dav/client'
 
 /**
- * Zustandsbehafteter In-Memory-CalDAV-Server für Sync-Tests: Kalender mit
- * Objekten, ETags, ctag, Änderungsprotokoll für sync-collection, If-Match-
- * Semantik bei PUT/DELETE. Spricht genug WebDAV für die Sync-Engine.
+ * Stateful in-memory CalDAV server for sync tests: calendars with
+ * objects, ETags, ctag, change log for sync-collection, If-Match
+ * semantics on PUT/DELETE. Speaks enough WebDAV for the sync engine.
  */
 
 interface FakeObject {
@@ -16,7 +16,7 @@ interface FakeCalendar {
   name: string
   displayName: string
   objects: Map<string, FakeObject>
-  /** href → rev der Löschung */
+  /** href → rev of the deletion */
   tombstones: Map<string, number>
   rev: number
   minValidRev: number
@@ -33,9 +33,9 @@ export interface FakeCall {
 export interface FakeServerOptions {
   supportsSync?: boolean
   pageSize?: number
-  /** PUT liefert keinen ETag-Header (Server schreibt Inhalt um) */
+  /** PUT returns no ETag header (server rewrites content) */
   noEtagOnPut?: boolean
-  /** unterstützte Komponenten der Kalender (Default nur VEVENT) */
+  /** supported calendar components (default VEVENT only) */
   components?: string[]
 }
 
@@ -45,9 +45,9 @@ export class FakeCalDavServer {
   calendars = new Map<string, FakeCalendar>()
   calls: FakeCall[] = []
   options: Required<FakeServerOptions>
-  /** Wenn gesetzt: jede Anfrage liefert diesen Status (Auth-/Fehlertests) */
+  /** If set: every request returns this status (auth/error tests) */
   forceStatus: number | null = null
-  /** Wenn gesetzt: PUT/DELETE liefern diesen Status */
+  /** If set: PUT/DELETE return this status */
   failWrites: number | null = null
   throwNetwork = false
   private etagSeq = 0
@@ -81,7 +81,7 @@ export class FakeCalDavServer {
     return `${HOME}${cal}/${file}`
   }
 
-  /** Serverseitige Änderung (z. B. anderer Client). Liefert den neuen ETag. */
+  /** Server-side change (e.g. another client). Returns the new ETag. */
   put(cal: string, file: string, ics: string): string {
     const c = this.calendars.get(cal)!
     c.rev += 1
@@ -100,7 +100,7 @@ export class FakeCalDavServer {
     c.tombstones.set(href, c.rev)
   }
 
-  /** Macht alle bisherigen Sync-Tokens ungültig. */
+  /** Invalidates all previous sync tokens. */
   invalidateTokens(cal: string): void {
     const c = this.calendars.get(cal)!
     c.minValidRev = c.rev + 1

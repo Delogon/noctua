@@ -1,13 +1,13 @@
-// Modellwahl für lokale Server (Onboarding): aus der Modellliste eines Servers
-// ein kleines, schnelles Modell für die Sortierung (Triage) und das größte für
-// Entwürfe vorschlagen. Reine Heuristik über den Namen — der Nutzer kann ändern.
+// Model choice for local servers (onboarding): from a server's model list, suggest
+// a small, fast model for sorting (triage) and the largest one for drafts.
+// Pure heuristic based on the name — the user can change it.
 
-/** Keine Chat-Modelle: Embeddings, Spracherkennung, Reranker, Bild/Ton. */
+/** Not chat models: embeddings, speech recognition, rerankers, image/audio. */
 const NON_CHAT = /embed|nomic|bge-|minilm|e5-|whisper|rerank|clip|tts|stable-?diffusion|flux/i
 
-/** Parameter-Anzahl in Milliarden aus dem Namen („3b", „30b-a3b", „gemma-3-12b", „270m"); sonst null. */
+/** Parameter count in billions from the name ("3b", "30b-a3b", "gemma-3-12b", "270m"); else null. */
 export function modelSizeB(id: string): number | null {
-  // Zahl direkt vor b/m, nicht mitten in einem Wort (llama3.2:3b → 3, qwen3:30b-a3b → 30)
+  // Number right before b/m, not mid-word (llama3.2:3b → 3, qwen3:30b-a3b → 30)
   const re = /(?:^|[^a-z0-9.])(\d+(?:\.\d+)?)([bm])(?![a-z])/gi
   let first: number | null = null
   for (const m of id.matchAll(re)) {
@@ -23,9 +23,9 @@ export interface PickedModels {
 }
 
 /**
- * Triage: das kleinste Modell ab 3 B (darunter taugt JSON-Ausgabe selten),
- * sonst das kleinste bekannte. Entwürfe: das größte. Ohne Größenangaben das
- * erste Chat-Modell für beides. Leere Liste → leere Strings.
+ * Triage: the smallest model from 3 B up (below that, JSON output is rarely usable),
+ * otherwise the smallest known. Drafts: the largest. Without sizes, the first
+ * chat model for both. Empty list → empty strings.
  */
 export function pickLocalModels(ids: string[]): PickedModels {
   const chat = ids.filter((id) => !NON_CHAT.test(id))

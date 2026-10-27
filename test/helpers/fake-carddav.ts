@@ -1,9 +1,9 @@
 import type { FetchLike } from '@main/dav/client'
 
 /**
- * Zustandsbehafteter In-Memory-CardDAV-Server für Sync-Tests: Principal mit
- * addressbook-home-set, Adressbücher mit Karten, ETags, ctag und
- * Änderungsprotokoll für sync-collection.
+ * Stateful in-memory CardDAV server for sync tests: principal with
+ * addressbook-home-set, address books with cards, ETags, ctag and
+ * change log for sync-collection.
  */
 
 interface FakeCard {

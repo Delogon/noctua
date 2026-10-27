@@ -20,7 +20,7 @@ interface Cmd {
   id: string
   label: string
   note: string
-  /** Tasten-Badge — leer lassen, wenn es keinen Shortcut gibt. */
+  /** Key badge — leave empty if there is no shortcut. */
   key?: string
   act: () => void
 }
@@ -34,7 +34,7 @@ function PaperPaletteOpen(): React.JSX.Element {
   const t = useT()
   const { lang, setLang } = useI18n()
   const paper = usePaper()
-  const threads = useThreads(paper.filter, paper.mbox)
+  const threads = useThreads(paper.filter, paper.mbox, paper.folderId)
   const followups = useFollowups()
   const accounts = useAccounts()
   const setAddAccountOpen = useUiStore((s) => s.setAddAccountOpen)
@@ -254,7 +254,7 @@ function PaperPaletteOpen(): React.JSX.Element {
       note: t('cmdOwlSearchNote'),
       key: '/',
       act: () => {
-        // Brücke für die alte Muskelerinnerung: Mailsuche wohnt jetzt bei der Eule
+        // Bridge for old muscle memory: mail search now lives with the owl
         paper.setView('chat')
         useOwl.getState().requestFocus()
       }
@@ -286,8 +286,8 @@ function PaperPaletteOpen(): React.JSX.Element {
     return list
   }, [threads.data, followups.data, accounts.data, paper, t, lang, setLang, setAddAccountOpen])
 
-  // Seit die Mailsuche in der Owl-View lebt (/), filtert die Palette nur noch
-  // Befehle — kein Mode-Routing, keine Debounce, keine Skeletons.
+  // Since mail search lives in the Owl view (/), the palette only filters
+  // commands — no mode routing, no debounce, no skeletons.
   const route = useMemo(() => routePaletteQuery(q, cmds), [cmds, q])
 
   const commandById = useMemo(() => new Map(cmds.map((command) => [command.id, command])), [cmds])
@@ -376,7 +376,7 @@ function PaperPaletteOpen(): React.JSX.Element {
               setSelection({ id: null, manual: false })
             }}
             onKeyDown={(e) => {
-              // Einsprechen: ⌘D startet/beendet, Enter beendet, Esc verwirft
+              // Dictation: ⌘D starts/stops, Enter stops, Esc discards
               if ((e.metaKey || e.ctrlKey) && (e.key === 'd' || e.key === 'D')) {
                 e.preventDefault()
                 e.stopPropagation()
@@ -514,7 +514,7 @@ export function HelpOverlay(): React.JSX.Element | null {
               </span>
             </div>
           ))}
-          {/* 5a-Legende: was die Rang-Ticks in der Liste bedeuten */}
+          {/* 5a legend: what the rank ticks in the list mean */}
           <div
             className="flex items-center gap-2.5"
             style={{ padding: '7px 0 2px', font: '400 10px var(--mono)', color: 'var(--muted)' }}

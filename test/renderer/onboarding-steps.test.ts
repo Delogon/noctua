@@ -97,7 +97,7 @@ describe('aiStepReady', () => {
     expect(
       aiStepReady('local', st({ localProfile: true, localTriageModel: 'a', localDraftModel: 'b' }))
     ).toBe(true)
-    // Modelle allein ohne Profil genügen nicht
+    // Models alone without a profile are not enough
     expect(aiStepReady('local', st({ localTriageModel: 'a', localDraftModel: 'b' }))).toBe(false)
   })
 
@@ -109,7 +109,7 @@ describe('aiStepReady', () => {
   it('Cloud/OpenRouter: Schlüssel genügt (Modelle haben Defaults)', () => {
     expect(aiStepReady('cloud', st())).toBe(false)
     expect(aiStepReady('cloud', st({ openrouterKey: true }))).toBe(true)
-    // Ein Local-Profil zählt nicht für die Cloud-Option
+    // A local profile does not count for the cloud option
     expect(aiStepReady('cloud', st({ localProfile: true }))).toBe(false)
   })
 

@@ -8,14 +8,15 @@ import { deleteSecret, getSecret, setSecret } from './secrets'
 import { isGoogleReauthCode, ReauthRequiredError } from './reauth'
 
 /**
- * Google-OAuth für Gmail-Konten (Loopback-Flow mit PKCE, wie beim
- * Microsoft-Login: Anmeldung im System-Browser, kein Passwort in der App).
+ * Google OAuth for Gmail accounts (loopback flow with PKCE, as with the
+ * Microsoft login: sign-in in the system browser, no password in the app).
  *
- * Client-ID: Default ist Thunderbirds öffentlich dokumentierter Google-Client
- * (gängige Praxis bei OSS-Mail-Tools; das „Secret" eines Installed-App-Clients
- * gilt laut Google ausdrücklich nicht als vertraulich). Über die Settings
- * `google.clientId`/`google.clientSecret` durch eine eigene Registrierung
- * ersetzbar. Nur das Refresh-Token wird gespeichert — verschlüsselt im Vault.
+ * Client ID: the default is Thunderbird's publicly documented Google client
+ * (common practice among OSS mail tools; per Google, the "secret" of an
+ * installed-app client is explicitly not considered confidential). Can be
+ * replaced with your own registration via the settings
+ * `google.clientId`/`google.clientSecret`. Only the refresh token is stored —
+ * encrypted in the vault.
  */
 const THUNDERBIRD_GOOGLE_CLIENT_ID =
   '406964657835-aq8lmia8j95dhl1a2bvharmfk3t1hgqj.apps.googleusercontent.com'
@@ -24,17 +25,17 @@ const THUNDERBIRD_GOOGLE_CLIENT_SECRET = 'kSmqreRr0qwBWJgbf5Y-PjSU'
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 
-// mail.google.com deckt IMAP und SMTP (XOAUTH2) ab; openid email liefert die
-// angemeldete Adresse im id_token, ohne einen weiteren API-Aufruf zu brauchen.
+// mail.google.com covers IMAP and SMTP (XOAUTH2); openid email provides the
+// signed-in address in the id_token without needing another API call.
 export const GOOGLE_MAIL_SCOPE = 'https://mail.google.com/ openid email'
 
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000
 const EXPIRY_MARGIN_MS = 60_000
 
 /**
- * Client-Auflösung: explizite Main-Settings > Org-Konfiguration > Thunderbird-
- * Default. Ein Org-Client bekommt NIE das Thunderbird-Secret: ohne eigenes
- * clientSecret bleibt es leer (öffentlicher Client, wird nicht mitgeschickt).
+ * Client resolution: explicit main settings > org configuration > Thunderbird
+ * default. An org client NEVER gets the Thunderbird secret: without its own
+ * clientSecret it stays empty (public client, not sent along).
  */
 export function resolveGoogleClient(
   settings: { clientId: string | null; clientSecret: string | null },
@@ -84,14 +85,14 @@ function base64url(buffer: Buffer): string {
   return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-/** PKCE-Paar: verifier (Zufall) + S256-Challenge. */
+/** PKCE pair: verifier (random) + S256 challenge. */
 export function pkcePair(): { verifier: string; challenge: string } {
   const verifier = base64url(randomBytes(32))
   const challenge = base64url(createHash('sha256').update(verifier).digest())
   return { verifier, challenge }
 }
 
-/** Autorisierungs-URL — pur gehalten, damit die Parameter testbar sind. */
+/** Authorization URL — kept pure so the parameters are testable. */
 export function googleAuthUrl(options: {
   clientId: string
   redirectUri: string
@@ -103,8 +104,8 @@ export function googleAuthUrl(options: {
     redirect_uri: options.redirectUri,
     response_type: 'code',
     scope: GOOGLE_MAIL_SCOPE,
-    // Refresh-Token nur mit offline+consent — sonst kommt nach dem ersten
-    // Login keines mehr, und die App könnte Tokens nicht erneuern.
+    // Refresh token only with offline+consent — otherwise none comes after the
+    // first login, and the app could not renew tokens.
     access_type: 'offline',
     prompt: 'consent',
     code_challenge: options.challenge,
@@ -115,8 +116,8 @@ export function googleAuthUrl(options: {
 }
 
 /**
- * E-Mail-Adresse aus dem id_token (JWT-Payload). Keine Signaturprüfung nötig:
- * Das Token kommt direkt von Googles Token-Endpoint über TLS.
+ * Email address from the id_token (JWT payload). No signature check needed:
+ * the token comes directly from Google's token endpoint over TLS.
  */
 export function emailFromIdToken(idToken: string): string | null {
   const payload = idToken.split('.')[1]
@@ -151,9 +152,9 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
     ).toString()
   })
   const body = (await response.json().catch(() => null)) as TokenResponse | null
-  // Google meldet Fehler (z. B. invalid_grant) als HTTP 400 mit JSON-Body —
-  // den reichen wir durch, die Aufrufer werten error/error_description aus.
-  // Ohne verwertbaren Body (Proxy-Fehlerseite, 5xx) gibt es einen klaren Fehler.
+  // Google reports errors (e.g. invalid_grant) as HTTP 400 with a JSON body —
+  // we pass it through; callers evaluate error/error_description.
+  // Without a usable body (proxy error page, 5xx) there is a clear error.
   if (!response.ok && !body?.error) {
     throw new Error(`Die Anmeldung bei Google ist fehlgeschlagen (HTTP ${response.status})`)
   }
@@ -165,13 +166,13 @@ const HTML_HEAD = '<html><body style="font-family:sans-serif;padding:2rem">'
 const SUCCESS_HTML = `${HTML_HEAD}<h3>Angemeldet.</h3>Du kannst dieses Fenster schließen und zu Noctua zurückkehren.</body></html>`
 const ERROR_HTML = `${HTML_HEAD}<h3>Anmeldung fehlgeschlagen.</h3>Bitte in Noctua erneut versuchen.</body></html>`
 
-/** In-Memory-Cache für Access-Tokens (leben ~1 h) je Adresse. */
+/** In-memory cache for access tokens (live ~1 h) per address. */
 const accessTokens = new Map<string, { token: string; expiresAt: number }>()
 
-/** Bricht den gerade wartenden Login ab — Ziel des CANCEL-Knopfs (Design 3b). */
+/** Aborts the currently waiting login — target of the CANCEL button (Design 3b). */
 let activeCancel: (() => void) | null = null
 
-/** Bricht einen wartenden Google-Login ab; false, wenn keiner läuft. */
+/** Aborts a waiting Google login; false if none is running. */
 export function cancelGoogleLogin(): boolean {
   if (!activeCancel) return false
   activeCancel()
@@ -179,9 +180,9 @@ export function cancelGoogleLogin(): boolean {
 }
 
 /**
- * Interaktiver Login: öffnet den System-Browser, nimmt den Redirect auf einem
- * Loopback-Port entgegen und tauscht den Code gegen Tokens. Gibt die
- * tatsächlich angemeldete Adresse zurück; das Refresh-Token landet im Vault.
+ * Interactive login: opens the system browser, receives the redirect on a
+ * loopback port and exchanges the code for tokens. Returns the address
+ * actually signed in; the refresh token goes into the vault.
  */
 export async function googleInteractiveLogin(): Promise<{ email: string }> {
   const { verifier, challenge } = pkcePair()
@@ -282,7 +283,7 @@ export async function googleInteractiveLogin(): Promise<{ email: string }> {
   })
 }
 
-/** Frisches Access-Token (mit Refresh); wirft, wenn ein Re-Login nötig ist. */
+/** Fresh access token (with refresh); throws if a re-login is needed. */
 export async function googleAccessToken(email: string): Promise<string> {
   const key = email.toLowerCase()
   const cached = accessTokens.get(key)
@@ -300,7 +301,7 @@ export async function googleAccessToken(email: string): Promise<string> {
   })
   if (!tokens.access_token) {
     if (isGoogleReauthCode(tokens.error)) {
-      // Zugriff widerrufen oder Token abgelaufen — Rest aufräumen, Re-Login nötig
+      // Access revoked or token expired — clean up the rest, re-login needed
       deleteSecret(refreshSecretKey(key))
       accessTokens.delete(key)
       throw new ReauthRequiredError('Google-Zugriff widerrufen — bitte erneut anmelden')

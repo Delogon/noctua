@@ -1,30 +1,30 @@
 import { isLocalOnly } from '../privacy'
 import { getClient, getProfile } from './providers/registry'
 
-// Funktions-Test für frei gewählte OpenRouter-Modelle (M86): schickt eine
-// Beispiel-Mail durch einen triage-förmigen Prompt und prüft, ob strukturiertes
-// JSON zurückkommt. Bewusst dieselbe Aufgabenform wie der echte Scanner —
-// besteht ein Modell den Test, kann es auch den Posteingang sortieren.
+// Function test for freely chosen OpenRouter models (M86): sends a
+// sample mail through a triage-shaped prompt and checks whether structured
+// JSON comes back. Deliberately the same task shape as the real scanner —
+// if a model passes the test, it can also sort the inbox.
 
 const TEST_SYSTEM =
-  'Du sortierst E-Mails. Antworte AUSSCHLIESSLICH mit einem JSON-Objekt der Form ' +
-  '{"category":"work|personal|newsletter|other","priority":1-5} — kein weiterer Text.'
+  'You sort emails. Reply ONLY with a JSON object of the form ' +
+  '{"category":"work|personal|newsletter|other","priority":1-5} — no other text.'
 
 const TEST_MAIL =
-  'Von: anna@beispiel.de\nBetreff: Angebot bis Freitag\n\n' +
-  'Hallo, kannst du mir bis Freitag das überarbeitete Angebot schicken? Danke!'
+  'From: anna@example.org\nSubject: Quote by Friday\n\n' +
+  'Hi, could you send me the revised quote by Friday? Thanks!'
 
 export interface ModelTestResult {
   ok: boolean
   latencyMs: number
   costUsd: number | null
-  /** Fehlergrund bzw. Auszug der unbrauchbaren Antwort — null bei Erfolg. */
+  /** Failure reason or excerpt of the unusable answer — null on success. */
   detail: string | null
 }
 
-/** Pures Urteil über die Modell-Antwort — separat testbar. */
+/** Pure verdict on the model answer — testable separately. */
 export function evaluateTestReply(raw: string): { ok: boolean; detail: string | null } {
-  // Codefences und Umgebungstext tolerieren, dann das erste JSON-Objekt greifen
+  // Tolerate code fences and surrounding text, then grab the first JSON object
   const match = raw.match(/\{[\s\S]*?\}/)
   if (!match) {
     return { ok: false, detail: `Antwort war kein JSON: „${raw.trim().slice(0, 120)}“` }
@@ -76,7 +76,7 @@ export async function runModelTest(profileId: string, model: string): Promise<Mo
     })
     const latencyMs = Date.now() - started
     const verdict = evaluateTestReply(result.text)
-    // Kosten gibt es nur bei bepreisten (OpenRouter-)Profilen
+    // Costs only exist for priced (OpenRouter) profiles
     const costUsd = profile.preset === 'openrouter' ? result.usage.costUsd : null
     return { ok: verdict.ok, latencyMs, costUsd, detail: verdict.detail }
   } catch (err) {
@@ -97,9 +97,9 @@ export interface ConnectionTestResult {
 }
 
 /**
- * Verbindungstest: Modellliste des Profils holen. Bewusst auch bei Local only
- * für externe Profile erlaubt — es ist eine ausdrückliche Nutzeraktion ohne
- * Mail-Inhalte, kein automatischer Request.
+ * Connection test: fetch the profile's model list. Deliberately allowed for
+ * external profiles even under Local only — it is an explicit user action without
+ * mail contents, not an automatic request.
  */
 export async function testProfileConnection(profileId: string): Promise<ConnectionTestResult> {
   const profile = getProfile(profileId)

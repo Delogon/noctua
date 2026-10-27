@@ -6,9 +6,9 @@ import { invoke } from '@renderer/lib/ipc'
 import { rowTime, useI18n, useT } from '@renderer/lib/i18n'
 import { useDeleteOwlConversation, useOwlConversations } from '@renderer/queries/owl'
 
-// Linke Spalte der Owl-View: persistierte Gespräche (owl_conversations).
-// j/k bewegt die Markierung, ↵ lädt das markierte Gespräch ins Blatt,
-// Klick lädt direkt. Ersetzt die fälschlich ausgeliehene Aufgabenliste.
+// Left column of the Owl view: persisted conversations (owl_conversations).
+// j/k moves the marker, ↵ loads the marked conversation into the sheet,
+// click loads directly. Replaces the wrongly borrowed task list.
 
 export function OwlConversationsPane(): React.JSX.Element {
   const t = useT()
@@ -20,7 +20,7 @@ export function OwlConversationsPane(): React.JSX.Element {
   const rows = conversations.data ?? []
   const listRef = useRef<HTMLDivElement>(null)
 
-  // Tastatur-Markierung folgt dem geöffneten Gespräch (derived state im Render)
+  // Keyboard marker follows the opened conversation (derived state in render)
   const [selId, setSelId] = useState<number | null>(selConversationId)
   const [prevOpenId, setPrevOpenId] = useState<number | null>(selConversationId)
   if (prevOpenId !== selConversationId) {
@@ -35,7 +35,7 @@ export function OwlConversationsPane(): React.JSX.Element {
       void invoke('owl:get', { id })
         .then(({ conversation }) => {
           if (!conversation) {
-            // Inzwischen gelöscht — Liste auffrischen statt still zu scheitern
+            // Deleted in the meantime — refresh the list instead of failing silently
             void queryClient.invalidateQueries({ queryKey: ['owl'] })
             return
           }
@@ -46,7 +46,7 @@ export function OwlConversationsPane(): React.JSX.Element {
     [queryClient]
   )
 
-  // j/k aus der Keymap bewegt die Markierung — nur in dieser Ansicht
+  // j/k from the keymap moves the marker — only in this view
   useEffect(() => {
     const onMove = (e: Event): void => {
       if (usePaper.getState().view !== 'chat') return
@@ -63,7 +63,7 @@ export function OwlConversationsPane(): React.JSX.Element {
     return () => window.removeEventListener('paper:move', onMove)
   }, [conversations.data])
 
-  // ↵ aus der Keymap öffnet die Markierung
+  // ↵ from the keymap opens the marked entry
   useEffect(() => {
     const onOwl = (e: Event): void => {
       if ((e as CustomEvent<string>).detail !== 'enter') return
@@ -144,7 +144,7 @@ export function OwlConversationsPane(): React.JSX.Element {
                 style={{
                   font: '400 12px var(--serif)',
                   fontStyle: 'italic',
-                  color: '#8a8272',
+                  color: 'var(--meta)',
                   marginTop: 2
                 }}
               >

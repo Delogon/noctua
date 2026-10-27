@@ -34,7 +34,7 @@ import {
 } from '@renderer/features/composer/composer-state'
 import { MessageAttachments } from '@renderer/features/paper/MessageAttachments'
 import { InvitationCards } from '@renderer/features/paper/InvitationCard'
-import { PhishingBanner } from '@renderer/features/paper/PhishingBanner'
+import { MailSecurityBanner } from '@renderer/features/paper/MailSecurityBanner'
 import { EventSuggestionCards } from '@renderer/features/paper/EventSuggestionCard'
 import { OverrideMenu } from '@renderer/features/inbox/OverrideMenu'
 import { useUiStore } from '@renderer/stores/ui'
@@ -46,7 +46,7 @@ import {
 import { parseAddresses } from '@renderer/features/composer/address-check'
 import { RecipientInput } from '@renderer/features/composer/RecipientInput'
 
-/** MailFrame mit cid-Inline-Bildern (lazy) und echter Bild-Freigabe. */
+/** MailFrame with cid inline images (lazy) and real image unblocking. */
 function InlineMailFrame({
   message,
   html
@@ -72,8 +72,8 @@ function InlineMailFrame({
 }
 
 /**
- * Geschwungener Pfeil zwischen Nachrichten-Boxen: zeigt nach oben (die
- * jüngere Nachricht steht darüber) und trägt den zeitlichen Abstand.
+ * Curved arrow between message boxes: points upward (the newer message is
+ * above) and carries the time gap.
  */
 function ReplyArrow({ gapLabel }: { gapLabel: string }): React.JSX.Element {
   return (
@@ -212,7 +212,7 @@ interface TriageInfo {
   needsReply: boolean
 }
 
-/** 5b: TRIAGE-Zeile unter der SECURITY-Sektion — nur wenn eine Annotation existiert. */
+/** 5b: TRIAGE row under the SECURITY section — only if an annotation exists. */
 function TriageSection({ triage }: { triage: TriageInfo }): React.JSX.Element {
   const t = useT()
   const categoryKey = {
@@ -460,7 +460,7 @@ function MessageHeaderDetailsPanel({
   )
 }
 
-/** Eine Nachricht als eigene Box: Meta-Kopf, Inhalt, einklappbares Zitat. */
+/** One message as its own box: meta header, content, collapsible quote. */
 function MessageBox({
   message,
   meta,
@@ -523,7 +523,7 @@ function MessageBox({
         )}
       </div>
       <div style={{ padding: '4px 14px 12px' }}>
-        <PhishingBanner messageId={message.id} />
+        <MailSecurityBanner messageId={message.id} />
         <InvitationCards messageId={message.id} />
         <EventSuggestionCards messageId={message.id} />
         {message.bodyHtml ? (
@@ -585,24 +585,33 @@ export function EmailSheet(): React.JSX.Element {
   const t = useT()
   const lang = useI18n((s) => s.lang)
   const queryClient = useQueryClient()
-  const { selThreadKey, filter, comp, setComp, resetComp, toastNow, setSelThreadKey, mbox } =
-    usePaper()
+  const {
+    selThreadKey,
+    filter,
+    comp,
+    setComp,
+    resetComp,
+    toastNow,
+    setSelThreadKey,
+    mbox,
+    folderId
+  } = usePaper()
   const overrideMenuOpen = useUiStore((s) => s.overrideMenuOpen)
   const setOverrideMenuOpen = useUiStore((s) => s.setOverrideMenuOpen)
-  const threads = useThreads(filter, mbox)
+  const threads = useThreads(filter, mbox, folderId)
   const accounts = useAccounts()
   const beginSend = useSendState((st) => st.begin)
 
-  // Suche/Benachrichtigung können Threads außerhalb der aktuellen Liste öffnen —
-  // dann NICHT auf den ersten Listeneintrag zurückfallen (falscher Thread!),
-  // sondern den Thread über seine geladenen Nachrichten anzeigen.
+  // Search/notifications can open threads outside the current list —
+  // then do NOT fall back to the first list entry (wrong thread!),
+  // but show the thread via its loaded messages.
   const found = threads.data?.find((th) => th.threadKey === selThreadKey)
   const listItem = found ?? (selThreadKey ? undefined : threads.data?.[0])
   const threadKey = selThreadKey ?? listItem?.threadKey ?? null
   const messages = useThread(threadKey)
   const accountId = listItem?.accountId ?? messages.data?.[0]?.accountId ?? null
   const account = accounts.data?.find((a) => a.id === accountId)
-  // Alle eigenen Adressen (mehrere Konten!) — sie fallen bei ALLE aus dem CC.
+  // All own addresses (multiple accounts!) — they drop out of CC on ALL.
   const ownEmails = useMemo(() => (accounts.data ?? []).map((a) => a.email), [accounts.data])
   const voiceTag = useVoiceTag(accountId, account?.accountName ?? null)
   const signature = useAccountSignature(account)
@@ -616,12 +625,12 @@ export function EmailSheet(): React.JSX.Element {
   const extraToText = useRef('')
   const extraCcText = useRef('')
   const extraBccText = useRef('')
-  // Gestrichene Antwort-Empfänger (M97): erst damit lässt sich jemand anderem
-  // als dem Absender antworten — die berechnete Adresse fliegt raus, die neue
-  // kommt über die +Zeile dazu. Wie die Extras threadlokal und flüchtig.
+  // Removed reply recipients (M97): only this makes it possible to reply to
+  // someone other than the sender — the computed address is dropped, the new
+  // one is added via the + row. Like the extras, thread-local and transient.
   const [droppedRecipients, setDroppedRecipients] = useState<string[]>([])
-  // Getippter, noch nicht als Chip übernommener Empfänger — nur als Ja/Nein,
-  // damit die Sendefreigabe stimmt, ohne pro Tastendruck neu zu rendern.
+  // Typed recipient not yet turned into a chip — only as yes/no, so the
+  // send enablement is right without re-rendering on every keystroke.
   const [hasPendingExtra, setHasPendingExtra] = useState(false)
   const resetExtras = useCallback((): void => {
     setExtrasOpen(false)
@@ -634,8 +643,8 @@ export function EmailSheet(): React.JSX.Element {
     extraCcText.current = ''
     extraBccText.current = ''
   }, [])
-  // Beim Threadwechsel zurücksetzen: State direkt im Render nachziehen
-  // (React-Muster „State bei Prop-Änderung anpassen"), Refs im Effect.
+  // Reset on thread switch: update state directly during render
+  // (React pattern „adjusting state when a prop changes"), refs in the effect.
   const [extrasThreadKey, setExtrasThreadKey] = useState(threadKey)
   if (extrasThreadKey !== threadKey) {
     setExtrasThreadKey(threadKey)
@@ -664,11 +673,11 @@ export function EmailSheet(): React.JSX.Element {
   )
   const savedDrafts = useDrafts()
 
-  // Explizit geöffnete Threads (Klick oder j/k) gelten als gelesen: Marker und
-  // fette Zeile verschwinden. Der automatisch angezeigte oberste Thread bleibt
-  // ungelesen — sonst würde jeder App-Start die neueste Mail „lesen". Nur
-  // wirklich ungelesene Nachrichten anfassen, sonst gingen unnötige
-  // setFlags-Ops an den IMAP-Server.
+  // Explicitly opened threads (click or j/k) count as read: marker and
+  // bold row disappear. The automatically shown top thread stays
+  // unread — otherwise every app start would „read" the newest mail. Only
+  // touch really unread messages, otherwise unnecessary
+  // setFlags ops would go to the IMAP server.
   useEffect(() => {
     if (!selThreadKey || selThreadKey !== threadKey) return
     const unreadIds = (messages.data ?? []).filter((m) => !m.seen).map((m) => m.id)
@@ -679,8 +688,8 @@ export function EmailSheet(): React.JSX.Element {
     })
   }, [selThreadKey, messages.data, threadKey, queryClient])
 
-  // Gespeicherten Entwurf beim Öffnen des Threads in den Composer laden (M37).
-  // Ein Live-Puffer eines anderen Threads wird dabei vom Autosave gesichert.
+  // Load the saved draft into the composer when opening the thread (M37).
+  // A live buffer of another thread is saved by autosave in the process.
   useEffect(() => {
     if (!threadKey || mbox !== 'inbox') return
     const c = usePaper.getState().comp
@@ -692,7 +701,7 @@ export function EmailSheet(): React.JSX.Element {
     setComp({ mode: 'ready', threadKey, text: saved.text, html: saved.html, manual: true })
   }, [threadKey, mbox, savedDrafts.data, resetComp, setComp])
 
-  // Uhr während des Zuhörens
+  // Clock while listening
   useEffect(() => {
     if (comp.mode !== 'listening') return
     const iv = setInterval(() => {
@@ -702,7 +711,7 @@ export function EmailSheet(): React.JSX.Element {
     return () => clearInterval(iv)
   }, [comp.mode])
 
-  // Draft-Streaming empfangen
+  // Receive draft streaming
   useEffect(
     () =>
       onPush('ai:draftChunk', (payload) => {
@@ -903,8 +912,8 @@ export function EmailSheet(): React.JSX.Element {
     processRecording(recording.blob, recording.threadKey, recording.seconds, operation)
   }, [processRecording, setComp, threadKey])
 
-  // Der Inhalt des gemeinsamen Editors ist zugleich Nachricht, Diktat-Ziel
-  // und Ausgangspunkt für eine Formulierung durch die Eule.
+  // The content of the shared editor is at once the message, the dictation
+  // target and the starting point for a rewrite by the owl.
   const elaborate = useCallback((): void => {
     const c = usePaper.getState().comp
     if (
@@ -970,14 +979,14 @@ export function EmailSheet(): React.JSX.Element {
       resetComp()
       setComp({ threadKey, replyAll: false })
     } else if (c.replyAll) {
-      // r schaltet eine offene Allen-Antwort zurück auf den Absender
+      // r switches an open reply-all back to the sender
       setComp({ replyAll: false })
     }
     requestAnimationFrame(() => composerRef.current?.focus())
   }, [threadKey, resetComp, setComp])
 
-  // Allen antworten (M80): wie r, aber mit CC an die übrigen ursprünglichen
-  // Empfänger. Ohne weitere Empfänger bleibt es eine normale Antwort + Hinweis.
+  // Reply all (M80): like r, but with CC to the remaining original
+  // recipients. Without further recipients it stays a normal reply + hint.
   const replyAllReply = useCallback((): void => {
     if (!threadKey || usePaper.getState().mbox !== 'inbox') return
     const all = messages.data ? buildReplyRecipients(messages.data, ownEmails, 'all') : null
@@ -1029,8 +1038,8 @@ export function EmailSheet(): React.JSX.Element {
       ],
       bcc: [...extraBcc, ...parseAddresses(extraBccText.current)]
     })
-    // Alles gestrichen und nichts nachgetragen: lieber nicht senden als an
-    // niemanden — der Sendeknopf ist dann ohnehin gesperrt.
+    // Everything removed and nothing added: better not send than send to
+    // nobody — the send button is disabled in that case anyway.
     if (to.length + cc.length + bcc.length === 0) return
     const htmlBody = composerHtmlForSend(c.html, c.text)
     setComp({ mode: 'sending', error: null, errorKind: null })
@@ -1045,9 +1054,9 @@ export function EmailSheet(): React.JSX.Element {
       replyToMessageId: reply.replyToMessageId
     })
       .then(({ outboxId, sendAt }) => {
-        // Nicht sofort archivieren: der Thread wird nur versteckt und erst
-        // archiviert, wenn der Versand wirklich draußen ist — Rückgängig holt
-        // ihn samt Entwurf zurück (Staging lebt im send-Store).
+        // Don't archive immediately: the thread is only hidden and archived
+        // once the send has really gone out — undo brings it back
+        // together with the draft (staging lives in the send store).
         beginSend({
           outboxId,
           sendAt,
@@ -1204,7 +1213,7 @@ export function EmailSheet(): React.JSX.Element {
     [threadKey, listItem, queryClient, toastNow, t]
   )
 
-  // Rückgängig fürs Ablegen: Knopf im Toast und Taste z laufen beide hierher.
+  // Undo for archiving: the toast button and the z key both end up here.
   const archiveToastRef = useRef<number | null>(null)
   const undoArchive = useCallback((): void => {
     if (usePaper.getState().undoArchive()) {
@@ -1214,8 +1223,8 @@ export function EmailSheet(): React.JSX.Element {
     } else toastNow(t('toastNothingUndo'))
   }, [toastNow, t])
 
-  // Ablegen mit Undo-Fenster: erst optisch verstecken, nach 5s wirklich
-  // archivieren (Archive löscht die Rows lokal — danach gäbe es kein Zurück).
+  // Archive with an undo window: first hide visually, after 5s really
+  // archive (archive deletes the rows locally — after that there's no way back).
   const archive = useCallback((): void => {
     if (!threadKey || !messages.data || usePaper.getState().mbox !== 'inbox') return
     const rows = (threads.data ?? []).filter(
@@ -1229,7 +1238,7 @@ export function EmailSheet(): React.JSX.Element {
     )
     setSelThreadKey(next && next.threadKey !== threadKey ? next.threadKey : null)
     if (usePaper.getState().comp.threadKey === threadKey) resetComp()
-    // Action-Toast lebt exakt so lange wie das Undo-Fenster von stageArchive
+    // The action toast lives exactly as long as the undo window of stageArchive
     archiveToastRef.current = toast.action(
       t('toastFiled'),
       { label: t('toastUndo'), kbd: 'Z', run: undoArchive },
@@ -1250,7 +1259,32 @@ export function EmailSheet(): React.JSX.Element {
     })
   }, [threadKey, messages.data, setSelThreadKey, toastNow, t, queryClient])
 
-  // Keymap-Aktionen (Custom-Events aus keymap.ts)
+  // Classic command bar: delete (everywhere) and report as spam (inbox/folders only).
+  // Optimistic like archiving — the list jumps to the neighboring thread.
+  const removeThread = useCallback(
+    (action: 'delete' | 'spam'): void => {
+      if (!threadKey || !messages.data) return
+      if (action === 'spam' && usePaper.getState().mbox !== 'inbox') return
+      const rows = (threads.data ?? []).filter(
+        (r) => !usePaper.getState().hiddenThreads.has(r.threadKey)
+      )
+      const i = rows.findIndex((r) => r.threadKey === threadKey)
+      const next = rows[i + 1] ?? rows[i - 1] ?? null
+      void invoke('messages:action', {
+        messageIds: messages.data.map((m) => m.id),
+        action
+      }).then(() => {
+        toastNow(t(action === 'delete' ? 'toastDeleted' : 'toastJunked'))
+        void queryClient.invalidateQueries({ queryKey: ['threads'] })
+        void queryClient.invalidateQueries({ queryKey: ['mboxCounts'] })
+      })
+      setSelThreadKey(next && next.threadKey !== threadKey ? next.threadKey : null)
+      if (usePaper.getState().comp.threadKey === threadKey) resetComp()
+    },
+    [threadKey, messages.data, threads.data, setSelThreadKey, resetComp, toastNow, t, queryClient]
+  )
+
+  // Keymap actions (custom events from keymap.ts)
   useEffect(() => {
     const onAction = (e: Event): void => {
       const action = (e as CustomEvent<string>).detail
@@ -1269,11 +1303,15 @@ export function EmailSheet(): React.JSX.Element {
         if (listItem?.aiSummary)
           toast.info(t('toastOwlGist', { gist: listItem.aiSummary }), { owl: true })
         else toastNow(t('toastNoQuestion'))
+      } else if (action === 'delete') removeThread('delete')
+      else if (action === 'spam') removeThread('spam')
+      else if (action === 'notSpam') {
+        if (usePaper.getState().mbox === 'spam') notSpam()
       } else if (action === 'undo') undoArchive()
       else if (action === 'taskAccept') decideTask(true)
       else if (action === 'taskDismiss') decideTask(false)
       else if (action === 'override') {
-        // Taste l (Design 3d): Kategorie-Menü nur öffnen, wenn ein Thread da ist
+        // Key l (Design 3d): only open the category menu if there is a thread
         if (listItem) setOverrideMenuOpen(true)
       } else if (action === 'escape') {
         if (c.mode === 'listening' || c.mode === 'transcribing' || c.mode === 'drafting') {
@@ -1288,6 +1326,8 @@ export function EmailSheet(): React.JSX.Element {
     startDictation,
     sendDraft,
     archive,
+    removeThread,
+    notSpam,
     manualReply,
     replyAllReply,
     redraft,
@@ -1301,8 +1341,8 @@ export function EmailSheet(): React.JSX.Element {
     t
   ])
 
-  // Override-Menü schließen, wenn der Thread verschwindet oder die Ansicht
-  // wechselt — ein hängender Open-Zustand würde die Einzeltasten blockieren.
+  // Close the override menu when the thread disappears or the view
+  // changes — a stuck open state would block the single-key shortcuts.
   useEffect(() => {
     if (overrideMenuOpen && !listItem) setOverrideMenuOpen(false)
   }, [overrideMenuOpen, listItem, setOverrideMenuOpen])
@@ -1314,7 +1354,7 @@ export function EmailSheet(): React.JSX.Element {
   }
 
   const meta = (m: MessageDetail): string => {
-    // Bei selbst gesendeten Nachrichten den echten Empfänger zeigen, nicht das eigene Konto
+    // For self-sent messages show the real recipient, not our own account
     const sentBySelf = (m.fromAddr ?? '').toLowerCase() === (account?.email ?? '').toLowerCase()
     const recipients = [...m.to, ...m.cc]
     const firstRecipient = recipients[0]
@@ -1342,13 +1382,13 @@ export function EmailSheet(): React.JSX.Element {
     account && messages.data
       ? buildReplyRecipients(messages.data, ownEmails, isReplyAll ? 'all' : 'sender')
       : null
-  // Gibt es überhaupt weitere Empfänger? Steuert den Umschalter in der Zeile.
+  // Are there any further recipients at all? Controls the toggle in the row.
   const replyAllExtras =
     account && messages.data
       ? (buildReplyRecipients(messages.data, ownEmails, 'all')?.cc ?? [])
       : []
-  // Was nach dem Streichen (M97) übrig bleibt. Anzeige, Sendefreigabe und
-  // Versand lesen denselben Stand, damit die Zeile nicht lügt.
+  // What remains after removal (M97). Display, send enablement and
+  // sending read the same state so the row doesn't lie.
   const replyToLive = replyTarget ? dropRecipients(replyTarget.to, droppedRecipients) : []
   const replyCcLive = replyTarget ? dropRecipients(replyTarget.cc, droppedRecipients) : []
   const extraCount = extraTo.length + extraCc.length + extraBcc.length
@@ -1630,13 +1670,13 @@ export function EmailSheet(): React.JSX.Element {
                           onChipsChange={field.set}
                           onTextChange={(text) => {
                             field.ref.current = text
-                            // Noch nicht als Chip übernommener Text zählt für
-                            // die Sendefreigabe mit — sonst schluckt der
-                            // gesperrte Knopf den ersten Klick, wenn man den
-                            // Absender gestrichen und die neue Adresse gerade
-                            // erst getippt hat. setState mit gleichem Wert
-                            // rendert nicht neu, das bleibt pro Tastendruck
-                            // billig.
+                            // Text not yet turned into a chip counts
+                            // toward send enablement — otherwise the
+                            // disabled button swallows the first click when
+                            // the sender was removed and the new address
+                            // was only just typed. setState with the same
+                            // value doesn't re-render, so this stays cheap
+                            // per keystroke.
                             setHasPendingExtra(
                               Boolean(
                                 extraToText.current.trim() ||

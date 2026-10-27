@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { TaskSyncGlyph } from './TaskSyncGlyph'
 import { contrastOn, type AccountSummary, type ThreadListItem } from '@shared/types'
-import { useMboxCounts, useThreads } from '@renderer/queries/threads'
+import { useFolders, useMboxCounts, useThreads } from '@renderer/queries/threads'
 import { useDrafts } from '@renderer/queries/drafts'
 import { useFollowups } from '@renderer/queries/followups'
 import { useTasks } from '@renderer/queries/tasks'
@@ -18,6 +18,7 @@ import { nudgedToday } from '@renderer/features/paper/nudge-send'
 import { priorityTickTone } from '@renderer/features/paper/priority'
 import { applyFilters, filterCounts } from '@renderer/features/paper/inbox-filters'
 import { InboxFilterMenu } from '@renderer/features/paper/InboxFilterMenu'
+import { FolderTree } from '@renderer/features/paper/FolderTree'
 import { OwlConversationsPane } from '@renderer/features/owl/OwlConversationsPane'
 import { useOwl } from '@renderer/stores/owl'
 import { CalendarSidebar } from '@renderer/features/calendar/CalendarSidebar'
@@ -27,7 +28,7 @@ import {
   visibleTaskRows
 } from './task-navigation'
 
-/** Badge in der Konto-Farbe (Pastell) mit kontrastierender Schrift. */
+/** Badge in the account color (pastel) with contrasting text. */
 function badgeStyle(color: string): React.CSSProperties {
   return {
     width: 13,
@@ -44,7 +45,7 @@ function badgeStyle(color: string): React.CSSProperties {
   }
 }
 
-/** 5a: Rang-Tick am Zeilenanfang — Rang 5 Akzent (klingelt), Rang 4 Ink. */
+/** 5a: rank tick at the start of the row — rank 5 accent (rings), rank 4 ink. */
 function PriorityTick({ aiPriority }: { aiPriority: number | null }): React.JSX.Element | null {
   const t = useT()
   const tone = priorityTickTone(aiPriority)
@@ -420,12 +421,12 @@ function AccountFilter({
   )
 }
 
-/** Interval-getriebene Lade-Punkte (das Theme deaktiviert CSS-Keyframes). */
+/** Interval-driven loading dots (the theme disables CSS keyframes). */
 /**
- * Manueller Refresh: gleicht alle Konten sofort mit dem Server ab. Die INBOX
- * kommt per IDLE ohnehin live — der Knopf existiert vor allem für Ordner am
- * 10-Minuten-Poll (Spam!). Der Spin ist Klick-Feedback; neue Mails treffen
- * asynchron über messages:changed ein.
+ * Manual refresh: syncs all accounts with the server immediately. The INBOX
+ * arrives live via IDLE anyway — the button exists mainly for folders on the
+ * 10-minute poll (spam!). The spin is click feedback; new mails arrive
+ * asynchronously via messages:changed.
  */
 function RefreshButton(): React.JSX.Element {
   const t = useT()
@@ -457,6 +458,28 @@ function RefreshButton(): React.JSX.Element {
   )
 }
 
+/** Toggle of the folder view (setting mail.showFolders) next to the refresh. */
+function FoldersToggle(): React.JSX.Element {
+  const t = useT()
+  const showFolders = usePaper((s) => s.showFolders)
+  const setShowFolders = usePaper((s) => s.setShowFolders)
+  return (
+    <button
+      type="button"
+      className="mailbox-refresh"
+      aria-pressed={showFolders}
+      data-active={showFolders}
+      onClick={() => setShowFolders(!showFolders)}
+      title={t('foldersToggleAria')}
+      aria-label={t('foldersToggleAria')}
+    >
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M1.75 3.25h4.5l1.5 1.5h6.5v8h-12.5z" />
+      </svg>
+    </button>
+  )
+}
+
 function SendingDots(): React.JSX.Element {
   const [dots, setDots] = useState('…')
   useEffect(() => {
@@ -479,17 +502,21 @@ function InboxList(): React.JSX.Element {
     comp,
     hiddenThreads,
     mbox,
+    folderId,
     setMbox,
     inboxFilters
   } = usePaper()
 
-  // Klick auf eine Mail verlässt den Composer — das Getippte sichert er selbst als Entwurf
+  // Clicking a mail leaves the composer — it saves what was typed as a draft itself
   const openThread = (threadKey: string): void => {
     setSelThreadKey(threadKey)
     if (view === 'compose') setView('inbox')
   }
-  const threadsQuery = useThreads(filter, mbox)
+  const threadsQuery = useThreads(filter, mbox, folderId)
   const counts = useMboxCounts(filter)
+  const layout = usePaper((s) => s.layout)
+  const showFolders = usePaper((s) => s.showFolders)
+  const folders = useFolders(layout === 'classic' || showFolders)
   const accounts = useAccounts()
   const listRef = useScrollToSelected(selThreadKey)
   const labels = useMemo(() => accountLabels(accounts.data ?? []), [accounts.data])
@@ -503,16 +530,36 @@ function InboxList(): React.JSX.Element {
     () => (threadsQuery.data ?? []).filter((r) => !hiddenThreads.has(r.threadKey)),
     [threadsQuery.data, hiddenThreads]
   )
-  // 5c: Zähler immer über die UNGEFILTERTE Liste — ein Fetch, Filter im Renderer
+  // 5c: counters always over the UNFILTERED list — one fetch, filtering in the renderer
   const inboxFilterCounts = useMemo(() => filterCounts(allRows), [allRows])
-  // Aktive Filter wirken nur im EINGANG — in SENT/SPAM bleiben sie geparkt
+  // Active filters only apply in the INBOX — in SENT/SPAM they stay parked
   const rows = useMemo(
     () => (mbox === 'inbox' ? applyFilters(allRows, inboxFilters) : allRows),
     [allRows, inboxFilters, mbox]
   )
   const sel = rows.find((r) => r.threadKey === selThreadKey) ?? rows[0]
+  const locationLabel = useMemo(() => {
+    const folder = folderId !== null ? folders.data?.find((f) => f.id === folderId) : undefined
+    const place = folder
+      ? folder.role === 'archive'
+        ? t('folderArchive')
+        : folder.role === 'junk'
+          ? t('folderJunk')
+          : folder.role === 'sent'
+            ? t('folderSent')
+            : folder.name
+      : filter === null && mbox === 'inbox'
+        ? t('folderUnified')
+        : mbox === 'sent'
+          ? t('folderSent')
+          : mbox === 'spam'
+            ? t('folderJunk')
+            : t('folderInbox')
+    const account = accounts.data?.find((a) => a.id === filter)
+    return account ? `${account.accountName || account.email} › ${place}` : place
+  }, [folderId, folders.data, filter, mbox, accounts.data, t])
 
-  // Optimistische Echos: frisch Gesendetes sofort anzeigen, bis die Server-Kopie da ist
+  // Optimistic echoes: show freshly sent mail immediately until the server copy arrives
   const echoes = useSendState((s) => s.echoes)
   const dropEcho = useSendState((s) => s.dropEcho)
   const sentEchoes = useMemo(
@@ -529,42 +576,63 @@ function InboxList(): React.JSX.Element {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="inbox-controls">
-        <AccountFilter
-          accounts={accounts.data ?? []}
-          loading={accounts.isLoading}
-          filter={filter}
-          onChange={setFilter}
-        />
-        <div className="flex items-stretch gap-1.5">
-          <div
-            className="mailbox-tabs min-w-0 flex-1"
-            role="group"
-            aria-label={t('mailboxTabsAria')}
-          >
-            {(
-              [
-                ['inbox', t('mboxInbox'), counts.data?.inbox],
-                ['sent', t('mboxSent'), counts.data?.sent],
-                ['spam', t('mboxSpam'), counts.data?.spam]
-              ] as Array<['inbox' | 'sent' | 'spam', string, number | undefined]>
-            ).map(([key, label, count], i) => {
-              const active = mbox === key
-              return (
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  key={key}
-                  onClick={() => setMbox(key)}
-                  className="mailbox-tab"
-                  data-first={i === 0}
-                >
-                  {label} <span>{count ?? ''}</span>
-                </button>
-              )
-            })}
+        {layout === 'classic' ? (
+          <div className="classic-list-head">
+            <span className="classic-list-head__title">{locationLabel}</span>
+            <RefreshButton />
           </div>
-          <RefreshButton />
-        </div>
+        ) : showFolders ? (
+          <>
+            <div className="flex items-stretch gap-1.5">
+              <div className="folder-panel-head min-w-0 flex-1">{locationLabel}</div>
+              <FoldersToggle />
+              <RefreshButton />
+            </div>
+            <div className="folder-tree-box">
+              <FolderTree showUserFolders />
+            </div>
+          </>
+        ) : (
+          <>
+            <AccountFilter
+              accounts={accounts.data ?? []}
+              loading={accounts.isLoading}
+              filter={filter}
+              onChange={setFilter}
+            />
+            <div className="flex items-stretch gap-1.5">
+              <div
+                className="mailbox-tabs min-w-0 flex-1"
+                role="group"
+                aria-label={t('mailboxTabsAria')}
+              >
+                {(
+                  [
+                    ['inbox', t('mboxInbox'), counts.data?.inbox],
+                    ['sent', t('mboxSent'), counts.data?.sent],
+                    ['spam', t('mboxSpam'), counts.data?.spam]
+                  ] as Array<['inbox' | 'sent' | 'spam', string, number | undefined]>
+                ).map(([key, label, count], i) => {
+                  const active = mbox === key
+                  return (
+                    <button
+                      type="button"
+                      aria-pressed={active}
+                      key={key}
+                      onClick={() => setMbox(key)}
+                      className="mailbox-tab"
+                      data-first={i === 0}
+                    >
+                      {label} <span>{count ?? ''}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <FoldersToggle />
+              <RefreshButton />
+            </div>
+          </>
+        )}
         {mbox === 'inbox' && (
           <div style={{ marginTop: 7 }}>
             <InboxFilterMenu counts={inboxFilterCounts} totalRows={allRows.length} />
@@ -609,7 +677,7 @@ function InboxList(): React.JSX.Element {
               {e.subject.trim() && (
                 <div
                   className="truncate"
-                  style={{ font: '400 12px var(--serif)', color: '#8a8272', marginTop: 2 }}
+                  style={{ font: '400 12px var(--serif)', color: 'var(--meta)', marginTop: 2 }}
                 >
                   {e.subject}
                 </div>
@@ -667,7 +735,7 @@ function InboxList(): React.JSX.Element {
                   style={{
                     font: '400 12px var(--serif)',
                     fontStyle: 'italic',
-                    color: r.unread ? 'var(--secondary)' : '#8a8272',
+                    color: r.unread ? 'var(--secondary)' : 'var(--meta)',
                     marginTop: 2
                   }}
                 >
@@ -677,7 +745,7 @@ function InboxList(): React.JSX.Element {
               {!r.aiSummary && r.subject && (
                 <div
                   className="truncate"
-                  style={{ font: '400 12px var(--serif)', color: '#8a8272', marginTop: 2 }}
+                  style={{ font: '400 12px var(--serif)', color: 'var(--meta)', marginTop: 2 }}
                 >
                   {r.subject}
                 </div>
@@ -812,8 +880,8 @@ function TasksList(): React.JSX.Element {
   const sel = all.find((x) => x.id === selTaskId) ?? all[0]
   const listRef = useScrollToSelected(selTaskId)
   const toggle = (id: number, status: string): void => {
-    // Der Wechsel kann die Aufgabe aus der gefilterten Liste nehmen — dann
-    // rückt die Auswahl auf den sichtbaren Nachbarn weiter.
+    // The change may remove the task from the filtered list — then the
+    // selection moves on to the visible neighbor.
     const becomesDone = status !== 'done'
     const willDisappear = becomesDone ? !showCompletedTasks : !showOpenTasks
     const shouldReconcileSelection = willDisappear && sel?.id === id
@@ -959,7 +1027,7 @@ function SettingsList(): React.JSX.Element {
   const orStatus = useOrKeyStatus()
   const models = useModels()
 
-  // Lokale Modelle (z. B. „llama3.1:8b") haben keinen „anbieter/"-Präfix
+  // Local models (e.g. „llama3.1:8b") have no „provider/" prefix
   const short = (id: string | undefined): string => (id ? (id.split('/').pop() ?? id) : '—')
   const rows: Array<{ id: SettingsSection; name: string; sub: string }> = [
     {
@@ -967,6 +1035,7 @@ function SettingsList(): React.JSX.Element {
       name: t('setAccounts'),
       sub: t('setAccountsSub', { n: accounts.data?.length ?? 0 })
     },
+    { id: 'appearance', name: t('setAppearance'), sub: t('setAppearanceSub') },
     { id: 'style', name: t('setStyle'), sub: t('setStyleSub') },
     { id: 'sig', name: t('setSig'), sub: t('setSigSub') },
     {
@@ -1015,13 +1084,13 @@ function SettingsList(): React.JSX.Element {
 
 export function ListPane(): React.JSX.Element {
   const t = useT()
-  const { view, filter, hiddenThreads, mbox } = usePaper()
-  const threadsQuery = useThreads(filter, mbox)
+  const { view, filter, hiddenThreads, mbox, folderId } = usePaper()
+  const threadsQuery = useThreads(filter, mbox, folderId)
   const followups = useFollowups()
   const openTasks = useTasks('open')
   const doneTasks = useTasks('done')
 
-  // j/k (und Pfeile) aus der Keymap: Auswahl in der aktiven Liste bewegen
+  // j/k (and arrows) from the keymap: move the selection in the active list
   useEffect(() => {
     const onMove = (e: Event): void => {
       const dir = (e as CustomEvent<number>).detail
@@ -1047,7 +1116,7 @@ export function ListPane(): React.JSX.Element {
         const cur = rows.findIndex((r) => r.id === st.selTaskId)
         st.setSelTaskId(rows[clamp((cur === -1 ? 0 : cur) + dir, rows.length)].id)
       } else if (st.view === 'settings') {
-        const order = ['accounts', 'style', 'sig', 'intel', 'tech'] as const
+        const order = ['accounts', 'appearance', 'style', 'sig', 'intel', 'tech'] as const
         const cur = order.indexOf(st.setSel)
         st.setSetSel(order[clamp(cur + dir, order.length)])
       }
@@ -1056,7 +1125,7 @@ export function ListPane(): React.JSX.Element {
     return () => window.removeEventListener('paper:move', onMove)
   }, [threadsQuery.data, followups.data, openTasks.data, doneTasks.data, hiddenThreads, mbox])
   return (
-    <div className="flex min-h-0 w-[400px] flex-none flex-col border-r border-ink">
+    <div className="flex min-h-0 w-full min-w-0 flex-col border-r border-ink">
       {(view === 'inbox' || view === 'compose') && <InboxList />}
       {view === 'waiting' && <WaitingList />}
       {view === 'tasks' && <TasksList />}
@@ -1094,7 +1163,7 @@ export function ListPane(): React.JSX.Element {
               type="button"
               className="owl-key-btn"
               onClick={() => {
-                // Die NEUE-FRAGE-Affordanz der Spalte: leert das Blatt, fokussiert das Feld
+                // The column's NEW-QUESTION affordance: clears the sheet, focuses the field
                 useOwl.getState().newQuestion()
                 useOwl.getState().requestFocus()
               }}

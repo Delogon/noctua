@@ -204,8 +204,8 @@ localDescribe('local semantic-search gold evaluation', () => {
       `\nLokaler Semantic-Search-Benchmark: ${JSON.stringify(metrics)}\nBericht: ${reportPath}`
     )
 
-    // Bewusst moderate erste Qualitätsbarriere. Der Bericht bleibt auch bei
-    // einem Fehlschlag erhalten und zeigt die konkreten Problemfälle.
+    // Deliberately moderate first quality bar. The report is kept even on
+    // failure and shows the concrete problem cases.
     expect(metrics.recallAt5).toBeGreaterThanOrEqual(0.7)
     expect(metrics.expectedRankRate).toBeGreaterThanOrEqual(0.65)
     expect(metrics.meanReciprocalRank).toBeGreaterThanOrEqual(0.45)

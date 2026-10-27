@@ -20,10 +20,10 @@ interface MessageRef {
 }
 
 /**
- * Seit wann ein Konto im Fehlerzustand hängt (Design 3b: „… — since 11:42").
- * Der Backoff-Loop wechselt zwischen error → connecting → error; der erste
- * Fehlerzeitpunkt bleibt dabei stehen und wird erst durch einen erfolgreichen
- * Sync (idle) oder das Stoppen des Kontos gelöscht.
+ * Since when an account has been stuck in the error state (design 3b: "… — since 11:42").
+ * The backoff loop alternates error → connecting → error; the first
+ * error time is kept and only cleared by a successful
+ * sync (idle) or by stopping the account.
  */
 export function nextErrorSince(prev: number | null, state: SyncState, now: number): number | null {
   if (state === 'idle' || state === 'off') return null
@@ -31,7 +31,7 @@ export function nextErrorSince(prev: number | null, state: SyncState, now: numbe
   return prev
 }
 
-/** Verwaltet einen AccountSyncer pro Konto und die offline-fähige Op-Queue. */
+/** Manages one AccountSyncer per account and the offline-capable op queue. */
 class SyncEngine {
   private db: Database.Database | null = null
   private syncers = new Map<number, AccountSyncer>()
@@ -54,7 +54,7 @@ class SyncEngine {
 
     let getCredentials: () => Promise<MailCredentials>
     if (account.credential_type === 'oauth-ms') {
-      // Access-Tokens leben ~1 h — bei jedem (Re-)Connect frisch holen
+      // Access tokens live ~1 h — fetch fresh on every (re)connect
       getCredentials = async () => ({
         user: account.email,
         accessToken: await msAccessToken(account.email)
@@ -68,7 +68,7 @@ class SyncEngine {
       const password = getSecret(accountSecretKey(account.id))
       if (!password) {
         this.states.set(account.id, { state: 'error', detail: 'Kein Passwort im Tresor' })
-        // Auch dieser Fehler bekommt seinen Zeitpunkt (Design 3b: „seit 11:42")
+        // This error gets its timestamp too (design 3b: "since 11:42")
         if (!this.errorSince.has(account.id)) this.errorSince.set(account.id, Date.now())
         return
       }
@@ -122,9 +122,9 @@ class SyncEngine {
   }
 
   /**
-   * Manueller Refresh aus der UI: alle Konten sofort abgleichen — oder mit
-   * accountId nur eines (RETRY am Fehlerzustand, Design 3b). refreshNow weckt
-   * auch Backoff-Wartephasen, ein gescheitertes Konto verbindet also sofort neu.
+   * Manual refresh from the UI: reconcile all accounts right away — or with
+   * accountId only one (RETRY in the error state, design 3b). refreshNow also
+   * wakes backoff waits, so a failed account reconnects immediately.
    */
   syncNow(accountId?: number): void {
     if (accountId !== undefined) {
@@ -134,7 +134,7 @@ class SyncEngine {
     for (const syncer of this.syncers.values()) syncer.refreshNow()
   }
 
-  /** Sent-Ordner nach einem Versand zeitnah nachziehen. */
+  /** Catch up the Sent folder promptly after a send. */
   resyncSent(accountId: number): void {
     void this.syncers
       .get(accountId)
@@ -143,8 +143,8 @@ class SyncEngine {
   }
 
   /**
-   * Zugangsdaten eines Kontos haben sich geändert (Passwort im Vault): Syncer
-   * neu starten, damit er das neue Geheimnis liest und needs-reauth verlässt.
+   * An account's credentials changed (password in the vault): restart the
+   * syncer so it reads the new secret and leaves needs-reauth.
    */
   async credentialsChanged(secretKey: string): Promise<void> {
     const accounts = this.db!.prepare('SELECT * FROM accounts').all() as AccountRow[]
@@ -169,9 +169,9 @@ class SyncEngine {
     if (!row) return null
     const syncer = this.syncers.get(row.account_id)
     if (!syncer) return null
-    // Header sind klein und werden pro Nachricht nur einmal gecacht. Das
-    // zugrunde liegende IMAP-Kommando künstlich zu "timeouten" würde es nicht
-    // abbrechen, sondern lediglich ein späteres erfolgreiches Ergebnis verlieren.
+    // Headers are small and only cached once per message. Artificially
+    // "timing out" the underlying IMAP command would not abort it,
+    // but merely lose a later successful result.
     return syncer.fetchMessageHeaders(messageId)
   }
 
@@ -188,8 +188,8 @@ class SyncEngine {
   }
 
   /**
-   * Optimistische Aktion: DB und UI sofort, IMAP über die Op-Queue.
-   * j/k/e darf sich nie nach Netzlatenz anfühlen.
+   * Optimistic action: DB and UI immediately, IMAP via the op queue.
+   * j/k/e must never feel like network latency.
    */
   applyAction(messageIds: number[], action: MessageAction): void {
     const db = this.db!
@@ -261,6 +261,12 @@ class SyncEngine {
             kind: 'move',
             payload: { folderId: folder_id, uids, targetSpecialUse: '\\Inbox' }
           }
+        } else if (action === 'spam') {
+          db.prepare(`DELETE FROM messages WHERE id IN (${idPlaceholders})`).run(...ids)
+          op = {
+            kind: 'move',
+            payload: { folderId: folder_id, uids, targetSpecialUse: '\\Junk' }
+          }
         } else if (action === 'delete') {
           db.prepare(`DELETE FROM messages WHERE id IN (${idPlaceholders})`).run(...ids)
           op = {
@@ -291,7 +297,7 @@ class SyncEngine {
 
   private async processQueue(accountId: number): Promise<void> {
     if (this.processing.has(accountId)) {
-      // Während des Laufs eingereihte Ops nicht bis zum nächsten idle liegen lassen
+      // Don't leave ops enqueued during the run lying around until the next idle
       this.reprocess.add(accountId)
       return
     }

@@ -24,9 +24,9 @@ export interface OutgoingMail {
   textBody: string
   htmlBody?: string
   replyToMessageId?: number
-  /** iMIP: Kalenderteil (multipart/alternative mit text/calendar; method=…, RFC 6047) */
+  /** iMIP: calendar part (multipart/alternative with text/calendar; method=…, RFC 6047) */
   icalEvent?: { method: string; content: string }
-  /** Stabile Message-ID (aus der Outbox) — macht eine gesendete Mail wiedererkennbar. */
+  /** Stable Message-ID (from the outbox) — makes a sent mail recognizable. */
   messageId?: string
 }
 
@@ -83,10 +83,10 @@ function safeBodyHtml(html: string): string {
 }
 
 /**
- * Versendet über den SMTP-Server des Kontos. Threading-Header (In-Reply-To,
- * References) werden aus der beantworteten Nachricht abgeleitet — so landet
- * die Antwort beim Empfänger im richtigen Thread. Gmail/Outlook/Bridge legen
- * die Mail serverseitig selbst im Sent-Ordner ab (kein APPEND nötig).
+ * Sends via the account's SMTP server. Threading headers (In-Reply-To,
+ * References) are derived from the replied-to message — so the reply
+ * lands in the right thread for the recipient. Gmail/Outlook/Bridge store
+ * the mail in the Sent folder server-side themselves (no APPEND needed).
  */
 export async function sendMail(db: Database.Database, mail: OutgoingMail): Promise<void> {
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(mail.accountId) as
@@ -124,14 +124,14 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
     }
   }
 
-  // Öffentliche Server: Betriebsart folgt der Port-Konvention (465 = SSL,
-  // 587 = STARTTLS). Auf Loopback (Proton Bridge) ist sie konfigurierbar und
-  // wird deshalb am Server erkannt statt geraten.
+  // Public servers: the mode follows the port convention (465 = SSL,
+  // 587 = STARTTLS). On loopback (Proton Bridge) it is configurable and
+  // is therefore detected at the server instead of guessed.
   const loopback = isLoopbackHost(account.smtp_host)
   const implicitTls = loopback
     ? await detectImplicitTls(account.smtp_host, account.smtp_port)
     : account.smtp_port === 465
-  // Loopback (Proton Bridge): selbstsigniertes Zertifikat nur mit passendem Pin
+  // Loopback (Proton Bridge): self-signed certificate only with a matching pin
   let loopbackTls: PinnedTlsOptions | undefined
   if (loopback) {
     try {
@@ -143,7 +143,7 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
         implicitTls
       )
     } catch (error) {
-      // Evtl. falsch erkannte Betriebsart — beim nächsten Versuch neu erkennen
+      // Possibly misdetected mode — detect again on the next attempt
       forgetTlsMode(account.smtp_host, account.smtp_port)
       throw error
     }
@@ -152,8 +152,8 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
     host: account.smtp_host,
     port: account.smtp_port,
     secure: implicitTls,
-    // Ohne implizites TLS: STARTTLS erzwingen (kein Klartext-Fallback) — auch
-    // auf Loopback, damit ein fremder Prozess am Port kein AUTH im Klartext sieht
+    // Without implicit TLS: enforce STARTTLS (no plaintext fallback) — also
+    // on loopback, so a foreign process on the port never sees AUTH in plaintext
     requireTLS: !implicitTls,
     connectionTimeout: 30_000,
     greetingTimeout: 20_000,
@@ -163,8 +163,8 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
   })
 
   try {
-    // Formatierter Composer und Signatur-Baukasten erzeugen eine HTML-Alternative;
-    // der Text bleibt für reine Text-Clients vollständig erhalten.
+    // Formatted composer and signature builder produce an HTML alternative;
+    // the text stays fully intact for plain-text clients.
     let html: string | undefined
     let attachments: Array<{ cid: string; filename: string; content: Buffer }> | undefined
     let plainText = mail.textBody
@@ -241,8 +241,8 @@ export async function sendMail(db: Database.Database, mail: OutgoingMail): Promi
       references
     })
   } catch (error) {
-    // Falsch erkannte Betriebsart (z. B. Bridge umkonfiguriert)? Beim
-    // nächsten Versuch neu erkennen statt am Cache festzuhalten.
+    // Misdetected mode (e.g. Bridge reconfigured)? On the
+    // next attempt detect again instead of sticking to the cache.
     if (loopback) forgetTlsMode(account.smtp_host, account.smtp_port)
     throw error
   } finally {

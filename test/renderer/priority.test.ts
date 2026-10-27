@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { needsYou, priorityTickTone } from '@renderer/features/paper/priority'
 
-/** Design Turn 5: Rang-Ticks und der „Braucht dich"-Filter (Renderer-Seite). */
+/** Design Turn 5: rank ticks and the „Braucht dich" filter (renderer side). */
 
 describe('priorityTickTone', () => {
   it('Rang 5 → Akzent, Rang 4 → Ink, darunter/null → kein Tick', () => {

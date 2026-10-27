@@ -1,13 +1,13 @@
 import { z } from 'zod'
 
 /**
- * Organisations-Konfiguration („Company Edition"): optional, zur Build-Zeit
- * eingebettet (Beispiel: build/org-config.example.json). Ohne Datei bleibt jedes Verhalten
- * wie im Upstream. Alle Felder sind optional; unbekannte Felder sind ein
- * Fehler (Tippfehler sollen den Build stoppen, nicht still verpuffen).
+ * Organization config ("Company Edition"): optional, embedded at build time
+ * (example: build/org-config.example.json). Without a file every behavior stays as in
+ * upstream. All fields are optional; unknown fields are an error
+ * (typos should stop the build, not silently fizzle out).
  *
- * Bewusst in shared/: das Build-Skript (electron.vite.config.ts), der Main
- * und die Tests validieren gegen dasselbe Schema.
+ * Deliberately in shared/: the build script (electron.vite.config.ts), main
+ * and the tests validate against the same schema.
  */
 
 function protocolOk(value: string, allowed: string[]): boolean {
@@ -28,7 +28,7 @@ const httpUrl = z
   .max(500)
   .refine((v) => protocolOk(v, ['https:', 'http:']), 'muss eine http(s)://-URL sein')
 
-/** Reservierte Profil-IDs: eingebautes OpenRouter und Pseudo-Profil Apple On-Device. */
+/** Reserved profile IDs: built-in OpenRouter and the Apple on-device pseudo-profile. */
 const RESERVED_PROFILE_IDS = ['openrouter', 'apple']
 
 const modelName = z.string().trim().min(1).max(200)
@@ -43,13 +43,13 @@ export const orgAiProfileSchema = z
     baseUrl: httpUrl,
     apiStyle: z.enum(['chat', 'responses']),
     isLocal: z.boolean(),
-    /** Aufgabe → Modell; wird nur beim allerersten Anlegen des Profils zugewiesen. */
+    /** Task → model; only assigned when the profile is first created. */
     tasks: z
       .object({
         triage: modelName.optional(),
         draft: modelName.optional(),
         stt: modelName.optional(),
-        /** Entscheidungsmodell (Ollama System One, z. B. clef-flash) */
+        /** Decision model (Ollama System One, e.g. clef-flash) */
         decision: modelName.optional()
       })
       .strict()
@@ -68,10 +68,36 @@ export const updatesConfigSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('off') }).strict()
 ])
 
+const domainName = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(253)
+  .regex(/^(?!-)[a-z0-9-]{1,63}(?:\.(?!-)[a-z0-9-]{1,63})+$/, 'Domain, z. B. example.com')
+
+/**
+ * Spam/phishing rules (src/main/mail/threat-signals.ts): extra protected
+ * brands (e.g. the company's own name) with their official domains, and
+ * trusted domains whose senders and link targets never count as impersonation
+ * or link deception.
+ */
+export const securityConfigSchema = z
+  .object({
+    brands: z
+      .record(
+        z.string().regex(/^[a-z0-9]{3,30}$/, 'ein Wort aus Kleinbuchstaben/Ziffern, 3–30 Zeichen'),
+        z.array(domainName).min(1).max(20)
+      )
+      .refine((brands) => Object.keys(brands).length <= 50, 'höchstens 50 Marken')
+      .optional(),
+    trustedDomains: z.array(domainName).max(200).optional()
+  })
+  .strict()
+
 export const orgConfigSchema = z
   .object({
     productName: z.string().trim().min(1).max(60).optional(),
-    /** Bundle-ID (Reverse-DNS) */
+    /** Bundle ID (reverse DNS) */
     appId: z
       .string()
       .max(120)
@@ -90,7 +116,7 @@ export const orgConfigSchema = z
       .object({
         localOnly: z.boolean().optional(),
         aiEnabledForNewAccounts: z.boolean().optional(),
-        /** block = Remote-Bilder blockieren (Upstream-Default), allow = laden */
+        /** block = block remote images (upstream default), allow = load */
         remoteImagesDefault: z.enum(['block', 'allow']).optional(),
         language: z.enum(['de', 'en', 'auto']).optional()
       })
@@ -120,20 +146,22 @@ export const orgConfigSchema = z
       })
       .strict()
       .optional(),
-    hideOpenRouterOnboarding: z.boolean().optional()
+    hideOpenRouterOnboarding: z.boolean().optional(),
+    security: securityConfigSchema.optional()
   })
   .strict()
 
 export type OrgConfig = z.infer<typeof orgConfigSchema>
 export type OrgAiProfile = z.infer<typeof orgAiProfileSchema>
 export type UpdatesConfig = z.infer<typeof updatesConfigSchema>
+export type SecurityConfig = z.infer<typeof securityConfigSchema>
 
-/** Fehler als lesbare Zeilen („updates.repo: Format owner/name"). */
+/** Errors as readable lines ("updates.repo: Format owner/name"). */
 export function formatOrgConfigIssues(error: z.ZodError): string[] {
   return error.issues.map((i) => `${i.path.join('.') || '(Wurzel)'}: ${i.message}`)
 }
 
-/** Parst die rohe JSON-Zeichenkette; wirft mit allen Problemen auf einmal. */
+/** Parses the raw JSON string; throws with all problems at once. */
 export function parseOrgConfig(raw: string): OrgConfig {
   let json: unknown
   try {
@@ -150,7 +178,7 @@ export function parseOrgConfig(raw: string): OrgConfig {
   return result.data
 }
 
-/** Format der Update-Datei im Modus „url". */
+/** Format of the update file in "url" mode. */
 export const updateManifestSchema = z.object({
   version: z
     .string()
@@ -161,10 +189,10 @@ export const updateManifestSchema = z.object({
 })
 export type UpdateManifest = z.infer<typeof updateManifestSchema>
 
-/** Standard-Updatequelle des Upstream. */
+/** Upstream's default update source. */
 export const UPSTREAM_UPDATE_REPO = 'Schereo/noctua'
 
-/** Namens-Ableitung (Datenordner/Executable) aus dem Produktnamen. */
+/** Name derivation (data folder/executable) from the product name. */
 export function slugifyProductName(name: string): string {
   return (
     name

@@ -1,16 +1,16 @@
 import { create } from 'zustand'
 
-// Zustand des Stups-Composers der Wartet-Ansicht: derselbe Automat wie der
-// Reply-Composer (stores/paper, comp), nur an ein Followup (messageId) statt
-// an einen Thread gebunden. Eigener Store, damit ein laufendes Stups-Diktat
-// den Posteingangs-Entwurf nicht berührt — und umgekehrt.
+// State of the nudge composer of the Waiting view: the same state machine as the
+// reply composer (stores/paper, comp), only bound to a followup (messageId) instead
+// of a thread. Separate store so a running nudge dictation does not
+// touch the inbox draft — and vice versa.
 
 export type NudgeMode = 'idle' | 'listening' | 'transcribing' | 'drafting' | 'ready' | 'sending'
 export type NudgeResultKind = 'transcribed' | 'generated'
 export type NudgeErrorKind = 'transcription' | 'generation' | 'send'
 
 export interface NudgeCompState {
-  /** Followup (messages.id der eigenen gesendeten Mail), zu dem der Puffer gehört. */
+  /** Followup (messages.id of the own sent mail) the buffer belongs to. */
   messageId: number | null
   mode: NudgeMode
   secs: number

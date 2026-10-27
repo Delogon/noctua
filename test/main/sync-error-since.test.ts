@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { nextErrorSince } from '@main/sync/engine'
 
-// „since 11:42" (Design 3b): der ERSTE Fehlerzeitpunkt bleibt über die
-// Backoff-Zyklen (error → connecting → error) stehen und verschwindet erst
-// mit einem erfolgreichen Sync.
+// „since 11:42" (Design 3b): the FIRST error time persists across the
+// backoff cycles (error → connecting → error) and only disappears
+// with a successful sync.
 
 describe('nextErrorSince', () => {
   const NOW = 1_752_576_600_000

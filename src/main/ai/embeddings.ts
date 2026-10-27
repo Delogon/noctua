@@ -1,40 +1,39 @@
-import { app } from 'electron'
+import { app, powerMonitor } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { htmlToText } from '../mail/parser'
 import { cleanupSearchOrphans, refreshMessageSearchIndex } from '../mail/ingest'
 import { isLocalOnly } from '../privacy'
+import { metrics } from '../diagnostics/metrics'
+import { EMBEDDING_MODEL, ExtractorCache, runExtractor, type EmbedPrefix } from './embed-model'
 
-export const EMBEDDING_MODEL = 'Xenova/multilingual-e5-base'
-const DIMS = 768
+export { EMBEDDING_MODEL }
 const BATCH = 8
 const SCAN_LIMIT = 48
 const POLL_INTERVAL_MS = 60_000
-
-type Extractor = (
-  texts: string[],
-  options: { pooling: 'mean'; normalize: boolean }
-) => Promise<{ data: Float32Array; dims: number[] }>
-
-let extractorPromise: Promise<Extractor> | null = null
+/** Pause between batches on battery: the index is not worth draining it. */
+const BATTERY_PAUSE_MS = 2_000
+/** Startup maintenance (orphans, legacy states) after the window is up. */
+const MAINTENANCE_DELAY_MS = 5_000
+/** The orphan reconciliation scans FTS and vector tables completely. */
+const ORPHAN_CLEANUP_INTERVAL_MS = 6 * 60 * 60_000
 
 /**
- * Lokale Embeddings (multilingual-e5-small, quantisiert, ~120 MB einmaliger
- * Download in userData/models). Mail-Inhalte verlassen den Rechner fürs
- * Indexieren nicht. E5 verlangt "passage:"/"query:"-Präfixe.
+ * Local embeddings (multilingual-e5-base, quantized, one-time download into
+ * userData/models). Mail contents don't leave the machine for indexing.
  */
 
 function modelCacheDir(): string {
   return process.env.NOCTUA_MODEL_CACHE_DIR?.trim() || join(app.getPath('userData'), 'models')
 }
 
-/** Liegt das (quantisierte) Modell schon im lokalen Cache? Dann braucht es kein Netz. */
+/** Is the (quantized) model already in the local cache? Then it needs no network. */
 export function isEmbeddingModelCached(): boolean {
   return existsSync(join(modelCacheDir(), EMBEDDING_MODEL, 'onnx', 'model_quantized.onnx'))
 }
 
-/** Ohne Download-Erlaubnis (Local only) und ohne Cache steht das Modell nicht bereit. */
+/** Without download permission (Local only) and without cache the model is unavailable. */
 export class EmbeddingModelUnavailableError extends Error {
   constructor() {
     super('Suchmodell nicht geladen („Nur lokal“: Download nur auf Anfrage)')
@@ -42,27 +41,83 @@ export class EmbeddingModelUnavailableError extends Error {
   }
 }
 
-async function getExtractor(allowDownload = !isLocalOnly()): Promise<Extractor> {
-  if (!extractorPromise) {
-    if (!allowDownload && !isEmbeddingModelCached()) throw new EmbeddingModelUnavailableError()
-    extractorPromise = (async () => {
-      const { env, pipeline } = await import('@huggingface/transformers')
-      env.cacheDir = modelCacheDir()
-      const pipe = await pipeline('feature-extraction', EMBEDDING_MODEL, {
-        dtype: 'q8',
-        // Ohne Download-Erlaubnis: nur Cache, keine Hugging-Face-Anfrage
-        local_files_only: !allowDownload
-      })
-      return pipe as unknown as Extractor
-    })()
-    extractorPromise.catch(() => {
-      extractorPromise = null // Download fehlgeschlagen → nächster Versuch später
-    })
-  }
-  return extractorPromise
+/** Where inference runs: a worker thread in the app, in-process in tests. */
+export interface EmbedBackend {
+  /** Without texts only loads the model. */
+  embed(texts: string[], prefix: EmbedPrefix, allowDownload: boolean): Promise<Float32Array[]>
+  stop?(): void
 }
 
-/** Entfernt URL-/Boilerplate-Rauschen, das Embeddings dominiert (Receipts!). */
+class InProcessEmbedder implements EmbedBackend {
+  private readonly cache = new ExtractorCache()
+
+  async embed(
+    texts: string[],
+    prefix: EmbedPrefix,
+    allowDownload: boolean
+  ): Promise<Float32Array[]> {
+    const extractor = await this.cache.get(modelCacheDir(), allowDownload)
+    return texts.length > 0 ? runExtractor(extractor, texts, prefix) : []
+  }
+}
+
+let backend: Promise<EmbedBackend> | null = null
+
+function selectBackend(): Promise<EmbedBackend> {
+  if (!backend) {
+    backend = (async (): Promise<EmbedBackend> => {
+      if (!process.versions.electron || process.env.NOCTUA_EMBED_IN_PROCESS === '1') {
+        return new InProcessEmbedder()
+      }
+      try {
+        const { WorkerEmbedder } = await import('./embed-worker-client')
+        return new WorkerEmbedder(modelCacheDir())
+      } catch (error) {
+        console.warn('[embeddings] worker unavailable, embedding in-process:', error)
+        return new InProcessEmbedder()
+      }
+    })()
+  }
+  return backend
+}
+
+/** Test seam: replaces the inference backend (null = default selection). */
+export function setEmbedBackend(next: EmbedBackend | null): void {
+  void backend?.then((current) => current.stop?.())
+  backend = next ? Promise.resolve(next) : null
+}
+
+async function embed(
+  texts: string[],
+  prefix: EmbedPrefix,
+  allowDownload = !isLocalOnly()
+): Promise<Float32Array[]> {
+  if (!allowDownload && !isEmbeddingModelCached()) throw new EmbeddingModelUnavailableError()
+  const current = await selectBackend()
+  try {
+    return await current.embed(texts, prefix, allowDownload)
+  } catch (error) {
+    // The worker died (or never started): keep search working in-process
+    if (error instanceof Error && error.name === 'EmbedWorkerUnavailableError') {
+      console.warn('[embeddings] worker failed, embedding in-process:', error.message)
+      current.stop?.()
+      const fallback = new InProcessEmbedder()
+      backend = Promise.resolve(fallback)
+      return fallback.embed(texts, prefix, allowDownload)
+    }
+    throw error
+  }
+}
+
+function onBattery(): boolean {
+  try {
+    return powerMonitor.isOnBatteryPower()
+  } catch {
+    return false
+  }
+}
+
+/** Removes URL/boilerplate noise that dominates embeddings (receipts!). */
 export function cleanForEmbedding(text: string): string {
   return text
     .replace(/\[image:[^\]]*\]/gi, ' ')
@@ -71,19 +126,6 @@ export function cleanForEmbedding(text: string): string {
     .replace(/[-_=*]{4,}/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-async function embed(texts: string[], prefix: 'passage' | 'query'): Promise<Float32Array[]> {
-  const extractor = await getExtractor()
-  const output = await extractor(
-    texts.map((t) => `${prefix}: ${t}`),
-    { pooling: 'mean', normalize: true }
-  )
-  const results: Float32Array[] = []
-  for (let i = 0; i < texts.length; i++) {
-    results.push(output.data.slice(i * DIMS, (i + 1) * DIMS) as Float32Array)
-  }
-  return results
 }
 
 export function embedQuery(text: string): Promise<Float32Array[]> {
@@ -115,31 +157,67 @@ export interface EmbeddingIndexStatus {
   model: {
     id: typeof EMBEDDING_MODEL
     state: EmbeddingModelState
-    /** Modelldateien liegen lokal vor (Suche funktioniert ohne Netz) */
+    /** Model files are available locally (search works without network) */
     cached: boolean
     error: string | null
   }
 }
 
-/** Indexiert Message-Bodies im Hintergrund in die vec0-Tabelle. */
+/**
+ * States that still need a vector, driven from the partial index
+ * idx_embed_pending (migration 040): its WHERE must match exactly, including
+ * the model literal. Newest messages first, from searchable folders only.
+ */
+export const PENDING_ROWS_SQL = `SELECT m.id, m.subject, m.from_name, m.from_addr, b.text_plain, b.html_raw,
+       coalesce((
+         SELECT group_concat(coalesce(a.filename, ''), ' ')
+         FROM attachments a WHERE a.message_id = m.id
+       ), '') AS attachment_names,
+       s.content_hash
+  FROM message_embedding_state s
+  CROSS JOIN messages m ON m.id = s.message_id
+  JOIN message_bodies b ON b.message_id = m.id
+  JOIN folders f ON f.id = m.folder_id
+  WHERE (
+      s.embedded_hash IS NULL
+      OR s.embedded_hash != s.content_hash
+      OR s.embedding_model IS NULL
+      OR s.embedding_model != '${EMBEDDING_MODEL}'
+    )
+    AND m.body_state = 'full'
+    AND f.special_use IN ('\\Inbox', '\\Sent', '\\Archive')
+  ORDER BY m.date DESC LIMIT ?`
+
+/** Indexes message bodies in the background into the vec0 table. */
 export class EmbeddingIndexer {
   private db: Database.Database | null = null
   private timer: NodeJS.Timeout | null = null
   private startupTimer: NodeJS.Timeout | null = null
+  private maintenanceTimer: NodeJS.Timeout | null = null
   private running = false
   private reconciled = false
   private modelState: EmbeddingModelState = 'not_loaded'
   private modelError: string | null = null
+  private lastOrphanCleanup = 0
 
   init(db: Database.Database): void {
     this.db = db
-    const cleaned = cleanupSearchOrphans(db)
+  }
+
+  /**
+   * Orphan cleanup and the legacy state backfill: full scans, so they run
+   * shortly after startup (start) instead of before the window is usable.
+   */
+  maintain(): void {
+    if (!this.db) return
+    const cleaned = metrics.time('ai.embed.cleanupOrphans', () => cleanupSearchOrphans(this.db!))
+    this.lastOrphanCleanup = Date.now()
     if (cleaned.fts + cleaned.vectors + cleaned.states > 0) {
       console.log(
         `[embeddings] Orphans entfernt: ${cleaned.fts} FTS, ${cleaned.vectors} Vektoren, ${cleaned.states} Staende`
       )
     }
-    this.ensureSearchStates()
+    metrics.time('ai.embed.ensureStates', () => this.ensureSearchStates())
   }
 
   start(): void {
@@ -158,6 +236,10 @@ export class EmbeddingIndexer {
         console.warn('[embeddings] reindex:', error)
       }
     }
+    this.maintenanceTimer = setTimeout(() => {
+      this.maintenanceTimer = null
+      this.maintain()
+    }, MAINTENANCE_DELAY_MS)
     this.startupTimer = setTimeout(() => this.kick(), 30_000)
     this.timer = setInterval(() => this.kick(), POLL_INTERVAL_MS)
   }
@@ -165,15 +247,18 @@ export class EmbeddingIndexer {
   stop(): void {
     if (this.timer) clearInterval(this.timer)
     if (this.startupTimer) clearTimeout(this.startupTimer)
+    if (this.maintenanceTimer) clearTimeout(this.maintenanceTimer)
     this.timer = null
     this.startupTimer = null
+    this.maintenanceTimer = null
+    void backend?.then((current) => current.stop?.())
   }
 
   isReady(): boolean {
     return this.modelState === 'ready'
   }
 
-  /** Wahrer lokaler Stand; zaehlt nur aktuelle Vektoren des aktiven Modells. */
+  /** True local state; counts only current vectors of the active model. */
   getStatus(): EmbeddingIndexStatus {
     if (!this.db) {
       return {
@@ -189,11 +274,11 @@ export class EmbeddingIndexer {
         }
       }
     }
-    // Der Zustand kommt allein aus message_embedding_state (indiziert). Ein
-    // `EXISTS (… message_vecs …)` pro Zeile wäre genauer, kostet auf einem
-    // 40k-Postfach aber ein bis drei Sekunden im Main-Prozess — und da vec0
-    // keinen Rowid-Index hat, wächst das quadratisch. Fehlende Vektoren fängt
-    // stattdessen reconcileMissingVectors() einmal pro Sitzung ab.
+    // The state comes solely from message_embedding_state (indexed). An
+    // `EXISTS (… message_vecs …)` per row would be more accurate, but costs one to
+    // three seconds in the main process on a 40k mailbox — and since vec0
+    // has no rowid index, it grows quadratically. Missing vectors are instead
+    // caught once per session by reconcileMissingVectors().
     const counts = this.db
       .prepare(
         `SELECT count(*) AS eligible,
@@ -238,15 +323,15 @@ export class EmbeddingIndexer {
   }
 
   /**
-   * Ausdrücklicher Download des Suchmodells (Einstellungen → „Suchmodell laden").
-   * Der einzige Weg, der bei Local only ins Netz darf — danach läuft die
-   * Indexierung wie gewohnt.
+   * Explicit download of the search model (Settings → "Load search model").
+   * The only path allowed onto the network under Local only — afterwards
+   * indexing runs as usual.
    */
   async downloadModel(): Promise<void> {
     this.modelState = 'loading'
     this.modelError = null
     try {
-      await getExtractor(true)
+      await embed([], 'passage', true)
       this.modelState = 'ready'
     } catch (error) {
       this.modelState = 'error'
@@ -256,7 +341,10 @@ export class EmbeddingIndexer {
     this.kick()
   }
 
-  /** Migrationen kennen keine SHA-256-Funktion; bestehende Bodies hier nachziehen. */
+  /**
+   * Migrations have no SHA-256 function; backfill existing bodies here. Once
+   * per session (init): every new envelope and body creates its state row.
+   */
   private ensureSearchStates(): void {
     if (!this.db) return
     const missing = this.db
@@ -277,10 +365,10 @@ export class EmbeddingIndexer {
   }
 
   /**
-   * Eine Migration kann die vec0-Tabelle neu anlegen (022 hat das getan),
-   * während message_embedding_state die Nachrichten weiter als eingebettet
-   * führt. Zwei billige Zählungen erkennen das; nur dann wird der teure
-   * Zeilenabgleich fällig — statt bei jedem Poll.
+   * A migration can recreate the vec0 table (022 did that),
+   * while message_embedding_state still lists the messages as embedded.
+   * Two cheap counts detect this; only then is the expensive
+   * row reconciliation due — instead of on every poll.
    */
   private reconcileMissingVectors(): void {
     if (this.reconciled || !this.db) return
@@ -311,43 +399,26 @@ export class EmbeddingIndexer {
   }
 
   private pendingRows(): IndexRow[] {
-    this.ensureSearchStates()
-    return this.db!.prepare(
-      `SELECT m.id, m.subject, m.from_name, m.from_addr, b.text_plain, b.html_raw,
-                coalesce((
-                  SELECT group_concat(coalesce(a.filename, ''), ' ')
-                  FROM attachments a WHERE a.message_id = m.id
-                ), '') AS attachment_names,
-                s.content_hash
-         FROM messages m JOIN message_bodies b ON b.message_id = m.id
-         JOIN folders f ON f.id = m.folder_id
-         JOIN message_embedding_state s ON s.message_id = m.id
-         WHERE m.body_state = 'full'
-           AND f.special_use IN ('\\Inbox', '\\Sent', '\\Archive')
-           AND (
-             s.embedded_hash IS NULL
-             OR s.embedded_hash != s.content_hash
-             OR s.embedding_model IS NULL
-             OR s.embedding_model != ?
-           )
-         ORDER BY m.date DESC LIMIT ?`
-    ).all(EMBEDDING_MODEL, SCAN_LIMIT) as IndexRow[]
+    return this.db!.prepare(PENDING_ROWS_SQL).all(SCAN_LIMIT) as IndexRow[]
   }
 
   private async drain(): Promise<void> {
-    // Local only: ohne gecachtes Modell kein automatischer Download — die
-    // Suche läuft dann nur über FTS, bis der Nutzer das Modell ausdrücklich lädt.
+    // Local only: without a cached model no automatic download — search
+    // then runs via FTS only until the user explicitly loads the model.
     if (isLocalOnly() && !isEmbeddingModelCached()) {
       if (this.modelState !== 'loading') this.modelState = 'not_loaded'
       return
     }
     this.reconcileMissingVectors()
     let rows = this.pendingRows()
-    // Der Waisen-Abgleich scannt FTS- und Vektortabelle komplett. Im
-    // Normalfall (nichts zu indexieren) lohnt das nicht alle 60 Sekunden —
-    // init() räumt beim Start auf, danach nur noch bei echter Arbeit.
+    // The orphan reconciliation scans the FTS and vector tables completely. In
+    // the normal case (nothing to index) that's not worth it every 60 seconds —
+    // init() cleans up on start, afterwards only when there's real work.
     if (rows.length === 0) return
-    cleanupSearchOrphans(this.db!)
+    if (Date.now() - this.lastOrphanCleanup >= ORPHAN_CLEANUP_INTERVAL_MS) {
+      metrics.time('ai.embed.cleanupOrphans', () => cleanupSearchOrphans(this.db!))
+      this.lastOrphanCleanup = Date.now()
+    }
     const insert = this.db!.prepare('INSERT INTO message_vecs (rowid, embedding) VALUES (?, ?)')
     const remove = this.db!.prepare('DELETE FROM message_vecs WHERE rowid = ?')
     const currentHash = this.db!.prepare(
@@ -370,12 +441,15 @@ export class EmbeddingIndexer {
         })
         if (this.modelState !== 'ready') this.modelState = 'loading'
         this.modelError = null
-        const vectors = await embed(texts, 'passage')
+        const vectors = await metrics.timeAsync('ai.embed.batch', () => embed(texts, 'passage'), {
+          messages: batch.length
+        })
+        metrics.count('ai.embed.messages', batch.length)
         this.modelState = 'ready'
         const tx = this.db!.transaction(() => {
           batch.forEach((row, index) => {
             const current = currentHash.get(row.id) as { content_hash: string } | undefined
-            // Body koennte sich waehrend der Modell-Inferenz geaendert haben.
+            // Body might have changed during model inference.
             if (!current || current.content_hash !== row.content_hash) return
             remove.run(BigInt(row.id))
             insert.run(BigInt(row.id), toBlob(vectors[index]))
@@ -384,6 +458,8 @@ export class EmbeddingIndexer {
           })
         })
         tx()
+        // Yield between batches; on battery also give the CPU a rest
+        await new Promise((resolve) => setTimeout(resolve, onBattery() ? BATTERY_PAUSE_MS : 0))
       }
       console.log(`[embeddings] ${rows.length} Nachrichten indexiert`)
       rows = this.pendingRows()

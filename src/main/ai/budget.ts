@@ -25,8 +25,8 @@ export function logUsage(
 }
 
 /**
- * Budget-Setting als Zahl; leer, NaN, Infinity oder negativ ergibt den Default —
- * sonst würde ein kaputter Wert (NaN >= x ist immer false) das Gate aushebeln.
+ * Budget setting as a number; empty, NaN, Infinity or negative yields the default —
+ * otherwise a broken value (NaN >= x is always false) would bypass the gate.
  */
 function budgetSetting(key: string, fallback: number): number {
   const raw = getSetting(key)
@@ -58,7 +58,7 @@ export function getUsageSummary(db: Database.Database): {
   return { todayCostUsd: todayCost.c, monthCostUsd: monthCost.c }
 }
 
-/** Hartes Gate: vor jedem Request prüfen, bei Überschreitung pausiert die Queue. */
+/** Hard gate: check before every request; when exceeded, the queue pauses. */
 export function isBudgetExceeded(db: Database.Database): boolean {
   const { todayCostUsd, monthCostUsd } = getUsageSummary(db)
   return todayCostUsd >= getDailyBudgetUsd() || monthCostUsd >= getMonthlyBudgetUsd()

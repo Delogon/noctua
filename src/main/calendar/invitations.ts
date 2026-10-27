@@ -35,11 +35,11 @@ import {
 import { applyIcsToObject, createObjectFromIcs, deleteEvent } from './service'
 
 /**
- * Eingehende Einladungen (iMIP): Parsen beim Ingest, Karte für die Mail-Ansicht,
- * RSVP und Verarbeitung von Antworten. Mails sind untrusted — es wird nie ohne
- * Nutzeraktion ein Termin angelegt. Einzige Ausnahme: ein REPLY, der den
- * PARTSTAT eines Teilnehmers an einem Termin aktualisiert, den WIR organisieren,
- * und dessen Absender-Adresse zum Teilnehmer passt.
+ * Incoming invitations (iMIP): parsing at ingest, card for the mail view,
+ * RSVP and processing of replies. Mails are untrusted — an event is never
+ * created without user action. Only exception: a REPLY that updates the
+ * PARTSTAT of an attendee on an event that WE organize,
+ * and whose sender address matches the attendee.
  */
 
 const MAX_PARTS_PER_MESSAGE = 4
@@ -81,9 +81,9 @@ function lang(): MailLang {
   return getSetting('ui.language') === 'en' ? 'en' : 'de'
 }
 
-// --- Kalenderobjekt zur UID ------------------------------------------------------------------------
+// --- Calendar object by UID ------------------------------------------------------------------------
 
-/** Termin im Kalender des Nutzers (per UID). Bevorzugt Konten mit Server-Scheduling. */
+/** Event in the user's calendar (by UID). Prefers accounts with server scheduling. */
 export function findObjectByUid(db: Database.Database, uid: string): CalObjectRow | undefined {
   return db
     .prepare(
@@ -101,7 +101,7 @@ function accountOfObject(db: Database.Database, obj: CalObjectRow): CalAccountRo
   return cal ? getCalAccount(db, cal.account_id) : undefined
 }
 
-/** Standardkalender für „Annehmen": erster beschreibbarer VEVENT-Kalender des passenden Kontos. */
+/** Default calendar for "Accept": first writable VEVENT calendar of the matching account. */
 export function suggestCalendarId(
   db: Database.Database,
   mailAccountId: number,
@@ -134,8 +134,8 @@ export function suggestCalendarId(
 // --- Ingest ---------------------------------------------------------------------------------------
 
 /**
- * Speichert die Einladungsteile einer Mail (aus storeBody). Wirft nie — eine
- * kaputte Einladung darf den Mail-Abruf nicht stören.
+ * Stores the invitation parts of a mail (from storeBody). Never throws — a
+ * broken invitation must not disrupt mail fetching.
  */
 export function storeInvitations(
   db: Database.Database,
@@ -156,7 +156,7 @@ export function storeInvitations(
     for (const part of parts.slice(0, MAX_PARTS_PER_MESSAGE)) {
       const parsed = parseItip(part.content, part.method)
       if (!parsed) continue
-      // text/calendar-Alternative und .ics-Anhang sind dieselbe Einladung
+      // text/calendar alternative and .ics attachment are the same invitation
       const key = `${parsed.method}|${parsed.uid}|${parsed.sequence}|${parsed.recurrenceId ?? ''}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -224,11 +224,11 @@ export function storeInvitations(
 }
 
 /**
- * Antwort eines Teilnehmers (REPLY). Wird nur übernommen, wenn
- * (a) wir Organisator des Termins sind, (b) der Absender der Mail genau dem
- * Teilnehmer entspricht, dessen PARTSTAT sich ändert (Spoofing-Schutz),
- * (c) der Teilnehmer in unserem Termin steht und (d) die Antwort nicht auf
- * einer älteren SEQUENCE beruht. Alles andere wird ignoriert.
+ * An attendee's reply (REPLY). Only applied if
+ * (a) we are the event's organizer, (b) the mail's sender exactly matches the
+ * attendee whose PARTSTAT changes (spoofing protection),
+ * (c) the attendee is in our event and (d) the reply is not based on
+ * an older SEQUENCE. Everything else is ignored.
  */
 function processReply(
   db: Database.Database,
@@ -266,7 +266,7 @@ function processReply(
     try {
       applyIcsToObject(obj.id, res.ics, db)
     } catch (error) {
-      // z. B. schreibgeschützter Kalender
+      // e.g. read-only calendar
       console.warn(
         `[invitations] Antwort nicht übernommen: ${error instanceof Error ? error.message : String(error)}`
       )
@@ -281,7 +281,7 @@ function processReply(
   )
 }
 
-// --- Ansicht ----------------------------------------------------------------------------------------
+// --- View -------------------------------------------------------------------------------------------
 
 function parseAttendeesJson(json: string): CalendarAttendee[] {
   try {
@@ -292,7 +292,7 @@ function parseAttendeesJson(json: string): CalendarAttendee[] {
   }
 }
 
-/** PARTSTAT des Nutzers im gespeicherten Termin (für das Vorkommen, sonst Stamm). */
+/** The user's PARTSTAT in the stored event (for the occurrence, otherwise the master). */
 function storedPartstat(
   ics: string,
   mine: ReadonlySet<string>,
@@ -397,7 +397,7 @@ export function toInvitationView(
   }
 }
 
-/** Einladungskarten einer Nachricht (nur REQUEST/CANCEL/REPLY/COUNTER). */
+/** Invitation cards of a message (REQUEST/CANCEL/REPLY/COUNTER only). */
 export function getInvitationsForMessage(
   db: Database.Database,
   messageId: number
@@ -430,7 +430,7 @@ function requireRow(db: Database.Database, id: number): InvitationRow {
 }
 
 function markResponded(db: Database.Database, row: InvitationRow, partstat: string): void {
-  // Alle Mails zu demselben Termin zeigen den neuen Stand
+  // All mails about the same event show the new state
   db.prepare(
     `UPDATE invitations SET state = 'responded', responded_partstat = ?, responded_at = ?
       WHERE uid = ? AND recurrence_id IS ? AND method = 'REQUEST'`
@@ -438,12 +438,12 @@ function markResponded(db: Database.Database, row: InvitationRow, partstat: stri
 }
 
 /**
- * Antwortweg bestimmen (reine Entscheidung, getrennt testbar):
- * - 'server': Termin liegt schon in einem Konto mit calendar-auto-schedule und enthält
- *   uns als ATTENDEE → nur PARTSTAT per PUT ändern, der Server verschickt die Antwort.
- *   KEINE iMIP-Mail (sonst doppelte Antwort beim Organisator).
- * - 'imip': sonst Termin lokal speichern (SCHEDULE-AGENT=CLIENT am ORGANIZER, damit der
- *   Server nicht zusätzlich antwortet) und die Antwort per Mail über die Outbox senden.
+ * Determine the reply path (pure decision, testable separately):
+ * - 'server': the event already lives in an account with calendar-auto-schedule and contains
+ *   us as ATTENDEE → only change PARTSTAT via PUT, the server sends the reply.
+ *   NO iMIP mail (otherwise the organizer gets a duplicate reply).
+ * - 'imip': otherwise store the event locally (SCHEDULE-AGENT=CLIENT on the ORGANIZER so the
+ *   server does not reply as well) and send the reply by mail via the outbox.
  */
 export function chooseRsvpPath(db: Database.Database, row: InvitationRow): 'server' | 'imip' {
   const obj = findObjectByUid(db, row.uid)
@@ -473,7 +473,7 @@ export function respondToInvitation(
   const partstat: RsvpPartstat = input.partstat
   const comment = input.comment?.trim() || undefined
 
-  // Doppelversand vermeiden: dieselbe Antwort ohne neuen Kommentar nicht erneut senden
+  // Avoid double sending: don't resend the same reply without a new comment
   if (row.state === 'responded' && row.responded_partstat === partstat && !comment) {
     return { path: chooseRsvpPath(db, row), objectId: obj?.id ?? null, mailQueued: false }
   }
@@ -482,15 +482,15 @@ export function respondToInvitation(
   const path = chooseRsvpPath(db, row)
 
   if (path === 'server' && obj) {
-    // Server-Scheduling: PARTSTAT der Serverkopie ändern (PUT mit If-Match über die Sync-Op);
-    // der Server schickt die Antwort an den Organisator.
+    // Server scheduling: change PARTSTAT of the server copy (PUT with If-Match via the sync op);
+    // the server sends the reply to the organizer.
     const res = setAttendeePartstat(obj.ics, mine, partstat, row.recurrence_id, ctx)
     if (res.changed) applyIcsToObject(obj.id, res.ics, db)
     markResponded(db, row, partstat)
     return { path: 'server', objectId: obj.id, mailQueued: false }
   }
 
-  // iMIP-Weg
+  // iMIP path
   const myAddress = (row.my_address ?? '').toLowerCase()
   if (!myAddress) throw new Error('Deine Adresse wurde in der Einladung nicht gefunden')
   const organizer = row.organizer
@@ -499,7 +499,7 @@ export function respondToInvitation(
 
   let objectId: number | null = obj?.id ?? null
   if (partstat === 'DECLINED') {
-    // Absage: Termin nicht (mehr) im Kalender führen
+    // Declined: don't keep the event in the calendar (any longer)
     if (obj && !mine.has(organizerOf(obj.ics) ?? '')) {
       deleteEvent(obj.id, row.recurrence_id ? 'this' : 'all', row.recurrence_id, db, ctx, {
         notifyAttendees: false
@@ -552,12 +552,12 @@ export function respondToInvitation(
   return { path: 'imip', objectId, mailQueued: true }
 }
 
-// --- Absage übernehmen ----------------------------------------------------------------------------------
+// --- Apply cancellation ---------------------------------------------------------------------------------
 
 /**
- * „Aus Kalender entfernen" nach einer Absage (CANCEL). Nur wenn der Organisator
- * des gespeicherten Termins der Organisator der Absage ist (sonst könnte jeder
- * fremde Termine „absagen") und die Absage nicht veraltet ist.
+ * "Remove from calendar" after a cancellation (CANCEL). Only if the organizer
+ * of the stored event is the organizer of the cancellation (otherwise anyone could
+ * "cancel" other people's events) and the cancellation is not outdated.
  */
 export function removeCancelledEvent(
   db: Database.Database,
@@ -585,12 +585,12 @@ export function removeCancelledEvent(
   )
 }
 
-// --- Scheduling-Kontext für den Termin-Editor ---------------------------------------------------------
+// --- Scheduling context for the event editor ----------------------------------------------------------
 
 /**
- * Wer bin ich zu diesem Termin? Neuer Termin / ohne Organisator → ich bin Organisator;
- * sonst entscheidet der ORGANIZER des gespeicherten Termins. Stammt der Termin aus
- * einer Einladung (REQUEST zur UID), liefert das die Einladung für die RSVP-Knöpfe.
+ * Who am I for this event? New event / no organizer → I am the organizer;
+ * otherwise the ORGANIZER of the stored event decides. If the event comes from
+ * an invitation (REQUEST for the UID), that invitation is returned for the RSVP buttons.
  */
 export function schedulingInfo(
   db: Database.Database,

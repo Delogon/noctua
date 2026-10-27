@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { STRINGS } from '@renderer/i18n/strings'
 
 /**
- * Copy-Hygiene für die String-Tabelle. Kein Test der
- * Wortwahl im Einzelnen, sondern Heuristiken gegen die typischen Rückfälle:
- * leere Texte, verlorene Platzhalter, „Sie“-Anrede, „Post“ für E-Mail.
+ * Copy hygiene for the string table. Not a test of
+ * individual word choice, but heuristics against the typical regressions:
+ * empty texts, lost placeholders, formal „Sie“ address, „Post“ for email.
  */
 
 const entries = Object.entries(STRINGS) as [string, { en: string; de: string }][]

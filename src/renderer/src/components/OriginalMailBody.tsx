@@ -9,7 +9,7 @@ interface OriginalMailBodyProps {
   loading: boolean
 }
 
-/** Volltext einer Quellmail, in derselben sicheren MailFrame wie im Posteingang. */
+/** Full text of a source mail, in the same secure MailFrame as in the inbox. */
 export function OriginalMailBody({ message, loading }: OriginalMailBodyProps): React.JSX.Element {
   const t = useT()
   const html = message?.bodyHtml ?? null

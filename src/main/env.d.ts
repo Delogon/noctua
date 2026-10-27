@@ -3,5 +3,5 @@ declare module '*.sql?raw' {
   export default content
 }
 
-/** Beim Build eingebettete Org-Konfiguration (electron.vite.config.ts); null = Upstream. */
+/** Org configuration embedded at build time (electron.vite.config.ts); null = upstream. */
 declare const __NOCTUA_ORG_CONFIG__: import('../shared/org-config').OrgConfig | null

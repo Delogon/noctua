@@ -1,6 +1,6 @@
 import type { AccountSummary } from '@shared/types'
 
-/** Einheitliche Postfachnamen für Filter, Badges, Palette und Auswahllisten. */
+/** Consistent mailbox names for filters, badges, palette and pickers. */
 export function accountLabels(
   accounts: Array<Pick<AccountSummary, 'id' | 'accountName'>>
 ): Map<number, string> {

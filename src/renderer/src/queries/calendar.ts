@@ -11,7 +11,7 @@ import { useCalendar } from '@renderer/stores/calendar'
 import type { InvokeInput, InvokeOutput } from '@shared/ipc-contract'
 import type { CalendarEventInput } from '@shared/calendar-types'
 
-// Kalender-Konten und -Listen (Phase 2.1) sowie die Kalenderansicht (2.2). Schlüssel:
+// Calendar accounts and lists (Phase 2.1) plus the calendar view (2.2). Keys:
 // ['calendar', 'accounts'|'list'|'events'|'event'].
 
 export function useCalendarAccounts(): UseQueryResult<
@@ -53,12 +53,12 @@ export function useCalendars(): UseQueryResult<InvokeOutput<'calendar:list'>['ca
   })
 }
 
-// --- Ansicht (Phase 2.2) -------------------------------------------------------------------
+// --- View (Phase 2.2) ----------------------------------------------------------------------
 
 type CalendarList = InvokeOutput<'calendar:list'>['calendars']
 export type CalendarInstances = InvokeOutput<'calendar:events:list'>['events']
 const EMPTY_EVENTS: CalendarInstances = []
-/** Nachbarperioden gelten kurz als frisch, damit Blättern nicht neu lädt. */
+/** Neighboring periods count as fresh briefly so paging does not reload. */
 const PREFETCH_STALE_MS = 30_000
 
 function eventsQuery(
@@ -76,7 +76,7 @@ function eventsQuery(
   }
 }
 
-/** Termine im Zeitraum [rangeStart, rangeEnd) der angegebenen Kalender. */
+/** Events in the range [rangeStart, rangeEnd) of the given calendars. */
 export function useCalendarEvents(
   rangeStart: number,
   rangeEnd: number,
@@ -95,7 +95,7 @@ export function useCalendarEvents(
   }
 }
 
-/** Nachbarperioden vorab laden (flüssiges Blättern). */
+/** Prefetch neighboring periods (smooth paging). */
 export function usePrefetchEvents(
   ranges: ReadonlyArray<{ start: number; end: number }>,
   calendarIds: readonly number[]
@@ -116,7 +116,7 @@ export function usePrefetchEvents(
   }, [queryClient, rangesKey, idsKey])
 }
 
-/** Einzelnes Ereignis bzw. Vorkommen mit allen editierbaren Feldern. */
+/** Single event or occurrence with all editable fields. */
 export function useCalendarEventDetail(
   objectId: number | null,
   recurrenceId: string | null
@@ -131,7 +131,7 @@ export function useCalendarEventDetail(
   })
 }
 
-/** Scheduling-Kontext (Organisator?, eigene Adressen, Einladung) für Editor und Lösch-Dialog. */
+/** Scheduling context (organizer?, own addresses, invitation) for editor and delete dialog. */
 export function useSchedulingInfo(
   calendarId: number | null,
   objectId: number | null
@@ -148,14 +148,14 @@ export function useSchedulingInfo(
   })
 }
 
-/** Alle Kalender-Abfragen (außer Konten) neu laden. */
+/** Reload all calendar queries (except accounts). */
 export function invalidateCalendarData(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: ['calendar', 'events'] })
   void queryClient.invalidateQueries({ queryKey: ['calendar', 'event'] })
   void queryClient.invalidateQueries({ queryKey: ['calendar', 'list'] })
 }
 
-/** Sichtbarkeit/Farbe mit sofortiger Anzeige (optimistisch), danach Abgleich. */
+/** Visibility/color with immediate display (optimistic), then reconciliation. */
 export function useCalendarListActions(): {
   setVisible: (calendarId: number, visible: boolean) => Promise<void>
   setColor: (calendarId: number, color: string | null) => Promise<void>
@@ -188,7 +188,7 @@ export function useCalendarListActions(): {
   }
 }
 
-/** Termine anlegen/ändern/löschen; die Listen laden danach neu. */
+/** Create/change/delete events; the lists reload afterwards. */
 export function useCalendarEventActions(): {
   create: (event: CalendarEventInput, opts?: { notifyAttendees?: boolean }) => Promise<void>
   update: (input: InvokeInput<'calendar:events:update'>) => Promise<void>
@@ -212,8 +212,8 @@ export function useCalendarEventActions(): {
 }
 
 /**
- * Globale Live-Updates (einmal in App): Änderungen aus dem Sync laden die Ansicht
- * neu; ein Klick auf eine Erinnerung springt zum Termin.
+ * Global live updates (once in App): changes from sync reload the view;
+ * a click on a reminder jumps to the event.
  */
 export function useCalendarLive(): void {
   const queryClient = useQueryClient()
@@ -225,13 +225,13 @@ export function useCalendarLive(): void {
           useCalendar.getState().focusEvent(objectId, recurrenceId, event.startUtc)
         )
         .catch(() => {
-          // Termin inzwischen gelöscht — kein Sprung
+          // Event deleted in the meantime — no jump
         })
     }
     const offOpen = onPush('calendar:openEvent', ({ objectId, recurrenceId }) =>
       open(objectId, recurrenceId)
     )
-    // Einladungskarte im Mail-View („Im Kalender öffnen") feuert ein Window-Event
+    // Invitation card in the mail view ("Open in calendar") fires a window event
     const onWindowOpen = (e: Event): void => {
       const detail = (e as CustomEvent<{ objectId: number; recurrenceId: string | null }>).detail
       if (detail && typeof detail.objectId === 'number') {

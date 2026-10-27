@@ -5,17 +5,17 @@ import type {
 } from '@shared/calendar-types'
 import { wallAsUtcMs, utcMsAsWall } from './dates'
 
-// Serien-Bearbeitung: wann der Bereichs-Dialog („Nur dieser / Dieser und folgende /
-// Alle") nötig ist und wie das Patch für den gewählten Bereich entsteht.
+// Series editing: when the scope dialog ("Only this / This and following /
+// All") is needed and how the patch for the chosen scope is built.
 
 export const SCOPE_ORDER: readonly CalendarEditScope[] = ['this', 'following', 'all']
 
-/** Muss der Nutzer einen Bereich wählen? (nur bei Serien bzw. Serien-Ausnahmen) */
+/** Must the user choose a scope? (only for series or series exceptions) */
 export function needsScope(target: { recurring: boolean }): boolean {
   return target.recurring
 }
 
-/** Effektiver Bereich fürs Backend: Einzeltermine laufen immer als 'all'. */
+/** Effective scope for the backend: single events always run as 'all'. */
 export function effectiveScope(
   target: { recurring: boolean },
   chosen: CalendarEditScope | null
@@ -24,9 +24,9 @@ export function effectiveScope(
 }
 
 /**
- * Nur die tatsächlich geänderten Felder. Das Backend stellt bei Bereich 'all' Zeit
- * und Regel der ganzen Serie um und verwirft dann Ausnahmen — ungeänderte Felder
- * dürfen deshalb nie mitgeschickt werden.
+ * Only the fields that actually changed. For scope 'all' the backend changes time
+ * and rule of the whole series and then discards exceptions — unchanged fields
+ * must therefore never be sent.
  */
 export function diffFields(
   initial: CalendarEventFields,
@@ -40,9 +40,9 @@ export function diffFields(
 }
 
 /**
- * Zeitänderung für die GANZE Serie: der bearbeitete Termin ist ein Vorkommen (nicht
- * der Serienstart). Die Verschiebung dieses Vorkommens wird auf den Serienstart
- * (`masterTime`) übertragen, damit DTSTART nicht auf das Vorkommen springt.
+ * Time change for the WHOLE series: the edited event is an occurrence (not
+ * the series start). The shift of this occurrence is applied to the series start
+ * (`masterTime`) so DTSTART does not jump to the occurrence.
  */
 export function shiftSeriesTime(
   masterTime: CalendarEventFields['time'],
@@ -61,9 +61,9 @@ export function shiftSeriesTime(
 }
 
 /**
- * Patch für `calendar:events:update` je nach Bereich:
- * - 'this': die Serienregel ist nicht änderbar → entfernen
- * - 'all' mit Zeitänderung an einem Vorkommen: relativ zum Serienstart verschieben
+ * Patch for `calendar:events:update` depending on scope:
+ * - 'this': the series rule cannot be changed → remove it
+ * - 'all' with a time change on an occurrence: shift relative to the series start
  */
 export function patchForScope(
   scope: CalendarEditScope,

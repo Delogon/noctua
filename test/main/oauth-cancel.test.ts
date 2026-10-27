@@ -7,8 +7,8 @@ import { cancelMsLogin } from '@main/auth/msal'
 import { CancelableLoopbackClient } from '@main/auth/loopback'
 import { createTestDb, closeTestDb } from '../helpers/db'
 
-// CANCEL bricht den OAuth-Roundtrip wirklich ab (Design 3b): der wartende
-// Login verwirft, der Loopback-Server schließt — kein Zombie-Listener.
+// CANCEL really aborts the OAuth round trip (Design 3b): the waiting
+// login rejects, the loopback server closes — no zombie listener.
 
 describe('cancelGoogleLogin', () => {
   let db: Database.Database | null = null
@@ -20,7 +20,7 @@ describe('cancelGoogleLogin', () => {
   it('bricht einen wartenden Login ab — das invoke-Promise verwirft', async () => {
     db = createTestDb()
     const login = googleInteractiveLogin()
-    // Erst wenn der Browser geöffnet wurde, lauscht der Loopback-Server
+    // The loopback server listens only once the browser has been opened
     await vi.waitFor(() => expect(shell.openExternal).toHaveBeenCalled())
 
     expect(cancelGoogleLogin()).toBe(true)
@@ -40,7 +40,7 @@ describe('cancelMsLogin', () => {
 
 describe('CancelableLoopbackClient (msal-Loopback mit Abbruchpfad)', () => {
   async function redirectUriOf(client: CancelableLoopbackClient): Promise<string> {
-    // msal pollt getRedirectUri, bis der Server lauscht — hier genauso
+    // msal polls getRedirectUri until the server listens — same here
     return vi.waitFor(() => client.getRedirectUri())
   }
 
@@ -65,7 +65,7 @@ describe('CancelableLoopbackClient (msal-Loopback mit Abbruchpfad)', () => {
     const response = await fetch(`http://127.0.0.1:${port}/?code=abc-123&state=xyz`, {
       redirect: 'manual'
     })
-    // 302 auf die Redirect-URI, damit der Code nicht in der Browser-History bleibt
+    // 302 to the redirect URI so the code does not stay in the browser history
     expect(response.status).toBe(302)
     await expect(listener).resolves.toMatchObject({ code: 'abc-123', state: 'xyz' })
     client.closeServer()
@@ -78,9 +78,9 @@ describe('CancelableLoopbackClient (msal-Loopback mit Abbruchpfad)', () => {
 
     client.cancel('Microsoft-Anmeldung abgebrochen')
     await expect(listener).rejects.toThrow(/abgebrochen/)
-    // Nach dem Abbruch bricht msals Redirect-Polling sofort ab (kein Poll-Code)
+    // After the cancel, msal's redirect polling stops immediately (no poll code)
     expect(() => client.getRedirectUri()).toThrow(/abgebrochen/)
-    // Der Port ist wieder frei — niemand lauscht mehr
+    // The port is free again — nobody is listening anymore
     await expect(fetch(`${uri.replace('localhost', '127.0.0.1')}/?code=x`)).rejects.toThrow()
   })
 })

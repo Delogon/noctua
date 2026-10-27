@@ -4,9 +4,9 @@ import { useT } from '@renderer/lib/i18n'
 import type { StringKey } from '@renderer/i18n/strings'
 import type { NetworkConnection } from '@shared/types'
 
-// Technik-Seite, Abschnitt „Netzwerkverbindungen": die tatsächlichen Ziele der
-// App, live aus Konten, KI-Profilen, Update-Quelle und Local only berechnet
-// (Main: privacy:networkConnections) — keine handgepflegte Behauptung.
+// Tech page, section „Netzwerkverbindungen": the app's actual destinations,
+// computed live from accounts, AI profiles, update source and Local only
+// (Main: privacy:networkConnections) — not a hand-maintained claim.
 
 const KIND_LABEL: Record<NetworkConnection['kind'], StringKey> = {
   mail: 'techNetKindMail',

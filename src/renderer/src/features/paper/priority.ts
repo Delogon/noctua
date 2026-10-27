@@ -1,9 +1,9 @@
 import type { ThreadListItem } from '@shared/types'
 
 /**
- * Prioritäts-Sichtbarkeit (Design Turn 5): Rang 5 klingelt (Akzent-Tick),
- * Rang 4 benachrichtigt (Ink-Tick), alles darunter bleibt still — die Liste
- * zeigt bewusst keine Zahlen und ändert keine Sortierung.
+ * Priority visibility (Design Turn 5): rank 5 rings (accent tick), rank 4
+ * notifies (ink tick), everything below stays silent — the list deliberately
+ * shows no numbers and does not change sorting.
  */
 export function priorityTickTone(aiPriority: number | null): 'accent' | 'ink' | null {
   if (aiPriority === 5) return 'accent'
@@ -11,7 +11,7 @@ export function priorityTickTone(aiPriority: number | null): 'accent' | 'ink' | 
   return null
 }
 
-/** „Braucht dich"-Filter: Rang 4+ — bewusst dieselbe Schwelle wie priorityTickTone. */
+/** „Braucht dich" filter: rank 4+ — deliberately the same threshold as priorityTickTone. */
 export function needsYou(item: Pick<ThreadListItem, 'aiPriority'>): boolean {
   return (item.aiPriority ?? 0) >= 4
 }

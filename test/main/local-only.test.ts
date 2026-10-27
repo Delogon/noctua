@@ -23,7 +23,7 @@ import {
 } from '@shared/settings-keys'
 import { closeTestDb, createTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 
-// Pull in die Handler erst nach den Mocks (zieht sonst Wörterbücher als ?asset-Importe)
+// Pull in the handlers only after the mocks (otherwise pulls dictionaries as ?asset imports)
 vi.mock('@main/spell', () => ({ getSpellEngine: vi.fn() }))
 vi.mock('@main/ai/providers/openai-factory', () => ({
   createOpenAiClient: () => ({ chat: { completions: { create: vi.fn() } } })
@@ -214,7 +214,7 @@ describe('Local only: Modellkatalog (Handler ai:profileModels)', () => {
     })
     expect(fetchMock).not.toHaveBeenCalled()
 
-    // OpenRouter-Katalog ebenso
+    // OpenRouter catalog too
     expect(
       await handlers['ai:profileModels']({ profileId: 'openrouter', manual: false, kind: 'chat' })
     ).toMatchObject({ skipped: true })
@@ -228,7 +228,7 @@ describe('Local only: Modellkatalog (Handler ai:profileModels)', () => {
     expect(localResult.skipped).toBe(false)
     expect(localResult.models.map((m) => m.id)).toEqual(['m1'])
 
-    // ausdrücklich angefordert
+    // explicitly requested
     const manual = await handlers['ai:profileModels']({
       profileId: cloud.id,
       manual: true,

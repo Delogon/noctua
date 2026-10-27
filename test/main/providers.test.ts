@@ -38,7 +38,7 @@ describe('buildImapOptions', () => {
       pinned
     )
     expect(bridge.tls).toBe(pinned)
-    // Für echte Hosts bleibt die Zertifikatsprüfung strikt an
+    // For real hosts certificate verification stays strictly on
     const remote = buildImapOptions(base, { user: 'x', pass: 'p' })
     expect(remote.tls).toBeUndefined()
   })

@@ -6,8 +6,8 @@ import { hhmm } from '@renderer/features/calendar/format'
 import { useDavContacts } from '@renderer/queries/contacts'
 import { cleanIpcError } from '@renderer/features/paper/account-states'
 
-// Settings -> Konten -> Kalender-Konto: Kontakte (CardDAV) ein-/ausschalten und
-// Adressbuecher einzeln aktivieren. Nur lesend; es gibt keinen Kontakt-Editor.
+// Settings -> Accounts -> calendar account: toggle contacts (CardDAV) and
+// enable address books individually. Read-only; there is no contact editor.
 
 function Toggle({
   on,
@@ -32,7 +32,7 @@ function Toggle({
       <span className="toggle-track" style={{ background: on ? 'var(--ink)' : 'transparent' }}>
         <span
           className="toggle-dot"
-          style={{ background: on ? '#F4F1EA' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
+          style={{ background: on ? 'var(--paper)' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
         />
       </span>
     </button>

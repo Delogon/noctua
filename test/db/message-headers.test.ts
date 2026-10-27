@@ -150,7 +150,7 @@ describe('message-header-details-repo', () => {
     expect(details?.rawHeadersTruncated).toBe(true)
     expect(Buffer.byteLength(details?.rawHeaders ?? '', 'latin1')).toBe(MAX_RAW_HEADER_BYTES)
     expect(details?.rawHeaders?.startsWith(prefix)).toBe(true)
-    // Ein gekappter Rohkopf ist kein vollständiger Authentifizierungsbeleg.
+    // A truncated raw header is not complete proof of authentication.
     expect(details?.authentication.spf).toBe('unknown')
   })
 

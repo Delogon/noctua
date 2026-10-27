@@ -1,27 +1,27 @@
 /**
- * Konto-Automatik des Composers (Design 3a): Neue Nachrichten folgen still dem
- * zuletzt für den ersten Empfänger verwendeten Postfach. Wechselt die
- * Automatik das sichtbare VON-Konto, erscheint für ~4 s eine Akzent-Notiz —
- * eine manuelle Wahl gewinnt und unterdrückt sie.
+ * Composer account autopilot (Design 3a): new messages silently follow the
+ * mailbox last used for the first recipient. If the autopilot changes the
+ * visible FROM account, an accent note appears for ~4 s —
+ * a manual choice wins and suppresses it.
  */
 
-/** Sichtbarkeitsdauer der Autopilot-Notiz (~4 s laut Design 3a). */
+/** Visibility duration of the autopilot note (~4 s per Design 3a). */
 export const FROM_AUTOPILOT_NOTE_MS = 4000
 
 export interface AutoSwitchPlan {
   accountId: number
-  /** Notiz nur zeigen, wenn sich das sichtbar gewählte Konto wirklich ändert. */
+  /** Only show the note if the visibly selected account really changes. */
   showNote: boolean
 }
 
 export function planAutoSwitch(params: {
-  /** Bevorzugtes Konto laut contacts:preferredAccount — null: keine Historie. */
+  /** Preferred account per contacts:preferredAccount — null: no history. */
   preferredAccountId: number | null
-  /** Effektiv angezeigtes Konto (gewähltes oder erstes) — null: keine Konten. */
+  /** Effectively displayed account (selected or first) — null: no accounts. */
   currentAccountId: number | null
-  /** Hat Tim in diesem Entwurf schon selbst gewählt? Dann gewinnt er. */
+  /** Has Tim already chosen himself in this draft? Then he wins. */
   manuallySelected: boolean
-  /** Bekannte Konto-IDs — verwaiste Empfehlungen werden ignoriert. */
+  /** Known account IDs — orphaned recommendations are ignored. */
   accountIds: readonly number[]
 }): AutoSwitchPlan | null {
   const { preferredAccountId, currentAccountId, manuallySelected, accountIds } = params

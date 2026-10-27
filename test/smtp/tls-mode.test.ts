@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { createServer, type Server } from 'node:net'
 import { detectImplicitTls, forgetTlsMode } from '@main/smtp/tls-mode'
 
-/** Erkennung der SMTP-Betriebsart auf Loopback (Proton Bridge: SSL vs. STARTTLS). */
+/** Detection of the SMTP mode on loopback (Proton Bridge: SSL vs. STARTTLS). */
 
 const servers: Server[] = []
 
@@ -57,9 +57,9 @@ describe('detectImplicitTls', () => {
     const server = createServer((socket) => socket.write('220 da\r\n'))
     const port = await listen(server)
     await new Promise((resolve) => server.close(() => resolve(null)))
-    // Server weg → Fehler, keine Aussage über die Betriebsart, kein Cache
+    // Server gone → error, no verdict on the mode, no cache
     expect(await detectImplicitTls('127.0.0.1', port, 300)).toBe(false)
-    // Wieder da → frisch erkannt statt aus dem Cache bedient
+    // Back again → freshly detected instead of served from cache
     const server2 = createServer(() => {})
     servers.push(server2)
     await new Promise((resolve) => server2.listen(port, '127.0.0.1', () => resolve(null)))

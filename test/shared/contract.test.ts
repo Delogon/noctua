@@ -33,7 +33,7 @@ describe('ipc-contract', () => {
       spec.output.parse({ state: 'helper-missing', detail: 'nicht gebaut' })
     ).not.toThrow()
     expect(() => spec.output.parse({ state: 'lokal', detail: null })).toThrow()
-    // Input ist optional (force default false)
+    // Input is optional (force default false)
     expect(() => spec.input.parse(undefined)).not.toThrow()
     expect(() => spec.input.parse({ force: true })).not.toThrow()
   })
@@ -183,7 +183,7 @@ describe('ipc-contract', () => {
     const spec = invokeContract['accounts:cancelOAuth']
     expect(spec.input.parse({ provider: 'gmail' })).toEqual({ provider: 'gmail' })
     expect(spec.input.parse({ provider: 'microsoft' })).toEqual({ provider: 'microsoft' })
-    // IMAP hat keinen Browser-Roundtrip — nichts abzubrechen
+    // IMAP has no browser round trip — nothing to cancel
     expect(() => spec.input.parse({ provider: 'imap' })).toThrow()
     expect(spec.output.parse({ canceled: true })).toEqual({ canceled: true })
     expect(spec.output.parse({ canceled: false })).toEqual({ canceled: false })
@@ -202,7 +202,7 @@ describe('ipc-contract', () => {
 
   it('sync:trigger nimmt optional ein einzelnes Konto (RETRY, Design 3b)', () => {
     const spec = invokeContract['sync:trigger']
-    // Bestandsaufrufer ohne Eingabe bleiben gültig
+    // Existing callers without input stay valid
     expect(spec.input.parse(undefined)).toBeUndefined()
     expect(spec.input.parse({})).toEqual({})
     expect(spec.input.parse({ accountId: 3 })).toEqual({ accountId: 3 })
@@ -304,10 +304,10 @@ describe('ipc-contract', () => {
         ]
       }
     ]
-    // Upsert: ohne id neu anlegen, mit id aktualisieren
+    // Upsert: create without id, update with id
     expect(() => save.input.parse({ title: 'Welche Rechnungen?', messages })).not.toThrow()
     expect(() => save.input.parse({ id: 3, title: 'Welche Rechnungen?', messages })).not.toThrow()
-    // Leere Gespräche werden nie gespeichert
+    // Empty conversations are never saved
     expect(() => save.input.parse({ title: 'Leer', messages: [] })).toThrow()
     expect(() => save.input.parse({ title: '  ', messages })).toThrow()
     expect(save.output.parse({ id: 7 })).toEqual({ id: 7 })
@@ -353,7 +353,7 @@ describe('ipc-contract', () => {
     for (const key of ['ui.language', 'sig.12', 'ai.styleProfile.3', 'ai.styleInstructions.7']) {
       expect(() => get.parse({ key }), key).not.toThrow()
     }
-    // Stilprofile sind lesbar, aber nicht vom Renderer schreibbar
+    // Style profiles are readable but not writable by the renderer
     expect(() => set.parse({ key: 'ai.styleProfile.3', value: '{}' })).toThrow()
     expect(() => set.parse({ key: 'sig.12', value: 'x' })).not.toThrow()
     for (const key of [

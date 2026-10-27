@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3-multiple-ciphers'
 import {
   upsertEnvelope,
   storeBody,
-  applyFlagUpdate,
+  applyFlagUpdates,
   cleanupSearchOrphans,
   deleteByUids,
   reindexHtmlOnlyMessages
@@ -83,7 +83,7 @@ describe('upsertEnvelope', () => {
     const archive = seedFolder(db, acc, '\\Archive')
     upsertEnvelope(db, acc, inbox, makeEnvelope({ uid: 1, gmMsgid: 'GM1' }))
     const dupe = upsertEnvelope(db, acc, archive, makeEnvelope({ uid: 99, gmMsgid: 'GM1' }))
-    expect(dupe).toBeNull() // als Duplikat verworfen
+    expect(dupe).toBeNull() // discarded as duplicate
     expect((db.prepare('SELECT count(*) c FROM messages').get() as { c: number }).c).toBe(1)
   })
 
@@ -227,22 +227,59 @@ describe('storeBody', () => {
   })
 })
 
-describe('applyFlagUpdate & deleteByUids', () => {
+describe('applyFlagUpdates & deleteByUids', () => {
   let db: Database.Database
   afterEach(() => closeTestDb(db))
 
-  it('applyFlagUpdate setzt seen/flagged anhand der Server-Flags', () => {
+  it('applyFlagUpdates setzt seen/flagged anhand der Server-Flags', () => {
     db = createTestDb()
     const acc = seedAccount(db)
     const folder = seedFolder(db, acc, '\\Inbox')
-    upsertEnvelope(db, acc, folder, makeEnvelope({ uid: 5 }))
-    const id = applyFlagUpdate(db, folder, 5, new Set(['\\Seen', '\\Flagged']))
-    expect(id).not.toBeNull()
-    const row = db.prepare('SELECT seen, flagged FROM messages WHERE id = ?').get(id!) as {
+    const res = upsertEnvelope(db, acc, folder, makeEnvelope({ uid: 5 }))!
+    const changed = applyFlagUpdates(db, folder, [
+      { uid: 5, flags: new Set(['\\Seen', '\\Flagged']) }
+    ])
+    expect(changed).toEqual([res.threadKey])
+    const row = db
+      .prepare('SELECT seen, flagged FROM messages WHERE id = ?')
+      .get(res.messageId) as {
       seen: number
       flagged: number
     }
     expect(row).toEqual({ seen: 1, flagged: 1 })
+  })
+
+  it('reports only messages whose flags really changed', () => {
+    db = createTestDb()
+    const acc = seedAccount(db)
+    const folder = seedFolder(db, acc, '\\Inbox')
+    const a = upsertEnvelope(
+      db,
+      acc,
+      folder,
+      makeEnvelope({ uid: 1, messageId: '<f1@t>', subject: 'Eins' })
+    )!
+    upsertEnvelope(db, acc, folder, makeEnvelope({ uid: 2, messageId: '<f2@t>', subject: 'Zwei' }))
+    const seen = new Set(['\\Seen'])
+    applyFlagUpdates(db, folder, [
+      { uid: 1, flags: seen },
+      { uid: 2, flags: seen }
+    ])
+    // Same flags again (idle resync): nothing to report
+    expect(
+      applyFlagUpdates(db, folder, [
+        { uid: 1, flags: seen },
+        { uid: 2, flags: seen }
+      ])
+    ).toEqual([])
+    // One message gets flagged on the server; unknown UIDs are ignored
+    expect(
+      applyFlagUpdates(db, folder, [
+        { uid: 1, flags: new Set(['\\Seen', '\\Flagged']) },
+        { uid: 2, flags: seen },
+        { uid: 99, flags: seen }
+      ])
+    ).toEqual([a.threadKey])
   })
 
   it('deleteByUids entfernt genau die genannten UIDs', () => {
@@ -266,7 +303,7 @@ describe('applyFlagUpdate & deleteByUids', () => {
       Buffer.from(new Float32Array(768).buffer)
     )
 
-    // Virtuelle Tabellen besitzen keine FK-Cascade.
+    // Virtual tables have no FK cascade.
     db.prepare('DELETE FROM messages WHERE id = ?').run(message.messageId)
     expect(db.prepare('SELECT count(*) count FROM messages_fts').get()).toEqual({ count: 1 })
     expect(db.prepare('SELECT count(*) count FROM message_vecs').get()).toEqual({ count: 1 })

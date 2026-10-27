@@ -9,8 +9,8 @@ import {
 } from './ics'
 
 /**
- * DB-Zugriff des Kalenders: Konten, Kalender, Objekte, Vorkommens-Cache
- * (cal_instances) und lokale Warteschlange (cal_pending_ops).
+ * Calendar DB access: accounts, calendars, objects, occurrence cache
+ * (cal_instances) and local queue (cal_pending_ops).
  */
 
 export interface CalAccountRow {
@@ -89,11 +89,11 @@ export interface PendingOpRow {
 
 export const calSecretKey = (accountId: number): string => `cal:${accountId}:password`
 
-// --- Instanz-Fenster ---------------------------------------------------------------------
+// --- Instance window ---------------------------------------------------------------------
 
 const WINDOW_KEY = 'calendar.window'
-export const WINDOW_BACK_MS = 183 * DAY_MS // ~6 Monate
-export const WINDOW_FORWARD_MS = 548 * DAY_MS // ~18 Monate
+export const WINDOW_BACK_MS = 183 * DAY_MS // ~6 months
+export const WINDOW_FORWARD_MS = 548 * DAY_MS // ~18 months
 const WINDOW_REFRESH_MS = 30 * DAY_MS
 
 export interface InstanceWindow {
@@ -122,7 +122,7 @@ export function getInstanceWindow(db: Database.Database, now = Date.now()): Inst
       const w = JSON.parse(raw) as InstanceWindow
       if (Number.isFinite(w.from) && Number.isFinite(w.to)) return w
     } catch {
-      // defekt → neu berechnen
+      // broken → recompute
     }
   }
   const w: InstanceWindow = {
@@ -135,8 +135,8 @@ export function getInstanceWindow(db: Database.Database, now = Date.now()): Inst
 }
 
 /**
- * Fenster bei Bedarf nachziehen (ca. monatlich) und wiederkehrende Objekte neu
- * materialisieren. Rückgabe: true, wenn das Fenster verschoben wurde.
+ * Advance the window when needed (roughly monthly) and re-materialize recurring
+ * objects. Returns: true if the window was moved.
  */
 export function ensureInstanceWindow(db: Database.Database, now = Date.now()): boolean {
   const current = getInstanceWindow(db, now)
@@ -157,9 +157,9 @@ export function ensureInstanceWindow(db: Database.Database, now = Date.now()): b
   return true
 }
 
-// --- Objekte -------------------------------------------------------------------------------
+// --- Objects -------------------------------------------------------------------------------
 
-/** Spalten aus dem ICS ableiten; nicht parsebare Ressourcen bleiben als INVALID erhalten. */
+/** Derive columns from the ICS; unparseable resources are kept as INVALID. */
 export function fieldsFromIcs(ics: string, href: string): ObjectFields {
   try {
     return extractObjectFields(parseCalendar(ics))
@@ -193,7 +193,7 @@ export interface UpsertObjectInput {
   pendingOp?: 'create' | 'update' | 'delete' | null
 }
 
-/** Legt ein Objekt an oder aktualisiert es (id bleibt stabil) und materialisiert die Vorkommen. */
+/** Creates or updates an object (id stays stable) and materializes the occurrences. */
 export function upsertObject(db: Database.Database, input: UpsertObjectInput): number {
   const f = fieldsFromIcs(input.ics, input.href)
   db.prepare(
@@ -253,7 +253,7 @@ export function deleteObject(db: Database.Database, id: number): void {
   db.prepare('DELETE FROM cal_objects WHERE id = ?').run(id)
 }
 
-// --- Vorkommen ------------------------------------------------------------------------------
+// --- Occurrences ----------------------------------------------------------------------------
 
 function occurrenceText(occ: Occurrence, name: string): string | null {
   const v = occ.comp.getFirstPropertyValue(name)
@@ -261,8 +261,8 @@ function occurrenceText(occ: Occurrence, name: string): string | null {
 }
 
 /**
- * Vorkommen eines Objekts neu berechnen. Nicht wiederkehrende vollständig,
- * wiederkehrende für das rollende Fenster.
+ * Recompute an object's occurrences. Non-recurring ones fully,
+ * recurring ones for the rolling window.
  */
 export function materializeInstances(
   db: Database.Database,
@@ -317,8 +317,8 @@ export const MAX_CAL_OP_ATTEMPTS = 10
 const DEAD_OP_RETENTION_MS = 30 * DAY_MS
 
 /**
- * Lokale Neuanlage: optimistisch schreiben, Op einreihen. Der Hrefs-Name leitet
- * sich aus der UID ab (nur sichere Zeichen).
+ * Local creation: write optimistically, queue an op. The href name is derived
+ * from the UID (safe characters only).
  */
 export function enqueueCreate(
   db: Database.Database,
@@ -355,7 +355,7 @@ export function newObjectHref(calendarUrl: string, uid: string): string {
   return `${base}${slug}.ics`
 }
 
-/** Lokale Änderung: Objekt aktualisieren; bestehende Op wird zusammengeführt. */
+/** Local change: update the object; an existing op is merged. */
 export function enqueueUpdate(
   db: Database.Database,
   obj: CalObjectRow,
@@ -384,7 +384,7 @@ export function enqueueUpdate(
   ).run(calendar.account_id, calendar.id, obj.id, obj.href, obj.uid, obj.etag, summary, Date.now())
 }
 
-/** Lokales Löschen. Nie übertragene Neuanlagen verschwinden ersatzlos. */
+/** Local deletion. Creations that were never uploaded disappear without a trace. */
 export function enqueueDelete(
   db: Database.Database,
   obj: CalObjectRow,

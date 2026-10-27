@@ -1,16 +1,16 @@
 import type { MessageDetail } from '@shared/types'
 
-// Empfänger-Berechnung für Antworten (M80). Pure Funktion, damit die Regeln
-// testbar sind — EmailSheet ruft sie sowohl fürs Senden als auch für die
-// Empfänger-Zeile über dem Composer auf.
+// Recipient computation for replies (M80). Pure function so the rules are
+// testable — EmailSheet calls it both for sending and for the
+// recipient row above the composer.
 //
-// Regeln:
-//  - Gerichtet wird auf die letzte fremde Nachricht des Threads (Fallback:
-//    letzte Nachricht, wenn der Thread nur eigene enthält).
-//  - AN = Reply-To-Header dieser Nachricht; ohne Reply-To deren From.
-//  - ALLE: CC = deren ursprüngliche An-/CC-Empfänger, abzüglich aller eigenen
-//    Adressen (der Nutzer kann mehrere Konten haben), der AN-Adressen und
-//    Duplikaten (case-insensitiv, Reihenfolge bleibt erhalten).
+// Rules:
+//  - The reply targets the last foreign message of the thread (fallback:
+//    last message, if the thread only contains own ones).
+//  - TO = Reply-To header of that message; without Reply-To its From.
+//  - ALL: CC = its original To/CC recipients, minus all own
+//    addresses (the user can have several accounts), the TO addresses and
+//    duplicates (case-insensitive, order is preserved).
 
 export type ReplyScope = 'sender' | 'all'
 
@@ -57,8 +57,8 @@ export function buildReplyRecipients(
         : [],
     new Set()
   )
-  // Degenerierter Fall (Thread nur aus eigenen Nachrichten): Antwort an die
-  // eigene Adresse — wie vor M80.
+  // Degenerate case (thread only of own messages): reply to the
+  // own address — as before M80.
   if (to.length === 0 && lastForeign.fromAddr) to.push(lastForeign.fromAddr)
 
   const toKeys = new Set(to.map((a) => a.toLowerCase()))

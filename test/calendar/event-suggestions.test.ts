@@ -131,7 +131,7 @@ describe('eventInputFromSuggestion', () => {
       organizer: null
     })
     expect(input.description).toBe('https://meet.example/x\nAus Mail: Treffen')
-    // ohne genannte Zone: Zone des Nutzers
+    // no zone given: the user's zone
     expect(
       eventInputFromSuggestion({ ...row, tzid: null }, 7, null, 'Europe/Berlin').time.tzid
     ).toBe('Europe/Berlin')
@@ -160,7 +160,7 @@ describe('acceptEventSuggestion', () => {
   it('ruft createEvent mit den richtigen Feldern auf und markiert den Vorschlag', () => {
     calId = addCalendar(calAccount, 'privat')
     const [id] = suggest([timed])
-    // Spion um das echte createEvent (der Vorschlag verweist per FK auf das Objekt)
+    // Spy around the real createEvent (the suggestion references the object via FK)
     const create = vi.fn((...args: Parameters<typeof createEvent>) => createEvent(...args))
     const { objectId } = acceptEventSuggestion(db, id, { createEvent: create })
     expect(objectId).toBeGreaterThan(0)
@@ -174,7 +174,7 @@ describe('acceptEventSuggestion', () => {
     expect(
       db.prepare('SELECT state, cal_object_id FROM event_suggestions WHERE id = ?').get(id)
     ).toEqual({ state: 'accepted', cal_object_id: objectId })
-    // zweiter Klick legt nichts doppelt an
+    // second click creates no duplicate
     expect(acceptEventSuggestion(db, id, { createEvent: create })).toEqual({ objectId })
     expect(create).toHaveBeenCalledTimes(1)
   })

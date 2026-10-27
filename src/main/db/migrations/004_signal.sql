@@ -1,9 +1,9 @@
--- Signal-Anbindung: Gruppen (opt-in fürs Lesen UND fürs AI-Scanning) + Nachrichten.
+-- Signal integration: groups (opt-in for reading AND for AI scanning) + messages.
 CREATE TABLE signal_groups (
   id INTEGER PRIMARY KEY,
-  group_id TEXT NOT NULL UNIQUE,        -- base64-Gruppen-ID von signal-cli
+  group_id TEXT NOT NULL UNIQUE,        -- base64 group ID from signal-cli
   name TEXT,
-  monitored INTEGER NOT NULL DEFAULT 0, -- nur monitored Gruppen werden gespeichert
+  monitored INTEGER NOT NULL DEFAULT 0, -- only monitored groups are stored
   ai_enabled INTEGER NOT NULL DEFAULT 0,
   last_message_at INTEGER
 );

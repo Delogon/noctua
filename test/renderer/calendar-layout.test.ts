@@ -11,7 +11,7 @@ import {
 import { agendaItems, agendaRange } from '@renderer/features/calendar/agenda'
 import { dayKey, daysFrom } from '@renderer/features/calendar/dates'
 
-// Zeitzone vor dem Sammeln der Tests setzen (Modul-Konstanten mit Date)
+// Set the time zone before tests are collected (module constants using Date)
 process.env.TZ = 'Europe/Berlin'
 
 let seq = 0
@@ -59,7 +59,7 @@ describe('Überlappungs-Layout', () => {
     const byKey = new Map(placed.map((p) => [p.item.key, p]))
     expect(byKey.get(a.key)).toMatchObject({ col: 0, cols: 2 })
     expect(byKey.get(b.key)).toMatchObject({ col: 1, cols: 2 })
-    // c beginnt, wenn a endet → wiederverwendet Spalte 0
+    // c starts when a ends → reuses column 0
     expect(byKey.get(c.key)).toMatchObject({ col: 0, cols: 2 })
   })
 
@@ -98,7 +98,7 @@ describe('Überlappungs-Layout', () => {
     const d = new Date(2026, 9, 25)
     const e = timed(new Date(2026, 9, 25, 9), new Date(2026, 9, 25, 10))
     expect(layoutDay([e], d)[0]).toMatchObject({ top: 540, bottom: 600 })
-    // Termin bis Tagesende
+    // event until end of day
     const late = timed(new Date(2026, 9, 25, 23), new Date(2026, 9, 26, 0))
     expect(layoutDay([late], d)[0]).toMatchObject({ top: 1380, bottom: 1440 })
   })
@@ -148,9 +148,9 @@ describe('Bänder (ganztägig, mehrtägig)', () => {
   const week = daysFrom(new Date(2026, 9, 5), 7).map(dayKey)
 
   it('Spalten und Spuren', () => {
-    const a = allDay('2026-10-06', '2026-10-09') // Di–Do
-    const b = allDay('2026-10-07', '2026-10-08') // Mi (überlappt a)
-    const c = allDay('2026-10-09', '2026-10-10') // Fr (frei in Spur 0)
+    const a = allDay('2026-10-06', '2026-10-09') // Tue–Thu
+    const b = allDay('2026-10-07', '2026-10-08') // Wed (overlaps a)
+    const c = allDay('2026-10-09', '2026-10-10') // Fri (free in lane 0)
     const { spans, lanes } = layoutSpans([b, c, a], week)
     expect(lanes).toBe(2)
     const s = new Map(spans.map((x) => [x.item.key, x]))
@@ -220,7 +220,7 @@ describe('blockSpan', () => {
     expect(a.cascade).toBe(true)
     expect(a.left).toBe(0)
     expect(a.width).toBeGreaterThan(60)
-    // letzter Block schließt bündig mit der rechten Spaltenkante ab
+    // last block ends flush with the right column edge
     expect(c.left + c.width).toBeCloseTo(100)
     expect(c.left).toBeGreaterThan(a.left)
   })

@@ -1,13 +1,13 @@
 import { ollamaRoot } from './systemone'
 
-// Fähigkeiten von Ollama-Modellen: GET {root}/api/tags (neuere Versionen liefern
-// `capabilities` je Modell mit) bzw. POST {root}/api/show {model}. Entscheidungs-
-// modelle melden NUR `decision` – sie dürfen nie für Chat/Generierung gewählt
-// werden (der Server antwortet dort mit Fehlern).
+// Capabilities of Ollama models: GET {root}/api/tags (newer versions include
+// `capabilities` per model) or POST {root}/api/show {model}. Decision
+// models report ONLY `decision` – they must never be picked for chat/generation
+// (the server responds with errors there).
 
 export interface OllamaModelCaps {
   name: string
-  /** null = unbekannt (Server liefert keine Fähigkeiten) */
+  /** null = unknown (server reports no capabilities) */
   capabilities: string[] | null
 }
 
@@ -15,7 +15,7 @@ const SHOW_LIMIT = 40
 const SHOW_CONCURRENCY = 4
 const CACHE_MS = 60_000
 
-/** Reines Entscheidungsmodell: kann `decision`, aber keine Textgenerierung. */
+/** Pure decision model: can do `decision`, but no text generation. */
 export function isDecisionOnly(caps: string[] | null | undefined): boolean {
   return !!caps && caps.includes('decision') && !caps.includes('completion')
 }
@@ -48,15 +48,15 @@ export interface ListCapsOptions {
   apiKey?: string | null
   tagsTimeoutMs?: number
   showTimeoutMs?: number
-  /** höchstens so viele Modelle per /api/show nachfragen (Standard 40) */
+  /** query at most this many models via /api/show (default 40) */
   showLimit?: number
   fetchImpl?: typeof fetch
 }
 
 /**
- * Modelle samt Fähigkeiten. Zuerst /api/tags; fehlt `capabilities` dort, fragt
- * /api/show für höchstens SHOW_LIMIT Modelle nach (kurze Timeouts, parallel).
- * Kein Ollama (oder nicht erreichbar) → leere Liste, nie ein Wurf.
+ * Models with their capabilities. /api/tags first; if `capabilities` is missing
+ * there, queries /api/show for at most SHOW_LIMIT models (short timeouts, parallel).
+ * No Ollama (or unreachable) → empty list, never a throw.
  */
 export async function listOllamaModelCaps(
   baseUrl: string,
@@ -90,7 +90,7 @@ export async function listOllamaModelCaps(
     models.push({ name, capabilities: readCaps(r.capabilities) })
   }
 
-  // Bekannte Entscheidungsmodelle zuerst, damit sie unter dem Limit nicht herausfallen
+  // Known decision models first so they don't fall outside the limit
   const unknown = models
     .filter((m) => m.capabilities === null)
     .sort((a, b) => Number(looksLikeDecision(b.name)) - Number(looksLikeDecision(a.name)))
@@ -112,7 +112,7 @@ export async function listOllamaModelCaps(
         )) as { capabilities?: unknown }
         m.capabilities = readCaps(body.capabilities)
       } catch {
-        // bleibt unbekannt (= wie Chat-Modell behandelt)
+        // stays unknown (= treated like a chat model)
       }
     }
   }
@@ -120,14 +120,14 @@ export async function listOllamaModelCaps(
   return models
 }
 
-/** Namens-Heuristik nur zur Reihenfolge der /api/show-Abfragen, nie als Urteil. */
+/** Name heuristic only for ordering the /api/show queries, never as a verdict. */
 function looksLikeDecision(name: string): boolean {
   return /^(clef|nimble|tev)/i.test(name.replace(/^.*\//, ''))
 }
 
 const capsCache = new Map<string, { at: number; models: OllamaModelCaps[] }>()
 
-/** Wie listOllamaModelCaps, 60 s gecacht (Modellpicker feuern mehrfach). */
+/** Like listOllamaModelCaps, cached for 60 s (model pickers fire repeatedly). */
 export async function getOllamaModelCaps(
   baseUrl: string,
   opts: ListCapsOptions = {}

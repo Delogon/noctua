@@ -10,7 +10,7 @@ interface DraftedRule {
   ruleJson: string
 }
 
-/** Regel-JSON lesbar formatieren — bei kaputtem JSON den Rohtext zeigen. */
+/** Format rule JSON readably — show the raw text for broken JSON. */
 function prettyRuleJson(ruleJson: string): string {
   try {
     return JSON.stringify(JSON.parse(ruleJson), null, 2)
@@ -20,9 +20,9 @@ function prettyRuleJson(ruleJson: string): string {
 }
 
 /**
- * NL-Regeln: Nutzer beschreibt, die Eule schlägt eine deterministische Regel
- * vor. Letterpress-Fassung (Design 3c) — menschliche Beschreibung zuerst,
- * das JSON hinter einer Disclosure; Zeilen im Toggle-Track-Vokabular.
+ * NL rules: the user describes, the owl suggests a deterministic rule.
+ * Letterpress version (Design 3c) — human description first, the JSON
+ * behind a disclosure; rows in the toggle-track vocabulary.
  */
 export function RulesSection(): React.JSX.Element {
   const t = useT()
@@ -32,7 +32,7 @@ export function RulesSection(): React.JSX.Element {
     queryFn: () => invoke('rules:list', undefined),
     select: (d) => d.rules
   })
-  // KI-Bedingungen brauchen ein Entscheidungsmodell – ohne es werden solche Regeln übersprungen
+  // AI conditions need a decision model – without one such rules are skipped
   const decisionReady = useTaskAssignments().data?.decision.blocked === null
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<DraftedRule | null>(null)
@@ -84,7 +84,7 @@ export function RulesSection(): React.JSX.Element {
         <span style={{ font: '400 9px var(--mono)', color: 'var(--faint)' }}>{t('rulesSub')}</span>
       </div>
 
-      {/* Beschreiben → Entwerfen: Eingabe + DRAFT-Taste (↵ im Feld tut dasselbe) */}
+      {/* Describe → draft: input + DRAFT key (↵ in the field does the same) */}
       <div className="flex gap-2" style={{ marginTop: 10 }}>
         <input
           value={text}
@@ -113,7 +113,7 @@ export function RulesSection(): React.JSX.Element {
         <p style={{ font: '400 9.5px var(--mono)', color: 'var(--ac)', marginTop: 8 }}>{error}</p>
       )}
 
-      {/* Der Entwurf: menschliche Beschreibung zuerst, JSON hinter der Disclosure */}
+      {/* The draft: human description first, JSON behind the disclosure */}
       {draft && (
         <div
           style={{
@@ -189,7 +189,7 @@ export function RulesSection(): React.JSX.Element {
         </div>
       )}
 
-      {/* Bestehende Regeln: Toggle-Track + Listenzeilen, Treffer als Outline-Chip */}
+      {/* Existing rules: toggle track + list rows, hits as an outline chip */}
       <div style={{ borderTop: '1px solid var(--hairline)', marginTop: 12 }}>
         {list.map((rule, index) => (
           <div
@@ -211,7 +211,7 @@ export function RulesSection(): React.JSX.Element {
               <span
                 className="toggle-dot"
                 style={{
-                  background: rule.enabled ? '#F4F1EA' : 'var(--ink)',
+                  background: rule.enabled ? 'var(--paper)' : 'var(--ink)',
                   marginLeft: rule.enabled ? 12 : 0
                 }}
               />

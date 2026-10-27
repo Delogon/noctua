@@ -9,8 +9,8 @@ import { useCalendarEventActions } from '@renderer/queries/calendar'
 import { fieldsFromForm, formFromSlot, validateForm } from './event-form'
 import { CalendarSelect, EventTimeFields } from './TimeFields'
 
-// Schnell-Anlegen: kleines Popover am Slot (Titel, Zeit, Kalender). „Mehr …" öffnet
-// den vollen Editor mit dem bisherigen Entwurf.
+// Quick create: small popover at the slot (title, time, calendar). "More …" opens
+// the full editor with the draft so far.
 
 const WIDTH = 320
 const HEIGHT = 300
@@ -41,7 +41,7 @@ export function QuickCreate({
       ),
     [draft.rect]
   )
-  // Seitlich neben den Slot statt darunter, wenn dort Platz ist (Slot bleibt sichtbar)
+  // Beside the slot instead of below it, if there is room (slot stays visible)
   const left =
     draft.rect.left + draft.rect.width + 8 + WIDTH <= window.innerWidth - 8
       ? draft.rect.left + draft.rect.width + 8

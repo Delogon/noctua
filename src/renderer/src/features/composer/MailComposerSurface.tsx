@@ -6,6 +6,7 @@ import { sanitizeComposerHtml } from './composer-html'
 import { ComposerSpellcheck } from './ComposerSpellcheck'
 import {
   composerShortcut,
+  escapeHtml,
   estimateTranscriptSkeleton,
   textToComposerHtml,
   type ComposerActivity
@@ -31,7 +32,7 @@ export interface MailComposerHandle {
 }
 
 interface MailComposerSurfaceProps {
-  /** 'nudge' = Stups-Composer der Wartet-Ansicht: wie reply, nur mit eigenem Send-Label. */
+  /** 'nudge' = nudge composer of the Waiting view: like reply, only with its own send label. */
   variant: 'new' | 'reply' | 'nudge'
   document: ComposerDocument
   activity: ComposerActivity
@@ -45,9 +46,9 @@ interface MailComposerSurfaceProps {
   resultKind?: ComposerResultKind | null
   error?: ComposerError | null
   canSend: boolean
-  /** Dezenter Mono-Hinweis neben den Send-Aktionen — z. B. NO SUBJECT (Design 3a). */
+  /** Subtle mono hint next to the send actions — e.g. NO SUBJECT (Design 3a). */
   sendNote?: string | null
-  /** reply: Gesamtzahl AN+CC bei Allen-antworten — Sende-Label wird „SENDEN AN {n}". */
+  /** reply: total TO+CC count for reply-all — the send label becomes "SEND TO {n}". */
   sendRecipientCount?: number | null
   autoFocus?: boolean
   onDocumentChange: (document: ComposerDocument) => void
@@ -59,7 +60,7 @@ interface MailComposerSurfaceProps {
   onRestoreOriginal?: () => void
   onDiscard?: () => void
   onErrorMessage: (message: string) => void
-  /** ⌘⇧A im Editor: Antwort-Umfang umschalten (Turn 9). Weglassen = Shortcut inaktiv. */
+  /** ⌘⇧A in the editor: toggle reply scope (Turn 9). Omit = shortcut inactive. */
   onToggleReplyScope?: () => void
 }
 
@@ -122,8 +123,8 @@ export const MailComposerSurface = forwardRef<MailComposerHandle, MailComposerSu
       ) {
         return
       }
-      // Nie rohen Text in den Editor legen: ohne <div>-Blöcke stünde \n im
-      // innerHTML, und der nächste Edit schickte HTML ohne Zeilenumbrüche los.
+      // Never put raw text into the editor: without <div> blocks there would be \n in
+      // innerHTML, and the next edit would send HTML without line breaks.
       if (desiredHtml) editor.innerHTML = desiredHtml
       else editor.innerHTML = textToComposerHtml(props.document.text)
     }, [props.document.html, props.document.text])
@@ -184,7 +185,7 @@ export const MailComposerSurface = forwardRef<MailComposerHandle, MailComposerSu
         document.execCommand(
           'insertHTML',
           false,
-          `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`
+          `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
         )
       } else {
         document.execCommand('createLink', false, href)
@@ -394,8 +395,8 @@ export const MailComposerSurface = forwardRef<MailComposerHandle, MailComposerSu
                 document.execCommand('insertText', false, event.clipboardData.getData('text/plain'))
                 emitDocument()
               }}
-              // Eigene Hunspell-Prüfung (DE+EN) statt der nativen — die
-              // erkennt bei Einzelwörtern zu wenig (siehe src/main/spell/).
+              // Own Hunspell check (DE+EN) instead of the native one — it
+              // recognizes too little for single words (see src/main/spell/).
               spellCheck={false}
             />
             <ComposerSpellcheck

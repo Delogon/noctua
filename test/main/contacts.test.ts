@@ -6,6 +6,7 @@ import {
   preferredAccountForContact,
   rebuildContactStats,
   recordSentContacts,
+  CONTACT_DISPLAY_NAME_SQL,
   suggestContacts
 } from '@main/db/repos/contacts'
 
@@ -19,7 +20,7 @@ describe('suggestContacts', () => {
     const inbox = seedFolder(db, accountId, '\\Inbox', 'INBOX')
     const sent = seedFolder(db, accountId, '\\Sent', 'Sent')
 
-    // Empfangen: 3× Alice (mit Name), 1× Bob (ohne Name)
+    // Received: 3× Alice (with name), 1× Bob (without name)
     for (let i = 0; i < 3; i++) {
       upsertEnvelope(
         db,
@@ -39,14 +40,14 @@ describe('suggestContacts', () => {
       inbox,
       makeEnvelope({ uid: 20, messageId: '<b@test>', fromAddr: 'bob@web.de', fromName: null })
     )
-    // Self-Send in der INBOX: eigene Adresse darf nie vorgeschlagen werden
+    // Self-send in the INBOX: own address must never be suggested
     upsertEnvelope(
       db,
       accountId,
       inbox,
       makeEnvelope({ uid: 21, messageId: '<self@test>', fromAddr: 'tim@test.de', fromName: 'Tim' })
     )
-    // Gesendet: 2× an Carla — sent zählt dreifach, muss vor Alice ranken
+    // Sent: 2× to Carla — sent counts triple, must rank before Alice
     for (let i = 0; i < 2; i++) {
       upsertEnvelope(
         db,
@@ -83,8 +84,8 @@ describe('suggestContacts', () => {
   })
 
   it('haelt den Anzeigenamen in contact_stats, statt ihn pro Abfrage zu suchen', () => {
-    // Die Namenssuche darf messages nicht mehr anfassen: auf einem echten
-    // Postfach war das eine korrelierte Suche pro Kontakt (Sekunden bis Minuten).
+    // The name search must no longer touch messages: on a real
+    // mailbox that was a correlated search per contact (seconds to minutes).
     expect(
       db.prepare('SELECT display_name FROM contact_stats WHERE addr = ?').get('alice@firma.de')
     ).toEqual({ display_name: 'Alice Ammann' })
@@ -103,7 +104,7 @@ describe('suggestContacts', () => {
   })
 
   it('filtert eigene Konto-Adressen aus', () => {
-    // tim@test.de steht durch den Self-Send in contact_stats, darf aber nie kommen
+    // tim@test.de is in contact_stats via the self-send, but must never appear
     expect(suggestContacts(db, 'test.de', 8)).toEqual([])
     const all = suggestContacts(db, '@', 8).map((r) => r.addr)
     expect(all).toContain('bob@web.de')
@@ -146,5 +147,102 @@ describe('suggestContacts', () => {
       .get(accountId, 'new@example.com') as { sent_count: number; last_interaction: number }
 
     expect(row).toEqual({ sent_count: 1, last_interaction: 1_800_000_000_000 })
+  })
+})
+
+describe('rebuildContactStats: display name per address', () => {
+  let db: Database.Database
+  let accountId: number
+  let inbox: number
+  let uid = 1
+
+  const receive = (
+    account: number,
+    folder: number,
+    fromAddr: string,
+    fromName: string | null
+  ): void => {
+    upsertEnvelope(
+      db,
+      account,
+      folder,
+      makeEnvelope({ uid: uid++, messageId: `<dn${uid}@test>`, fromAddr, fromName })
+    )
+  }
+  const displayName = (account: number, addr: string): string | null | undefined =>
+    (
+      db
+        .prepare('SELECT display_name FROM contact_stats WHERE account_id = ? AND addr = ?')
+        .get(account, addr) as { display_name: string | null } | undefined
+    )?.display_name
+
+  beforeEach(() => {
+    db = createTestDb()
+    accountId = seedAccount(db, { email: 'owner@test.de' })
+    inbox = seedFolder(db, accountId, '\\Inbox', 'INBOX')
+  })
+  afterEach(() => closeTestDb(db))
+
+  it('picks the most frequent non-null name, matching addresses case-insensitively', () => {
+    receive(accountId, inbox, 'Max@Firma.de', 'Max M.')
+    receive(accountId, inbox, 'max@firma.de', 'Max Mustermann')
+    receive(accountId, inbox, 'MAX@FIRMA.DE', 'Max Mustermann')
+    receive(accountId, inbox, 'max@firma.de', null)
+    rebuildContactStats(db, accountId)
+    expect(displayName(accountId, 'max@firma.de')).toBe('Max Mustermann')
+  })
+
+  it('leaves the name empty when an address never had one', () => {
+    receive(accountId, inbox, 'noreply@shop.example', null)
+    rebuildContactStats(db, accountId)
+    expect(displayName(accountId, 'noreply@shop.example')).toBeNull()
+  })
+
+  it('breaks ties by the most recently used name', () => {
+    upsertEnvelope(
+      db,
+      accountId,
+      inbox,
+      makeEnvelope({
+        uid: uid++,
+        messageId: '<tie-old@test>',
+        fromAddr: 'tie@example.org',
+        fromName: 'Anna',
+        date: 1_700_000_000_000
+      })
+    )
+    upsertEnvelope(
+      db,
+      accountId,
+      inbox,
+      makeEnvelope({
+        uid: uid++,
+        messageId: '<tie-new@test>',
+        fromAddr: 'tie@example.org',
+        fromName: 'Zora',
+        date: 1_800_000_000_000
+      })
+    )
+    rebuildContactStats(db, accountId)
+    expect(displayName(accountId, 'tie@example.org')).toBe('Zora')
+  })
+
+  it('counts names from all accounts (not scoped to the account)', () => {
+    const other = seedAccount(db, { email: 'second@test.de' })
+    const otherInbox = seedFolder(db, other, '\\Inbox', 'INBOX')
+    receive(accountId, inbox, 'shared@example.org', 'Short')
+    receive(other, otherInbox, 'shared@example.org', 'Full Name')
+    receive(other, otherInbox, 'shared@example.org', 'Full Name')
+    rebuildContactStats(db, accountId)
+    expect(displayName(accountId, 'shared@example.org')).toBe('Full Name')
+  })
+
+  it('looks names up with an index seek, not a scan per contact', () => {
+    const plan = db
+      .prepare(`EXPLAIN QUERY PLAN ${CONTACT_DISPLAY_NAME_SQL}`)
+      .all(accountId) as Array<{ detail: string }>
+    expect(plan.map((row) => row.detail).join('\n')).toMatch(
+      /SEARCH m USING (?:COVERING )?INDEX idx_msg_from_addr_lower/
+    )
   })
 })

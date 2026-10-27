@@ -1,13 +1,18 @@
 import { create } from 'zustand'
 import type { InboxFilterId } from '@renderer/features/paper/inbox-filters'
+import { PANE_LIMITS, clampPaneWidth, type PaneId } from '@renderer/features/paper/pane-layout'
 import { invoke } from '@renderer/lib/ipc'
 import { toast } from './toast'
 
-// Zentraler UI-Zustand des Letterpress-Frames (M19). Der Composer-Automat
-// lebt hier, damit Owl-Rail und Listen-Chips („DRAFT READY") ihn sehen.
+// Central UI state of the Letterpress frame (M19). The composer state machine
+// lives here so the Owl rail and list chips ("DRAFT READY") can see it.
 
 export type PaperView = 'inbox' | 'waiting' | 'tasks' | 'calendar' | 'settings' | 'chat' | 'compose'
-export type SettingsSection = 'accounts' | 'style' | 'sig' | 'intel' | 'tech'
+export type SettingsSection = 'accounts' | 'appearance' | 'style' | 'sig' | 'intel' | 'tech'
+/** Layout (setting ui.layout): Letterpress original or Outlook-like Classic. */
+export type PaperLayout = 'letterpress' | 'classic'
+export type Mbox = 'inbox' | 'sent' | 'spam'
+export type PaperTheme = 'light' | 'dark'
 export type CompMode = 'idle' | 'listening' | 'transcribing' | 'drafting' | 'ready' | 'sending'
 
 export type CompResultKind = 'transcribed' | 'generated'
@@ -32,9 +37,9 @@ export interface CompState {
   manual: boolean
   elaborated: boolean
   draftId: string | null
-  /** Allen antworten (M80): CC an die übrigen ursprünglichen Empfänger. */
+  /** Reply all (M80): CC to the other original recipients. */
   replyAll: boolean
-  /** Kompatibilitaetsfeld fuer aeltere Reply-Entwuerfe. */
+  /** Compatibility field for older reply drafts. */
   reviseBase: string | null
 }
 
@@ -64,7 +69,7 @@ const COMP_IDLE: CompState = {
 interface PaperState {
   view: PaperView
   setView: (view: PaperView) => void
-  // Auswahl je Liste
+  // Selection per list
   selThreadKey: string | null
   setSelThreadKey: (key: string | null) => void
   selWaitingId: number | null
@@ -77,21 +82,43 @@ interface PaperState {
   setShowOpenTasks: (show: boolean) => void
   setSel: SettingsSection
   setSetSel: (s: SettingsSection) => void
-  // Ordner (EINGANG/GESENDET/SPAM)
-  mbox: 'inbox' | 'sent' | 'spam'
-  setMbox: (m: 'inbox' | 'sent' | 'spam') => void
-  // Konto-Filter (1/2/3, Chips)
+  // Folder (EINGANG/GESENDET/SPAM)
+  mbox: Mbox
+  setMbox: (m: Mbox) => void
+  // Account filter (1/2/3, chips)
   filter: number | null
   setFilter: (accountId: number | null) => void
-  // Listen-Filter (Design Turn 7): Sitzungszustand, nicht persistiert
+  /** Folder view: selected single folder (null = unified view across mbox). */
+  folderId: number | null
+  /** Pick a folder: account + view in one step; folderId only for own folders/archive. */
+  openFolder: (target: { accountId: number | null; mbox: Mbox; folderId: number | null }) => void
+  // Layout (persisted in settings ui.layout / mail.showFolders)
+  layout: PaperLayout
+  setLayout: (layout: PaperLayout) => void
+  showFolders: boolean
+  setShowFolders: (show: boolean) => void
+  theme: PaperTheme
+  setTheme: (theme: PaperTheme) => void
+  // Columns: width (dragged) and folder bar on/off (Classic)
+  paneWidths: Record<PaneId, number>
+  /** persist=false while dragging, true on release (settings ui.paneWidths). */
+  setPaneWidth: (id: PaneId, width: number, persist?: boolean) => void
+  showFolderPane: boolean
+  toggleFolderPane: () => void
+  /** Columns that should stay open despite lack of space (session, not persisted). */
+  pinnedPanes: ReadonlySet<PaneId>
+  /** Click on a bar: expand it, or pin it when space is short. */
+  expandPane: (id: PaneId, autoCollapsed: boolean) => void
+  collapsePane: (id: PaneId) => void
+  // List filters (Design Turn 7): session state, not persisted
   inboxFilters: Set<InboxFilterId>
   toggleInboxFilter: (id: InboxFilterId) => void
   clearInboxFilters: () => void
-  // Composer-Automat
+  // Composer state machine
   comp: CompState
   setComp: (patch: Partial<CompState>) => void
   resetComp: () => void
-  // Seitenleisten (persistiert in settings ui.showList/ui.showRail)
+  // Sidebars (persisted in settings ui.showList/ui.showRail)
   showList: boolean
   showRail: boolean
   toggleList: () => void
@@ -103,17 +130,17 @@ interface PaperState {
   setHelpOpen: (v: boolean) => void
   onboarding: boolean
   setOnboarding: (v: boolean) => void
-  /** Shim auf die zentrale Toast-Queue (Design 1c) — Call-Sites unverändert. */
+  /** Shim onto the central toast queue (Design 1c) — call sites unchanged. */
   toastNow: (msg: string, durationMs?: number) => void
-  // Ablegen mit Undo-Fenster (z)
+  // Filing with undo window (z)
   hiddenThreads: Set<string>
   stageArchive: (threadKey: string, messageIds: number[]) => void
   undoArchive: () => boolean
-  /** Thread ohne Timer verstecken/zeigen (Rückgängig-Fenster beim Senden). */
+  /** Hide/show a thread without a timer (undo window when sending). */
   setThreadHidden: (threadKey: string, hidden: boolean) => void
 }
 
-/** Undo-Fenster fürs Ablegen — eine Quelle für stageArchive UND den Action-Toast. */
+/** Undo window for filing — one source for stageArchive AND the action toast. */
 export const ARCHIVE_UNDO_WINDOW_MS = 5000
 
 let pendingArchive: {
@@ -146,9 +173,73 @@ export const usePaper = create<PaperState>((set) => ({
   setSel: 'accounts',
   setSetSel: (setSel) => set({ setSel }),
   mbox: 'inbox',
-  setMbox: (mbox) => set({ mbox, selThreadKey: null }),
+  setMbox: (mbox) => set({ mbox, folderId: null, selThreadKey: null }),
   filter: null,
-  setFilter: (filter) => set({ filter, selThreadKey: null }),
+  setFilter: (filter) => set({ filter, folderId: null, selThreadKey: null }),
+  folderId: null,
+  openFolder: ({ accountId, mbox, folderId }) =>
+    set({ filter: accountId, mbox, folderId, selThreadKey: null, view: 'inbox' }),
+  layout: 'letterpress',
+  setLayout: (layout) => {
+    void invoke('settings:set', { key: 'ui.layout', value: layout })
+    set({ layout })
+  },
+  theme: 'light',
+  setTheme: (theme) => {
+    void invoke('settings:set', { key: 'ui.theme', value: theme })
+    set({ theme })
+  },
+  paneWidths: {
+    folders: PANE_LIMITS.folders.default,
+    list: PANE_LIMITS.list.default,
+    rail: PANE_LIMITS.rail.default
+  },
+  setPaneWidth: (id, width, persist = false) =>
+    set((s) => {
+      const paneWidths = { ...s.paneWidths, [id]: clampPaneWidth(id, width) }
+      if (persist) {
+        void invoke('settings:set', { key: 'ui.paneWidths', value: JSON.stringify(paneWidths) })
+      }
+      return { paneWidths }
+    }),
+  showFolderPane: true,
+  toggleFolderPane: () =>
+    set((s) => {
+      const next = !s.showFolderPane
+      void invoke('settings:set', { key: 'ui.showFolderPane', value: next ? '1' : '0' })
+      return { showFolderPane: next }
+    }),
+  pinnedPanes: new Set<PaneId>(),
+  expandPane: (id, autoCollapsed) => {
+    const s = usePaper.getState()
+    if (autoCollapsed) {
+      set({ pinnedPanes: new Set([...s.pinnedPanes, id]) })
+      return
+    }
+    if (id === 'folders' && !s.showFolderPane) s.toggleFolderPane()
+    if (id === 'list' && !s.showList) s.toggleList()
+    if (id === 'rail' && !s.showRail) s.toggleRail()
+  },
+  collapsePane: (id) => {
+    const s = usePaper.getState()
+    const pinned = new Set(s.pinnedPanes)
+    pinned.delete(id)
+    set({ pinnedPanes: pinned })
+    if (id === 'folders' && s.showFolderPane) s.toggleFolderPane()
+    if (id === 'list' && s.showList) s.toggleList()
+    if (id === 'rail' && s.showRail) s.toggleRail()
+  },
+  showFolders: false,
+  setShowFolders: (showFolders) => {
+    // Main reads mail.showFolders when listing folders; the refresh fetches the folders immediately
+    void invoke('settings:set', { key: 'mail.showFolders', value: showFolders ? '1' : '0' }).then(
+      () => invoke('sync:trigger', undefined).catch(() => {})
+    )
+    set((s) => ({
+      showFolders,
+      ...(showFolders || s.folderId === null ? {} : { folderId: null, selThreadKey: null })
+    }))
+  },
   inboxFilters: new Set<InboxFilterId>(),
   toggleInboxFilter: (id) =>
     set((s) => {
@@ -187,7 +278,7 @@ export const usePaper = create<PaperState>((set) => ({
   },
   hiddenThreads: new Set<string>(),
   stageArchive: (threadKey, messageIds) => {
-    // Nur ein Undo-Level: vorherigen Kandidaten endgültig ablegen
+    // Only one undo level: file the previous candidate for good
     commitArchive()
     const timer = setTimeout(() => {
       commitArchive()
@@ -217,12 +308,37 @@ export const usePaper = create<PaperState>((set) => ({
     })
 }))
 
-/** Beim Start gemerkte Leisten-Zustände laden. */
+/** Load the sidebar states remembered at startup. */
 export function initPanelPrefs(): void {
   void invoke('settings:get', { key: 'ui.showList' }).then((r) => {
     if (r.value === '0') usePaper.setState({ showList: false })
   })
   void invoke('settings:get', { key: 'ui.showRail' }).then((r) => {
     if (r.value === '0') usePaper.setState({ showRail: false })
+  })
+  void invoke('settings:get', { key: 'ui.layout' }).then((r) => {
+    if (r.value === 'classic') usePaper.setState({ layout: 'classic' })
+  })
+  void invoke('settings:get', { key: 'mail.showFolders' }).then((r) => {
+    if (r.value === '1') usePaper.setState({ showFolders: true })
+  })
+  void invoke('settings:get', { key: 'ui.theme' }).then((r) => {
+    if (r.value === 'dark') usePaper.setState({ theme: 'dark' })
+  })
+  void invoke('settings:get', { key: 'ui.showFolderPane' }).then((r) => {
+    if (r.value === '0') usePaper.setState({ showFolderPane: false })
+  })
+  void invoke('settings:get', { key: 'ui.paneWidths' }).then((r) => {
+    if (!r.value) return
+    try {
+      const saved = JSON.parse(r.value) as Partial<Record<PaneId, unknown>>
+      const widths = { ...usePaper.getState().paneWidths }
+      for (const id of ['folders', 'list', 'rail'] as const) {
+        if (typeof saved[id] === 'number') widths[id] = clampPaneWidth(id, saved[id])
+      }
+      usePaper.setState({ paneWidths: widths })
+    } catch {
+      // broken value: keep default widths
+    }
   })
 }

@@ -3,13 +3,13 @@ import type { OwlMessage, OwlSource } from '@shared/types'
 import type { PushPayload } from '@shared/ipc-contract'
 import type { SemanticSearchHit } from '@renderer/features/search/useSemanticSearch'
 
-// Zustand der Owl-View (Suchen + Fragen in einem Eingabefeld).
-// Der Automat aus dem Design-Handoff:
+// State of the Owl view (search + ask in one input field).
+// The state machine from the design handoff:
 //   empty → typing(hits) → asking(streaming) → conversation(idle) → typing(follow-up)
-// Die IPC-Aufrufe (ai:chat, owl:*) leben in der View bzw. in queries/owl.ts —
-// hier nur reine, testbare Übergänge.
+// The IPC calls (ai:chat, owl:*) live in the view or in queries/owl.ts —
+// here only pure, testable transitions.
 
-/** Nachricht im aktiven Verlauf; pending markiert die noch streamende Antwort. */
+/** Message in the active history; pending marks the answer still streaming. */
 export interface OwlDraftMessage extends OwlMessage {
   pending?: boolean
 }
@@ -17,47 +17,47 @@ export interface OwlDraftMessage extends OwlMessage {
 export type OwlPhase = 'empty' | 'typing' | 'asking' | 'conversation'
 
 interface OwlState {
-  /** Entwurfstext im Eingabefeld (Suche und Frage zugleich). */
+  /** Draft text in the input field (search and question at once). */
   query: string
   setQuery: (query: string) => void
-  /** Geöffnetes (persistiertes) Gespräch — null vor der ersten Speicherung. */
+  /** Opened (persisted) conversation — null before the first save. */
   selConversationId: number | null
-  /** Aktiver Verlauf im Blatt. */
+  /** Active history in the sheet. */
   messages: OwlDraftMessage[]
-  /** Läuft gerade eine Antwort? */
+  /** Is an answer currently running? */
   asking: boolean
   chatId: string | null
-  /** Inline-Fehler unterm Eingabefeld — nie als Toast. */
+  /** Inline error below the input field — never as a toast. */
   askError: string | null
-  /** Live-Treffer zum Frage-Zeitpunkt: reichern die SOURCES-Karte an. */
+  /** Live hits at question time: enrich the SOURCES card. */
   contextHits: SemanticSearchHit[]
-  /** Zähler: Eingabefeld fokussieren, sobald die View (wieder) steht. */
+  /** Counter: focus the input field as soon as the view is up (again). */
   pendingFocus: boolean
   requestFocus: () => void
   clearFocusRequest: () => void
   /**
-   * Frage stellen: hängt Nutzerbeitrag + streamende Antwort an und liefert
-   * die history für ai:chat (Verlauf VOR dieser Frage). null, wenn gerade
-   * schon gefragt wird oder die Frage leer ist.
+   * Ask a question: appends the user turn + streaming answer and returns
+   * the history for ai:chat (history BEFORE this question). null if a question
+   * is already running or the question is empty.
    */
   beginAsk: (
     question: string,
     hits?: SemanticSearchHit[]
   ) => { history: Array<{ role: 'user' | 'assistant'; content: string }> } | null
   setChatId: (chatId: string) => void
-  /** Streaming-Chunk anwenden; fremde chatIds werden ignoriert. */
+  /** Apply a streaming chunk; foreign chatIds are ignored. */
   applyChunk: (payload: PushPayload<'ai:chatChunk'>) => void
-  /** Abbruch/Fehler: Frage zurück ins Eingabefeld, nichts wird gespeichert. */
+  /** Abort/error: question back into the input field, nothing is saved. */
   failAsk: (message: string) => void
-  /** Nach owl:save: id des persistierten Gesprächs übernehmen. */
+  /** After owl:save: adopt the id of the persisted conversation. */
   setSaved: (id: number) => void
-  /** Persistiertes Gespräch ins Blatt laden. */
+  /** Load a persisted conversation into the sheet. */
   openConversation: (conversation: { id: number; messages: OwlMessage[] }) => void
-  /** n / NEUE FRAGE: zurück in den Leerzustand. */
+  /** n / NEW QUESTION: back to the empty state. */
   newQuestion: () => void
 }
 
-/** Ableitung der Automat-Phase — die View rendert ausschließlich danach. */
+/** Derivation of the state machine phase — the view renders exclusively from it. */
 export function owlPhase(state: {
   query: string
   asking: boolean
@@ -68,7 +68,7 @@ export function owlPhase(state: {
   return state.messages.length > 0 ? 'conversation' : 'empty'
 }
 
-/** history für ai:chat: abgeschlossene Beiträge, gekappt aufs Contract-Limit. */
+/** history for ai:chat: completed turns, capped at the contract limit. */
 export function historyForAsk(
   messages: OwlDraftMessage[]
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
@@ -78,7 +78,7 @@ export function historyForAsk(
     .slice(-12)
 }
 
-/** Quellen aus dem Push mit den Live-Treffern zum Frage-Zeitpunkt anreichern. */
+/** Enrich sources from the push with the live hits at question time. */
 export function enrichSources(
   sources: NonNullable<PushPayload<'ai:chatChunk'>['sources']>,
   hits: SemanticSearchHit[]
@@ -152,8 +152,8 @@ export const useOwl = create<OwlState>((set, get) => ({
   },
 
   failAsk: (message) => {
-    // Abgebrochene Fragen verschwinden restlos: Frage zurück ins Feld,
-    // Verlauf wie vor dem Fragen — gespeichert wird so etwas nie.
+    // Aborted questions vanish without a trace: question back into the field,
+    // history as before asking — such a thing is never saved.
     const state = get()
     const messages = [...state.messages]
     const pendingIndex = messages.findLastIndex((m) => m.role === 'assistant' && m.pending)

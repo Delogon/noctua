@@ -1,9 +1,9 @@
--- Der CHECK auf credential_type kennt 'oauth-google' nicht, und SQLite kann
--- Constraints nicht nachträglich ändern → accounts nach dem offiziellen
--- 12-Schritt-Verfahren neu aufbauen (FKs sind während Migrationen aus, siehe
--- migrate.ts — sonst würde DROP TABLE per CASCADE alle Mails mitlöschen).
--- Kinder-Tabellen referenzieren "accounts" namentlich; durch DROP + RENAME
--- zeigen ihre Fremdschlüssel danach wieder auf die neue Tabelle.
+-- The CHECK on credential_type doesn't know 'oauth-google', and SQLite cannot
+-- alter constraints afterwards → rebuild accounts using the official
+-- 12-step procedure (FKs are off during migrations, see
+-- migrate.ts — otherwise DROP TABLE would CASCADE-delete all mails).
+-- Child tables reference "accounts" by name; after DROP + RENAME
+-- their foreign keys point at the new table again.
 CREATE TABLE accounts_new (
   id INTEGER PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
@@ -15,7 +15,7 @@ CREATE TABLE accounts_new (
   imap_port INTEGER NOT NULL,
   smtp_host TEXT NOT NULL,
   smtp_port INTEGER NOT NULL,
-  tls_fingerprint256 TEXT,              -- Cert-Pinning (Proton Bridge)
+  tls_fingerprint256 TEXT,              -- Cert pinning (Proton Bridge)
   ai_enabled INTEGER NOT NULL DEFAULT 1,
   color TEXT,
   created_at INTEGER NOT NULL,
@@ -34,7 +34,7 @@ INSERT INTO accounts_new (id, email, display_name, provider, credential_type,
 DROP TABLE accounts;
 ALTER TABLE accounts_new RENAME TO accounts;
 
--- Index und Trigger hingen an der alten Tabelle und fielen mit dem DROP
+-- Index and trigger belonged to the old table and were dropped with it
 CREATE UNIQUE INDEX idx_accounts_account_name_nocase
   ON accounts(lower(account_name));
 

@@ -1,10 +1,18 @@
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { isSecurityNotification, isUserAuthoredMail } from './tasks'
 import { taskAddresseeVerdict } from '../../ai/addressee'
-import type { AiCategory, MessageDetail, Recipient, ThreadListItem } from '@shared/types'
+import type {
+  AiCategory,
+  FolderListItem,
+  MessageDetail,
+  Recipient,
+  ThreadListItem
+} from '@shared/types'
+import { folderLeaf, folderRole } from '@shared/folder-roles'
 import { htmlToText } from '../../mail/parser'
 import { isForwardWithoutRequest, textBeforeForwardedMessage } from '../../mail/forwarded'
 import { isVisibleMailAttachment } from '../../mail/attachment-visibility'
+import { metrics } from '../../diagnostics/metrics'
 
 interface ThreadAggRow {
   thread_key: string
@@ -27,177 +35,259 @@ function parseRecipients(json: string | null): Recipient[] {
   }
 }
 
-function buildThreadItem(db: Database.Database, agg: ThreadAggRow): ThreadListItem {
-  const latest = db
+/** Up to three recipient labels (name, else address) from a to_json value. */
+function recipientLabels(json: string | null): string[] {
+  if (!json) return []
+  try {
+    return (JSON.parse(json) as Array<{ name?: string; address?: string }>)
+      .map((x) => x.name || x.address || '')
+      .filter(Boolean)
+      .slice(0, 3)
+  } catch {
+    return []
+  }
+}
+
+/** Thread keys of the current page as a JSON array parameter for `json_each`. */
+const PAGE_KEYS = 'SELECT value FROM json_each(?)'
+
+interface TaskCandidate {
+  thread_key: string
+  message_id: number
+  status: string
+  title: string
+  due_date: string | null
+  subject: string | null
+}
+
+interface ActionCandidate {
+  thread_key: string
+  message_id: number
+  label: string | null
+  due: string | null
+  addressed_to_me: number
+  to_json: string | null
+  cc_json: string | null
+  from_addr: string | null
+  subject: string | null
+  special_use: string | null
+  account_email: string | null
+  account_display_name: string | null
+  account_name: string | null
+}
+
+/**
+ * Builds the list rows for one page with a fixed number of set-based queries
+ * (was ~8 queries per thread, ~2,400 statements for 300 rows). Every query
+ * looks at all messages of the thread, independent of the listed folder, and
+ * orders ties like the old per-thread queries did: newest date, then newest id.
+ */
+function buildThreadItems(db: Database.Database, aggs: ThreadAggRow[]): ThreadListItem[] {
+  if (aggs.length === 0) return []
+  const keys = JSON.stringify(aggs.map((agg) => agg.thread_key))
+
+  const latest = new Map(
+    (
+      db
+        .prepare(
+          `SELECT thread_key, subject, snippet FROM (
+             SELECT m.thread_key, m.subject, m.snippet,
+                    row_number() OVER (PARTITION BY m.thread_key ORDER BY m.date DESC, m.id DESC) rn
+             FROM messages m WHERE m.thread_key IN (${PAGE_KEYS})
+           ) WHERE rn = 1`
+        )
+        .all(keys) as Array<{ thread_key: string; subject: string | null; snippet: string | null }>
+    ).map((row) => [row.thread_key, row])
+  )
+
+  const toJson = new Map(
+    (
+      db
+        .prepare(
+          `SELECT thread_key, to_json FROM (
+             SELECT m.thread_key, m.to_json,
+                    row_number() OVER (PARTITION BY m.thread_key ORDER BY m.date DESC, m.id DESC) rn
+             FROM messages m WHERE m.thread_key IN (${PAGE_KEYS}) AND m.to_json IS NOT NULL
+           ) WHERE rn = 1`
+        )
+        .all(keys) as Array<{ thread_key: string; to_json: string }>
+    ).map((row) => [row.thread_key, row.to_json])
+  )
+
+  // Up to three distinct sender names, ordered by their most recent message
+  const fromNames = new Map<string, string[]>()
+  for (const row of db
     .prepare(
-      'SELECT subject, snippet FROM messages WHERE thread_key = ? ORDER BY date DESC LIMIT 1'
+      `SELECT thread_key, from_name FROM (
+         SELECT thread_key, from_name,
+                row_number() OVER (PARTITION BY thread_key ORDER BY min(pos)) rk
+         FROM (
+           SELECT m.thread_key, m.from_name,
+                  row_number() OVER (PARTITION BY m.thread_key ORDER BY m.date DESC, m.id DESC) pos
+           FROM messages m WHERE m.thread_key IN (${PAGE_KEYS}) AND m.from_name IS NOT NULL
+         )
+         GROUP BY thread_key, from_name
+       ) WHERE rk <= 3 ORDER BY thread_key, rk`
     )
-    .get(agg.thread_key) as { subject: string | null; snippet: string | null }
-  const toNames = (
-    db
+    .all(keys) as Array<{ thread_key: string; from_name: string }>) {
+    const list = fromNames.get(row.thread_key) ?? []
+    list.push(row.from_name)
+    fromNames.set(row.thread_key, list)
+  }
+
+  const colors = new Map(
+    (
+      db.prepare('SELECT id, color FROM accounts').all() as Array<{
+        id: number
+        color: string | null
+      }>
+    ).map((row) => [row.id, row.color])
+  )
+
+  // AI view of the thread: category/summary of the newest annotated message,
+  // priority as the maximum across the thread; user override beats the model.
+  const ai = new Map(
+    (
+      db
+        .prepare(
+          `SELECT thread_key, cat, summary, needs_reply, max_priority FROM (
+             SELECT m.thread_key, coalesce(a.user_override_category, a.category) cat, a.summary,
+                    a.needs_reply, max(a.priority) OVER (PARTITION BY m.thread_key) max_priority,
+                    row_number() OVER (PARTITION BY m.thread_key ORDER BY m.date DESC, m.id DESC) rn
+             FROM ai_annotations a JOIN messages m ON m.id = a.message_id
+             WHERE m.thread_key IN (${PAGE_KEYS})
+           ) WHERE rn = 1`
+        )
+        .all(keys) as Array<{
+        thread_key: string
+        cat: string
+        summary: string | null
+        needs_reply: number
+        max_priority: number | null
+      }>
+    ).map((row) => [row.thread_key, row])
+  )
+
+  // Letterpress: the owl's task suggestion + decision state.
+  // accepted/dismissed = a task exists with its source in this thread;
+  // suggested = annotation has action_items, but no task yet.
+  const tasks = new Map(
+    (
+      db
+        .prepare(
+          `SELECT thread_key, message_id, status, title, due_date, subject FROM (
+             SELECT m.thread_key, m.id message_id, t.status, t.title, t.due_date, m.subject,
+                    row_number() OVER (PARTITION BY m.thread_key ORDER BY t.created_at DESC, t.id DESC) rn
+             FROM tasks t
+             JOIN messages m ON t.source_kind = 'mail' AND m.id = t.source_id
+             JOIN folders f ON f.id = m.folder_id
+             WHERE m.thread_key IN (${PAGE_KEYS})
+               AND coalesce(f.special_use, '') <> '\\Sent'
+               AND NOT EXISTS (SELECT 1 FROM accounts own WHERE lower(own.email) = lower(m.from_addr))
+           ) WHERE rn = 1`
+        )
+        .all(keys) as TaskCandidate[]
+    ).map((row) => [row.thread_key, row])
+  )
+  const actions = new Map(
+    (
+      db
+        .prepare(
+          `SELECT * FROM (
+             SELECT m.thread_key, m.id message_id,
+                    json_extract(a.action_items_json, '$[0].title') label,
+                    json_extract(a.action_items_json, '$[0].due') due,
+                    a.addressed_to_me, m.to_json, m.cc_json, m.from_addr, m.subject, f.special_use,
+                    acc.email account_email, acc.display_name account_display_name, acc.account_name,
+                    row_number() OVER (PARTITION BY m.thread_key ORDER BY m.date DESC, m.id DESC) rn
+             FROM ai_annotations a JOIN messages m ON m.id = a.message_id
+             JOIN folders f ON f.id = m.folder_id
+             LEFT JOIN accounts acc ON acc.id = m.account_id
+             WHERE m.thread_key IN (${PAGE_KEYS})
+               AND json_array_length(coalesce(a.action_items_json, '[]')) > 0
+           ) WHERE rn = 1`
+        )
+        .all(keys) as ActionCandidate[]
+    ).map((row) => [row.thread_key, row])
+  )
+
+  // Body text only for the few messages that carry a task or an action item
+  const bodyIds = [...tasks.values(), ...actions.values()].map((row) => row.message_id)
+  const bodies = new Map<number, string>()
+  if (bodyIds.length > 0) {
+    for (const row of db
       .prepare(
-        `SELECT to_json FROM messages WHERE thread_key = ? AND to_json IS NOT NULL ORDER BY date DESC LIMIT 1`
+        `SELECT message_id, text_plain, html_raw FROM message_bodies
+         WHERE message_id IN (${PAGE_KEYS})`
       )
-      .all(agg.thread_key) as Array<{ to_json: string }>
-  ).flatMap((r) => {
-    try {
-      return (JSON.parse(r.to_json) as Array<{ name?: string; address?: string }>)
-        .map((x) => x.name || x.address || '')
-        .filter(Boolean)
-        .slice(0, 3)
-    } catch {
-      return []
+      .all(JSON.stringify([...new Set(bodyIds)])) as Array<{
+      message_id: number
+      text_plain: string | null
+      html_raw: string | null
+    }>) {
+      bodies.set(row.message_id, row.text_plain?.trim() || htmlToText(row.html_raw ?? ''))
+    }
+  }
+  const bodyOf = (messageId: number): string => bodies.get(messageId) ?? ''
+
+  return aggs.map((agg) => {
+    const last = latest.get(agg.thread_key)
+    const toNames = recipientLabels(toJson.get(agg.thread_key) ?? null)
+    const annotation = ai.get(agg.thread_key)
+    const taskRow = tasks.get(agg.thread_key)
+    const actionItem = actions.get(agg.thread_key)
+
+    let taskState: 'suggested' | 'accepted' | 'dismissed' | 'none' = 'none'
+    let suggestedTask: { label: string; due: string | null } | null = null
+    const visibleTask =
+      taskRow && !isForwardWithoutRequest(taskRow.subject, bodyOf(taskRow.message_id))
+        ? taskRow
+        : undefined
+    if (visibleTask) {
+      taskState = visibleTask.status === 'dismissed' ? 'dismissed' : 'accepted'
+      suggestedTask = { label: visibleTask.title, due: visibleTask.due_date }
+    } else if (
+      actionItem?.label &&
+      !isSecurityNotification(last?.subject) &&
+      // Addressee gate: 'none' (distribution list/Bcc, CC only, other salutation)
+      // shows no suggestion either; 'suggest' and 'create' allow the strip.
+      taskAddresseeVerdict({
+        accountEmail: actionItem.account_email,
+        displayName: actionItem.account_display_name,
+        accountName: actionItem.account_name,
+        toJson: actionItem.to_json,
+        ccJson: actionItem.cc_json,
+        bodyText: textBeforeForwardedMessage(actionItem.subject, bodyOf(actionItem.message_id)),
+        addressedToMe: actionItem.addressed_to_me !== 0
+      }) !== 'none' &&
+      !isUserAuthoredMail(db, actionItem.from_addr, actionItem.special_use) &&
+      !isForwardWithoutRequest(actionItem.subject, bodyOf(actionItem.message_id))
+    ) {
+      taskState = 'suggested'
+      suggestedTask = { label: actionItem.label, due: actionItem.due }
+    }
+
+    return {
+      threadKey: agg.thread_key,
+      accountId: agg.account_id,
+      accountColor: colors.get(agg.account_id) ?? '#7c7ff2',
+      subject: last?.subject ?? null,
+      snippet: last?.snippet ?? null,
+      fromNames: fromNames.get(agg.thread_key) ?? [],
+      toNames,
+      date: agg.max_date,
+      messageCount: agg.cnt,
+      unread: agg.unread_cnt > 0,
+      flagged: agg.flagged === 1,
+      hasAttachments: agg.has_att === 1,
+      aiCategory: (annotation?.cat as AiCategory) ?? null,
+      aiPriority: annotation ? annotation.max_priority : null,
+      aiSummary: annotation?.summary ?? null,
+      needsReply: annotation?.needs_reply === 1,
+      suggestedTask,
+      taskState
     }
   })
-  const fromNames = (
-    db
-      .prepare(
-        `SELECT DISTINCT from_name FROM messages
-         WHERE thread_key = ? AND from_name IS NOT NULL ORDER BY date DESC LIMIT 3`
-      )
-      .all(agg.thread_key) as Array<{ from_name: string }>
-  ).map((r) => r.from_name)
-  const color = (
-    db.prepare('SELECT color FROM accounts WHERE id = ?').get(agg.account_id) as
-      { color: string | null } | undefined
-  )?.color
-
-  // AI-Sicht des Threads: Kategorie/Summary der neuesten annotierten Nachricht,
-  // Priorität als Maximum über den Thread; Nutzer-Override schlägt das Modell.
-  const ai = db
-    .prepare(
-      `SELECT coalesce(a.user_override_category, a.category) cat, a.summary, a.needs_reply
-       FROM ai_annotations a JOIN messages m ON m.id = a.message_id
-       WHERE m.thread_key = ? ORDER BY m.date DESC LIMIT 1`
-    )
-    .get(agg.thread_key) as { cat: string; summary: string | null; needs_reply: number } | undefined
-
-  // Letterpress: Aufgaben-Vorschlag der Eule + Entscheidungszustand.
-  // accepted/dismissed = es existiert ein Task mit Quelle in diesem Thread;
-  // suggested = Annotation hat action_items, aber noch kein Task.
-  const taskRow = db
-    .prepare(
-      `SELECT t.status, t.title, t.due_date, m.subject, b.text_plain, b.html_raw FROM tasks t
-       JOIN messages m ON t.source_kind = 'mail' AND m.id = t.source_id
-       JOIN folders f ON f.id = m.folder_id
-       LEFT JOIN message_bodies b ON b.message_id = m.id
-       WHERE m.thread_key = ?
-         AND coalesce(f.special_use, '') <> '\\Sent'
-         AND NOT EXISTS (SELECT 1 FROM accounts own WHERE lower(own.email) = lower(m.from_addr))
-       ORDER BY t.created_at DESC LIMIT 1`
-    )
-    .get(agg.thread_key) as
-    | {
-        status: string
-        title: string
-        due_date: string | null
-        subject: string | null
-        text_plain: string | null
-        html_raw: string | null
-      }
-    | undefined
-  const actionItem = db
-    .prepare(
-      `SELECT json_extract(a.action_items_json, '$[0].title') label,
-              json_extract(a.action_items_json, '$[0].due') due,
-              a.addressed_to_me,
-              m.to_json, m.cc_json, m.from_addr, m.subject, f.special_use,
-              acc.email account_email, acc.display_name account_display_name,
-              acc.account_name, b.text_plain, b.html_raw
-       FROM ai_annotations a JOIN messages m ON m.id = a.message_id
-       JOIN folders f ON f.id = m.folder_id
-       LEFT JOIN accounts acc ON acc.id = m.account_id
-       LEFT JOIN message_bodies b ON b.message_id = m.id
-       WHERE m.thread_key = ? AND json_array_length(coalesce(a.action_items_json, '[]')) > 0
-       ORDER BY m.date DESC LIMIT 1`
-    )
-    .get(agg.thread_key) as
-    | {
-        label: string | null
-        due: string | null
-        addressed_to_me: number
-        to_json: string | null
-        cc_json: string | null
-        from_addr: string | null
-        special_use: string | null
-        account_email: string | null
-        account_display_name: string | null
-        account_name: string | null
-        subject: string | null
-        text_plain: string | null
-        html_raw: string | null
-      }
-    | undefined
-  let taskState: 'suggested' | 'accepted' | 'dismissed' | 'none' = 'none'
-  let suggestedTask: { label: string; due: string | null } | null = null
-  const visibleTask =
-    taskRow &&
-    !isForwardWithoutRequest(
-      taskRow.subject,
-      taskRow.text_plain?.trim() || htmlToText(taskRow.html_raw ?? '')
-    )
-      ? taskRow
-      : undefined
-  if (visibleTask) {
-    taskState = visibleTask.status === 'dismissed' ? 'dismissed' : 'accepted'
-    suggestedTask = { label: visibleTask.title, due: visibleTask.due_date }
-  } else if (
-    actionItem?.label &&
-    !isSecurityNotification(latest.subject) &&
-    // Adressat-Gate: 'none' (Verteiler/Bcc, nur CC, fremde Anrede) zeigt auch
-    // keinen Vorschlag; 'suggest' und 'create' lassen den Streifen zu.
-    taskAddresseeVerdict({
-      accountEmail: actionItem.account_email,
-      displayName: actionItem.account_display_name,
-      accountName: actionItem.account_name,
-      toJson: actionItem.to_json,
-      ccJson: actionItem.cc_json,
-      bodyText: textBeforeForwardedMessage(
-        actionItem.subject,
-        actionItem.text_plain?.trim() || htmlToText(actionItem.html_raw ?? '')
-      ),
-      addressedToMe: actionItem.addressed_to_me !== 0
-    }) !== 'none' &&
-    !isUserAuthoredMail(db, actionItem.from_addr, actionItem.special_use) &&
-    !isForwardWithoutRequest(
-      actionItem.subject,
-      actionItem.text_plain?.trim() || htmlToText(actionItem.html_raw ?? '')
-    )
-  ) {
-    taskState = 'suggested'
-    suggestedTask = { label: actionItem.label, due: actionItem.due }
-  }
-  const maxPriority = ai
-    ? (
-        db
-          .prepare(
-            `SELECT max(a.priority) p FROM ai_annotations a
-             JOIN messages m ON m.id = a.message_id WHERE m.thread_key = ?`
-          )
-          .get(agg.thread_key) as { p: number | null }
-      ).p
-    : null
-
-  return {
-    threadKey: agg.thread_key,
-    accountId: agg.account_id,
-    accountColor: color ?? '#7c7ff2',
-    subject: latest?.subject ?? null,
-    snippet: latest?.snippet ?? null,
-    fromNames,
-    toNames,
-    date: agg.max_date,
-    messageCount: agg.cnt,
-    unread: agg.unread_cnt > 0,
-    flagged: agg.flagged === 1,
-    hasAttachments: agg.has_att === 1,
-    aiCategory: (ai?.cat as AiCategory) ?? null,
-    aiPriority: maxPriority,
-    aiSummary: ai?.summary ?? null,
-    needsReply: ai?.needs_reply === 1,
-    suggestedTask,
-    taskState
-  }
 }
 
 const THREAD_AGG_SELECT = `
@@ -219,18 +309,63 @@ export function listThreads(
   db: Database.Database,
   limit: number,
   accountId?: number,
-  mbox: 'inbox' | 'sent' | 'spam' = 'inbox'
+  mbox: 'inbox' | 'sent' | 'spam' = 'inbox',
+  folderId?: number
 ): ThreadListItem[] {
-  const where = `JOIN folders f ON m.folder_id = f.id WHERE f.special_use = ?`
+  // Folder view: exactly one folder. Otherwise the unified view across the
+  // special-use folders — \Junk thus only shows up when SPAM is explicitly selected.
+  const where =
+    folderId != null
+      ? `JOIN folders f ON m.folder_id = f.id WHERE f.id = ?`
+      : `JOIN folders f ON m.folder_id = f.id WHERE f.special_use = ?`
   const accountFilter = accountId != null ? ' AND m.account_id = ?' : ''
-  const params: unknown[] =
-    accountId != null ? [MBOX_SPECIAL[mbox], accountId, limit] : [MBOX_SPECIAL[mbox], limit]
+  const params: unknown[] = [folderId != null ? folderId : MBOX_SPECIAL[mbox]]
+  if (accountId != null) params.push(accountId)
+  params.push(limit)
+  // `+m.thread_key`: group via a temp B-tree instead of walking idx_msg_thread
+  // over every message of every folder; the scan then starts from the folder.
   const rows = db
     .prepare(
-      `${THREAD_AGG_SELECT} ${where}${accountFilter} GROUP BY m.thread_key ORDER BY max_date DESC LIMIT ?`
+      `${THREAD_AGG_SELECT} ${where}${accountFilter} GROUP BY +m.thread_key ORDER BY max_date DESC LIMIT ?`
     )
     .all(...params) as ThreadAggRow[]
-  return rows.map((agg) => buildThreadItem(db, agg))
+  return metrics.time('db.threads.buildItems', () => buildThreadItems(db, rows), {
+    rows: rows.length
+  })
+}
+
+/**
+ * Folder tree per account for the folder view: only folders with envelopes
+ * (full sync). Trash/Drafts/"All Mail" stay out.
+ */
+export const LIST_FOLDERS_SQL = `SELECT f.id, f.account_id, f.path, f.delimiter, f.special_use,
+       count(DISTINCT m.thread_key) AS threads,
+       count(DISTINCT CASE WHEN m.seen = 0 THEN m.thread_key END) AS unread
+  FROM folders f LEFT JOIN messages m ON m.folder_id = f.id
+  WHERE f.sync_mode = 'full'
+  GROUP BY f.id
+  ORDER BY f.account_id, f.path COLLATE NOCASE`
+
+export function listFolders(db: Database.Database): FolderListItem[] {
+  const rows = db.prepare(LIST_FOLDERS_SQL).all() as Array<{
+    id: number
+    account_id: number
+    path: string
+    delimiter: string | null
+    special_use: string | null
+    threads: number
+    unread: number
+  }>
+  return rows.map((r) => ({
+    id: r.id,
+    accountId: r.account_id,
+    path: r.path,
+    name: folderLeaf(r.path, r.delimiter),
+    delimiter: r.delimiter,
+    role: folderRole(r.special_use),
+    threadCount: r.threads,
+    unreadCount: r.unread
+  }))
 }
 
 export function imagesAllowKey(addr: string): string {
@@ -256,8 +391,8 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
      ORDER BY CAST(part_id AS INTEGER), id`
   )
   const allowStmt = db.prepare('SELECT value FROM settings WHERE key = ?')
-  // Local only: keine automatischen Remote-Bilder — weder Absender-Freigabe noch
-  // globaler Default greifen; „Bilder anzeigen" pro Nachricht bleibt möglich.
+  // Local only: no automatic remote images — neither sender approval nor
+  // the global default apply; "show images" per message stays possible.
   const localOnly =
     (allowStmt.get('privacy.localOnly') as { value: string } | undefined)?.value === '1'
   return rows.map((r) => {
@@ -285,10 +420,10 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
       listUnsubscribe: r.list_unsubscribe === 1,
       remoteImagesAllowed:
         !localOnly &&
-        // Default BLOCKIERT (Design 3b, Privacy-Versprechen): Remote-Bilder
-        // laden nur, wenn der Nutzer es global erlaubt hat ('1') ODER der
-        // Absender auf der Freigabeliste steht. Explizit gespeicherte Werte
-        // ('1'/'0') behalten ihre Bedeutung — nur der ungesetzte Default dreht.
+        // Default BLOCKED (design 3b, privacy promise): remote images
+        // load only if the user allowed it globally ('1') OR the
+        // sender is on the allowlist. Explicitly stored values
+        // ('1'/'0') keep their meaning — only the unset default flips.
         ((allowStmt.get('mail.remoteImagesDefault') as { value: string } | undefined)?.value ===
           '1' ||
           (
@@ -316,20 +451,21 @@ export function getThreadMessages(db: Database.Database, threadKey: string): Mes
   })
 }
 
-/** Thread-Zähler je Ordner (für die Segmented-Control), optional je Konto. */
+/**
+ * Thread counts per folder (for the segmented control), optionally per account.
+ * Starts from the folders (a folder belongs to exactly one account) and counts
+ * from the covering index idx_msg_folder_thread, without reading message rows.
+ */
+export const MBOX_COUNT_SQL = `SELECT count(DISTINCT m.thread_key) n FROM folders f
+  CROSS JOIN messages m ON m.folder_id = f.id
+  WHERE f.special_use = ? AND (? IS NULL OR f.account_id = ?)`
+
 export function mboxCounts(
   db: Database.Database,
   accountId?: number
 ): { inbox: number; sent: number; spam: number } {
   const row = (special: string): number =>
-    (
-      db
-        .prepare(
-          `SELECT count(DISTINCT m.thread_key) n FROM messages m
-           JOIN folders f ON m.folder_id = f.id
-           WHERE f.special_use = ? AND (? IS NULL OR m.account_id = ?)`
-        )
-        .get(special, accountId ?? null, accountId ?? null) as { n: number }
-    ).n
+    (db.prepare(MBOX_COUNT_SQL).get(special, accountId ?? null, accountId ?? null) as { n: number })
+      .n
   return { inbox: row('\\Inbox'), sent: row('\\Sent'), spam: row('\\Junk') }
 }

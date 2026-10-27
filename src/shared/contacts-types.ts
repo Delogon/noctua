@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-/** CardDAV-Kontakte eines Kalender-Kontos (Phase 3.1, nur lesend). */
+/** CardDAV contacts of a calendar account (phase 3.1, read-only). */
 export const davAddressBookSchema = z.object({
   id: z.number(),
   displayName: z.string().max(500),

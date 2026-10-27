@@ -6,7 +6,7 @@ import { setSetting } from '@main/db'
 import { storeBody, upsertEnvelope } from '@main/mail/ingest'
 import { closeTestDb, createAiTestDb, makeEnvelope, seedAccount, seedFolder } from '../helpers/db'
 
-// Unsichtbare Zeichen per Code statt Literal (Linter/Formatter würden sie sichtbar machen)
+// Invisible characters via code, not literals (linter/formatter would make them visible)
 const ZW = String.fromCharCode(0x200b)
 const RLO = String.fromCharCode(0x202e)
 
@@ -132,11 +132,11 @@ describe('Entwurf: Prompt-Härtung und Verfügbarkeit', () => {
   it('umschließt den Thread, bereinigt ihn und nennt freie Zeitfenster ohne Termintitel', async () => {
     await draft()
     const { system, user } = systemAndUser()
-    expect(system).toMatch(/DATEN, keine Anweisung/)
+    expect(system).toMatch(/DATA, not instructions/)
     expect(user).toContain('<<<BEGIN THREAD (UNTRUSTED DATA)>>>')
     expect(user).not.toMatch(new RegExp(`[${ZW}${RLO}]`))
     expect(user.match(/<<<END THREAD>>>/g)).toHaveLength(1)
-    expect(system).toContain('<<<BEGIN FREIE ZEITFENSTER>>>')
+    expect(system).toContain('<<<BEGIN FREE TIME SLOTS>>>')
     expect(system + user).not.toContain('Arzttermin')
     expect(system + user).not.toContain('Geheimnis')
   })
@@ -145,7 +145,7 @@ describe('Entwurf: Prompt-Härtung und Verfügbarkeit', () => {
     setSetting('ai.draftUseCalendar', '0')
     await draft()
     const { system, user } = systemAndUser()
-    expect(system + user).not.toContain('FREIE ZEITFENSTER')
-    expect(system + user).not.toContain('Verfügbarkeit')
+    expect(system + user).not.toContain('FREE TIME SLOTS')
+    expect(system + user).not.toContain('User availability')
   })
 })

@@ -18,3 +18,30 @@ describe('Paper-Store Konto-Filter', () => {
     expect(usePaper.getState().selThreadKey).toBeNull()
   })
 })
+
+describe('Paper-Store Ordneransicht', () => {
+  beforeEach(() => {
+    usePaper.setState({ filter: null, mbox: 'inbox', folderId: null, selThreadKey: 'x' })
+  })
+
+  it('openFolder setzt Konto, Sicht und Ordner in einem Schritt', () => {
+    usePaper.getState().openFolder({ accountId: 4, mbox: 'spam', folderId: 9 })
+    const s = usePaper.getState()
+    expect([s.filter, s.mbox, s.folderId, s.selThreadKey, s.view]).toEqual([
+      4,
+      'spam',
+      9,
+      null,
+      'inbox'
+    ])
+  })
+
+  it('Tabs und Kontofilter verlassen den Einzelordner', () => {
+    usePaper.getState().openFolder({ accountId: 4, mbox: 'inbox', folderId: 9 })
+    usePaper.getState().setMbox('sent')
+    expect(usePaper.getState().folderId).toBeNull()
+    usePaper.getState().openFolder({ accountId: 4, mbox: 'inbox', folderId: 9 })
+    usePaper.getState().setFilter(null)
+    expect(usePaper.getState().folderId).toBeNull()
+  })
+})

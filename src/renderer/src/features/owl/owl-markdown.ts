@@ -1,10 +1,10 @@
 /**
- * Miniatur-Markdown für Eulen-Antworten — genau die Teilmenge, die die
- * Modelle tatsächlich produzieren: **fett**, *kursiv*, `Code`, - /1. Listen,
- * ###-Überschriften und [n]-Quellenverweise. Bewusst ohne Dependency und
- * ohne HTML: der Parser liefert eine Struktur, gerendert wird mit React-
- * Elementen (kein dangerouslySetInnerHTML). Läuft auch auf halbfertigen
- * Streaming-Texten — unvollständige Auszeichnung bleibt einfach Klartext.
+ * Miniature Markdown for owl answers — exactly the subset the
+ * models actually produce: **bold**, *italic*, `code`, - /1. lists,
+ * ### headings and [n] source references. Deliberately without a dependency and
+ * without HTML: the parser returns a structure, rendering uses React
+ * elements (no dangerouslySetInnerHTML). Also works on half-finished
+ * streaming texts — incomplete markup simply stays plain text.
  */
 
 export type OwlInline =
@@ -21,7 +21,7 @@ export type OwlBlock =
 
 const INLINE_RE = /(\*\*([^*\n]+)\*\*)|(\*([^*\n]+)\*)|(`([^`\n]+)`)|(\[(\d{1,3})\])/g
 
-/** Zerlegt eine Zeile in Inline-Stücke; unvollständige Marker bleiben Text. */
+/** Splits a line into inline pieces; incomplete markers stay text. */
 export function parseInlines(line: string): OwlInline[] {
   const out: OwlInline[] = []
   let pos = 0
@@ -38,10 +38,10 @@ export function parseInlines(line: string): OwlInline[] {
 }
 
 /**
- * Sammelt die im Antworttext zitierten [n]-Indizes — Reihenfolge des ersten
- * Auftretens, ohne Duplikate. Läuft über denselben Parser wie das Rendering:
- * gezählt wird genau, was dort als Quellverweis klickbar würde (ein [n] in
- * einem Code-Span etwa nicht).
+ * Collects the [n] indices cited in the answer text — in order of first
+ * occurrence, without duplicates. Uses the same parser as rendering:
+ * it counts exactly what would be clickable there as a source reference (an [n] in
+ * a code span, for instance, would not).
  */
 export function citedSourceIndices(text: string): number[] {
   const seen = new Set<number>()
@@ -60,7 +60,7 @@ const BULLET_RE = /^\s*[-*•]\s+(.*)$/
 const ORDERED_RE = /^\s*\d{1,3}[.)]\s+(.*)$/
 const HEADING_RE = /^#{1,4}\s+(.*)$/
 
-/** Zerlegt den Antworttext in Blöcke (Absätze, Listen, Überschriften). */
+/** Splits the answer text into blocks (paragraphs, lists, headings). */
 export function parseOwlMarkdown(text: string): OwlBlock[] {
   const blocks: OwlBlock[] = []
   let paragraph: OwlInline[][] = []
@@ -102,8 +102,8 @@ export function parseOwlMarkdown(text: string): OwlBlock[] {
       continue
     }
     flushList()
-    // Volle **Fett**-Zeile wirkt wie eine Zwischenüberschrift (häufiges
-    // Modell-Muster) — als eigener Absatz beginnen, damit sie freisteht.
+    // A full **bold** line acts like a subheading (common
+    // model pattern) — start it as its own paragraph so it stands alone.
     if (/^\*\*[^*]+\*\*:?$/.test(line.trim())) {
       flushParagraph()
       blocks.push({ kind: 'heading', inlines: parseInlines(line.trim()) })

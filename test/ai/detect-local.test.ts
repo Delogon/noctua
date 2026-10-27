@@ -39,7 +39,7 @@ describe('detectLocalServers', () => {
       'http://127.0.0.1:11434/v1': { data: [{ id: 'qwen3:30b' }, { id: 'llama3.2:3b' }] },
       'http://localhost:11434/v1': { data: [{ id: 'llama3.2:3b' }] },
       'http://127.0.0.1:1234/v1': { data: [{ id: 'gemma-3-12b' }] },
-      // llama.cpp: `models` statt `data`
+      // llama.cpp: `models` instead of `data`
       'http://127.0.0.1:8080/v1': { models: [{ model: 'm.gguf' }] }
     })
     const { found } = await detectLocalServers()

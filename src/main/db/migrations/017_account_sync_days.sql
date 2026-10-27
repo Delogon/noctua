@@ -1,3 +1,3 @@
--- Sync-Zeitraum pro Konto: NULL = Standard (90 Tage Liste / 183 Tage Suche),
--- 0 = alles synchronisieren, sonst Anzahl Tage für Liste UND Suche.
+-- Sync period per account: NULL = default (90 days list / 183 days search),
+-- 0 = sync everything, otherwise number of days for list AND search.
 ALTER TABLE accounts ADD COLUMN sync_days INTEGER;

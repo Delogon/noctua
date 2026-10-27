@@ -1,3 +1,3 @@
-// Die Heuristik liegt in shared/, damit der Renderer beim Anlegen eines Profils
-// denselben Vorschlag fürs lokal-Flag machen kann.
+// The heuristic lives in shared/ so the renderer can make the same suggestion for
+// the local flag when creating a profile.
 export { hostOf, suggestIsLocal } from '@shared/local-host'

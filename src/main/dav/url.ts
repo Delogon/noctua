@@ -1,4 +1,4 @@
-/** URL-Helfer für den WebDAV-Client: Transport-Regeln und Href-Normalisierung. */
+/** URL helpers for the WebDAV client: transport rules and href normalization. */
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
 
@@ -14,8 +14,8 @@ export class InsecureUrlError extends Error {
 }
 
 /**
- * Zugangsdaten gehen nur über HTTPS raus. http:// ist ausschließlich für
- * Loopback erlaubt (lokaler Radicale/Baïkal zum Testen).
+ * Credentials only go out over HTTPS. http:// is allowed exclusively for
+ * loopback (local Radicale/Baïkal for testing).
  */
 export function assertSecureUrl(url: URL): void {
   if (url.protocol === 'https:') return
@@ -27,7 +27,7 @@ export function assertSecureUrl(url: URL): void {
   )
 }
 
-/** Parst eine vom Nutzer eingegebene Server-Adresse (ohne Schema → https://). */
+/** Parses a server address entered by the user (without scheme → https://). */
 export function parseServerInput(raw: string): URL {
   const trimmed = raw.trim()
   if (!trimmed) throw new Error('Server-Adresse fehlt')
@@ -63,22 +63,22 @@ function canonicalSegment(segment: string): string {
 }
 
 /**
- * Normalisierter Pfad eines Hrefs (absolut oder relativ zu `base`): gleiche
- * Ressource → gleicher String, auch wenn der Server mal `%40`, mal `@`
- * schickt. Wird als Schlüssel in der DB und für Vergleiche benutzt.
+ * Normalized path of an href (absolute or relative to `base`): same
+ * resource → same string, even if the server sometimes sends `%40` and sometimes `@`.
+ * Used as a key in the DB and for comparisons.
  */
 export function normalizeHref(href: string, base: string | URL): string {
   const url = new URL(href, base)
   return url.pathname.split('/').map(canonicalSegment).join('/')
 }
 
-/** Normalisierter Pfad mit abschließendem Slash (für Collections). */
+/** Normalized path with trailing slash (for collections). */
 export function normalizeCollectionHref(href: string, base: string | URL): string {
   const p = normalizeHref(href, base)
   return p.endsWith('/') ? p : `${p}/`
 }
 
-/** Absolute URL zu einem gespeicherten Pfad auf dem Server `origin`. */
+/** Absolute URL for a stored path on the server `origin`. */
 export function hrefToUrl(href: string, base: string | URL): string {
   return new URL(href, base).toString()
 }
@@ -88,10 +88,10 @@ export function sameOrigin(a: URL, b: URL): boolean {
 }
 
 /**
- * Gehört `candidate` zum selben Anbieter wie `anchor`? (gleicher Origin oder
- * gleiche Registrierungs-Domain, z. B. caldav.icloud.com → p01-caldav.icloud.com).
- * Schützt davor, dass ein Server per href die Zugangsdaten auf einen fremden
- * Host umlenkt.
+ * Does `candidate` belong to the same provider as `anchor`? (same origin or
+ * same registrable domain, e.g. caldav.icloud.com → p01-caldav.icloud.com).
+ * Protects against a server redirecting the credentials to a foreign
+ * host via href.
  */
 export function isRelatedHost(anchor: URL, candidate: URL): boolean {
   if (sameOrigin(anchor, candidate)) return true

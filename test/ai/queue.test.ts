@@ -12,7 +12,7 @@ vi.mock('@main/ai/triage', () => ({
 }))
 vi.mock('@main/notifications', () => ({ maybeNotify: vi.fn(), updateBadge: vi.fn() }))
 
-import { AiQueue, classifyAiError } from '@main/ai/queue'
+import { AiQueue, TRIAGE_DISCOVERY_SQL, TRIAGE_WINDOW_MS, classifyAiError } from '@main/ai/queue'
 
 interface JobRow {
   status: string
@@ -106,12 +106,12 @@ describe('AiQueue (REL-2)', () => {
     queue.kick()
     await vi.waitFor(() => expect(runTriage.mock.calls.length).toBeGreaterThanOrEqual(5))
     await new Promise((r) => setTimeout(r, 50))
-    // Parallelität 2: ein bereits gestarteter Job kann die Schwelle überholen
+    // Concurrency 2: an already started job can overshoot the threshold
     const calls = runTriage.mock.calls.length
     expect(calls).toBeLessThanOrEqual(6)
-    // kein Job wurde als error verbraucht
+    // no job was consumed as error
     for (const id of ids) expect(job(id).status).not.toBe('error')
-    // weiteres kick() während der Pause startet nichts
+    // further kick() during the pause starts nothing
     queue.kick()
     await new Promise((r) => setTimeout(r, 30))
     expect(runTriage.mock.calls.length).toBe(calls)
@@ -153,5 +153,69 @@ describe('Budget-Settings (REL-2)', () => {
     setSetting('ai.monthlyBudgetUsd', '0')
     expect(getDailyBudgetUsd()).toBe(1.25)
     expect(getMonthlyBudgetUsd()).toBe(0)
+  })
+})
+
+describe('triage discovery', () => {
+  let db: Database.Database
+  afterEach(() => closeTestDb(db))
+
+  it('enqueues recent Inbox mails with a body from AI-enabled accounts only', () => {
+    db = createTestDb()
+    const account = seedAccount(db, { email: 'tim@test.de' })
+    const inbox = seedFolder(db, account, '\\Inbox', 'INBOX')
+    const archive = seedFolder(db, account, '\\Archive', 'Archive')
+    const off = seedAccount(db, { email: 'off@test.de' })
+    db.prepare('UPDATE accounts SET ai_enabled = 0 WHERE id = ?').run(off)
+    const offInbox = seedFolder(db, off, '\\Inbox', 'INBOX')
+    const now = Date.now()
+    const day = 24 * 3600_000
+    let uid = 0
+    const add = (
+      folder: number,
+      accountId: number,
+      over: { date?: number | null; internalDate?: number; body?: 'full' | 'none' }
+    ): number => {
+      uid += 1
+      const id = upsertEnvelope(
+        db,
+        accountId,
+        folder,
+        makeEnvelope({
+          uid,
+          messageId: `<d${uid}@test>`,
+          date: over.date === undefined ? now - day : over.date,
+          internalDate: over.internalDate ?? now - day
+        })
+      )!.messageId
+      db.prepare('UPDATE messages SET body_state = ? WHERE id = ?').run(over.body ?? 'full', id)
+      return id
+    }
+    const recent = add(inbox, account, {})
+    const internalOnly = add(inbox, account, { date: null, internalDate: now - 2 * day })
+    add(inbox, account, { date: now - 40 * day, internalDate: now - 40 * day })
+    add(inbox, account, { body: 'none' })
+    add(archive, account, {})
+    add(offInbox, off, {})
+
+    db.prepare(TRIAGE_DISCOVERY_SQL).run(now - TRIAGE_WINDOW_MS, 1)
+    const jobs = db
+      .prepare(`SELECT message_id FROM ai_jobs WHERE kind = 'triage' ORDER BY message_id`)
+      .pluck()
+      .all()
+    expect(jobs).toEqual([recent, internalOnly])
+  })
+
+  it('seeks the date window per Inbox instead of scanning all messages', () => {
+    db = createTestDb()
+    const plan = (
+      db.prepare(`EXPLAIN QUERY PLAN ${TRIAGE_DISCOVERY_SQL}`).all(0, 1) as Array<{
+        detail: string
+      }>
+    )
+      .map((row) => row.detail)
+      .join('\n')
+    expect(plan).toMatch(/SEARCH m USING INDEX idx_msg_folder_date \(folder_id=\? AND <expr>>\?\)/)
+    expect(plan).not.toMatch(/SCAN m\b/)
   })
 })

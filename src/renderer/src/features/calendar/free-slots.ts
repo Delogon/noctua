@@ -1,6 +1,6 @@
-// Gemeinsame freie Zeit mehrerer Teilnehmer: reine Logik für den Verfügbarkeitsstreifen und
-// „nächster gemeinsamer freier Termin" im Termin-Editor. Alles in lokaler Zeit (Wandzeit der
-// Systemzone), Tage per Date-Konstruktor — damit sind Sommerzeit-Wechsel kein Sonderfall.
+// Shared free time of several attendees: pure logic for the availability strip and
+// "next common free slot" in the event editor. Everything in local time (wall time of the
+// system zone), days via the Date constructor — so DST changes are not a special case.
 
 export interface Interval {
   startUtc: number
@@ -9,7 +9,7 @@ export interface Interval {
 
 const STEP_MS = 15 * 60_000
 
-/** Sortiert und verschmilzt überlappende/aneinanderstoßende Intervalle; leere fallen weg. */
+/** Sorts and merges overlapping/adjacent intervals; empty ones are dropped. */
 export function mergeIntervals(list: readonly Interval[]): Interval[] {
   const out: Interval[] = []
   for (const b of [...list]
@@ -22,34 +22,34 @@ export function mergeIntervals(list: readonly Interval[]): Interval[] {
   return out
 }
 
-/** Lokale Uhrzeit `hour` am Tag von `dayMs`. */
+/** Local hour `hour` on the day of `dayMs`. */
 export function localDayAt(dayMs: number, hour: number): number {
   const d = new Date(dayMs)
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour).getTime()
 }
 
-/** Beginn der nächsten Viertelstunde (>= ms). */
+/** Start of the next quarter hour (>= ms). */
 function ceilStep(ms: number): number {
   return Math.ceil(ms / STEP_MS) * STEP_MS
 }
 
 export interface CommonSlotOptions {
-  /** Belegung je Person; Personen ohne Auskunft gehören nicht hierher */
+  /** Busy times per person; people without info do not belong here */
   busy: ReadonlyArray<readonly Interval[]>
   durationMs: number
-  /** Frühester Beginn (z. B. jetzt) */
+  /** Earliest start (e.g. now) */
   fromMs: number
-  /** Arbeitstage Mo–Fr ab dem Tag von fromMs, Standard 10 */
+  /** Workdays Mon–Fri from the day of fromMs, default 10 */
   workingDays?: number
   startHour?: number
   endHour?: number
 }
 
-/** Die nächsten `count` Arbeitstage (Mo–Fr) als lokale Tagesanfänge. */
+/** The next `count` workdays (Mon–Fri) as local starts of day. */
 export function workingDayStarts(fromMs: number, count: number): number[] {
   const first = new Date(fromMs)
   const out: number[] = []
-  // Obergrenze gegen Endlosschleifen: 10 Arbeitstage = höchstens ~14 Kalendertage
+  // Upper bound against endless loops: 10 workdays = at most ~14 calendar days
   for (let i = 0; i < count * 3 + 7 && out.length < count; i++) {
     const d = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i)
     const wd = d.getDay()
@@ -59,9 +59,9 @@ export function workingDayStarts(fromMs: number, count: number): number[] {
 }
 
 /**
- * Erstes Zeitfenster der gegebenen Dauer, in dem niemand belegt ist: auf Viertelstunden
- * gerastert, innerhalb der Arbeitszeit (Standard 08–18), nie vor `fromMs`. Null, wenn
- * innerhalb der Arbeitstage nichts frei ist (oder die Dauer nicht in einen Arbeitstag passt).
+ * First time window of the given duration in which nobody is busy: snapped to quarter
+ * hours, within working hours (default 08–18), never before `fromMs`. Null if
+ * nothing is free within the workdays (or the duration does not fit into a workday).
  */
 export function findCommonFreeSlot(opts: CommonSlotOptions): Interval | null {
   const { durationMs } = opts
@@ -85,13 +85,13 @@ export function findCommonFreeSlot(opts: CommonSlotOptions): Interval | null {
 }
 
 export interface StripSegment {
-  /** Anteile 0..1 der Streifenbreite */
+  /** Fractions 0..1 of the strip width */
   from: number
   to: number
   tentative: boolean
 }
 
-/** Belegung als Anteile eines Fensters [winStart, winEnd) für die Streifen-Darstellung. */
+/** Busy times as fractions of a window [winStart, winEnd) for the strip display. */
 export function stripSegments(
   busy: ReadonlyArray<Interval & { type?: string }>,
   winStart: number,
@@ -113,12 +113,12 @@ export function stripSegments(
   return out.sort((a, b) => a.from - b.from)
 }
 
-/** Überschneidet der Zeitraum eine Belegung? */
+/** Does the time range overlap a busy time? */
 export function conflictsWith(busy: readonly Interval[], slot: Interval): boolean {
   return busy.some((b) => b.endUtc > slot.startUtc && b.startUtc < slot.endUtc)
 }
 
-/** Lokale Wandzeit 'YYYY-MM-DD' + 'HH:mm' als Zeitstempel; NaN bei ungültiger Eingabe. */
+/** Local wall time 'YYYY-MM-DD' + 'HH:mm' as a timestamp; NaN for invalid input. */
 export function wallToLocalMs(date: string, time: string): number {
   const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
   const t = /^(\d{2}):(\d{2})$/.exec(time)

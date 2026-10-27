@@ -1,8 +1,8 @@
 /**
- * Extraktive Zusammenfassung ohne KI (Hybrid-Triage): der erste sinnvolle Satz
- * des Textes, bereinigt, höchstens 140 Zeichen. Fällt auf den Betreff zurück.
- * Gilt für Mails, bei denen das Entscheidungsmodell „unwichtig" sagt – ein
- * Textmodell wäre dafür Verschwendung.
+ * Extractive summary without AI (hybrid triage): the first meaningful sentence
+ * of the text, cleaned, at most 140 characters. Falls back to the subject.
+ * Applies to mails the decision model calls "unimportant" – a
+ * text model would be wasted on them.
  */
 
 const MAX_LEN = 140
@@ -32,14 +32,14 @@ export function extractiveSummary(subject: string | null, body: string | null): 
   const fallback = shorten(clean(subject ?? '')) || 'Kein Textinhalt'
   const lines = (body ?? '').replace(/\r\n?/g, '\n').split('\n')
   for (const raw of lines) {
-    // Zitate und Signaturtrenner beenden die Suche nicht, werden aber übersprungen
+    // Quotes and signature separators don't end the search, but are skipped
     if (/^\s*>/.test(raw)) continue
     if (/^\s*--\s*$/.test(raw)) break
     const line = clean(raw)
     if (line.length < 20) continue
     if (GREETING.test(line) || NOISE_LINE.test(line)) continue
     if (!/\p{L}{3,}/u.test(line)) continue
-    // erster Satz der Zeile (Punkt/!/? gefolgt von Leerraum und Großbuchstabe/Ziffer)
+    // first sentence of the line (period/!/? followed by whitespace and an uppercase letter/digit)
     const sentence = line.split(/(?<=[.!?])\s+(?=[\p{Lu}\d„"])/u)[0]
     const picked = sentence.length >= 20 ? sentence : line
     return shorten(picked)

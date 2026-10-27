@@ -17,7 +17,7 @@ describe('migrations', () => {
 
   it('wenden alle Migrationen sauber an und setzen user_version', () => {
     db = createTestDb()
-    expect(db.pragma('user_version', { simple: true })).toBe(33)
+    expect(db.pragma('user_version', { simple: true })).toBe(40)
   })
 
   it('erzwingt eindeutige Postfachnamen unabhängig von Großschreibung', () => {
@@ -166,7 +166,7 @@ describe('migrations', () => {
 
   it('erlaubt oauth-google und erhält Daten + Fremdschlüssel beim accounts-Neubau', () => {
     db = createTestDb()
-    // Bestand überlebt den Neubau: Konto + Ordner + Nachricht bleiben verknüpft
+    // Existing data survives the rebuild: account + folder + message stay linked
     const acc = seedAccount(db, { email: 'bestand@test.de' })
     const folder = seedFolder(db, acc, '\\Inbox')
     upsertEnvelope(db, acc, folder, makeEnvelope({ uid: 1, messageId: '<bestand@t>' }))
@@ -174,14 +174,14 @@ describe('migrations', () => {
       n: 1
     })
 
-    // Neuer credential_type wird angenommen …
+    // New credential_type is accepted …
     db.prepare(
       `INSERT INTO accounts (email, account_name, provider, credential_type,
         imap_host, imap_port, smtp_host, smtp_port, created_at)
        VALUES ('oauth@gmail.com', 'OAuth', 'gmail', 'oauth-google',
         'imap.gmail.com', 993, 'smtp.gmail.com', 465, 1)`
     ).run()
-    // … Unsinn weiterhin nicht
+    // … nonsense still is not
     expect(() =>
       db
         .prepare(
@@ -193,7 +193,7 @@ describe('migrations', () => {
         .run()
     ).toThrow(/CHECK constraint/)
 
-    // Trigger und Namens-Index haben den Neubau überlebt
+    // Triggers and name index survived the rebuild
     expect(() =>
       db
         .prepare(
@@ -204,7 +204,7 @@ describe('migrations', () => {
         .run()
     ).toThrow(/Postfachname fehlt/)
 
-    // ON DELETE CASCADE der Kinder zeigt weiter auf die neue Tabelle
+    // The children's ON DELETE CASCADE still points to the new table
     db.prepare('DELETE FROM accounts WHERE id = ?').run(acc)
     expect(db.prepare('SELECT count(*) n FROM messages WHERE account_id = ?').get(acc)).toEqual({
       n: 0
@@ -225,7 +225,7 @@ describe('migrations', () => {
     db = createTestDb()
     const { runMigrations } = await import('@main/db/migrate')
     const result = runMigrations(db)
-    expect(result).toEqual({ from: 33, to: 33 })
+    expect(result).toEqual({ from: 40, to: 40 })
   })
 
   it('bereinigt Aufgaben aus kontenuebergreifenden Selbst-Sends', async () => {
@@ -255,8 +255,8 @@ describe('migrations', () => {
        VALUES ('mail', ?, ?, 'Falsche Aufgabe', 'open', 1)`
     ).run(messageId, receiver)
 
-    // Eine echte v11-DB besitzt die M13/M14/M15/M19/M20/M23-Strukturen noch nicht. Der Test startet
-    // sonst zwar bei user_version 11, behaelt aber physisch das aktuelle Schema.
+    // A real v11 DB does not yet have the M13/M14/M15/M19/M20/M23 structures. Otherwise the test
+    // starts at user_version 11 but physically keeps the current schema.
     db.exec(`
       ALTER TABLE ai_annotations DROP COLUMN addressed_to_me;
       ALTER TABLE followups DROP COLUMN nudged_at;
@@ -278,10 +278,15 @@ describe('migrations', () => {
       );
       ALTER TABLE folders DROP COLUMN envelope_backfill_since;
       ALTER TABLE folders DROP COLUMN body_backfill_since;
+      ALTER TABLE folders DROP COLUMN delimiter;
+      ALTER TABLE ai_decisions DROP COLUMN spam;
+      DROP TABLE mail_threat_checks;
+      DROP INDEX IF EXISTS idx_msg_body_pending;
+      ALTER TABLE messages DROP COLUMN body_attempts;
     `)
     db.pragma('user_version = 11')
     const { runMigrations } = await import('@main/db/migrate')
-    expect(runMigrations(db)).toEqual({ from: 11, to: 33 })
+    expect(runMigrations(db)).toEqual({ from: 11, to: 40 })
     expect(db.prepare('SELECT count(*) count FROM tasks').get()).toEqual({ count: 0 })
     expect(
       db
@@ -321,14 +326,19 @@ describe('migrations', () => {
       const conn = openFileDb(path)
       runMigrations(conn)
       conn.exec(`INSERT INTO settings (key, value) VALUES ('probe', 'x')`)
-      // Zustand von v22 simulieren: Migration 23+ steht wieder aus
+      // Simulate the v22 state: migration 23+ is pending again
       conn.exec(`ALTER TABLE contact_stats DROP COLUMN display_name`)
       conn.exec(`DROP INDEX IF EXISTS idx_op_queue_status`)
       conn.exec(`ALTER TABLE op_queue DROP COLUMN status`)
       conn.exec(`ALTER TABLE op_queue DROP COLUMN last_error`)
+      conn.exec(`ALTER TABLE folders DROP COLUMN delimiter`)
+      conn.exec(`ALTER TABLE ai_decisions DROP COLUMN spam`)
+      conn.exec(`DROP TABLE mail_threat_checks`)
+      conn.exec(`DROP INDEX IF EXISTS idx_msg_body_pending`)
+      conn.exec(`ALTER TABLE messages DROP COLUMN body_attempts`)
       conn.pragma('user_version = 22')
 
-      expect(runMigrations(conn)).toEqual({ from: 22, to: 33 })
+      expect(runMigrations(conn)).toEqual({ from: 22, to: 40 })
       const backup = `${path}.bak-v22`
       expect(existsSync(backup)).toBe(true)
       const bak = new Database(backup)

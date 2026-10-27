@@ -17,8 +17,8 @@ function autoCreateEnabled(): boolean {
 }
 
 /**
- * Login-/Security-Benachrichtigungen erzeugen nie Aufgaben (Triage v4 verbietet
- * es dem Modell; dieser Guard fängt Ausreißer und Alt-Annotationen ab).
+ * Login/security notifications never create tasks (triage v4 forbids
+ * it to the model; this guard catches outliers and old annotations).
  */
 export function isSecurityNotification(subject: string | null | undefined): boolean {
   if (!subject) return false
@@ -28,9 +28,9 @@ export function isSecurityNotification(subject: string | null | undefined): bool
 }
 
 /**
- * Eine Nachricht stammt vom Nutzer selbst, wenn sie im Gesendet-Ordner liegt
- * oder ihr Absender einer beliebigen verbundenen Adresse entspricht. Letzteres
- * deckt Kopien ab, die von Konto A an das ebenfalls verbundene Konto B gingen.
+ * A message comes from the user themselves if it is in the Sent folder
+ * or its sender matches any connected address. The latter
+ * covers copies sent from account A to account B, which is also connected.
  */
 export function isUserAuthoredMail(
   db: Database.Database,
@@ -54,9 +54,9 @@ function taskCategories(): Set<string> {
 }
 
 /**
- * Legt Aufgaben aus einer Triage-Annotation an. Regeln: global aktivierbar,
- * nur konfigurierte Kategorien; needs_reply erzeugt eine „Antworten"-Aufgabe.
- * Dedupe über UNIQUE(source_kind, source_id, title).
+ * Creates tasks from a triage annotation. Rules: globally toggleable,
+ * configured categories only; needs_reply creates an "Antworten" task.
+ * Dedupe via UNIQUE(source_kind, source_id, title).
  */
 export function createTasksFromTriage(
   db: Database.Database,
@@ -73,9 +73,9 @@ export function createTasksFromTriage(
     ownerAccountName?: string | null
     toJson?: string | null
     ccJson?: string | null
-    /** Eigener Mailtext (ohne weitergeleiteten Block) für die Anrede-Analyse. */
+    /** Own mail text (without forwarded block) for the salutation analysis. */
     bodyText?: string | null
-    /** addressed_to_me aus der Triage; fehlend = true (Alt-Annotationen). */
+    /** addressed_to_me from the triage; missing = true (old annotations). */
     addressedToMe?: boolean | null
     fromAddr?: string | null
     folderSpecialUse?: string | null
@@ -85,8 +85,8 @@ export function createTasksFromTriage(
   if (!autoCreateEnabled()) return 0
   if (!taskCategories().has(params.category)) return 0
   if (isSecurityNotification(params.subject)) return 0
-  // Adressat-Gate: nur 'create' darf automatisch anlegen; 'suggest' bleibt
-  // dem Vorschlags-Streifen überlassen, 'none' unterdrückt beides.
+  // Addressee gate: only 'create' may create automatically; 'suggest' is left
+  // to the suggestion strip, 'none' suppresses both.
   const verdict = taskAddresseeVerdict({
     accountEmail: params.accountEmail,
     displayName: params.ownerDisplayName,
@@ -135,7 +135,7 @@ export function createTasksFromTriage(
     )
     created += result.changes
   }
-  // CalDAV-Aufgabenliste (falls aktiv): neue aktive Aufgaben einreihen
+  // CalDAV task list (if active): enqueue new active tasks
   if (created > 0) afterLocalTaskChange(db)
   return created
 }
@@ -245,7 +245,28 @@ export function countOpenTasks(db: Database.Database): number {
   ).length
 }
 
-/** Entfernt alte automatische Aufgaben, die nur aus FYI-Weiterleitungen stammen. */
+/** Settings flag: the forward cleanup below already ran on this database. */
+export const FORWARD_TASK_CLEANUP_FLAG = 'tasks.forwardCleanupDone'
+
+/**
+ * Startup: runs the forward cleanup once per database. Triage has suppressed
+ * these tasks since, so later launches have nothing to repair (and must not
+ * remove a task the user created by hand from a forward).
+ */
+export function cleanupForwardTasksOnce(db: Database.Database): number {
+  const done = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get(FORWARD_TASK_CLEANUP_FLAG) as { value: string } | undefined
+  if (done?.value === '1') return 0
+  const removed = cleanupForwardTasksWithoutRequest(db)
+  db.prepare(
+    `INSERT INTO settings (key, value) VALUES (?, '1')
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+  ).run(FORWARD_TASK_CLEANUP_FLAG)
+  return removed
+}
+
+/** Removes old automatic tasks that only stem from FYI forwards. */
 export function cleanupForwardTasksWithoutRequest(db: Database.Database): number {
   const rows = db
     .prepare(
@@ -286,9 +307,9 @@ export function cleanupForwardTasksWithoutRequest(db: Database.Database): number
 }
 
 /**
- * Entscheidet den Aufgaben-Vorschlag eines Threads (Letterpress t/x):
- * accept legt den Task an, dismiss einen 'dismissed'-Merker, damit der
- * Vorschlag nicht wieder auftaucht.
+ * Decides a thread's task suggestion (Letterpress t/x):
+ * accept creates the task, dismiss a 'dismissed' marker so that the
+ * suggestion doesn't come back.
  */
 export function decideSuggestion(db: Database.Database, threadKey: string, accept: boolean): void {
   const row = db

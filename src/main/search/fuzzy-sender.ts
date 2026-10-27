@@ -30,20 +30,20 @@ export function boundedLevenshtein(a: string, b: string, max: number): number {
 }
 
 /** Lowercase, fold ß→ss and strip diacritics — mirrors the FTS folding. */
-function normalizeToken(raw: string): string {
+export function normalizeToken(raw: string): string {
   return foldSharpS(raw.toLocaleLowerCase('de-DE'))
     .normalize('NFD')
     .replace(/\p{M}+/gu, '')
 }
 
-function allowedDistance(length: number): number {
+export function allowedDistance(length: number): number {
   if (length <= 4) return 0
   if (length <= 6) return 1
   return 2
 }
 
 /** Generic mailbox words that must never identify a sender. */
-const GENERIC_TOKENS = new Set([
+export const GENERIC_TOKENS = new Set([
   'info',
   'kontakt',
   'contact',
@@ -58,13 +58,13 @@ const GENERIC_TOKENS = new Set([
   'hello'
 ])
 
-interface SenderRow {
+export interface SenderRow {
   addr: string
   name: string | null
   weight: number
 }
 
-function senderTokens(row: SenderRow): string[] {
+export function senderTokens(row: SenderRow): string[] {
   const local = row.addr.split('@')[0] ?? ''
   const parts = [...local.split(/[._\-+]/), ...(row.name ?? '').split(/[\s,._\-"']+/)]
   return [...new Set(parts.map(normalizeToken).filter((token) => token.length >= 3))]
@@ -74,6 +74,51 @@ export interface FuzzySenderMatch {
   addr: string
   distance: number
   weight: number
+}
+
+/**
+ * Sender inventory as a token index: each distinct token once, grouped by
+ * length, pointing to the senders that carry it. Rebuilt when new messages
+ * arrived (max id changed) or after SENDER_INDEX_TTL_MS (deletes, renames).
+ */
+interface SenderIndex {
+  maxId: number
+  builtAt: number
+  senders: SenderRow[]
+  tokensByLength: Map<number, Map<string, number[]>>
+}
+
+const SENDER_INDEX_TTL_MS = 60_000
+const senderIndexes = new WeakMap<Database.Database, SenderIndex>()
+
+function senderIndex(db: Database.Database): SenderIndex {
+  const maxId = (db.prepare('SELECT max(id) FROM messages').pluck().get() as number | null) ?? 0
+  const cached = senderIndexes.get(db)
+  if (cached && cached.maxId === maxId && Date.now() - cached.builtAt < SENDER_INDEX_TTL_MS) {
+    return cached
+  }
+  const senders = db
+    .prepare(
+      `SELECT lower(from_addr) AS addr, max(from_name) AS name, count(*) AS weight
+       FROM messages
+       WHERE from_addr IS NOT NULL AND from_addr <> ''
+       GROUP BY lower(from_addr)`
+    )
+    .all() as SenderRow[]
+  const tokensByLength = new Map<number, Map<string, number[]>>()
+  senders.forEach((sender, index) => {
+    for (const token of senderTokens(sender)) {
+      if (GENERIC_TOKENS.has(token)) continue
+      let byToken = tokensByLength.get(token.length)
+      if (!byToken) tokensByLength.set(token.length, (byToken = new Map()))
+      const owners = byToken.get(token)
+      if (owners) owners.push(index)
+      else byToken.set(token, [index])
+    }
+  })
+  const index: SenderIndex = { maxId, builtAt: Date.now(), senders, tokensByLength }
+  senderIndexes.set(db, index)
+  return index
 }
 
 /**
@@ -90,34 +135,36 @@ export function fuzzySenderMatches(
     .filter((term) => term.length >= 4 && !GENERIC_TOKENS.has(term))
   if (candidates.length === 0) return []
 
-  const senders = db
-    .prepare(
-      `SELECT lower(from_addr) AS addr, max(from_name) AS name, count(*) AS weight
-       FROM messages
-       WHERE from_addr IS NOT NULL AND from_addr <> ''
-       GROUP BY lower(from_addr)`
-    )
-    .all() as SenderRow[]
-
-  const matches = new Map<string, FuzzySenderMatch>()
-  for (const sender of senders) {
-    const tokens = senderTokens(sender)
-    let best = Number.POSITIVE_INFINITY
-    for (const term of candidates) {
-      const budget = allowedDistance(term.length)
-      for (const token of tokens) {
-        if (GENERIC_TOKENS.has(token)) continue
+  const { senders, tokensByLength } = senderIndex(db)
+  // Best distance per sender; each distinct token is compared once, and only
+  // tokens whose length is within the edit budget
+  const best = new Map<number, number>()
+  for (const term of candidates) {
+    const budget = allowedDistance(term.length)
+    for (let length = term.length - budget; length <= term.length + budget; length++) {
+      for (const [token, owners] of tokensByLength.get(length) ?? []) {
         const distance = boundedLevenshtein(term, token, budget)
-        if (distance <= budget) best = Math.min(best, distance)
+        if (distance > budget) continue
+        for (const owner of owners) {
+          const previous = best.get(owner)
+          if (previous === undefined || distance < previous) best.set(owner, distance)
+        }
       }
-    }
-    if (best !== Number.POSITIVE_INFINITY) {
-      matches.set(sender.addr, { addr: sender.addr, distance: best, weight: sender.weight })
     }
   }
 
-  return [...matches.values()]
-    .sort((a, b) => a.distance - b.distance || b.weight - a.weight)
+  return [...best.entries()]
+    .map(([index, distance]) => ({
+      addr: senders[index].addr,
+      distance,
+      weight: senders[index].weight
+    }))
+    .sort(
+      (a, b) =>
+        a.distance - b.distance ||
+        b.weight - a.weight ||
+        (a.addr < b.addr ? -1 : a.addr > b.addr ? 1 : 0)
+    )
     .slice(0, maxResults)
 }
 

@@ -202,12 +202,12 @@ describe('Aufgeschobene Archivierung (Antworten)', () => {
     expect(paper.comp.threadKey).toBe('tk-2')
     expect(paper.comp.text).toBe('Hallo Heike,\npasst.')
     expect(paper.comp.mode).toBe('ready')
-    // Es wurde nie archiviert
+    // It was never archived
     expect(invokeMock).not.toHaveBeenCalledWith(
       'messages:action',
       expect.objectContaining({ action: 'archive' })
     )
-    // Countdown-Toast verschwindet still — die Composer-Rückkehr ist das Feedback
+    // Countdown toast disappears silently — the composer returning is the feedback
     expect(useToast.getState().current).toBeNull()
     expect(useToast.getState().queue).toHaveLength(0)
   })

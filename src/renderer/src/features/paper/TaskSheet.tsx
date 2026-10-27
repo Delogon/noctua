@@ -40,7 +40,7 @@ export function TaskSheet(): React.JSX.Element {
       if (!sel || taskMutationPending.current) return
 
       const completing = sel.status !== 'done'
-      // Verschwindet die Aufgabe durch den Wechsel aus der gefilterten Sicht?
+      // Does the task vanish from the filtered view because of the change?
       const willDisappear = completing ? !showCompletedTasks : !showOpenTasks
       const shouldAdvance = (completing && advanceAfterCompletion) || willDisappear
       const nextTaskId = shouldAdvance

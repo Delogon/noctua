@@ -8,7 +8,7 @@ import {
   workingDayStarts
 } from '@renderer/features/calendar/free-slots'
 
-// Lokale Zeit (wie die Implementierung): Mo 5.10.2026 ist ein Montag.
+// Local time (like the implementation): Mon 5.10.2026 is a Monday.
 const L = (d: number, h: number, m = 0): number => new Date(2026, 9, d, h, m).getTime()
 const iv = (d: number, h1: number, h2: number): { startUtc: number; endUtc: number } => ({
   startUtc: L(d, h1),
@@ -26,7 +26,7 @@ describe('mergeIntervals', () => {
 
 describe('workingDayStarts', () => {
   it('überspringt das Wochenende', () => {
-    // Fr 9.10. + Mo 12.10. + Di 13.10.
+    // Fri 9.10. + Mon 12.10. + Tue 13.10.
     const days = workingDayStarts(L(9, 15), 3)
     expect(days.map((d) => new Date(d).getDate())).toEqual([9, 12, 13])
   })
@@ -53,13 +53,13 @@ describe('findCommonFreeSlot', () => {
       durationMs: HOUR,
       fromMs: L(5, 7)
     })
-    // 09:00-09:30 ist zu kurz, Montag danach belegt → Dienstag 08:00
+    // 09:00-09:30 is too short, Monday busy after that → Tuesday 08:00
     expect(slot).toEqual({ startUtc: L(6, 8), endUtc: L(6, 9) })
   })
 
   it('springt über das Wochenende', () => {
     const slot = findCommonFreeSlot({
-      busy: [[iv(9, 8, 18)]], // Freitag komplett belegt
+      busy: [[iv(9, 8, 18)]], // Friday fully booked
       durationMs: HOUR,
       fromMs: L(9, 7)
     })

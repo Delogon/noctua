@@ -1,13 +1,13 @@
 /**
- * Datumszeile für System-Prompts: Die Modelle kennen das heutige Datum nicht —
- * ohne diese Zeile kann die Eule Fragen wie „diesen Monat" oder Diktate wie
- * „sag ihm, ich melde mich morgen" nicht auflösen. Die ISO-Form steht mit
- * dabei, damit das Modell verlässlich rechnen kann.
+ * Date line for system prompts: the models don't know today's date —
+ * without this line the owl can't resolve questions like "this month" or dictations
+ * like "tell him I'll get back tomorrow". The ISO form is included
+ * so the model can calculate reliably.
  */
 /**
- * Zeitstempel in LOKALER Zeit für Prompts („2026-07-16 09:12") — toISOString
- * wäre UTC und verschiebt um Mitternacht sogar das Datum. sv-SE liefert das
- * ISO-ähnliche Format; timeZone ist nur für Tests übersteuerbar.
+ * Timestamp in LOCAL time for prompts ("2026-07-16 09:12") — toISOString
+ * would be UTC and around midnight even shifts the date. sv-SE yields the
+ * ISO-like format; timeZone can only be overridden for tests.
  */
 export function localStamp(ts: number | Date, timeZone?: string): string {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -23,7 +23,7 @@ export function localStamp(ts: number | Date, timeZone?: string): string {
 }
 
 export function currentDateLine(now = new Date()): string {
-  const readable = new Intl.DateTimeFormat('de-DE', {
+  const readable = new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -34,9 +34,10 @@ export function currentDateLine(now = new Date()): string {
     String(now.getMonth() + 1).padStart(2, '0'),
     String(now.getDate()).padStart(2, '0')
   ].join('-')
-  const time = new Intl.DateTimeFormat('de-DE', {
+  const time = new Intl.DateTimeFormat('en-GB', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    hour12: false
   }).format(now)
-  return `Heute ist ${readable} (${iso}), ${time} Uhr.`
+  return `Today is ${readable} (${iso}), ${time}.`
 }

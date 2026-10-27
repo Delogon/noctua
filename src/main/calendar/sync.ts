@@ -34,12 +34,12 @@ import {
 } from './repo'
 
 /**
- * Sync-Engine des Kalenders (Phase 2.1).
+ * Calendar sync engine (phase 2.1).
  *
- * Ablauf je Konto-Lauf: (1) lokale Änderungen übertragen (cal_pending_ops),
- * (2) Kalenderliste abgleichen, (3) je Kalender ctag prüfen und dann
- * inkrementell per sync-collection (RFC 6578) oder — ohne Unterstützung bzw.
- * bei ungültigem Token — per ETag-Vergleich (calendar-query + multiget).
+ * Flow per account run: (1) upload local changes (cal_pending_ops),
+ * (2) reconcile the calendar list, (3) per calendar check the ctag and then sync
+ * incrementally via sync-collection (RFC 6578) or — without support or
+ * with an invalid token — via ETag comparison (calendar-query + multiget).
  */
 
 export type CalSyncState = 'idle' | 'connecting' | 'syncing' | 'error' | 'needs-reauth' | 'off'
@@ -54,10 +54,10 @@ export interface ConflictInfo {
 }
 
 export interface SyncEvents {
-  /** calendarIds leer = Kalenderliste hat sich geändert */
+  /** Empty calendarIds = the calendar list has changed */
   onChanged(accountId: number, calendarIds: number[]): void
   onConflict(info: ConflictInfo): void
-  /** CardDAV-Kontakte eines Kontos haben sich geändert (Phase 3.1) */
+  /** An account's CardDAV contacts have changed (phase 3.1) */
   onContactsChanged?(accountId: number): void
 }
 
@@ -69,9 +69,9 @@ export interface SyncContext {
 
 const MAX_SYNC_PAGES = 50
 
-// --- Kalenderliste -------------------------------------------------------------------------
+// --- Calendar list -------------------------------------------------------------------------
 
-/** Kalenderliste des Servers abgleichen. Liefert die Zeilen samt Server-Zustand. */
+/** Reconcile the server's calendar list. Returns the rows along with the server state. */
 export async function refreshCalendarList(
   ctx: SyncContext,
   account: CalAccountRow
@@ -129,7 +129,7 @@ export async function refreshCalendarList(
         )
       }
     })
-    // Gelöschte Kalender entfernen — nicht bei leerer Antwort (Server-Aussetzer)
+    // Remove deleted calendars — but not on an empty response (server hiccup)
     if (infos.length > 0) {
       const present = new Set(infos.map((i) => i.url))
       for (const cal of existing) {
@@ -156,7 +156,7 @@ function lastSegment(url: string): string {
   return decodeURIComponent(parts[parts.length - 1] ?? 'Kalender')
 }
 
-// --- Kalender abgleichen -----------------------------------------------------------------------
+// --- Reconcile calendar ------------------------------------------------------------------------
 
 interface Collected {
   mode: 'full' | 'delta'
@@ -191,18 +191,18 @@ async function collectChanges(
           if (res.syncToken) token = res.syncToken
           if (!res.truncated) return { mode, entries, removed, syncToken: token }
         }
-        // zu viele Seiten: lieber sauber per ETag abgleichen
+        // too many pages: better reconcile cleanly via ETag
         break
       } catch (error) {
         if (error instanceof SyncTokenInvalidError && cal.sync_token && attempt === 0) {
-          token = null // Token ungültig → vollständiger Neuabgleich
+          token = null // Token invalid → full resync
           continue
         }
         if (
           error instanceof DavHttpError &&
           [400, 403, 404, 405, 415, 501].includes(error.status)
         ) {
-          // Server kann sync-collection nicht: dauerhaft auf ETag-Abgleich umstellen
+          // Server can't do sync-collection: switch to ETag reconciliation permanently
           ctx.db.prepare('UPDATE calendars SET supports_sync = 0 WHERE id = ?').run(cal.id)
           break
         }
@@ -210,13 +210,13 @@ async function collectChanges(
       }
     }
   }
-  // Fallback: ctag + ETag-Vergleich
+  // Fallback: ctag + ETag comparison
   const list = await queryEtags(ctx.client, cal.url)
   const entries = new Map<string, string | null>(list.map((e: EtagEntry) => [e.href, e.etag]))
   return { mode: 'full', entries, removed: new Set(), syncToken: null }
 }
 
-/** Gleicht einen Kalender ab. Rückgabe: true, wenn sich lokale Daten geändert haben. */
+/** Reconciles a calendar. Returns: true if local data changed. */
 export async function syncCalendar(
   ctx: SyncContext,
   cal: CalendarRow,
@@ -239,14 +239,14 @@ export async function syncCalendar(
     ).map((o) => [o.href, o])
   )
 
-  // Lokale, noch nicht übertragene Änderungen haben Vorrang (Konflikt beim Push über If-Match)
+  // Local changes not yet uploaded take precedence (conflict on push via If-Match)
   const toFetch: string[] = []
   for (const [href, etag] of collected.entries) {
     const l = local.get(href)
     if (l?.pending_op) continue
     if (!l || etag === null || l.etag !== etag) toFetch.push(href)
   }
-  // Zurückgerollte lokale Änderungen (etag = NULL) von der Server-Fassung neu laden
+  // Reload rolled-back local changes (etag = NULL) from the server version
   for (const [href, l] of local) {
     if (l.etag === null && !l.pending_op && !toFetch.includes(href)) toFetch.push(href)
   }
@@ -289,7 +289,7 @@ export async function syncCalendar(
   return changed
 }
 
-/** Kompletter Lauf für ein Konto. */
+/** Complete run for an account. */
 export async function syncAccount(
   ctx: SyncContext,
   account: CalAccountRow,
@@ -303,7 +303,7 @@ export async function syncAccount(
     try {
       if (await syncCalendar(ctx, row, info, opts)) changedIds.push(row.id)
     } catch (error) {
-      // Auth-/Netzfehler beenden den Lauf; Einzelfehler eines Kalenders nicht
+      // Auth/network errors end the run; individual errors of one calendar don't
       if (error instanceof DavAuthError || error instanceof DavTransportError) throw error
       console.warn(
         `[calendar] Sync von „${row.display_name}“ fehlgeschlagen:`,
@@ -319,7 +319,7 @@ export async function syncAccount(
   if (firstError) throw firstError
 }
 
-// --- Lokale Änderungen übertragen ------------------------------------------------------------------
+// --- Upload local changes --------------------------------------------------------------------------
 
 function objectUrl(cal: CalendarRow, href: string): string {
   return new URL(href, cal.url).toString()
@@ -340,7 +340,7 @@ function markDead(
   ).run(`${reason}: ${detail}`.slice(0, 500), ics, op.id)
 }
 
-/** Server-Fassung laden und lokal übernehmen; null, wenn die Ressource dort nicht (mehr) existiert. */
+/** Load the server version and apply it locally; null if the resource no longer exists there. */
 async function adoptServerVersion(
   ctx: SyncContext,
   cal: CalendarRow,
@@ -381,9 +381,9 @@ async function pushOp(
       await client.delete(url, op.base_etag)
     } catch (error) {
       if (error instanceof DavHttpError && (error.status === 404 || error.status === 410)) {
-        // schon weg
+        // already gone
       } else if (error instanceof DavHttpError && error.status === 412) {
-        // Server-Stand hat sich geändert: Löschung verwerfen, Server-Fassung behalten
+        // Server state changed: discard the deletion, keep the server version
         const exists = await adoptServerVersion(ctx, cal, op.href)
         markDead(db, op, exists ? 'conflict' : 'deleted-on-server', 'Server-Version geändert', null)
         if (obj && !exists) deleteObject(db, obj.id)
@@ -399,7 +399,7 @@ async function pushOp(
   }
 
   if (!obj) {
-    // Objekt wurde zwischenzeitlich vom Server entfernt
+    // Object was removed by the server in the meantime
     db.prepare('DELETE FROM cal_pending_ops WHERE id = ?').run(op.id)
     return
   }
@@ -413,7 +413,7 @@ async function pushOp(
     let etag = res.etag
     let ics = obj.ics
     if (!etag) {
-      // Kein ETag im Response: Server hat den Inhalt evtl. umgeschrieben → neu laden
+      // No ETag in the response: the server may have rewritten the content → reload
       try {
         const got = await client.get(url)
         etag = got.etag
@@ -432,7 +432,7 @@ async function pushOp(
         report('conflict')
         return
       }
-      // Konflikt: Server-Fassung gewinnt, die lokale bleibt zur Diagnose in der Op
+      // Conflict: the server version wins, the local one stays in the op for diagnosis
       const mine = obj.ics
       const exists = await adoptServerVersion(ctx, cal, op.href)
       if (!exists) deleteObject(db, obj.id)
@@ -445,7 +445,7 @@ async function pushOp(
       if (op.kind === 'create') deleteObject(db, obj.id)
       else
         db.prepare('UPDATE cal_objects SET etag = NULL, pending_op = NULL WHERE id = ?').run(obj.id)
-      // etag = NULL erzwingt beim nächsten Sync das Neuladen der Server-Fassung
+      // etag = NULL forces reloading the server version on the next sync
       db.prepare('UPDATE calendars SET ctag = NULL WHERE id = ?').run(cal.id)
       report('forbidden')
       return
@@ -454,7 +454,7 @@ async function pushOp(
   }
 }
 
-/** Überträgt wartende lokale Änderungen. Netz-/Auth-Fehler brechen ab, ohne Versuche zu verbrennen. */
+/** Uploads pending local changes. Network/auth errors abort without burning attempts. */
 export async function pushPendingOps(ctx: SyncContext, account: CalAccountRow): Promise<number> {
   const ops = listPendingOps(ctx.db, account.id)
   let pushed = 0
@@ -501,7 +501,7 @@ export async function pushPendingOps(ctx: SyncContext, account: CalAccountRow): 
     }
   }
   if (touched.size > 0) ctx.events.onChanged(account.id, [...touched])
-  // Einladungen (iMIP) erst nach erfolgreicher Übertragung versenden
+  // Send invitations (iMIP) only after a successful upload
   try {
     flushItipQueue(ctx.db, account.id)
   } catch (error) {
@@ -512,13 +512,13 @@ export async function pushPendingOps(ctx: SyncContext, account: CalAccountRow): 
   return pushed
 }
 
-// --- Schleife pro Konto ---------------------------------------------------------------------------
+// --- Loop per account -----------------------------------------------------------------------------
 
 export const POLL_INTERVAL_MS = 5 * 60_000
 export const BACKOFF_BASE_MS = 15_000
 export const BACKOFF_MAX_MS = 15 * 60_000
 
-/** Backoff mit Jitter (±30 %), exponentiell bis zum Maximum. */
+/** Backoff with jitter (±30 %), exponential up to the maximum. */
 export function backoffDelay(attempt: number, random: () => number = Math.random): number {
   const base = Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** attempt)
   return base * (0.7 + random() * 0.6)
@@ -534,12 +534,12 @@ export interface LoopDeps {
   db: Database.Database
   events: SyncEvents
   onState: (accountId: number, state: CalSyncState, detail: string | null) => void
-  /** Test-Hook: eigene fetch-Implementierung */
+  /** Test hook: custom fetch implementation */
   fetch?: FetchLike
   getPassword?: (accountId: number) => string | null
 }
 
-/** Ein Konto: Poll-Schleife mit Backoff, needs-reauth bei 401. */
+/** One account: poll loop with backoff, needs-reauth on 401. */
 export class AccountLoop {
   private stopped = false
   private attempt = 0
@@ -547,7 +547,7 @@ export class AccountLoop {
   private wake: (() => void) | null = null
   private forceNext = false
   private running = false
-  // Anstoß während eines laufenden Abgleichs: danach nicht erst das Intervall abwarten
+  // Triggered during a running sync: don't wait for the interval afterwards
   private kicked = false
 
   constructor(
@@ -565,7 +565,7 @@ export class AccountLoop {
     this.deps.onState(this.accountId, 'off', null)
   }
 
-  /** Sofortiger Abgleich (UI-Refresh, lokale Änderung); weckt auch Backoff-Wartezeiten. */
+  /** Immediate sync (UI refresh, local change); also wakes backoff waits. */
   refreshNow(opts: { force?: boolean; clearReauth?: boolean } = {}): void {
     if (opts.force) this.forceNext = true
     if (opts.clearReauth) this.needsReauth = false
@@ -574,12 +574,12 @@ export class AccountLoop {
     else this.kicked = true
   }
 
-  /** Nach Systemruhe: aufwecken, aber needs-reauth nicht aufheben. */
+  /** After system sleep: wake up, but don't clear needs-reauth. */
   wakeUp(): void {
     if (!this.needsReauth) this.wake?.()
   }
 
-  /** Ein Lauf ohne Wartezeit (auch für Tests). */
+  /** One run without waiting (also for tests). */
   async runOnce(): Promise<RunOutcome> {
     const { db } = this.deps
     const account = getCalAccount(db, this.accountId)
@@ -598,7 +598,7 @@ export class AccountLoop {
       const force = this.forceNext
       this.forceNext = false
       await syncAccount({ db, client, events: this.deps.events }, account, { force })
-      // Kontakte (CardDAV) teilen Zugangsdaten, Backoff und needs-reauth mit dem Kalender
+      // Contacts (CardDAV) share credentials, backoff and needs-reauth with the calendar
       await syncAccountContacts(
         { db, client, onChanged: (id) => this.deps.events.onContactsChanged?.(id) },
         getCalAccount(db, account.id) ?? account,
@@ -643,7 +643,7 @@ export class AccountLoop {
         this.attempt = 0
         delay = pollDelay()
       } else if (outcome === 'needs-reauth') {
-        // Kein Backoff-Loop gegen falsche Zugangsdaten: warten, bis der Nutzer eingreift
+        // No backoff loop against wrong credentials: wait until the user intervenes
         this.needsReauth = true
         this.attempt = 0
         delay = null
@@ -670,7 +670,7 @@ export class AccountLoop {
 
 // --- Engine -----------------------------------------------------------------------------------------
 
-/** Verwaltet die Schleifen aller Kalender-Konten. */
+/** Manages the loops of all calendar accounts. */
 export class CalendarSyncEngine {
   private db: Database.Database | null = null
   private loops = new Map<number, AccountLoop>()
@@ -726,7 +726,7 @@ export class CalendarSyncEngine {
     for (const id of [...this.loops.keys()]) this.stopAccount(id)
   }
 
-  /** Zugangsdaten geändert: Schleife neu starten (verlässt needs-reauth). */
+  /** Credentials changed: restart the loop (leaves needs-reauth). */
   restartAccount(accountId: number): void {
     this.stopAccount(accountId)
     this.startAccount(accountId)
@@ -745,13 +745,13 @@ export class CalendarSyncEngine {
     }
   }
 
-  /** Manueller Refresh (alle Konten oder eines); hebt needs-reauth auf (Nutzeraktion). */
+  /** Manual refresh (all accounts or one); clears needs-reauth (user action). */
   refresh(accountId?: number, force = false): void {
     const targets = accountId !== undefined ? [this.loops.get(accountId)] : [...this.loops.values()]
     for (const loop of targets) loop?.refreshNow({ force, clearReauth: true })
   }
 
-  /** Nach lokaler Änderung: zeitnah übertragen. */
+  /** After a local change: upload promptly. */
   kick(accountId: number): void {
     this.loops.get(accountId)?.refreshNow()
   }

@@ -4,8 +4,8 @@ import { useUiStore } from '@renderer/stores/ui'
 import { toast, useToast } from '@renderer/stores/toast'
 
 /**
- * Stups-Sicherheit: In der Wartet-Ansicht darf nur ⌘↵ senden — ein
- * unfokussiertes Enter löst keine echte Mail mehr aus.
+ * Nudge safety: in the waiting view only ⌘↵ may send — an
+ * unfocused Enter no longer sends a real mail.
  */
 
 type Handler = (event: KeyboardEvent) => void
@@ -232,7 +232,7 @@ describe('Keymap — Z/⌘Z-Routing für die Toast-Queue', () => {
     handler(event)
     expect(run).toHaveBeenCalledOnce()
     expect(event.preventDefault).toHaveBeenCalled()
-    // die Countdown-Toast ist damit abgeräumt
+    // the countdown toast is thereby cleared
     expect(useToast.getState().current).toBeNull()
   })
 

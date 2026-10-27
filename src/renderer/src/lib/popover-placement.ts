@@ -1,15 +1,15 @@
 import { useLayoutEffect, useRef } from 'react'
 
 /**
- * Automatische Popover-Ausrichtung (M83): Dropdowns ankern nicht mehr starr
- * per CSS (`left: 0` / `right: 0`), sondern messen sich beim Öffnen am
- * Fenster und wählen die Richtung selbst — linksbündig, wenn rechts Platz
- * ist, sonst rechtsbündig, notfalls an die Fensterkante geklemmt; nach oben
- * statt unten, wenn unterm Anker weniger Raum bleibt als darüber.
+ * Automatic popover alignment (M83): dropdowns no longer anchor rigidly
+ * via CSS (`left: 0` / `right: 0`), but measure themselves against the
+ * window on open and pick the direction themselves — left-aligned if there is room
+ * on the right, otherwise right-aligned, clamped to the window edge if needed; upward
+ * instead of downward if there is less room below the anchor than above.
  *
- * Die Geometrie steckt in computePopoverPlacement (pur, testbar); der Hook
- * usePopoverPlacement schreibt die Position per Layout-Effekt vor dem Paint
- * direkt ans Element, sodass nie ein falsch positionierter Frame sichtbar wird.
+ * The geometry lives in computePopoverPlacement (pure, testable); the hook
+ * usePopoverPlacement writes the position directly to the element in a layout
+ * effect before paint, so a mispositioned frame is never visible.
  */
 
 export interface PlacementBox {
@@ -20,17 +20,17 @@ export interface PlacementBox {
 }
 
 export interface PopoverPlacement {
-  /** Linke Kante des Popovers in Viewport-Koordinaten. */
+  /** Left edge of the popover in viewport coordinates. */
   left: number
-  /** Obere Kante des Popovers in Viewport-Koordinaten. */
+  /** Top edge of the popover in viewport coordinates. */
   top: number
-  /** Gekappte Höhe, wenn der verfügbare Raum kleiner ist als das Popover. */
+  /** Clamped height when the available space is smaller than the popover. */
   maxHeight: number | null
-  /** true: öffnet über dem Anker (unten wäre weniger Platz). */
+  /** true: opens above the anchor (below there would be less room). */
   openUp: boolean
 }
 
-/** Sicherheitsabstand zur Fensterkante und Lücke zwischen Anker und Popover. */
+/** Safety margin to the window edge and gap between anchor and popover. */
 const EDGE_MARGIN = 8
 const ANCHOR_GAP = 4
 
@@ -43,8 +43,8 @@ export function computePopoverPlacement(
   const gap = opts.gap ?? ANCHOR_GAP
   const margin = opts.margin ?? EDGE_MARGIN
 
-  // Horizontal: linksbündig am Anker bevorzugt; passt das nicht,
-  // rechtsbündig; ragt auch das hinaus, an die Kanten klemmen.
+  // Horizontal: left-aligned at the anchor preferred; if that doesn't fit,
+  // right-aligned; if that overflows too, clamp to the edges.
   let left = anchor.left
   if (left + popover.width > viewport.width - margin) {
     left = anchor.left + anchor.width - popover.width
@@ -52,8 +52,8 @@ export function computePopoverPlacement(
   left = Math.min(left, viewport.width - margin - popover.width)
   left = Math.max(margin, left)
 
-  // Vertikal: unterm Anker bevorzugt; nach oben nur, wenn dort mehr Raum
-  // ist. Reicht die gewählte Seite nicht, wird die Höhe gekappt (scrollt).
+  // Vertical: below the anchor preferred; upward only if there is more room
+  // there. If the chosen side is not enough, the height is clamped (scrolls).
   const spaceBelow = viewport.height - margin - (anchor.top + anchor.height + gap)
   const spaceAbove = anchor.top - gap - margin
   const openUp = popover.height > spaceBelow && spaceAbove > spaceBelow
@@ -66,14 +66,14 @@ export function computePopoverPlacement(
 }
 
 /**
- * Richtet das offene Popover an seinem Anker aus — dem Eltern-Element, also
- * dem Control, in dem es gerendert wird. Das Element trägt `popover="manual"`
- * und wird in den Top-Layer des Fensters gehoben: Dort nimmt es keinen Platz
- * im Scroll-Container ein (kein seitliches Mitscrollen), wird von keinem
- * Vorfahren geclippt und liegt über allem. Öffnen/Schließen steuern weiter
- * die Komponenten (Outside-Click, Esc) — der DOM-Platz bleibt unverändert,
- * `contains()`-Checks funktionieren also wie zuvor. Neu gemessen wird bei
- * Fenster-Resize, Scroll und wenn sich die Größe des Popover-Inhalts ändert.
+ * Aligns the open popover to its anchor — the parent element, i.e.
+ * the control it is rendered in. The element carries `popover="manual"`
+ * and is lifted into the window's top layer: there it takes no space
+ * in the scroll container (no sideways co-scrolling), is not clipped by any
+ * ancestor and lies above everything. Opening/closing is still controlled by
+ * the components (outside click, Esc) — the DOM position stays unchanged,
+ * so `contains()` checks work as before. It is re-measured on
+ * window resize, scroll and when the size of the popover content changes.
  */
 export function usePopoverPlacement(open: boolean): React.RefObject<HTMLDivElement | null> {
   const popoverRef = useRef<HTMLDivElement>(null)
@@ -84,25 +84,25 @@ export function usePopoverPlacement(open: boolean): React.RefObject<HTMLDivEleme
     const anchor = el?.parentElement
     if (!el || !anchor) return
 
-    // Top-Layer, sofern die Popover-API da ist (Fallback: absolut im Control)
+    // Top layer, if the Popover API is available (fallback: absolute in the control)
     const topLayer = typeof el.showPopover === 'function' && el.hasAttribute('popover')
     if (topLayer) {
       try {
         el.showPopover()
       } catch {
-        // bereits offen — egal
+        // already open — doesn't matter
       }
     }
 
     const measure = (): void => {
-      // Vorherige Klemmung verwerfen, damit die natürliche Größe misst
+      // Discard the previous clamping so the natural size is measured
       el.style.left = ''
       el.style.top = ''
       el.style.right = ''
       el.style.bottom = ''
       el.style.maxHeight = ''
       if (topLayer) {
-        // UA-Styles des Popover-Elements (inset:0, margin:auto, padding) ersetzen
+        // Replace UA styles of the popover element (inset:0, margin:auto, padding)
         el.style.position = 'fixed'
         el.style.margin = '0'
         el.style.padding = '0'
@@ -122,11 +122,11 @@ export function usePopoverPlacement(open: boolean): React.RefObject<HTMLDivEleme
       )
 
       if (topLayer) {
-        // position:fixed im Top-Layer: left/top sind direkt Viewport-Koordinaten
+        // position:fixed in the top layer: left/top are directly viewport coordinates
         el.style.left = `${placement.left}px`
         el.style.top = `${placement.top}px`
       } else {
-        // Viewport → CSS-Koordinaten über die Used-Values der Messposition
+        // Viewport → CSS coordinates via the used values of the measured position
         const computed = getComputedStyle(el)
         el.style.left = `${parseFloat(computed.left) + placement.left - rect.left}px`
         el.style.top = `${parseFloat(computed.top) + placement.top - rect.top}px`
@@ -143,7 +143,7 @@ export function usePopoverPlacement(open: boolean): React.RefObject<HTMLDivEleme
     const observer = new ResizeObserver(measure)
     observer.observe(el)
     window.addEventListener('resize', measure)
-    // capture: fängt auch Scrollen innerer Container (Liste, Sheet)
+    // capture: also catches scrolling of inner containers (list, sheet)
     window.addEventListener('scroll', measure, true)
     return () => {
       observer.disconnect()

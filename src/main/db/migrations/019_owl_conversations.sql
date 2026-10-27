@@ -1,6 +1,6 @@
--- Eulen-Gespräche: Frage-Antwort-Verläufe der Owl-View überleben den Neustart.
--- messages_json trägt den kompletten Verlauf als JSON-Array
--- [{role, content, at?, sources?}] — die Eule erinnert sich, statt zu vergessen.
+-- Owl conversations: Q&A histories of the owl view survive restarts.
+-- messages_json holds the complete history as a JSON array
+-- [{role, content, at?, sources?}] — the owl remembers instead of forgetting.
 CREATE TABLE owl_conversations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,

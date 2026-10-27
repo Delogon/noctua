@@ -3,25 +3,25 @@ import type { StringKey } from '@renderer/i18n/strings'
 import { needsYou } from '@renderer/features/paper/priority'
 
 /**
- * Filter-Registry der Posteingangs-Liste (Design Turn 7): Künftige Filter
- * sind EIN Eintrag hier — Menü-Sektionen, Optionen, Zeilen-Chips und die
- * UND-Verknüpfung entstehen daraus, ohne neue UI zu bauen.
+ * Filter registry of the inbox list (Design Turn 7): future filters are ONE
+ * entry here — menu sections, options, row chips and the AND combination
+ * derive from it without building new UI.
  */
 
 export type InboxFilterId = 'needsYou'
 
 export interface InboxFilterDef {
   id: InboxFilterId
-  /** strings.ts-Key der Sektions-Legende im Menü. */
+  /** strings.ts key of the section legend in the menu. */
   section: StringKey
-  /** strings.ts-Key der Options-Beschriftung. */
+  /** strings.ts key of the option label. */
   label: StringKey
-  /** strings.ts-Key der Zusatznotiz hinter dem Label (optional). */
+  /** strings.ts key of the extra note after the label (optional). */
   note?: StringKey
-  /** Nur Anzeige (kbd-Chip) — das Binding lebt in keymap.ts. */
+  /** Display only (kbd chip) — the binding lives in keymap.ts. */
   hotkey?: string
   predicate: (row: Pick<ThreadListItem, 'aiPriority'>) => boolean
-  /** true: Option und Zeilen-Chip zeigen die Trefferzahl (ungefiltert). */
+  /** true: option and row chip show the match count (unfiltered). */
   countRows: boolean
 }
 
@@ -37,7 +37,7 @@ export const INBOX_FILTERS: InboxFilterDef[] = [
   }
 ]
 
-/** UND-Verknüpfung aller aktiven Filter; leeres Set lässt die Rows unberührt. */
+/** AND combination of all active filters; an empty set leaves the rows untouched. */
 export function applyFilters<T extends Pick<ThreadListItem, 'aiPriority'>>(
   rows: T[],
   active: ReadonlySet<InboxFilterId>
@@ -47,7 +47,7 @@ export function applyFilters<T extends Pick<ThreadListItem, 'aiPriority'>>(
   return rows.filter((row) => predicates.every((matches) => matches(row)))
 }
 
-/** Trefferzahlen je Filter — IMMER auf den ungefilterten Rows (stabile Zähler). */
+/** Match counts per filter — ALWAYS on the unfiltered rows (stable counters). */
 export function filterCounts(
   rows: Array<Pick<ThreadListItem, 'aiPriority'>>
 ): Record<InboxFilterId, number> {
@@ -58,7 +58,7 @@ export function filterCounts(
   return counts
 }
 
-/** Sektionen in Registry-Reihenfolge, dedupliziert — fürs Menü-Rendering. */
+/** Sections in registry order, deduplicated — for menu rendering. */
 export function filterSections(): Array<{ section: StringKey; defs: InboxFilterDef[] }> {
   const sections: Array<{ section: StringKey; defs: InboxFilterDef[] }> = []
   for (const def of INBOX_FILTERS) {

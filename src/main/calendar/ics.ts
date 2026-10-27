@@ -3,9 +3,9 @@ import type { CalendarAlarm, CalendarAttendee, CalendarEventFields } from '@shar
 import { resolveZone, UTC_ZONE, wallAsUtcMs, type VTimezones, type Wall, type Zone } from './tz'
 
 /**
- * ICS lesen: Parsen (ical.js), Zeiten (TZID/UTC/floating/DATE), Felder und
- * Vorkommen (RRULE/RDATE/EXDATE/RECURRENCE-ID). Alle Berechnungen laufen über
- * Wandzeit + Zone (siehe tz.ts), damit Sommerzeit-Umstellungen stimmen.
+ * Reading ICS: parsing (ical.js), times (TZID/UTC/floating/DATE), fields and
+ * occurrences (RRULE/RDATE/EXDATE/RECURRENCE-ID). All calculations use
+ * wall time + zone (see tz.ts) so that DST transitions come out right.
  */
 
 export const PRODID = '-//Noctua//CalDAV 1.0//EN'
@@ -18,7 +18,7 @@ export function parseCalendar(text: string): ICAL.Component {
   return root
 }
 
-/** ICS-Text mit abschließendem CRLF (RFC 5545). */
+/** ICS text with trailing CRLF (RFC 5545). */
 export function serializeCalendar(root: ICAL.Component): string {
   return `${root.toString()}\r\n`
 }
@@ -32,7 +32,7 @@ export function vtimezonesOf(root: ICAL.Component): VTimezones {
   return map
 }
 
-/** Alle Komponenten eines Typs, getrennt in Stamm (ohne RECURRENCE-ID) und Ausnahmen. */
+/** All components of a type, split into master (without RECURRENCE-ID) and exceptions. */
 export function splitComponents(
   root: ICAL.Component,
   kind: 'vevent' | 'vtodo' = 'vevent'
@@ -43,11 +43,11 @@ export function splitComponents(
   return { master, overrides }
 }
 
-// --- Zeitwerte --------------------------------------------------------------------
+// --- Time values ------------------------------------------------------------------
 
 export interface TimeInfo {
   allDay: boolean
-  /** 'UTC' | IANA/andere TZID | null (floating) */
+  /** 'UTC' | IANA/other TZID | null (floating) */
   tzid: string | null
   wall: Wall
   utcMs: number
@@ -119,7 +119,7 @@ export function parseWallIso(value: string): Wall {
   }
 }
 
-/** Kanonische Vorkommens-ID: Datum bei ganztägig, sonst UTC-ISO. */
+/** Canonical occurrence ID: date for all-day, otherwise UTC ISO. */
 export function recurrenceIdOf(info: TimeInfo): string {
   if (info.allDay) return wallToDateString(info.wall)
   return `${new Date(info.utcMs).toISOString().slice(0, 19)}Z`
@@ -135,14 +135,14 @@ export function recurrenceIdToUtcMs(rid: string): number {
 export interface EventTimes {
   start: TimeInfo
   endUtc: number
-  /** Dauer: ms (zeitgebunden) bzw. Tage·DAY_MS (ganztägig) */
+  /** Duration: ms (timed) or days·DAY_MS (all-day) */
   durationMs: number
-  /** Ganztägig: letzter Tag exklusiv */
+  /** All-day: last day exclusive */
   endDay: string | null
   hasExplicitEnd: boolean
 }
 
-/** Start/Ende eines VEVENT (DTEND, DURATION oder Standard). */
+/** Start/end of a VEVENT (DTEND, DURATION or default). */
 export function eventTimes(
   comp: ICAL.Component,
   vtz: VTimezones,
@@ -181,7 +181,7 @@ export function eventTimes(
   }
 }
 
-// --- Objekt-Felder (Spalten in cal_objects) -----------------------------------------
+// --- Object fields (columns in cal_objects) -----------------------------------------
 
 export interface ObjectFields {
   uid: string
@@ -242,7 +242,7 @@ export function extractObjectFields(root: ICAL.Component): ObjectFields {
   }
 }
 
-// --- Vorkommen ----------------------------------------------------------------------
+// --- Occurrences --------------------------------------------------------------------
 
 export interface Occurrence {
   recurrenceId: string | null
@@ -252,7 +252,7 @@ export interface Occurrence {
   startDay: string | null
   endDay: string | null
   isOverride: boolean
-  /** Komponente, deren Felder für dieses Vorkommen gelten */
+  /** Component whose fields apply to this occurrence */
   comp: ICAL.Component
 }
 
@@ -262,11 +262,11 @@ const MAX_OCCURRENCES = 5_000
 export interface ExpandOptions {
   windowStart: number
   windowEnd: number
-  /** Zählt Vorkommen auch außerhalb des Fensters (z. B. für COUNT-Berechnung) */
+  /** Counts occurrences outside the window too (e.g. for the COUNT calculation) */
   all?: boolean
 }
 
-/** UNTIL → UTC-ms-Grenze (inklusiv) bzw. Tag für Datumswerte. */
+/** UNTIL → UTC ms limit (inclusive), or the day for date values. */
 function untilLimit(rule: ICAL.Recur, start: TimeInfo): { utcMs: number } | { day: string } | null {
   const until = rule.until
   if (!until) return null
@@ -322,7 +322,7 @@ function occurrenceFrom(
   }
 }
 
-/** Alle EXDATE-Einträge als kanonische Vorkommens-IDs. */
+/** All EXDATE entries as canonical occurrence IDs. */
 export function exdatesOf(master: ICAL.Component, vtz: VTimezones): string[] {
   const out: string[] = []
   for (const prop of master.getAllProperties('exdate')) {
@@ -337,8 +337,8 @@ export function exdatesOf(master: ICAL.Component, vtz: VTimezones): string[] {
 }
 
 /**
- * Vorkommen einer Ressource im Fenster [windowStart, windowEnd). Ausnahmen
- * (RECURRENCE-ID) ersetzen das generierte Vorkommen; EXDATE entfernt es.
+ * Occurrences of a resource in the window [windowStart, windowEnd). Exceptions
+ * (RECURRENCE-ID) replace the generated occurrence; EXDATE removes it.
  */
 export function expandResource(root: ICAL.Component, opts: ExpandOptions): Occurrence[] {
   const vtz = vtimezonesOf(root)
@@ -352,13 +352,13 @@ export function expandResource(root: ICAL.Component, opts: ExpandOptions): Occur
   const masterTimes = master ? eventTimes(master, vtz) : null
   const recurring = !!master && (master.hasProperty('rrule') || master.hasProperty('rdate'))
 
-  // Ausnahmen vorbereiten
+  // Prepare exceptions
   const overrideByRid = new Map<string, ICAL.Component>()
   for (const o of overrides) {
     const ridInfo = readTime(o.getFirstProperty('recurrence-id'), vtz)
     if (!ridInfo) continue
     let rid = recurrenceIdOf(ridInfo)
-    // Datum vs. Datum-Zeit zwischen Stamm und Ausnahme angleichen
+    // Align date vs. date-time between master and exception
     if (masterTimes?.start.allDay && !ridInfo.allDay) rid = wallToDateString(ridInfo.wall)
     overrideByRid.set(rid, o)
   }
@@ -414,7 +414,7 @@ export function expandResource(root: ICAL.Component, opts: ExpandOptions): Occur
       generated.push({ wall: start.wall, utc: start.utcMs })
     }
 
-    // RDATE zusätzlich
+    // RDATE in addition
     for (const prop of master.getAllProperties('rdate')) {
       const tzid = prop.getParameter('tzid')
       for (const v of prop.getValues()) {
@@ -441,7 +441,7 @@ export function expandResource(root: ICAL.Component, opts: ExpandOptions): Occur
     }
   }
 
-  // Ausnahmen (auch ohne Stamm-Komponente: nur eingeladen zu einem Vorkommen)
+  // Exceptions (also without a master component: invited to a single occurrence only)
   for (const [rid, o] of overrideByRid) {
     const times = eventTimes(o, vtz, masterTimes?.durationMs ?? null)
     if (!times) continue
@@ -454,7 +454,7 @@ export function expandResource(root: ICAL.Component, opts: ExpandOptions): Occur
   return out
 }
 
-// --- Felder für die API --------------------------------------------------------------
+// --- Fields for the API --------------------------------------------------------------
 
 function propText(comp: ICAL.Component, name: string): string | null {
   const v = comp.getFirstPropertyValue(name)
@@ -528,7 +528,7 @@ export function readAttendees(comp: ICAL.Component): CalendarAttendee[] {
   return out
 }
 
-/** Felder einer Komponente für das API (Zeiten in Wandzeit der DTSTART-Zone). */
+/** Fields of a component for the API (times in wall time of the DTSTART zone). */
 export function readFields(
   comp: ICAL.Component,
   vtz: VTimezones,

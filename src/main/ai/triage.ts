@@ -9,17 +9,21 @@ import {
   type ResolvedDecision
 } from './providers/registry'
 import type { ResolvedTask } from './providers/types'
-import { decide, isDecisionConfigError } from './providers/systemone'
+import { decide, decideEach, isDecisionConfigError } from './providers/systemone'
 import {
-  DECISION_STATE_NOTE,
   TRIAGE_QUESTIONS,
+  fullState,
+  questionState,
+  decisionMode,
+  type StateBlocks,
   buildHybridWritePrompt,
   hybridWriteSchema,
   interpretTriageAnswers,
   writeGates,
   type HybridWrite
 } from './decision-triage'
-import { computePhishingSignals } from './phishing-signals'
+import { computeMailSignals } from '../mail/threat-signals'
+import { loadThreatInput, signalStateBlock } from './threat-check'
 import { extractiveSummary } from './extractive-summary'
 import { NEEDS_REPLY_THRESHOLD, ADDRESSED_TO_ME_THRESHOLD } from '@shared/decision-thresholds'
 import { AppleGuardrailError, appleFmStatus, appleGate, appleTriage } from './apple-fm'
@@ -28,6 +32,7 @@ import { createTasksFromTriage, isUserAuthoredMail } from '../db/repos/tasks'
 import { isForwardWithoutRequest, textBeforeForwardedMessage } from '../mail/forwarded'
 import { recipientPlacement, salutationTarget } from './addressee'
 import { localStamp } from './prompt-date'
+import { outputLanguage, outputLanguageName, type OutputLanguage } from './output-language'
 import {
   UNTRUSTED_SYSTEM_NOTE,
   sanitizeUntrusted,
@@ -35,10 +40,10 @@ import {
   wrapUntrusted
 } from './untrusted'
 
-// v6: Mail-Inhalt in Delimitern + „Daten, keine Anweisung" (SEC-15). Das Ausgabeformat
-// ist unverändert; bestehende Annotationen bleiben gültig. Die Erhöhung setzt beim Start
-// nur permanent gescheiterte Jobs zurück (requeueOnPromptChange) — erledigte Jobs bleiben
-// über UNIQUE(message_id, kind) gesperrt, es gibt KEINE Neu-Triage des 30-Tage-Fensters.
+// v6: mail content in delimiters + "data, not instructions" (SEC-15). The output format
+// is unchanged; existing annotations remain valid. On startup the bump only resets
+// permanently failed jobs (requeueOnPromptChange) — completed jobs stay
+// locked via UNIQUE(message_id, kind); there is NO re-triage of the 30-day window.
 export const PROMPT_VERSION = 6
 
 export const AI_CATEGORIES = [
@@ -51,7 +56,7 @@ export const AI_CATEGORIES = [
   'other'
 ] as const
 
-// Action-Items als Objekt mit optionaler Frist; v1-Strings werden toleriert.
+// Action items as an object with optional deadline; v1 strings are tolerated.
 const actionItemSchema = z.union([
   z.object({
     title: z.string().max(200),
@@ -73,74 +78,72 @@ const triageResultSchema = z.object({
   summary: z.string().max(300),
   action_items: z.array(actionItemSchema).max(5).default([]),
   needs_reply: z.boolean().default(false),
-  // Abwärtskompatibel: Alt-Antworten (Prompt v4) ohne das Feld gelten als adressiert.
+  // Backward compatible: legacy answers (prompt v4) without the field count as addressed.
   addressed_to_me: z.boolean().default(true),
   confidence: z.number().min(0).max(1).default(0.5)
 })
 
 /**
- * Aufgaben-Gate fürs On-Device-Modell (M88): eine einzige enge Frage. Die
- * Formulierung ist eval-getrieben (scripts/apple-triage-eval) — Änderungen
- * dort nachmessen, nicht nach Gefühl umtexten.
+ * Task gate for the on-device model (M88): a single narrow question. The
+ * wording is eval-driven (scripts/apple-triage-eval) — re-measure changes
+ * there, don't reword by gut feeling.
  */
-export const APPLE_GATE_PROMPT = `Du prüfst für einen E-Mail-Client GENAU EINE Frage:
-Bittet in dieser Mail ein einzelner Mensch den im EMPFÄNGER-Block genannten
-Kontoinhaber PERSÖNLICH um etwas, existiert eine echte Frist für IHN
-(zahlen, Formular abgeben, buchen), oder wartet der Absender erkennbar auf
-eine persönliche Antwort des Kontoinhabers (z. B. eine direkte Frage an ihn)?
+export const APPLE_GATE_PROMPT = `You check EXACTLY ONE question for an email client:
+Does a single human in this email ask the account owner named in the RECIPIENT block to do
+something PERSONALLY, is there a real deadline for THEM (pay, submit a form, book), or is the
+sender clearly waiting for a personal reply from the account owner (e.g. a direct question to them)?
 
-NEIN bei: Newslettern, Werbung (auch mit Frist „nur bis Sonntag"),
-Benachrichtigungen von Diensten, Sicherheitshinweisen und Codes, Reports,
-automatischen Erinnerungen, Rundmails mit Gruppenanrede, Mails deren Anrede
-eine andere Person nennt, reinen Infos ohne Bitte.
-Im Zweifel: NEIN.`
+Answer NO for: newsletters, advertising (even with a deadline such as "only until Sunday"),
+service notifications, security notices and codes, reports, automatic reminders, mass mailings
+with a group salutation, emails whose salutation names a different person, and pure information
+without a request.
+When in doubt: NO.`
 
-const SYSTEM_PROMPT = `Du bist der Triage-Klassifikator eines persönlichen E-Mail-Clients.
+function systemPrompt(language: OutputLanguage = outputLanguage()): string {
+  return `You are the triage classifier of a personal email client.
 ${UNTRUSTED_SYSTEM_NOTE}
-Analysiere die E-Mail und antworte AUSSCHLIESSLICH mit einem JSON-Objekt, exakt in dieser Form:
+Analyse the email and reply ONLY with a JSON object, exactly in this form:
 {
   "category": "personal" | "work" | "newsletter" | "promotions" | "notifications" | "transactional" | "other",
   "priority": 1-5,
-  "summary": "Einzeiler auf Deutsch, max. 140 Zeichen, sachlich",
-  "action_items": [{"title": "konkrete Aufgabe für den Empfänger", "due": "YYYY-MM-DD oder null"}],
+  "summary": "one line in ${outputLanguageName(language)}, max. 140 characters, factual",
+  "action_items": [{"title": "concrete task for the recipient, in ${outputLanguageName(language)}", "due": "YYYY-MM-DD or null"}],
   "needs_reply": true|false,
   "addressed_to_me": true|false,
   "confidence": 0.0-1.0
 }
 
-addressed_to_me: true NUR, wenn der im EMPFÄNGER-Block genannte Kontoinhaber
-persönlich gemeint ist (namentlich angesprochen, direkt adressiert oder klar
-Adressat der Bitte). false, wenn Anrede oder Bitte sich an eine andere Person
-richtet (z. B. Anrede mit fremdem Namen, Verteiler-Mail für jemand anderen,
-Mail nur zur Kenntnis).
-action_items NUR, wenn ein Mensch den genannten Kontoinhaber persönlich um
-etwas bittet oder eine echte Frist für IHN existiert (zahlen, antworten,
-buchen, kündigen, vorbereiten). Richtet sich die Anrede oder Bitte an eine
-andere Person, KEINE action_items und needs_reply=false.
-NIEMALS action_items aus: Login-/Anmelde-Benachrichtigungen („neue Anmeldung",
-„Sicherheitswarnung", 2FA-/Verifizierungs-Codes), Passwort-Mails,
-Systembenachrichtigungen, Newslettern, Werbung oder reinen Infos — auch wenn
-der Text Handlungsaufforderungen wie „überprüfe/ändere dein Passwort" enthält;
-solche Standard-Sicherheitshinweise sind KEINE Aufgaben des Nutzers.
-due nur setzen, wenn eine konkrete Frist erkennbar ist (relativ zum Mail-Datum
-in ein absolutes Datum umrechnen), sonst null.
+addressed_to_me: true ONLY if the account owner named in the RECIPIENT block is meant personally
+(addressed by name, addressed directly, or clearly the person the request is for). false if the
+salutation or request is aimed at someone else (e.g. a salutation with another name, a mailing-list
+email meant for someone else, an email sent for information only).
+action_items ONLY if a human asks the named account owner personally to do something, or there is
+a real deadline for THEM (pay, reply, book, cancel, prepare). If the salutation or request is aimed
+at another person: NO action_items and needs_reply=false.
+NEVER create action_items from: sign-in notifications ("new sign-in", "security alert", 2FA or
+verification codes), password emails, system notifications, newsletters, advertising or pure
+information — even if the text contains calls to action such as "check/change your password";
+such standard security notices are NOT tasks for the user.
+Set due only if a concrete deadline is recognisable (convert it to an absolute date relative to the
+email's date), otherwise null.
 
-Kategorien:
-- personal: echte Menschen, private Kommunikation
-- work: berufliche Kommunikation von echten Menschen
-- newsletter: redaktionelle Mailings, Digests
-- promotions: Werbung, Angebote, Marketing — auch Produktankündigungen und
-  Feature-Marketing von Diensten, die der Empfänger bereits nutzt
-- notifications: automatische Benachrichtigungen von Diensten (Social, Tools, Kalender)
-- transactional: Rechnungen, Bestellungen, Versand, Sicherheitscodes, Verträge
-- other: nichts davon
+Categories:
+- personal: real people, private communication
+- work: professional communication from real people
+- newsletter: editorial mailings, digests
+- promotions: advertising, offers, marketing — including product announcements and feature
+  marketing from services the recipient already uses
+- notifications: automatic notifications from services (social, tools, calendar)
+- transactional: invoices, orders, shipping, security codes, contracts
+- other: none of these
 
-Priorität: 5 = dringend/wichtig für den Empfänger (Mensch wartet auf Antwort, harte Frist,
-Sicherheitsvorfall), 4 = Dienst-Warnungen, die bei Ignorieren zu Einschränkungen führen
-(Speicher voll, Zahlung fehlgeschlagen, Konto-Sperrung droht), 3 = normal,
-1 = ignorierbar (Massenwerbung, Smalltalk-Duplikate).
-needs_reply nur bei echten Menschen mit Antworterwartung.
-summary nennt den Kern (wer will was), keine Floskeln.`
+Priority: 5 = urgent/important for the recipient (a human is waiting for a reply, hard deadline,
+security incident), 4 = service warnings that lead to restrictions if ignored (storage full, payment
+failed, account suspension pending), 3 = normal, 1 = ignorable (mass advertising, small-talk
+duplicates).
+needs_reply only for real people who expect a reply.
+summary states the core (who wants what), no filler phrases.`
+}
 
 interface TriageRow {
   id: number
@@ -163,11 +166,21 @@ interface TriageRow {
   folder_special_use: string | null
 }
 
-function buildUserPrompt(
+interface PromptBlocks {
+  /** From/Subject/Date */
+  header: string
+  replyTo: string | null
+  recipient: string
+  signals: string | null
+  /** Sanitized body (not yet wrapped) */
+  bodyText: string
+}
+
+function buildPromptBlocks(
   db: Database.Database,
   row: TriageRow,
   extraSignals: string[] = []
-): string {
+): PromptBlocks {
   const fullBodyText = row.text_plain?.trim() || htmlToText(row.html_raw ?? '')
   const bodyText = sanitizeUntrusted(textBeforeForwardedMessage(row.subject, fullBodyText), 6000)
   const stats = db
@@ -182,40 +195,81 @@ function buildUserPrompt(
     .get(row.account_id, row.from_addr ?? '') as { cat: string } | undefined
 
   const signals = [
-    row.list_unsubscribe ? 'List-Unsubscribe-Header vorhanden (Massenmail-Signal)' : null,
+    row.list_unsubscribe ? 'List-Unsubscribe header present (bulk mail signal)' : null,
     stats && stats.sent_count > 0
-      ? `Der Empfänger hat diesem Absender schon ${stats.sent_count}× geschrieben (bekannter Kontakt)`
+      ? `The recipient has written to this sender ${stats.sent_count} times before (known contact)`
       : null,
-    previous ? `Frühere Mails dieses Absenders wurden als "${previous.cat}" eingeordnet` : null,
+    previous ? `Earlier emails from this sender were classified as "${previous.cat}"` : null,
     ...extraSignals
   ].filter(Boolean)
 
-  // EMPFÄNGER-Block: Wer ist der Kontoinhaber, wo steht er im Envelope,
-  // wen spricht die Anrede an? Grundlage für addressed_to_me.
+  // RECIPIENT block: who is the account owner, where are they in the envelope,
+  // whom does the salutation address? Basis for addressed_to_me.
   const ownerName = row.account_display_name?.trim() || row.account_name?.trim() || null
   const placement = recipientPlacement(row.account_email, row.to_json, row.cc_json)
   const placementLabel = {
-    to: 'steht im An',
-    cc: 'steht nur im CC',
-    absent: 'ist weder in An noch CC (Verteiler-/Bcc-Zustellung)'
+    to: 'is in To',
+    cc: 'is only in CC',
+    absent: 'is neither in To nor CC (mailing list / Bcc delivery)'
   }[placement]
   const salutation = salutationTarget(bodyText)
   const salutationLabel =
     salutation.kind === 'named'
-      ? `nennt namentlich: ${salutation.names.join(', ')}`
+      ? // Names come from the mail body: quoted and capped (SEC-15)
+        `names: ${salutation.names
+          .slice(0, 5)
+          .map((name) => JSON.stringify(sanitizeUntrustedLine(name, 60)))
+          .join(', ')}`
       : salutation.kind === 'group'
-        ? 'Gruppenanrede (z. B. „Hallo zusammen")'
-        : 'keine erkennbare Anrede'
+        ? 'group salutation (e.g. "Hello everyone")'
+        : 'no recognisable salutation'
 
+  let replyTo: string | null = null
+  try {
+    const list = JSON.parse(row.reply_to ?? '[]') as Array<{ address?: string }>
+    const addresses = list.map((r) => r.address).filter((a): a is string => !!a)
+    if (addresses.length > 0) {
+      replyTo = wrapUntrusted(
+        'REPLY-TO',
+        `Reply-To: ${sanitizeUntrustedLine(addresses.join(', '), 300)}`
+      )
+    }
+  } catch {
+    // broken JSON: no Reply-To line
+  }
+
+  return {
+    // From/Subject are sender-controlled: delimited like the body (SEC-15)
+    header: [
+      wrapUntrusted(
+        'HEADER',
+        [
+          `From: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unknown', 200)}>`,
+          `Subject: ${sanitizeUntrustedLine(row.subject, 300) || '(no subject)'}`
+        ].join('\n')
+      ),
+      `Date: ${row.date ? localStamp(row.date) : 'unknown'}`
+    ].join('\n'),
+    replyTo,
+    recipient: `RECIPIENT (account owner): ${ownerName ? `${ownerName} ` : ''}<${row.account_email ?? 'unknown'}>; ${placementLabel}; salutation of the email: ${salutationLabel}`,
+    signals: signals.length > 0 ? `Signals: ${signals.join('; ')}` : null,
+    bodyText
+  }
+}
+
+function buildUserPrompt(
+  db: Database.Database,
+  row: TriageRow,
+  extraSignals: string[] = []
+): string {
+  const blocks = buildPromptBlocks(db, row, extraSignals)
   return [
-    `Von: ${sanitizeUntrustedLine(row.from_name, 120)} <${sanitizeUntrustedLine(row.from_addr ?? 'unbekannt', 200)}>`,
-    `Betreff: ${sanitizeUntrustedLine(row.subject, 300) || '(kein Betreff)'}`,
-    `Datum: ${row.date ? localStamp(row.date) : 'unbekannt'}`,
-    `EMPFÄNGER (Kontoinhaber): ${ownerName ? `${ownerName} ` : ''}<${row.account_email ?? 'unbekannt'}>; ${placementLabel}; Anrede der Mail: ${salutationLabel}`,
-    signals.length > 0 ? `Signale: ${signals.join('; ')}` : null,
+    blocks.header,
+    blocks.recipient,
+    blocks.signals,
     '',
-    'Inhalt:',
-    wrapUntrusted('MAIL', bodyText || '(kein Textinhalt)')
+    'Content:',
+    wrapUntrusted('MAIL', blocks.bodyText || '(no text content)')
   ]
     .filter((line) => line !== null)
     .join('\n')
@@ -226,9 +280,9 @@ export type TriageOutcome = 'done' | 'skipped-no-client' | 'skipped-missing'
 type TriageVerdict = z.infer<typeof triageResultSchema>
 
 /**
- * Rohes Ergebnis des On-Device-Modells in die Schema-Form bringen: Guided
- * Generation garantiert die Struktur, aber Wertebereiche (Kategorie-Enum,
- * Prioritätsklemme, Datums-Format) klemmen wir hier deterministisch.
+ * Bring the on-device model's raw result into schema form: guided
+ * generation guarantees the structure, but we clamp value ranges (category enum,
+ * priority clamp, date format) deterministically here.
  */
 export function sanitizeAppleVerdict(raw: unknown): TriageVerdict {
   const value = (raw ?? {}) as Record<string, unknown>
@@ -260,8 +314,8 @@ export function sanitizeAppleVerdict(raw: unknown): TriageVerdict {
   })
 }
 
-/** Neutrales Urteil, wenn Apples Guardrails den Mail-Inhalt ablehnen —
- *  die Mail bleibt nutzbar (Kategorie other, keine Aufgaben, Zuversicht 0). */
+/** Neutral verdict when Apple's guardrails reject the mail content —
+ *  the mail stays usable (category other, no tasks, confidence 0). */
 function neutralVerdict(subject: string | null): TriageVerdict {
   return triageResultSchema.parse({
     category: 'other',
@@ -274,14 +328,14 @@ function neutralVerdict(subject: string | null): TriageVerdict {
   })
 }
 
-/** Klassifiziert eine Nachricht und schreibt die Annotation. Wirft bei API-Fehlern. */
+/** Classifies a message and writes the annotation. Throws on API errors. */
 export async function runTriage(db: Database.Database, messageId: number): Promise<TriageOutcome> {
   const provider = getTriageProvider()
-  // Aufgabe → Profil: bei Local only oder ohne Key/Modell pausiert die Triage
-  // wie bei „kein Key" (Job bleibt liegen, kein verbrannter Versuch)
+  // Task → profile: under Local only or without key/model, triage pauses
+  // as with "no key" (job stays queued, no burned attempt)
   const resolved = provider === 'openrouter' ? resolveTask('triage') : null
-  // Entscheidungsmodell (System One): entscheidet zuerst, das Textmodell schreibt nur bei Bedarf.
-  // Läuft auch ohne nutzbares Textmodell (dann extraktive Zusammenfassung, keine Aufgabentitel).
+  // Decision model (System One): decides first, the text model only writes when needed.
+  // Also runs without a usable text model (then extractive summary, no task titles).
   const decisionCfg = provider === 'openrouter' ? resolveDecision() : null
   if (provider === 'openrouter' && !resolved && !decisionCfg) return 'skipped-no-client'
 
@@ -303,24 +357,24 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
   if (decisionCfg) {
     const outcome = await runHybridTriage(db, row, messageId, decisionCfg, resolved)
     if (outcome) return outcome
-    // Konfigurationsfehler des Entscheidungsmodells: klassische Triage übernimmt
+    // Decision-model configuration error: classic triage takes over
   }
 
   const userPrompt = buildUserPrompt(db, row)
 
   if (provider === 'apple') {
     const status = await appleFmStatus()
-    // Modell lädt/It's off: Job ohne verbrannten Versuch zurücklegen (wie „kein Key")
+    // Model loading/it's off: put the job back without burning an attempt (like "no key")
     if (status.state !== 'available') return 'skipped-no-client'
-    // Zweistufig (M88): Erst die enge Gate-Frage („bittet ein Mensch den
-    // Kontoinhaber persönlich?"), dann das Gesamturteil. Das 3B-Modell
-    // beantwortet die isolierte Frage deutlich zuverlässiger, als es
-    // Aufgaben im Gesamturteil extrahiert — nur bei Gate=ja dürfen
-    // action_items und needs_reply Aufgaben erzeugen.
+    // Two-stage (M88): first the narrow gate question ("is a human asking the
+    // account owner personally?"), then the overall verdict. The 3B model
+    // answers the isolated question much more reliably than it
+    // extracts tasks in the overall verdict — only with gate=yes may
+    // action_items and needs_reply create tasks.
     const gateOpen = await appleGate(APPLE_GATE_PROMPT, userPrompt)
     let parsed: TriageVerdict
     try {
-      parsed = sanitizeAppleVerdict(await appleTriage(SYSTEM_PROMPT, userPrompt))
+      parsed = sanitizeAppleVerdict(await appleTriage(systemPrompt(), userPrompt))
     } catch (error) {
       if (!(error instanceof AppleGuardrailError)) throw error
       parsed = neutralVerdict(row.subject)
@@ -342,20 +396,20 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
     const result = await client.complete({
       model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt() },
         {
           role: 'user',
           content:
             attempt === 0
               ? userPrompt
-              : `${userPrompt}\n\nDeine letzte Antwort war ungültig (${lastError}). Antworte exakt nach Schema.`
+              : `${userPrompt}\n\nYour last answer was invalid (${lastError}). Reply exactly according to the schema.`
         }
       ],
       json: true,
       temperature: 0.1,
-      // Reasoning-Modelle (z. B. DeepSeek v4 Flash) verbrauchen max_tokens
-      // auch für Denk-Tokens — 500 schnitt Antworten ab (finish=length)
-      // und verbrannte Retries. Der Output selbst bleibt ~150 Tokens.
+      // Reasoning models (e.g. DeepSeek v4 Flash) spend max_tokens
+      // on thinking tokens too — 500 cut off answers (finish=length)
+      // and burned retries. The output itself stays ~150 tokens.
       maxTokens: 1200
     })
 
@@ -383,19 +437,19 @@ export async function runTriage(db: Database.Database, messageId: number): Promi
   )
 }
 
-/** Erste {...}-Struktur eines Textmodell-Outputs (Codezäune/Umgebungstext tolerieren). */
+/** First {...} structure of a text model output (tolerate code fences/surrounding text). */
 function parseHybridWrite(raw: string): HybridWrite {
   const match = raw.match(/\{[\s\S]*\}/)
   return hybridWriteSchema.parse(JSON.parse(match?.[0] ?? raw))
 }
 
 /**
- * Hybrid-Triage: EIN System-One-Aufruf (Kategorie, Priorität, needs_reply,
- * addressed_to_me, has_request, proposes_meeting, phishing); das Textmodell
- * schreibt nur Aufgabentitel (has_request) und den Einzeiler (Priorität ≥ 3
- * oder needs_reply). Alles andere bekommt eine extraktive Zusammenfassung.
- * Gibt null zurück, wenn das Entscheidungsmodell falsch konfiguriert ist
- * (404/kein Entscheidungsmodell) – dann läuft die klassische Triage.
+ * Hybrid triage: ONE System One call (category, priority, needs_reply,
+ * addressed_to_me, has_request, proposes_meeting, phishing); the text model
+ * only writes task titles (has_request) and the one-liner (priority ≥ 3
+ * or needs_reply). Everything else gets an extractive summary.
+ * Returns null if the decision model is misconfigured
+ * (404/not a decision model) – then classic triage runs.
  */
 async function runHybridTriage(
   db: Database.Database,
@@ -406,34 +460,33 @@ async function runHybridTriage(
 ): Promise<TriageOutcome | null> {
   const fullBodyText = row.text_plain?.trim() || htmlToText(row.html_raw ?? '')
   const bodyText = textBeforeForwardedMessage(row.subject, fullBodyText)
-  const signals = computePhishingSignals({
-    fromName: row.from_name,
-    fromAddr: row.from_addr,
-    replyToJson: row.reply_to,
-    html: row.html_raw
-  })
+  const signals = computeMailSignals(loadThreatInput(db, messageId, row)!)
   const userPrompt = buildUserPrompt(db, row)
-  const state = [
-    DECISION_STATE_NOTE,
-    '',
-    userPrompt,
-    signals.lines.length > 0
-      ? `\nPhishing-Prüfung (lokal, vor der Analyse berechnet):\n${signals.lines.map((l) => `- ${sanitizeUntrustedLine(l, 220)}`).join('\n')}`
-      : ''
-  ].join('\n')
+  const prompt = buildPromptBlocks(db, row)
+  const security = signalStateBlock(signals).trim()
+  const blocks: StateBlocks = {
+    header: prompt.header,
+    replyTo: prompt.replyTo,
+    recipient: prompt.recipient,
+    signals: prompt.signals,
+    security: security || null,
+    body: `Content:\n${wrapUntrusted('MAIL', prompt.bodyText || '(no text content)')}`,
+    bodyShort: `Content (excerpt):\n${wrapUntrusted('MAIL', prompt.bodyText.slice(0, 2000) || '(no text content)')}`
+  }
+  const params = { baseUrl: cfg.profile.baseUrl, apiKey: cfg.apiKey, model: cfg.model }
 
-  let result: Awaited<ReturnType<typeof decide>>
+  let result: {
+    answers: Awaited<ReturnType<typeof decide>>['answers']
+    usage: { inputTokens: number; outputTokens: number }
+  }
   try {
-    result = await decide({
-      baseUrl: cfg.profile.baseUrl,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
-      state,
-      questions: TRIAGE_QUESTIONS
-    })
+    result =
+      decisionMode() === 'single'
+        ? await decide({ ...params, state: fullState(blocks), questions: TRIAGE_QUESTIONS })
+        : await decideEach(params, TRIAGE_QUESTIONS, (name) => questionState(name, blocks))
   } catch (error) {
     if (isDecisionConfigError(error)) {
-      console.warn('[ai] Entscheidungsmodell unbrauchbar, klassische Triage:', error)
+      console.warn('[ai] decision model unusable, falling back to classic triage:', error)
       return null
     }
     throw error
@@ -460,7 +513,7 @@ async function runHybridTriage(
             content:
               attempt === 0
                 ? userPrompt
-                : `${userPrompt}\n\nDeine letzte Antwort war ungültig (${lastError}). Antworte exakt nach Schema.`
+                : `${userPrompt}\n\nYour last answer was invalid (${lastError}). Reply exactly according to the schema.`
           }
         ],
         json: true,
@@ -485,7 +538,7 @@ async function runHybridTriage(
         lastError = error instanceof Error ? error.message.slice(0, 300) : 'parse error'
       }
     }
-    // Zweimal ungültig: nicht scheitern – Entscheidung steht, Text wird extraktiv
+    // Invalid twice: don't fail – the decision stands, text becomes extractive
   }
 
   const summary =
@@ -510,8 +563,8 @@ async function runHybridTriage(
   db.prepare(
     `INSERT OR REPLACE INTO ai_decisions (message_id, model, category, category_confidence,
        priority_score, needs_reply, addressed_to_me, has_request, proposes_meeting, phishing,
-       phishing_signals_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       spam, phishing_signals_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     messageId,
     cfg.model,
@@ -523,14 +576,15 @@ async function runHybridTriage(
     decision.hasRequest,
     decision.proposesMeeting,
     decision.phishing,
+    decision.spam,
     JSON.stringify(signals.codes),
     Date.now()
   )
   return 'done'
 }
 
-/** Deterministische Nachverarbeitung + Persistenz — für beide Provider gleich:
- *  Regeln schlagen Modell-Feinheiten, dann Annotation-Upsert und Task-Ableitung. */
+/** Deterministic post-processing + persistence — the same for both providers:
+ *  rules beat model subtleties, then annotation upsert and task derivation. */
 function persistVerdict(
   db: Database.Database,
   row: TriageRow,
@@ -567,7 +621,7 @@ function persistVerdict(
        prompt_version = excluded.prompt_version, input_tokens = excluded.input_tokens,
        output_tokens = excluded.output_tokens, cost_usd = excluded.cost_usd,
        created_at = excluded.created_at`
-    // user_override_category bleibt beim Upsert unangetastet erhalten.
+    // user_override_category is left untouched by the upsert.
   ).run(
     messageId,
     parsed.category,
@@ -585,9 +639,9 @@ function persistVerdict(
     Date.now()
   )
 
-  // Historische Mails — angekommen, bevor das Konto eingerichtet wurde
-  // (Erst-Sync-Backfill) — erzeugen keine Aufgaben. Triage, Prioritäten und
-  // Anzeige bleiben unberührt; nur der Aufgaben-Schritt wird übersprungen.
+  // Historical mails — arrived before the account was set up
+  // (initial-sync backfill) — create no tasks. Triage, priorities and
+  // display stay unaffected; only the task step is skipped.
   const arrivedAt = row.internal_date ?? row.date
   const historicalMail =
     arrivedAt !== null && row.account_created_at !== null && arrivedAt < row.account_created_at

@@ -6,10 +6,10 @@ import { useListeningAudio } from '@renderer/features/paper/useListeningAudio'
 export type DictationState = 'idle' | 'listening' | 'transcribing'
 
 /**
- * Einsprechen für Eingabefelder (Suche, Eule-Fragen): Aufnahme über den
- * gemeinsamen Mikrofon-Stream, Transkription über ai:transcribe, fertiger
- * Text per Callback. Der Composer hat seinen eigenen, verschränkteren Fluss
- * (Entwurf-Erhalt, Retry) — dieser Hook ist die leichte Variante für Felder.
+ * Dictation for input fields (search, asking the owl): recording via the
+ * shared microphone stream, transcription via ai:transcribe, finished
+ * text via callback. The composer has its own, more intertwined flow
+ * (draft preservation, retry) — this hook is the lightweight variant for fields.
  */
 export function useDictation(options: {
   onText: (text: string) => void
@@ -27,7 +27,7 @@ export function useDictation(options: {
   const operationRef = useRef(0)
   const { bars, takeRecording } = useListeningAudio(state === 'listening')
   const optionsRef = useRef(options)
-  // Ref erst nach dem Commit nachziehen (nicht im Render schreiben)
+  // Update the ref only after the commit (don't write during render)
   useEffect(() => {
     optionsRef.current = options
   })
@@ -49,7 +49,7 @@ export function useDictation(options: {
 
   const cancel = useCallback((): void => {
     operationRef.current += 1
-    // Aufnahme verwerfen; der Stream schließt über den Hook-Effekt
+    // Discard the recording; the stream closes via the hook effect
     void takeRecording()
     setState('idle')
   }, [takeRecording])
@@ -67,8 +67,8 @@ export function useDictation(options: {
       }
       const { blobToWav } = await import('@renderer/lib/wav')
       const { base64, peak } = await blobToWav(blob)
-      // Stumme Aufnahme (z. B. stummgeschalteter Track) gar nicht erst
-      // transkribieren — das Modell würde sonst ratlos antworten.
+      // Don't even transcribe a silent recording (e.g. muted track)
+      // — the model would otherwise answer at a loss.
       if (peak < 0.01) {
         if (operationRef.current !== operation) return
         setState('idle')

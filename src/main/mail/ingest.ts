@@ -61,9 +61,9 @@ function recipientsForSearch(...values: Array<string | null>): string {
 }
 
 /**
- * Baut FTS und den Content-Hash aus derselben lokalen Momentaufnahme neu auf.
- * Der Hash invalidiert einen Vektor nur, wenn sich semantisch relevanter Inhalt
- * (inklusive Envelope-Metadaten oder Anhangnamen) wirklich geaendert hat.
+ * Rebuilds FTS and the content hash from the same local snapshot.
+ * The hash only invalidates a vector if semantically relevant content
+ * (including envelope metadata or attachment names) actually changed.
  */
 export function refreshMessageSearchIndex(db: Database.Database, messageId: number): void {
   const row = db
@@ -100,20 +100,27 @@ export function refreshMessageSearchIndex(db: Database.Database, messageId: numb
     .prepare('SELECT content_hash FROM message_embedding_state WHERE message_id = ?')
     .get(messageId) as { content_hash: string } | undefined
 
-  db.prepare('DELETE FROM messages_fts WHERE rowid = ?').run(messageId)
-  db.prepare(
-    `INSERT INTO messages_fts (rowid, subject, sender, recipients, body)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(
-    messageId,
-    foldSharpS(row.subject ?? ''),
-    foldSharpS(sender),
-    foldSharpS(recipients),
-    foldSharpS(searchableBody)
-  )
+  // The hash covers every indexed field: unchanged content (e.g. a body
+  // fetched again) keeps its FTS row instead of a delete + re-insert.
+  const unchanged =
+    previous?.content_hash === contentHash &&
+    db.prepare('SELECT 1 FROM messages_fts_docsize WHERE id = ?').get(messageId) !== undefined
+  if (!unchanged) {
+    db.prepare('DELETE FROM messages_fts WHERE rowid = ?').run(messageId)
+    db.prepare(
+      `INSERT INTO messages_fts (rowid, subject, sender, recipients, body)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      messageId,
+      foldSharpS(row.subject ?? ''),
+      foldSharpS(sender),
+      foldSharpS(recipients),
+      foldSharpS(searchableBody)
+    )
+  }
 
   if (!previous || previous.content_hash !== contentHash) {
-    // Ein alter Vektor darf waehrend des Rebuilds keine falschen Treffer liefern.
+    // An old vector must not produce wrong hits during the rebuild.
     db.prepare('DELETE FROM message_vecs WHERE rowid = ?').run(BigInt(messageId))
   }
   db.prepare(
@@ -141,7 +148,7 @@ export interface SearchOrphanCleanup {
   states: number
 }
 
-/** Entfernt Indexzeilen, die virtuelle Tabellen nicht per FK-Cascade verlieren. */
+/** Removes index rows that virtual tables don't lose via FK cascade. */
 /**
  * One-time repair (M94): the trigram rebuild in migration 021 populated the
  * index from text_plain/snippet only — HTML-only mails lost their body text
@@ -209,8 +216,8 @@ export function cleanupSearchOrphans(db: Database.Database): SearchOrphanCleanup
 }
 
 /**
- * Envelope-Phase: legt die Nachricht an oder aktualisiert Flags, wenn sie
- * schon existiert. Gibt die messages.id zurück (oder null bei Gmail-Duplikat).
+ * Envelope phase: creates the message, or updates flags if it
+ * already exists. Returns messages.id (or null for a Gmail duplicate).
  */
 export function upsertEnvelope(
   db: Database.Database,
@@ -260,7 +267,7 @@ export function upsertEnvelope(
     return { messageId: existing.id, threadKey: existing.thread_key, isNew: false }
   }
 
-  // Gmail-Dedupe: dieselbe Mail kann über mehrere synchronisierte Ordner kommen.
+  // Gmail dedupe: the same mail can arrive via several synced folders.
   if (env.gmMsgid) {
     const dupe = db
       .prepare('SELECT id FROM messages WHERE account_id = ? AND gm_msgid = ? AND folder_id != ?')
@@ -315,12 +322,12 @@ export function upsertEnvelope(
     )
 
   const messageId = Number(result.lastInsertRowid)
-  // Envelope-Metadaten sind sofort suchbar, auch waehrend Bodies nachladen.
+  // Envelope metadata is searchable right away, even while bodies are loading.
   refreshMessageSearchIndex(db, messageId)
   return { messageId, threadKey, isNew: true }
 }
 
-/** Body-Phase: speichert Text/HTML, Attachment-Metadaten und den FTS-Eintrag. */
+/** Body phase: stores text/HTML, attachment metadata and the FTS entry. */
 export function storeBody(db: Database.Database, messageId: number, parsed: ParsedMail): void {
   const row = db
     .prepare(
@@ -357,31 +364,46 @@ export function storeBody(db: Database.Database, messageId: number, parsed: Pars
     `UPDATE messages SET body_state = 'full', snippet = ?, has_attachments = ? WHERE id = ?`
   ).run(parsed.snippet, hasVisibleAttachments ? 1 : 0, messageId)
 
-  // Immer ersetzen: wiederholte Fetches koennen korrigierte Bodies oder
-  // Attachment-Metadaten enthalten und muessen dann FTS + Vektor invalidieren.
+  // Always replace: repeated fetches can contain corrected bodies or
+  // attachment metadata and must then invalidate FTS + vector.
   refreshMessageSearchIndex(db, messageId)
 
-  // Einladungen (text/calendar): geparste Zusammenfassung ablegen; wirft nie
+  // Invitations (text/calendar): store the parsed summary; never throws
   storeInvitations(db, messageId, parsed.calendarParts)
 }
 
-export function applyFlagUpdate(
+/**
+ * Applies the server's flags for a batch of UIDs in one transaction and
+ * returns the thread keys whose messages actually changed. Rows whose
+ * seen/flagged/answered already match are not written and not reported, so
+ * an idle resync of the newest UIDs produces no change events.
+ */
+export function applyFlagUpdates(
   db: Database.Database,
   folderId: number,
-  uid: number,
-  flags: Set<string>
-): number | null {
-  const row = db
-    .prepare('SELECT id FROM messages WHERE folder_id = ? AND uid = ?')
-    .get(folderId, uid) as { id: number } | undefined
-  if (!row) return null
-  db.prepare('UPDATE messages SET seen = ?, flagged = ?, answered = ? WHERE id = ?').run(
-    flagInt(flags, '\\Seen'),
-    flagInt(flags, '\\Flagged'),
-    flagInt(flags, '\\Answered'),
-    row.id
+  updates: Array<{ uid: number; flags: Set<string> }>
+): string[] {
+  if (updates.length === 0) return []
+  const select = db.prepare(
+    'SELECT id, thread_key, seen, flagged, answered FROM messages WHERE folder_id = ? AND uid = ?'
   )
-  return row.id
+  const update = db.prepare('UPDATE messages SET seen = ?, flagged = ?, answered = ? WHERE id = ?')
+  const changed = new Set<string>()
+  db.transaction(() => {
+    for (const { uid, flags } of updates) {
+      const row = select.get(folderId, uid) as
+        | { id: number; thread_key: string; seen: number; flagged: number; answered: number }
+        | undefined
+      if (!row) continue
+      const seen = flagInt(flags, '\\Seen')
+      const flagged = flagInt(flags, '\\Flagged')
+      const answered = flagInt(flags, '\\Answered')
+      if (row.seen === seen && row.flagged === flagged && row.answered === answered) continue
+      update.run(seen, flagged, answered, row.id)
+      changed.add(row.thread_key)
+    }
+  })()
+  return [...changed]
 }
 
 export function deleteByUids(db: Database.Database, folderId: number, uids: number[]): void {

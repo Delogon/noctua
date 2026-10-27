@@ -17,8 +17,8 @@ import {
 } from '@renderer/queries/intel'
 import { suggestIsLocal } from '@shared/local-host'
 
-// Settings → Intelligence: Provider-Profile, Aufgaben-Zuordnung, Local only und
-// Dinge, die nur auf Anforderung ins Netz gehen. (Phase 1.1/1.2)
+// Settings → Intelligence: provider profiles, task assignment, Local only and
+// things that only go online on request. (Phase 1.1/1.2)
 
 const BTN_PRIMARY: React.CSSProperties = {
   font: '500 10px var(--mono)',
@@ -37,7 +37,7 @@ function errText(err: unknown): string {
   return cleanIpcError(err instanceof Error ? err.message : String(err))
 }
 
-/** Tag „LOKAL"/„EXTERN" am Profil. */
+/** „LOKAL"/„EXTERN" tag on the profile. */
 function LocalTag({ isLocal }: { isLocal: boolean }): React.JSX.Element {
   const t = useT()
   return (
@@ -56,7 +56,7 @@ function LocalTag({ isLocal }: { isLocal: boolean }): React.JSX.Element {
   )
 }
 
-/** Tag „ORGANISATION" an einem von der Organisation bereitgestellten Profil. */
+/** „ORGANISATION" tag on a profile provided by the organization. */
 function ManagedTag(): React.JSX.Element {
   const t = useT()
   return (
@@ -89,7 +89,7 @@ export function LocalOnlyCard(): React.JSX.Element {
     void invoke('privacy:setLocalOnly', { localOnly: !on })
       .then(({ localOnly: next }) => {
         toastNow(next ? t('toastLocalOnlyOn') : t('toastLocalOnlyOff'))
-        // betrifft KI-Zuordnung, Modelllisten, Remote-Bilder und die Suche
+        // affects AI assignment, model lists, remote images and search
         void queryClient.invalidateQueries({ queryKey: ['privacy'] })
         void queryClient.invalidateQueries({ queryKey: ['ai'] })
         void queryClient.invalidateQueries({ queryKey: ['thread'] })
@@ -122,7 +122,7 @@ export function LocalOnlyCard(): React.JSX.Element {
   )
 }
 
-// ── Profile ─────────────────────────────────────────────────────────────────
+// ── Profiles ────────────────────────────────────────────────────────────────
 
 interface Draft {
   id: string | null
@@ -130,7 +130,7 @@ interface Draft {
   baseUrl: string
   apiStyle: 'chat' | 'responses'
   isLocal: boolean
-  /** Nutzer hat das Flag selbst gesetzt — dann schlägt die URL-Heuristik nichts mehr vor */
+  /** The user set the flag themselves — then the URL heuristic suggests nothing anymore */
   localTouched: boolean
   key: string
 }
@@ -156,7 +156,7 @@ function ProfileEditor({
   const queryClient = useQueryClient()
   const { toastNow } = usePaper()
   const builtin = profile?.preset === 'openrouter'
-  // Von der Organisation bereitgestellt: alles außer dem Key gesperrt
+  // Provided by the organization: everything except the key is locked
   const managed = profile?.managed === true
   const [draft, setDraft] = useState<Draft>(
     profile
@@ -233,14 +233,14 @@ function ProfileEditor({
   }
 
   const runTest = async (): Promise<void> => {
-    // Test läuft gegen das gespeicherte Profil — ungespeicherte Änderungen erst sichern
+    // The test runs against the saved profile — save unsaved changes first
     const target = await save()
     if (!target) return
     setTesting(true)
     setTest(null)
     try {
       setTest(await invoke('ai:profiles:test', { id: target.id }))
-      // Modellliste des Profils ist jetzt evtl. anders
+      // The profile's model list may be different now
       void queryClient.invalidateQueries({ queryKey: ['ai', 'profileModels', target.id] })
     } catch (err) {
       setTest({ ok: false, latencyMs: 0, modelCount: 0, detail: errText(err) })
@@ -303,7 +303,7 @@ function ProfileEditor({
             const baseUrl = e.target.value
             patch({
               baseUrl,
-              // Vorschlag fürs lokal-Flag, solange der Nutzer es nicht selbst gesetzt hat
+              // Suggestion for the local flag as long as the user hasn't set it themselves
               ...(draft.localTouched ? {} : { isLocal: suggestIsLocal(baseUrl) })
             })
           }}
@@ -415,7 +415,7 @@ export function ProvidersCard(): React.JSX.Element {
   const t = useT()
   const profiles = useProfiles()
   const localOnly = useLocalOnly().data === true
-  // 'new' = Editor für ein neues Profil, sonst die ID des bearbeiteten
+  // 'new' = editor for a new profile, otherwise the ID of the one being edited
   const [editing, setEditing] = useState<string | 'new' | null>(null)
 
   return (
@@ -498,11 +498,11 @@ export function ProvidersCard(): React.JSX.Element {
   )
 }
 
-// ── Aufgaben-Zuordnung ──────────────────────────────────────────────────────
+// ── Task assignment ─────────────────────────────────────────────────────────
 
 /**
- * Profil-Auswahl einer Aufgabe. Bei Local only sind externe Profile ausgegraut;
- * für die Triage kommt Apple On-Device als zusätzliche Wahl dazu.
+ * Profile selection for a task. With Local only, external profiles are grayed
+ * out; for triage, Apple On-Device is added as an extra choice.
  */
 export function TaskProviderPicker({ task }: { task: AiTaskName }): React.JSX.Element {
   const t = useT()
@@ -521,7 +521,7 @@ export function TaskProviderPicker({ task }: { task: AiTaskName }): React.JSX.El
 
   const change = (profileId: string): void => {
     if (!current || profileId === current.profileId) return
-    // Das Modell gehört zum Profil: beim Wechsel zurücksetzen (OpenRouter → Default)
+    // The model belongs to the profile: reset on change (OpenRouter → default)
     void invoke('ai:tasks:set', { task, profileId, model: '' })
       .then(() => {
         const name =
@@ -575,9 +575,9 @@ export function TaskProviderPicker({ task }: { task: AiTaskName }): React.JSX.El
 }
 
 /**
- * Modellwahl für eigene (Nicht-OpenRouter-)Profile: Liste aus GET /models mit
- * Freitext-Fallback. Bei Local only holt Main externe Listen nicht automatisch —
- * dann gibt es einen ausdrücklichen „Liste laden"-Knopf.
+ * Model choice for custom (non-OpenRouter) profiles: list from GET /models
+ * with free-text fallback. With Local only, Main doesn't fetch external lists
+ * automatically — then there is an explicit „Liste laden" button.
  */
 export function ProfileModelPicker({
   task,
@@ -601,7 +601,7 @@ export function ProfileModelPicker({
     detail: string | null
     forModel: string
   } | null>(null)
-  // Testergebnis gilt nur für das getestete Modell
+  // The test result only applies to the tested model
   const result = rawResult?.forModel === `${profile.id}/${current}` ? rawResult : null
 
   const loadManually = (): void => {
@@ -692,7 +692,7 @@ export function ProfileModelPicker({
           {t('customModelApply')}
         </button>
       </div>
-      {/* Der Test schickt eine Beispiel-Mail durch den Scanner-Prompt — für Diktat unpassend */}
+      {/* The test sends a sample mail through the scanner prompt — unsuitable for dictation */}
       {task !== 'stt' && current && (
         <div className="flex items-center gap-2">
           <button
@@ -720,12 +720,12 @@ export function ProfileModelPicker({
   )
 }
 
-// ── Entscheidungen (Ollama System One) ──────────────────────────────────────
+// ── Decisions (Ollama System One) ───────────────────────────────────────────
 
 /**
- * Entscheidungsmodell (clef-flash, nimble …): optional, nur lokale Profile.
- * Eigene Karte statt TaskProviderPicker — kein OpenRouter, „Aus" als Zustand,
- * Modelle nur mit Fähigkeit `decision`.
+ * Decision model (clef-flash, nimble …): optional, local profiles only.
+ * Its own card instead of TaskProviderPicker — no OpenRouter, „Aus" as a
+ * state, only models with the `decision` capability.
  */
 export function DecisionCard(): React.JSX.Element {
   const t = useT()
@@ -760,13 +760,13 @@ export function DecisionCard(): React.JSX.Element {
 
   const changeProfile = async (profileId: string): Promise<void> => {
     if (!profileId) return assign('', '')
-    // Vorwahl: clef-flash, sonst das erste Entscheidungsmodell des Servers
+    // Preselection: clef-flash, otherwise the server's first decision model
     let model = ''
     try {
       const list = await invoke('ai:profileModels', { profileId, manual: false, kind: 'decision' })
       model = (list.models.find((m) => m.id.startsWith('clef-flash')) ?? list.models[0])?.id ?? ''
     } catch {
-      // ohne Liste bleibt die Modellwahl leer – Freitext ist möglich
+      // without a list the model choice stays empty – free text is possible
     }
     assign(profileId, model)
   }
@@ -924,7 +924,7 @@ export function DecisionCard(): React.JSX.Element {
   )
 }
 
-// ── Auf Anforderung (Updates, Suchmodell) ───────────────────────────────────
+// ── On request (updates, search model) ──────────────────────────────────────
 
 export function OnDemandCard(): React.JSX.Element {
   const t = useT()

@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type -- Build-Tooling in .mjs */
-// Rastert build/icon.svg zu allen App-Icon-Artefakten:
-//   build/icon.icns   (macOS-Bundle, via iconutil)
-//   build/icon.png    (1024px, electron-builder-Fallback)
-//   resources/icon.png (512px, Dev-Dock-Icon)
-// Aufruf: node scripts/generate-icons.mjs
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- build tooling in .mjs */
+// Rasterizes build/icon.svg into all app icon artifacts:
+//   build/icon.icns   (macOS bundle, via iconutil)
+//   build/icon.png    (1024px, electron-builder fallback)
+//   resources/icon.png (512px, dev dock icon)
+// Usage: node scripts/generate-icons.mjs
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
@@ -24,7 +24,7 @@ const iconset = join(root, 'build/icon.iconset')
 rmSync(iconset, { recursive: true, force: true })
 mkdirSync(iconset, { recursive: true })
 
-// iconutil erwartet die Apple-Namenskonvention (Basisgröße + @2x-Variante).
+// iconutil expects Apple's naming convention (base size + @2x variant).
 const entries = [
   [16, 'icon_16x16.png'],
   [32, 'icon_16x16@2x.png'],

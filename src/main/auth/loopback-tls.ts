@@ -4,19 +4,19 @@ import { X509Certificate } from 'node:crypto'
 import { getDb } from '../db'
 
 /**
- * Zertifikat-Pinning für Loopback-Server (Proton Bridge & Co., SEC vuln-0010).
+ * Certificate pinning for loopback servers (Proton Bridge & co., SEC vuln-0010).
  *
- * Die Bridge präsentiert ein selbstsigniertes Zertifikat — eine CA-Prüfung ist
- * unmöglich. Ohne Pinning würde jeder lokale Prozess, der den Port vor der
- * Bridge belegt, Passwort und Mailverkehr erhalten. Deshalb Trust-on-first-use:
- * Beim ersten Verbinden wird der SHA-256-Fingerabdruck in
- * accounts.tls_fingerprint256 gespeichert, danach muss er passen.
+ * The Bridge presents a self-signed certificate — a CA check is
+ * impossible. Without pinning, any local process that grabs the port before the
+ * Bridge would receive the password and mail traffic. Hence trust-on-first-use:
+ * on the first connection the SHA-256 fingerprint is stored in
+ * accounts.tls_fingerprint256; after that it must match.
  *
- * Ablauf je Verbindung: Eine Probe-Verbindung (inkl. STARTTLS-Dialog) holt das
- * Zertifikat und vergleicht den Fingerabdruck mit dem Pin. Die eigentliche
- * Verbindung bekommt genau dieses Zertifikat als einzige CA plus einen
- * Fingerabdruck-Check — sie ist damit kryptografisch an den Pin gebunden,
- * bevor imapflow/nodemailer Zugangsdaten senden.
+ * Per connection: a probe connection (incl. STARTTLS dialog) fetches the
+ * certificate and compares its fingerprint with the pin. The actual
+ * connection gets exactly this certificate as its only CA plus a
+ * fingerprint check — it is thus cryptographically bound to the pin
+ * before imapflow/nodemailer send credentials.
  */
 
 export type LoopbackProtocol = 'imap' | 'smtp'
@@ -78,14 +78,14 @@ function writePins(accountId: number, pins: PinMap): void {
     .run(Object.keys(pins).length > 0 ? JSON.stringify(pins) : null, accountId)
 }
 
-/** Nutzer hat die Zugangsdaten neu eingegeben → dem aktuellen Zertifikat neu vertrauen. */
+/** User re-entered the credentials → trust the current certificate anew. */
 export function clearTlsPins(accountId: number): void {
   writePins(accountId, {})
 }
 
 const PROBE_TIMEOUT_MS = 10_000
 
-/** Liest Zeilen, bis eine `done(line)` erfüllt; `fail(line)` bricht ab. */
+/** Reads lines until one satisfies `done(line)`; `fail(line)` aborts. */
 function readUntil(
   socket: Socket,
   done: (line: string) => boolean,
@@ -156,7 +156,7 @@ async function startTls(socket: Socket, protocol: LoopbackProtocol): Promise<voi
   }
 }
 
-/** Holt das Server-Zertifikat (PEM) über eine eigene Probe-Verbindung. */
+/** Fetches the server certificate (PEM) over a separate probe connection. */
 export async function probeServerCertificate(
   host: string,
   port: number,
@@ -182,7 +182,7 @@ export async function probeServerCertificate(
     }
     const tlsSocket = tlsConnect({
       ...(plain ? { socket: plain } : { host, port }),
-      // Nur die Probe akzeptiert jedes Zertifikat — sie sendet keine Zugangsdaten.
+      // Only the probe accepts any certificate — it sends no credentials.
       rejectUnauthorized: false
     })
     secure = tlsSocket
@@ -202,9 +202,9 @@ export async function probeServerCertificate(
 }
 
 /**
- * TLS-Optionen für eine Loopback-Verbindung, gebunden an den gepinnten
- * Fingerabdruck. Ohne Konto-ID (Verbindungstest vor dem Anlegen) wird an das
- * Zertifikat der Probe gebunden, aber nichts gespeichert.
+ * TLS options for a loopback connection, bound to the pinned
+ * fingerprint. Without an account ID (connection test before creation) it is
+ * bound to the probe's certificate, but nothing is stored.
  */
 export async function pinnedLoopbackTls(
   accountId: number | null,
@@ -224,7 +224,7 @@ export async function pinnedLoopbackTls(
   return {
     rejectUnauthorized: true,
     ca: [pem],
-    // Hostname ist bei Loopback bedeutungslos — entscheidend ist der Pin.
+    // Hostname is meaningless on loopback — the pin is what matters.
     checkServerIdentity: (_host, cert) =>
       cert.fingerprint256 === fingerprint256 ? undefined : new TlsPinMismatchError(host, port)
   }

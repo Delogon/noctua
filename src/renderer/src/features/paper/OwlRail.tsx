@@ -14,7 +14,7 @@ import { RailAgenda } from '@renderer/features/calendar/RailAgenda'
 
 const RAIL_DRAFT_LIMIT = 5
 
-/** Zweite nicht-leere Zeile (nach der Anrede), sonst die erste. */
+/** Second non-empty line (after the greeting), otherwise the first. */
 function draftExcerptOf(text: string): string {
   return text.split('\n').filter((l) => l.trim())[1] ?? text.split('\n')[0] ?? ''
 }
@@ -35,11 +35,11 @@ function RailCard({ children }: { children: React.ReactNode }): React.JSX.Elemen
 }
 
 /**
- * Pose der Rail-Eule aus Composer-Zustand und Schlüssel-Status (Turn 4b):
- * Diktat → listen, Transkription/Entwurf → scan, kein Schlüssel → asleep,
- * sonst awake (blinzelt live).
+ * Pose of the rail owl from composer state and key status (Turn 4b):
+ * dictation → listen, transcription/draft → scan, no key → asleep,
+ * otherwise awake (blinks live).
  */
-// eslint-disable-next-line react-refresh/only-export-components -- Reine Hilfsfunktion, von Tests importiert
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper imported by tests
 export function railOwlPose(compMode: string, hasKey: boolean | undefined): OwlPose {
   if (compMode === 'listening') return 'listen'
   if (compMode === 'transcribing' || compMode === 'drafting') return 'scan'
@@ -49,12 +49,21 @@ export function railOwlPose(compMode: string, hasKey: boolean | undefined): OwlP
 
 export function OwlRail(): React.JSX.Element {
   const t = useT()
-  const { comp, setView, setMbox, setSelThreadKey, setSelWaitingId, filter, mbox, resetComp } =
-    usePaper()
+  const {
+    comp,
+    setView,
+    setMbox,
+    setSelThreadKey,
+    setSelWaitingId,
+    filter,
+    mbox,
+    folderId,
+    resetComp
+  } = usePaper()
   const toastNow = usePaper((s) => s.toastNow)
   const tasks = useTasks('open')
   const followups = useFollowups()
-  const activeThreads = useThreads(filter, mbox)
+  const activeThreads = useThreads(filter, mbox, folderId)
   const inboxThreads = useThreads(filter, 'inbox')
   const accounts = useAccounts()
   const savedDrafts = useDrafts()
@@ -69,7 +78,7 @@ export function OwlRail(): React.JSX.Element {
     ? inboxThreads.data?.find((th) => th.threadKey === comp.threadKey)
     : undefined
 
-  // Live-Puffer zuerst, dahinter alle gespeicherten Entwürfe (jüngste zuerst).
+  // Live buffer first, followed by all saved drafts (newest first).
   const liveKey = comp.text.trim() ? comp.threadKey : null
   const railDrafts: RailDraft[] = []
   if (liveKey) {
@@ -103,8 +112,8 @@ export function OwlRail(): React.JSX.Element {
   }
 
   const deleteRailDraft = (d: RailDraft): void => {
-    // Erst den Puffer leeren (löst die Sicherung aus), dann löschen — die
-    // IPC-Reihenfolge stellt sicher, dass das Löschen zuletzt gewinnt.
+    // First clear the buffer (triggers the save), then delete — the
+    // IPC order ensures the delete wins last.
     if (usePaper.getState().comp.threadKey === d.threadKey) resetComp()
     removeDraft(d.threadKey)
     toastNow(t('toastDraftDeleted'))
@@ -126,7 +135,7 @@ export function OwlRail(): React.JSX.Element {
 
   return (
     <div
-      className="flex w-[290px] flex-none flex-col gap-[11px] overflow-y-auto border-l border-ink"
+      className="flex w-full min-w-0 flex-col gap-[11px] overflow-y-auto border-l border-ink"
       style={{ background: 'var(--rail)', padding: '14px 15px 12px', boxSizing: 'border-box' }}
     >
       <div className="flex flex-none items-baseline gap-2">

@@ -1,20 +1,20 @@
 import { z } from 'zod'
 
-// Typisierter Client für Ollamas „System One"-API (Entscheidungsmodelle wie
-// clef-flash, clef, nimble, tev1): POST {root}/v1/systemone. Kein Chat, keine
-// Generierung, kein Streaming — das Modell beantwortet getippte Fragen
-// (choice / noul / score) mit Wahrscheinlichkeiten über einem gemeinsamen
-// `state`. Läuft nur lokal; Nutzung kostet 0 (Tokens werden trotzdem geloggt).
+// Typed client for Ollama's "System One" API (decision models like
+// clef-flash, clef, nimble, tev1): POST {root}/v1/systemone. No chat, no
+// generation, no streaming — the model answers typed questions
+// (choice / noul / score) with probabilities over a shared
+// `state`. Runs only locally; usage costs 0 (tokens are logged anyway).
 
-/** Ollama lehnt Bodies > 64 KiB (ohne Bilder) mit 413 ab; wir bleiben deutlich darunter. */
+/** Ollama rejects bodies > 64 KiB (without images) with 413; we stay well below that. */
 export const MAX_BODY_BYTES = 60 * 1024
-/** Obergrenze für den state-Text (Mail), bevor der Body-Guard greift. */
+/** Upper bound for the state text (mail) before the body guard kicks in. */
 export const MAX_STATE_BYTES = 40 * 1024
 export const MAX_QUESTIONS = 64
 const DEFAULT_TIMEOUT_MS = 60_000
 const TRUNCATION_MARKER = '\n[… gekürzt]'
 
-// --- Schemas (spiegeln die System-One-API: capabilities/decision + openapi.yaml) ------------------------------
+// --- Schemas (mirror the System One API: capabilities/decision + openapi.yaml) -------------------------------
 
 const instructionsSchema = z.string().trim().min(1)
 
@@ -80,21 +80,21 @@ export const responseSchema = z.object({
 })
 export type SystemOneResponse = z.infer<typeof responseSchema>
 
-// --- Fehler -----------------------------------------------------------------------------------
+// --- Errors -----------------------------------------------------------------------------------
 
 export type SystemOneErrorKind =
-  | 'model-missing' // 404: Modell nicht heruntergeladen
-  | 'not-decision' // 400: kein Entscheidungsmodell / nicht unterstützt
-  | 'context' // 400: Eingabe länger als das geladene Kontextfenster
+  | 'model-missing' // 404: model not downloaded
+  | 'not-decision' // 400: not a decision model / not supported
+  | 'context' // 400: input longer than the loaded context window
   | 'too-large' // 413
   | 'server' // 5xx
-  | 'network' // nicht erreichbar / Timeout
+  | 'network' // unreachable / timeout
   | 'invalid-response'
   | 'invalid-request'
 
 /**
- * `status` ist bewusst eine eigene Eigenschaft: classifyAiError() der AI-Queue
- * wertet sie aus (5xx = transient, 4xx = permanent) — ohne Sonderfall hier.
+ * `status` is deliberately a separate property: the AI queue's classifyAiError()
+ * evaluates it (5xx = transient, 4xx = permanent) — no special case here.
  */
 export class SystemOneError extends Error {
   readonly status?: number
@@ -107,7 +107,7 @@ export class SystemOneError extends Error {
   }
 }
 
-/** Konfigurationsfehler: Wiederholen hilft nicht, die klassische Triage kann übernehmen. */
+/** Configuration error: retrying won't help, classic triage can take over. */
 export function isDecisionConfigError(error: unknown): boolean {
   return (
     error instanceof SystemOneError &&
@@ -121,7 +121,7 @@ export function mapHttpError(status: number, body: string, model: string): Syste
     const parsed = JSON.parse(body) as { error?: unknown }
     if (typeof parsed.error === 'string') detail = parsed.error.slice(0, 300)
   } catch {
-    // Rohtext behalten
+    // keep raw text
   }
   if (status === 404) {
     return new SystemOneError(
@@ -161,12 +161,12 @@ export function mapHttpError(status: number, body: string, model: string): Syste
   return new SystemOneError('server', `Entscheidungsmodell: HTTP ${status}: ${detail}`, status)
 }
 
-// --- Request-Aufbau ---------------------------------------------------------------------------
+// --- Request building -------------------------------------------------------------------------
 
 const encoder = new TextEncoder()
 const byteLength = (s: string): number => encoder.encode(s).length
 
-/** `state` so kürzen, dass der JSON-Body unter `maxBytes` bleibt (nie mitten in einem Surrogatpaar). */
+/** Truncate `state` so the JSON body stays under `maxBytes` (never inside a surrogate pair). */
 export function fitState(
   state: string,
   buildBody: (state: string) => string,
@@ -178,7 +178,7 @@ export function fitState(
     current = cutText(current, MAX_STATE_BYTES)
     truncated = true
   }
-  // JSON-Escaping (\n, \", \uXXXX) bläht auf — iterativ proportional kürzen
+  // JSON escaping (\n, \", \uXXXX) inflates — truncate proportionally, iteratively
   for (let i = 0; i < 12; i++) {
     const size = byteLength(buildBody(current))
     if (size <= maxBytes) return { state: current, truncated }
@@ -195,14 +195,14 @@ function cutText(text: string, maxBytes: number): string {
   const budget = Math.max(0, maxBytes - marker)
   let end = Math.min(text.length, budget)
   while (end > 0 && byteLength(text.slice(0, end)) > budget) end = Math.floor(end * 0.9)
-  // kein halbes Surrogatpaar am Ende
+  // no half surrogate pair at the end
   const last = text.charCodeAt(end - 1)
   if (last >= 0xd800 && last <= 0xdbff) end -= 1
   return text.slice(0, end) + TRUNCATION_MARKER
 }
 
 export interface DecideParams {
-  /** Basis-URL des Profils (mit oder ohne /v1) */
+  /** Base URL of the profile (with or without /v1) */
   baseUrl: string
   apiKey?: string | null
   model: string
@@ -221,7 +221,7 @@ export interface DecideResult {
   model: string
 }
 
-/** Ollama-Wurzel: Basis-URL ohne abschließenden /v1 und ohne Slash. */
+/** Ollama root: base URL without trailing /v1 and without slash. */
 export function ollamaRoot(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '')
 }
@@ -240,7 +240,7 @@ export function buildRequestBody(
   })
 }
 
-/** Eine System-One-Anfrage. Validiert Anfrage und Antwort; wirft SystemOneError. */
+/** A System One request. Validates request and response; throws SystemOneError. */
 export async function decide(params: DecideParams): Promise<DecideResult> {
   const names = Object.keys(params.questions)
   if (names.length === 0 || names.length > MAX_QUESTIONS) {
@@ -324,7 +324,40 @@ export async function decide(params: DecideParams): Promise<DecideResult> {
   }
 }
 
-// --- Antwort-Helfer ---------------------------------------------------------------------------
+export interface DecideEachResult extends DecideResult {
+  /** Number of System One requests made */
+  calls: number
+}
+
+/**
+ * One request per question, run concurrently, each with its own state. Answers
+ * are merged and usage summed. Throws the first error (a config error on any
+ * call means the model is unusable; a transient one fails the whole decision).
+ */
+export async function decideEach(
+  params: Omit<DecideParams, 'questions' | 'state'>,
+  questions: Questions,
+  stateFor: (name: string) => string
+): Promise<DecideEachResult> {
+  const names = Object.keys(questions)
+  const results = await Promise.all(
+    names.map((name) =>
+      decide({ ...params, questions: { [name]: questions[name] }, state: stateFor(name) })
+    )
+  )
+  return {
+    answers: Object.assign({}, ...results.map((r) => r.answers)),
+    usage: {
+      inputTokens: results.reduce((sum, r) => sum + r.usage.inputTokens, 0),
+      outputTokens: results.reduce((sum, r) => sum + r.usage.outputTokens, 0)
+    },
+    truncated: results.some((r) => r.truncated),
+    model: results[0]?.model ?? params.model,
+    calls: results.length
+  }
+}
+
+// --- Response helpers -------------------------------------------------------------------------
 
 export function noulOf(answers: Record<string, Answer>, name: string): number {
   const a = answers[name]

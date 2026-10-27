@@ -1,6 +1,6 @@
-// Zitat-Historie („Am … schrieb …:", „On … wrote:", >-Blöcke, gmail_quote)
-// vom eigentlichen Nachrichtentext trennen — der Verlauf steckt in jeder
-// Antwort erneut und macht Threads sonst unlesbar.
+// Separate the quote history ("Am … schrieb …:", "On … wrote:", > blocks, gmail_quote)
+// from the actual message text — the history is contained again in every
+// reply and otherwise makes threads unreadable.
 
 const TEXT_MARKERS = [
   /^Am .{4,80} schrieb .{2,120}:\s*$/,
@@ -20,7 +20,7 @@ export function splitTextQuote(text: string): { visible: string; quoted: string 
       cut = i
       break
     }
-    // Beginn eines zusammenhängenden >-Zitatblocks (mind. 2 Zeilen)
+    // Start of a contiguous > quote block (at least 2 lines)
     if (line.startsWith('>') && (lines[i + 1] ?? '').trim().startsWith('>')) {
       cut = i
       break
@@ -47,7 +47,7 @@ export function splitHtmlQuote(html: string): { visible: string; quoted: string 
     const doc = new DOMParser().parseFromString(html, 'text/html')
     const first = doc.body.querySelector(HTML_QUOTE_SELECTORS)
     if (!first) return { visible: html, quoted: null }
-    // Das Zitat-Element plus alles danach (Signatur-Reste des Zitats etc.)
+    // The quote element plus everything after it (signature remnants of the quote etc.)
     const range = doc.createRange()
     range.setStartBefore(first)
     range.setEnd(doc.body, doc.body.childNodes.length)

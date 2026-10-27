@@ -6,9 +6,9 @@ import {
 } from '@renderer/features/composer/address-check'
 
 /**
- * Design 3a: Zweifelhafte Adressen (@ ohne Punkt in der Domain) behalten
- * ihren Chip — im Akzent, mit erklärendem title. Unbrauchbares wird gar
- * nicht erst zum Chip.
+ * Design 3a: Doubtful addresses (@ without a dot in the domain) keep
+ * their chip — in the accent color, with an explanatory title. Unusable input
+ * never becomes a chip.
  */
 describe('classifyAddress', () => {
   it('vollständige Adressen sind ok', () => {

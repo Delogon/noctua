@@ -2,16 +2,16 @@ import { useEffect, useState } from 'react'
 import { useT } from '@renderer/lib/i18n'
 import { useToast, type Toast } from '@renderer/stores/toast'
 
-/** Augen nur bei Eulen-Ursprung — und nie beim Countdown (Rec-Punkt gewinnt). */
-// eslint-disable-next-line react-refresh/only-export-components -- Reine Hilfsfunktion, von Tests und Toast-Komponente gemeinsam genutzt
+/** Eyes only for owl origin — and never on the countdown (rec dot wins). */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper shared by tests and the toast component
 export function showOwlEyes(toast: Pick<Toast, 'owl' | 'countdown'>): boolean {
   return Boolean(toast.owl) && !toast.countdown
 }
 
 /**
- * Die eine Toast-Leiste (Design 1c): Ink-Balken unten mittig, vier Varianten.
- * Countdown bekommt pulsierenden Rec-Punkt und eine 2px-Progress-Schiene,
- * Fehler einen Akzent-Rahmen und bleiben bis zum Schließen stehen.
+ * The one toast bar (Design 1c): ink bar at bottom center, four variants.
+ * Countdown gets a pulsing rec dot and a 2px progress rail,
+ * errors get an accent frame and stay until closed.
  */
 export function ToastHost(): React.JSX.Element | null {
   const current = useToast((s) => s.current)
@@ -22,8 +22,8 @@ export function ToastHost(): React.JSX.Element | null {
 
   const isCountdown = Boolean(current?.countdown)
 
-  // Tick nur fürs Zifferblatt und die Schiene des Countdowns (rein visuell —
-  // den Auto-Swap am Ende übernimmt der Store-Timer).
+  // Tick only for the countdown's dial and rail (purely visual —
+  // the store timer handles the auto-swap at the end).
   useEffect(() => {
     if (!isCountdown) return
     const iv = setInterval(() => setClock(Date.now()), 200)
@@ -32,8 +32,8 @@ export function ToastHost(): React.JSX.Element | null {
 
   if (!current) return null
 
-  // Beim ersten Render eines Countdowns ist die Uhr noch nicht getickt —
-  // dann ist createdAt (gerade eben) die genaueste Zeitquelle.
+  // On a countdown's first render the clock has not ticked yet —
+  // then createdAt (just now) is the most accurate time source.
   const now = Math.max(clock, current.createdAt)
   const cd = current.countdown
   const secondsLeft = cd ? Math.max(0, Math.ceil((cd.until - now) / 1000)) : 0
@@ -50,8 +50,8 @@ export function ToastHost(): React.JSX.Element | null {
           data-buttons={current.action || showDismiss ? '' : undefined}
         >
           {showOwlEyes(current) ? (
-            // Eulen-Ursprung: zwei Akzent-Augen statt Quadrat — der Rec-Punkt
-            // des Countdowns hat immer Vorrang.
+            // Owl origin: two accent eyes instead of a square — the countdown's
+            // rec dot always takes precedence.
             <span className="toast-bar__eyes" aria-hidden="true">
               <span />
               <span />

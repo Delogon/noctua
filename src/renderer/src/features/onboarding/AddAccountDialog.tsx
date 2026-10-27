@@ -7,8 +7,8 @@ import { useEscapeClose } from '@renderer/lib/useEscapeClose'
 type Provider = 'gmail' | 'microsoft' | 'imap'
 
 /**
- * Konto-Onboarding. Gmail und Microsoft über OAuth im System-Browser
- * (kein Passwort in der App), generisches IMAP mit Host/Port und Passwort.
+ * Account onboarding. Gmail and Microsoft via OAuth in the system browser
+ * (no password in the app), generic IMAP with host/port and password.
  */
 export function AddAccountDialog(): React.JSX.Element | null {
   const t = useT()
@@ -25,7 +25,7 @@ export function AddAccountDialog(): React.JSX.Element | null {
   const [imapPort, setImapPort] = useState('993')
   const [smtpHost, setSmtpHost] = useState('')
   const [smtpPort, setSmtpPort] = useState('465')
-  // '' = Standard (90 Tage Liste / 183 Tage Suche), '0' = alles, sonst Tage
+  // '' = default (90 days list / 183 days search), '0' = everything, otherwise days
   const [syncDays, setSyncDays] = useState('')
 
   if (!addAccountOpen) return null
@@ -40,7 +40,7 @@ export function AddAccountDialog(): React.JSX.Element | null {
     setPassword('')
   }
 
-  // Gmail und Microsoft laufen über den Browser-Login mit eigenem Button
+  // Gmail and Microsoft go through the browser login with their own button
   const oauth =
     provider === 'microsoft'
       ? {
@@ -60,7 +60,7 @@ export function AddAccountDialog(): React.JSX.Element | null {
 
   const submit = (event: React.FormEvent): void => {
     event.preventDefault()
-    if (provider !== 'imap') return // OAuth-Provider haben einen eigenen Login-Button
+    if (provider !== 'imap') return // OAuth providers have their own login button
     addAccount.mutate(
       {
         provider,

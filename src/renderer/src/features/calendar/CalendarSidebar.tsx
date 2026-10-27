@@ -12,16 +12,16 @@ import { addMonths, dayKey, isSameDay, monthGrid, parseDayKey, viewDays } from '
 import { CALENDAR_PALETTE, colorMapOf } from './palette'
 import { locale, weekdayShort } from './format'
 
-// Seitenleiste der Kalenderansicht (linke Spalte): Mini-Monat zum Navigieren und die
-// Kalender-Legende mit Sichtbarkeit und Farbwahl. Die Farbe kommt aus einer kleinen
-// festen Palette; „Standard" gibt die Serverfarbe wieder frei.
+// Sidebar of the calendar view (left column): mini month for navigation and the
+// calendar legend with visibility and color choice. The color comes from a small
+// fixed palette; "Default" restores the server color.
 
 function MiniMonth(): React.JSX.Element {
   const t = useT()
   const lang = useI18n((s) => s.lang)
   const { anchor, mode, setAnchor } = useCalendar()
   const anchorDate = useMemo(() => parseDayKey(anchor), [anchor])
-  // Angezeigter Monat folgt dem Anker, lässt sich aber unabhängig blättern
+  // Displayed month follows the anchor but can be paged independently
   const [shown, setShown] = useState<{ key: string; offset: number }>({ key: anchor, offset: 0 })
   const offset = shown.key === anchor ? shown.offset : 0
   const monthDate = addMonths(new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1), offset)

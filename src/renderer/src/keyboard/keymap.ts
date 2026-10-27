@@ -5,9 +5,9 @@ import { useToast } from '@renderer/stores/toast'
 import { accountFilterForHotkey } from './account-hotkeys'
 import { calendarKeyAction } from '@renderer/features/calendar/keys'
 
-// Letterpress-Keymap — direkter Port des Behavior-Specs (Component.onKey im
-// Handoff-Prototyp): kontextuelle Enter-Praezedenz und Esc-Kaskade.
-// (Die fruehere g-Sequenz wurde in 0.49 ersatzlos ausgebaut.)
+// Letterpress keymap — direct port of the behavior spec (Component.onKey in the
+// handoff prototype): contextual Enter precedence and Esc cascade.
+// (The former g sequence was removed without replacement in 0.49.)
 
 function dispatch(
   scope: 'mail' | 'waiting' | 'task' | 'owl' | 'compose' | 'calendar',
@@ -25,15 +25,15 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
     const typing = tag === 'INPUT' || tag === 'TEXTAREA' || !!target?.isContentEditable
     const withinComposer = !!target?.closest('.mail-composer')
 
-    // Cmd-Kombis (laufen zusaetzlich uebers native Menue; hier fuer Vollbild & Co.)
+    // Cmd combos (also run via the native menu; here for fullscreen & co.)
     if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
       e.preventDefault()
       paper.setPaletteOpen(!paper.paletteOpen)
       paper.setHelpOpen(false)
       return
     }
-    // ⌘Z gehört NUR dem sichtbaren Undo-Send-Countdown; beim Tippen bleibt
-    // es das native Undo des fokussierten Felds.
+    // ⌘Z belongs ONLY to the visible undo-send countdown; while typing it
+    // stays the native undo of the focused field.
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
       const current = useToast.getState().current
       if (!typing && current?.kind === 'countdown' && current.action) {
@@ -49,8 +49,8 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
       )
       return
     }
-    // ⌘F = Suchen: öffnet die Owl-View mit fokussiertem Feld (läuft
-    // zusätzlich übers native Menü; hier für den Fall ohne App-Menü).
+    // ⌘F = search: opens the Owl view with the field focused (also runs
+    // via the native menu; here for the case without an app menu).
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
       e.preventDefault()
       paper.setView('chat')
@@ -63,7 +63,7 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
         dispatch('mail', 'dictate')
         return
       }
-      // Stups-Composer: Diktat auch in der Wartet-Ansicht
+      // Nudge composer: dictation in the Waiting view too
       if (paper.view === 'waiting') {
         e.preventDefault()
         dispatch('waiting', 'dictate')
@@ -76,7 +76,7 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
         dispatch('mail', 'elaborate')
         return
       }
-      // Stups neu formulieren — das Sheet prüft selbst, ob Text da ist
+      // Rephrase nudge — the sheet checks itself whether there is text
       if (paper.view === 'waiting') {
         e.preventDefault()
         dispatch('waiting', 'elaborate')
@@ -89,8 +89,8 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
         dispatch('mail', 'enter')
         return
       }
-      // Stups senden verlangt bewusst ⌘↵ — ein unfokussiertes Enter darf
-      // keine echte Mail auslösen.
+      // Sending a nudge deliberately requires ⌘↵ — an unfocused Enter must
+      // not trigger a real mail.
       if (paper.view === 'waiting') {
         e.preventDefault()
         dispatch('waiting', 'enter')
@@ -112,29 +112,29 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
         paper.setHelpOpen(false)
         return
       }
-      // Kategorie-Override schließt zuerst (das Overlay selbst hört ebenfalls auf Esc)
+      // Category override closes first (the overlay itself also listens for Esc)
       if (ui.overrideMenuOpen) {
         ui.setOverrideMenuOpen(false)
         return
       }
-      // Esc-Kaskade der Owl-View: erst das Suchfeld leeren, dann wie gewohnt.
-      // (Bei fokussiertem Feld übernimmt dessen Handler und stoppt das Event.)
+      // Esc cascade of the Owl view: first clear the search field, then as usual.
+      // (With the field focused, its handler takes over and stops the event.)
       if (paper.view === 'chat' && useOwl.getState().query) {
         useOwl.getState().setQuery('')
         return
       }
-      // Kalender: Esc schließt der Reihe nach Löschen-Dialog, Schnell-Anlegen, Editor, Auswahl
+      // Calendar: Esc closes in order delete dialog, quick create, editor, selection
       if (paper.view === 'calendar') {
         dispatch('calendar', 'escape')
         return
       }
-      // Compose-Ansicht: Esc legt den Entwurf ab und kehrt in den Posteingang
-      // zurück (Design 3a). Menüs/Dropdowns stoppen das Event vorher selbst.
+      // Compose view: Esc files the draft and returns to the inbox
+      // (Design 3a). Menus/dropdowns stop the event themselves beforehand.
       if (paper.view === 'compose') {
         dispatch('compose', 'escape')
         return
       }
-      // Wartet-Ansicht: Esc bricht ein laufendes Stups-Diktat bzw. -Formulieren ab
+      // Waiting view: Esc aborts a running nudge dictation or rephrasing
       if (paper.view === 'waiting') {
         dispatch('waiting', 'escape')
         return
@@ -148,22 +148,22 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
 
     if (typing) return
     if (paper.paletteOpen || paper.helpOpen || paper.onboarding) return
-    // Offenes Override-Menü besitzt 1–7/0, ↑↓ und ↵ selbst (tinykeys im Overlay) —
-    // sonst würden die Ziffern zugleich den Kontofilter umschalten.
+    // An open override menu owns 1–7/0, ↑↓ and ↵ itself (tinykeys in the overlay) —
+    // otherwise the digits would also toggle the account filter.
     if (ui.overrideMenuOpen) return
 
     if (e.metaKey || e.ctrlKey || e.altKey) return
     const k = e.key
     const view = paper.view
 
-    // Kalender-Tasten (d/w/m, t, j/k, ←/→, n, ↵, e, ⌫): nur in der Kalenderansicht und nicht
-    // aus dem Editor/Dialog heraus — dort gehören Enter/Rücktaste den Bedienelementen.
+    // Calendar keys (d/w/m, t, j/k, ←/→, n, ↵, e, ⌫): only in the calendar view and not
+    // from within the editor/dialog — there Enter/Backspace belong to the controls.
     if (view === 'calendar' && !e.shiftKey && !target?.closest('[data-cal-modal]')) {
       const action = calendarKeyAction(k)
-      // Enter auf einem fokussierten Knopf löst dessen eigenen Klick aus (Termin-Block, Seitenleiste)
+      // Enter on a focused button triggers its own click (event block, sidebar)
       if (action && !(k === 'Enter' && tag === 'BUTTON')) {
         e.preventDefault()
-        // Neuer Termin/Öffnen/Löschen nicht per Tastenwiederholung mehrfach auslösen
+        // Don't trigger new event/open/delete multiple times via key repeat
         if (e.repeat && (action === 'new' || action === 'open' || action === 'delete')) return
         dispatch('calendar', action)
         return
@@ -209,7 +209,7 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
       return
     }
     if (k === 'i') {
-      // 5c: „Braucht dich" — Sitzungsfilter auf Rang 4+
+      // 5c: "Needs you" — session filter on rank 4+
       if (view === 'inbox') paper.toggleInboxFilter('needsYou')
       return
     }
@@ -222,7 +222,7 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
       return
     }
     if (k === 'a') {
-      // M80: Allen antworten — wie r, aber mit CC an die übrigen Empfänger
+      // M80: Reply all — like r, but with CC to the other recipients
       if (view === 'inbox' && paper.mbox === 'inbox') dispatch('mail', 'replyAll')
       return
     }
@@ -255,12 +255,12 @@ export function installPaperKeymap(accountIds: () => readonly number[]): () => v
       return
     }
     if (k === 'l') {
-      // Kategorie-Override (Design 3d): öffnet das Menü auf dem selektierten Thread
+      // Category override (Design 3d): opens the menu on the selected thread
       if (view === 'inbox' && paper.mbox === 'inbox') dispatch('mail', 'override')
       return
     }
     if (k === '/') {
-      // Mailsuche wohnt bei der Eule: View öffnen und Feld fokussieren (⌘K bleibt Palette)
+      // Mail search lives with the owl: open the view and focus the field (⌘K stays the palette)
       e.preventDefault()
       paper.setView('chat')
       useOwl.getState().requestFocus()

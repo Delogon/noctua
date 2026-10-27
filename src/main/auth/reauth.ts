@@ -1,8 +1,8 @@
 /**
- * Erkennung von „Anmeldung nötig"-Fehlern bei OAuth-Konten. Ein widerrufenes
- * oder abgelaufenes Refresh-Token hilft kein Reconnect-Loop — die Sync-Engine
- * mappt solche Fehler auf den Zustand `needs-reauth` (siehe isAuthFailure in
- * account-syncer.ts), die UI bietet dann „Erneut anmelden" an.
+ * Detection of "sign-in required" errors for OAuth accounts. A reconnect loop
+ * does not help with a revoked or expired refresh token — the sync engine
+ * maps such errors to the `needs-reauth` state (see isAuthFailure in
+ * account-syncer.ts), and the UI then offers "Sign in again".
  */
 export class ReauthRequiredError extends Error {
   readonly needsReauth = true
@@ -19,7 +19,7 @@ export function isReauthError(error: unknown): boolean {
   )
 }
 
-/** OAuth-Fehlercodes, bei denen nur eine interaktive Anmeldung weiterhilft. */
+/** OAuth error codes where only an interactive sign-in helps. */
 const REAUTH_CODES = new Set([
   'invalid_grant',
   'interaction_required',
@@ -31,10 +31,10 @@ const REAUTH_CODES = new Set([
 ])
 
 /**
- * MSAL wirft bei abgelaufenem/widerrufenem Refresh-Token eine
- * InteractionRequiredAuthError (errorCode z. B. invalid_grant /
- * interaction_required). Duck-Typing statt instanceof: robust gegen mehrfach
- * gebündelte msal-common-Kopien und in Tests ohne MSAL-Klassen konstruierbar.
+ * On an expired/revoked refresh token MSAL throws an
+ * InteractionRequiredAuthError (errorCode e.g. invalid_grant /
+ * interaction_required). Duck typing instead of instanceof: robust against multiple
+ * bundled msal-common copies and constructible in tests without MSAL classes.
  */
 export function isMsalReauthError(error: unknown): boolean {
   const e = error as { name?: unknown; errorCode?: unknown; subError?: unknown } | null
@@ -46,7 +46,7 @@ export function isMsalReauthError(error: unknown): boolean {
   )
 }
 
-/** Wandelt MSAL-Refresh-Fehler in ReauthRequiredError; alles andere bleibt unverändert. */
+/** Converts MSAL refresh errors into ReauthRequiredError; everything else stays unchanged. */
 export function mapMsalError(error: unknown): unknown {
   if (isMsalReauthError(error)) {
     const detail = error instanceof Error ? error.message : String(error)
@@ -57,7 +57,7 @@ export function mapMsalError(error: unknown): unknown {
   return error
 }
 
-/** Google-Token-Endpoint: error-Feld der JSON-Antwort. */
+/** Google token endpoint: error field of the JSON response. */
 export function isGoogleReauthCode(code: string | undefined): boolean {
   return code === 'invalid_grant'
 }

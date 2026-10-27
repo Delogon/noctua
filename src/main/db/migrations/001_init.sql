@@ -1,4 +1,4 @@
--- Noctua Schema v1: Konten, Ordner, Nachrichten, AI-Annotationen, Sync-State.
+-- Noctua schema v1: accounts, folders, messages, AI annotations, sync state.
 
 CREATE TABLE accounts (
   id INTEGER PRIMARY KEY,
@@ -10,13 +10,13 @@ CREATE TABLE accounts (
   imap_port INTEGER NOT NULL,
   smtp_host TEXT NOT NULL,
   smtp_port INTEGER NOT NULL,
-  tls_fingerprint256 TEXT,              -- Cert-Pinning (Proton Bridge)
+  tls_fingerprint256 TEXT,              -- Cert pinning (Proton Bridge)
   ai_enabled INTEGER NOT NULL DEFAULT 1,
   color TEXT,
   created_at INTEGER NOT NULL
 );
 
--- Werte sind safeStorage-verschlüsselte Ciphertexte, nie Klartext.
+-- Values are safeStorage-encrypted ciphertexts, never plaintext.
 CREATE TABLE secrets (
   key TEXT PRIMARY KEY,
   ciphertext BLOB NOT NULL,
@@ -46,11 +46,11 @@ CREATE TABLE messages (
   account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   folder_id INTEGER NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
   uid INTEGER NOT NULL,
-  gm_msgid TEXT,                        -- Gmail X-GM-MSGID (Dedupe)
-  gm_thrid TEXT,                        -- Gmail X-GM-THRID (autoritatives Threading)
+  gm_msgid TEXT,                        -- Gmail X-GM-MSGID (dedupe)
+  gm_thrid TEXT,                        -- Gmail X-GM-THRID (authoritative threading)
   message_id TEXT,
   in_reply_to TEXT,
-  refs TEXT,                            -- References-Header, whitespace-getrennt
+  refs TEXT,                            -- References header, whitespace-separated
   thread_key TEXT NOT NULL,
   subject TEXT,
   from_addr TEXT,
@@ -78,7 +78,7 @@ CREATE INDEX idx_msg_gm_msgid ON messages(gm_msgid);
 CREATE TABLE message_bodies (
   message_id INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
   text_plain TEXT,
-  html_raw TEXT                         -- Sanitizing erst beim Rendern (DOMPurify)
+  html_raw TEXT                         -- Sanitized only at render time (DOMPurify)
 );
 
 CREATE TABLE attachments (
@@ -88,8 +88,8 @@ CREATE TABLE attachments (
   filename TEXT,
   mime_type TEXT,
   size INTEGER,
-  content_id TEXT,                      -- für cid:-Inline-Bilder
-  local_path TEXT                       -- NULL bis heruntergeladen
+  content_id TEXT,                      -- for cid: inline images
+  local_path TEXT                       -- NULL until downloaded
 );
 CREATE INDEX idx_att_message ON attachments(message_id);
 
@@ -102,7 +102,7 @@ CREATE TABLE ai_annotations (
   action_items_json TEXT,
   needs_reply INTEGER NOT NULL DEFAULT 0,
   confidence REAL,
-  user_override_category TEXT,          -- manuelle Korrektur schlägt das Modell dauerhaft
+  user_override_category TEXT,          -- manual correction permanently overrides the model
   model TEXT,
   prompt_version INTEGER NOT NULL,
   input_tokens INTEGER,
@@ -111,7 +111,7 @@ CREATE TABLE ai_annotations (
   created_at INTEGER NOT NULL
 );
 
--- UNIQUE(message_id, kind) ist zugleich der Scan-Cache: nie zweimal scannen.
+-- UNIQUE(message_id, kind) doubles as the scan cache: never scan twice.
 CREATE TABLE ai_jobs (
   id INTEGER PRIMARY KEY,
   message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
@@ -135,7 +135,7 @@ CREATE TABLE ai_usage_log (
   UNIQUE (day, model)
 );
 
--- Offline-fähige Schreib-Operationen Richtung IMAP (optimistische UI).
+-- Offline-capable write operations towards IMAP (optimistic UI).
 CREATE TABLE op_queue (
   id INTEGER PRIMARY KEY,
   account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -145,7 +145,7 @@ CREATE TABLE op_queue (
   created_at INTEGER NOT NULL
 );
 
--- Prioritäts-Boost ("hat Tim dem je geschrieben?") + Stilbeispiel-Auswahl.
+-- Priority boost ("has Tim ever written to them?") + style example selection.
 CREATE TABLE contact_stats (
   account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   addr TEXT NOT NULL,
@@ -155,7 +155,7 @@ CREATE TABLE contact_stats (
   PRIMARY KEY (account_id, addr)
 );
 
--- Contentless FTS5; rowid = messages.id, Befüllung explizit im Ingest-Code.
+-- Contentless FTS5; rowid = messages.id, populated explicitly in the ingest code.
 CREATE VIRTUAL TABLE messages_fts USING fts5(
   subject, sender, recipients, body,
   content = '',

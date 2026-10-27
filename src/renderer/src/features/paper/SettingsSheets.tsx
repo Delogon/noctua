@@ -20,7 +20,8 @@ import {
   TaskProviderPicker,
   DecisionCard
 } from '@renderer/features/settings/AiProvidersSection'
-import { usePaper } from '@renderer/stores/paper'
+import { usePaper, type PaperLayout } from '@renderer/stores/paper'
+import { PANE_LIMITS } from '@renderer/features/paper/pane-layout'
 import { rowTime, useI18n, useT } from '@renderer/lib/i18n'
 import { useStyleMeta, useStyleProfile } from '@renderer/features/paper/useVoiceTag'
 import {
@@ -93,10 +94,10 @@ export function AccountsSheet(): React.JSX.Element {
   const [pass, setPass] = useState('')
   const [busy, setBusy] = useState(false)
   const [oauthWaiting, setOauthWaiting] = useState<'microsoft' | 'gmail' | null>(null)
-  // Ein per CANCEL abgebrochener Login verwirft sein invoke — dieser Marker
-  // unterscheidet den stillen Abbruch von echten Fehlern (Design 3b).
+  // A login aborted via CANCEL discards its invoke — this marker
+  // distinguishes the silent abort from real errors (Design 3b).
   const oauthCanceled = useRef(false)
-  // '' = Standard (90 Tage Liste / 183 Tage Suche), '0' = alles, sonst Tage
+  // '' = default (90 days list / 183 days search), '0' = everything, else days
   const [syncDays, setSyncDays] = useState('')
   const parsedSyncDays = (): number | undefined => (syncDays === '' ? undefined : Number(syncDays))
 
@@ -104,7 +105,7 @@ export function AccountsSheet(): React.JSX.Element {
     void queryClient.invalidateQueries({ queryKey: ['accounts'] })
   }
 
-  // Gmail und Microsoft melden sich im System-Browser an — kein Passwort in der App
+  // Gmail and Microsoft sign in in the system browser — no password in the app
   const addOauth = (provider: 'microsoft' | 'gmail'): void => {
     if (!accountName.trim()) {
       toastNow(t('toastAccountNameRequired'))
@@ -121,14 +122,14 @@ export function AccountsSheet(): React.JSX.Element {
         refresh()
       })
       .catch((err) => {
-        // Selbst abgebrochen: die verschwundene Wartezeile ist Feedback genug
+        // Aborted by the user: the vanished waiting row is feedback enough
         if (oauthCanceled.current) return
         toastNow(err instanceof Error ? err.message : String(err))
       })
       .finally(() => setOauthWaiting(null))
   }
 
-  /** CANCEL beendet den OAuth-Roundtrip wirklich — Loopback-Server inklusive. */
+  /** CANCEL really ends the OAuth round trip — loopback server included. */
   const cancelOauth = (): void => {
     if (!oauthWaiting) return
     oauthCanceled.current = true
@@ -155,7 +156,7 @@ export function AccountsSheet(): React.JSX.Element {
         ? {
             imapHost: host.trim(),
             imapPort: Number(imapPort) || 993,
-            // Leer = wie bisher aus dem IMAP-Host abgeleitet (imap. → smtp.)
+            // Empty = derived from the IMAP host as before (imap. → smtp.)
             smtpHost: smtpHost.trim() || host.trim().replace(/^imap\./, 'smtp.'),
             smtpPort: Number(smtpPort) || 587
           }
@@ -246,7 +247,7 @@ export function AccountsSheet(): React.JSX.Element {
         </button>
       </div>
       {oauthWaiting && (
-        // Warten auf den Browser-Login (Design 3b) — statt eines nackten „···"
+        // Waiting for the browser login (Design 3b) — instead of a bare „···"
         <div className="tint-card" style={{ padding: '11px 13px', marginTop: 12 }}>
           <div className="flex items-center gap-3">
             <span
@@ -395,14 +396,15 @@ export function AccountsSheet(): React.JSX.Element {
       <TasksSyncSection />
       <div className="double-rule" style={{ marginTop: 18 }} />
       <RemoteImagesPrivacy />
+      <SecuritySettings />
     </SheetShell>
   )
 }
 
 /**
- * Eine Konto-Karte im Konten-Sheet. Im Fehlerzustand steht der GESPEICHERTE
- * Fehlertext inline unter der Adresse („IMAP: connection refused (993) —
- * seit 11:42") — ein Accent-Wort allein ist keine Diagnose (Design 3b).
+ * An account card in the accounts sheet. In the error state the SAVED error
+ * text is shown inline under the address („IMAP: connection refused (993) —
+ * seit 11:42") — an accent word alone is no diagnosis (Design 3b).
  */
 function AccountCard({
   account: a,
@@ -465,9 +467,9 @@ function AccountCard({
 }
 
 /**
- * Zugangsdaten erneuern: bei Passwort-/Bridge-Konten ein Inline-Feld (der
- * Server-Login wird vor dem Speichern geprüft), bei Google/Microsoft der
- * Browser-Login erneut. Im Fehlerzustand hervorgehoben, sonst dezent.
+ * Renew credentials: for password/Bridge accounts an inline field (the
+ * server login is verified before saving), for Google/Microsoft the browser
+ * login again. Highlighted in the error state, otherwise subtle.
  */
 function CredentialsRow({
   account,
@@ -612,9 +614,9 @@ function CredentialsRow({
 }
 
 /**
- * Rechte Seite einer Konto-Karte: Status/RETRY plus Trennen mit
- * Zweitklick-Bestätigung — der erste Klick spannt YES, DISCONNECT / KEEP,
- * Esc, Blur oder 5 s ohne Entscheidung entspannen wieder (Design 3b).
+ * Right side of an account card: status/RETRY plus disconnect with
+ * second-click confirmation — the first click arms YES, DISCONNECT / KEEP;
+ * Esc, blur or 5 s without a decision disarm it again (Design 3b).
  */
 function AccountRowActions({
   account,
@@ -630,20 +632,20 @@ function AccountRowActions({
   const yesRef = useRef<HTMLButtonElement | null>(null)
   const disarm = (event: ConfirmEvent): void => setArmed(confirmAfter(event))
 
-  // 5-s-Fenster: ohne Entscheidung fällt die Bestätigung von selbst zurück
+  // 5 s window: without a decision the confirmation falls back on its own
   useEffect(() => {
     if (!armed) return
     const timer = setTimeout(() => setArmed(confirmAfter('timeout')), DISCONNECT_CONFIRM_WINDOW_MS)
     return () => clearTimeout(timer)
   }, [armed])
 
-  // Fokus auf YES — damit Esc und Blur natürlich greifen
+  // Focus on YES — so Esc and blur apply naturally
   useEffect(() => {
     if (armed) yesRef.current?.focus()
   }, [armed])
 
   const retry = (): void => {
-    // RETRY weckt genau dieses Konto — refreshNow bricht auch den Backoff ab
+    // RETRY wakes exactly this account — refreshNow also cancels the backoff
     void invoke('sync:trigger', { accountId: account.id }).catch(() => {})
   }
 
@@ -751,7 +753,7 @@ function AccountRowActions({
   )
 }
 
-/** Sync-Zeitraum eines bestehenden Kontos ändern — der Syncer startet danach neu. */
+/** Change the sync range of an existing account — the syncer restarts afterwards. */
 function SyncRangeRow({ account }: { account: AccountSummary }): React.JSX.Element {
   const t = useT()
   const queryClient = useQueryClient()
@@ -919,7 +921,7 @@ function AccountNameEditor({ account }: { account: AccountSummary }): React.JSX.
   )
 }
 
-/** Pastell-Farbwahl pro Konto — färbt die Badges in Liste und Glyphen. */
+/** Pastel color choice per account — colors the badges in list and glyphs. */
 function ColorRow({ account }: { account: AccountSummary }): React.JSX.Element {
   const t = useT()
   const queryClient = useQueryClient()
@@ -963,11 +965,11 @@ function ColorRow({ account }: { account: AccountSummary }): React.JSX.Element {
 }
 
 /**
- * Privacy-Einstellungen (Design 3b): Remote-Bilder sind standardmäßig BLOCKIERT,
- * bis der Nutzer sie erlaubt — als Schutz formuliert, Default entspricht dem
- * Privacy-Versprechen. Nur ein explizites '1' lädt automatisch; gespeicherte
- * Entscheidungen von Bestandsnutzern bleiben unangetastet. Dazu der
- * Sperrbildschirm-Schutz für Benachrichtigungen (vuln-0015).
+ * Privacy settings (Design 3b): remote images are BLOCKED by default until
+ * the user allows them — phrased as protection, the default matches the
+ * privacy promise. Only an explicit '1' loads automatically; saved decisions
+ * of existing users stay untouched. Plus the lock-screen protection for
+ * notifications (vuln-0015).
  */
 function RemoteImagesPrivacy(): React.JSX.Element {
   const t = useT()
@@ -1017,6 +1019,38 @@ function RemoteImagesPrivacy(): React.JSX.Element {
   )
 }
 
+/**
+ * Spam & phishing: warnings always run (local rules, possibly decision model);
+ * mail is moved automatically only after explicitly switching it on.
+ */
+function SecuritySettings(): React.JSX.Element {
+  const t = useT()
+  const [autoJunk, setAutoJunk] = useState(false)
+  useEffect(() => {
+    void invoke('settings:get', { key: 'security.autoJunk' }).then((r) =>
+      setAutoJunk(r.value === '1')
+    )
+  }, [])
+  const toggle = (): void => {
+    const next = !autoJunk
+    setAutoJunk(next)
+    void invoke('settings:set', { key: 'security.autoJunk', value: next ? '1' : '0' })
+  }
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div className="mlabel" style={{ color: 'var(--muted)' }}>
+        {t('securityHead')}
+      </div>
+      <PrivacyToggle
+        on={autoJunk}
+        onToggle={toggle}
+        label={t('securityAutoJunkToggle')}
+        note={t('securityAutoJunkNote')}
+      />
+    </div>
+  )
+}
+
 function PrivacyToggle({
   on,
   onToggle,
@@ -1040,7 +1074,7 @@ function PrivacyToggle({
           <span
             className="toggle-dot"
             style={{
-              background: on ? '#F4F1EA' : 'var(--ink)',
+              background: on ? 'var(--paper)' : 'var(--ink)',
               marginLeft: on ? 12 : 0
             }}
           />
@@ -1060,15 +1094,15 @@ function VoiceCard({ account }: { account: AccountSummary }): React.JSX.Element 
   const { toastNow } = usePaper()
   const [training, setTraining] = useState(false)
   const [pct, setPct] = useState(0)
-  // Ehrlich gescheitertes Nachlernen (Design 3e): echter Fehlertext, kein 100 %
+  // Honestly failed retraining (Design 3e): real error text, no 100 %
   const [failure, setFailure] = useState<string | null>(null)
   const [learn, setLearn] = useState(true)
   const [rules, setRules] = useState('')
   const [rulesFlash, setRulesFlash] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
   const [previewing, setPreviewing] = useState(false)
-  // Anweisungen: letzter Stand + zuletzt gespeicherter Stand — für Blur-Save
-  // UND den Unmount-Flush (keine verlorenen Änderungen, Design 3e)
+  // Instructions: latest state + last saved state — for blur save
+  // AND the unmount flush (no lost changes, Design 3e)
   const latestRules = useRef('')
   const savedRules = useRef('')
 
@@ -1094,7 +1128,7 @@ function VoiceCard({ account }: { account: AccountSummary }): React.JSX.Element 
     })
   }
 
-  // Unmount-Flush: Sheet-Wechsel mitten im Tippen verliert nichts (Design 3e)
+  // Unmount flush: switching sheets mid-typing loses nothing (Design 3e)
   useEffect(() => {
     return () => {
       const value = latestRules.current.trim()
@@ -1128,9 +1162,9 @@ function VoiceCard({ account }: { account: AccountSummary }): React.JSX.Element 
           }, 300)
           return
         }
-        // ok:false heißt: kein Schlüssel oder kein Korpus — Balken einfrieren,
-        // Grund inline sagen, RETRY anbieten. Nie still 100 % (Design 3e / M53).
-        // Der Grund wird LIVE geprüft, nicht aus dem Query-Cache geraten.
+        // ok:false means: no key or no corpus — freeze the bar,
+        // state the reason inline, offer RETRY. Never silently 100 % (Design 3e / M53).
+        // The reason is checked LIVE, not guessed from the query cache.
         const { exists } = await invoke('secrets:exists', { key: 'openrouter.apiKey' })
         setFailure(exists ? t('voiceNoSent') : t('owlAskDisabled'))
         setTraining(false)
@@ -1209,7 +1243,7 @@ function VoiceCard({ account }: { account: AccountSummary }): React.JSX.Element 
         </div>
       )}
       {(training || failure !== null) && (
-        // Gescheitert friert der Balken ein — das Intervall stoppt mit training
+        // On failure the bar freezes — the interval stops with training
         <div style={{ height: 4, background: 'var(--hairline-light)', marginTop: 11 }}>
           <div
             style={{
@@ -1298,7 +1332,10 @@ function VoiceCard({ account }: { account: AccountSummary }): React.JSX.Element 
           >
             <span
               className="toggle-dot"
-              style={{ background: learn ? '#F4F1EA' : 'var(--ink)', marginLeft: learn ? 12 : 0 }}
+              style={{
+                background: learn ? 'var(--paper)' : 'var(--ink)',
+                marginLeft: learn ? 12 : 0
+              }}
             />
           </span>
           <span style={{ font: '400 9px var(--mono)', color: 'var(--muted)' }}>
@@ -1326,7 +1363,7 @@ function VoiceCard({ account }: { account: AccountSummary }): React.JSX.Element 
   )
 }
 
-/** Frische-Text der Voice-Card: „updated today / yesterday / {n} days ago". */
+/** Freshness text of the voice card: „updated today / yesterday / {n} days ago". */
 function freshnessLabel(t: ReturnType<typeof useT>, updatedAt: number): string {
   const fresh = freshnessOf(updatedAt, Date.now())
   if (fresh.kind === 'today') return t('updatedToday')
@@ -1395,9 +1432,9 @@ export function StyleSheetView(): React.JSX.Element {
 }
 
 /**
- * Eigenes OpenRouter-Modell (M86): frei eintippen, per Beispiel-Mail testen,
- * erst nach bestandenem Test übernehmen. Die Modell-ID-Form prüft der
- * Contract; hier nur eine freundliche Vorab-Prüfung.
+ * Custom OpenRouter model (M86): type freely, test with a sample mail,
+ * adopt only after the test passes. The contract checks the model ID
+ * format; here only a friendly pre-check.
  */
 function CustomModelRow({ onPick }: { onPick: (id: string) => void }): React.JSX.Element {
   const t = useT()
@@ -1536,7 +1573,7 @@ function ModelList({
   const catalog = useProfileModels('openrouter')
   const catalogModels = catalog.data?.models
   const rows = useMemo(() => {
-    // Nischen-Varianten raus (Bild/Video/Realtime, Spezial-SKUs)
+    // Drop niche variants (image/video/realtime, special SKUs)
     const NICHE = /(image|video|realtime|tts|transcribe|search|-fast|computer-use)/
     const models =
       kind === 'stt'
@@ -1555,7 +1592,7 @@ function ModelList({
     }
     let pick: typeof models = []
     if (kind === 'stt') {
-      // günstigste Audio-Modelle, max 2 je Provider
+      // cheapest audio models, max 2 per provider
       const perProv = new Map<string, number>()
       pick = [...models]
         .sort((a, b) => a.promptPerM - b.promptPerM)
@@ -1568,19 +1605,19 @@ function ModelList({
         })
         .slice(0, 5)
     } else if (kind === 'scan') {
-      // billigste pro Provider, dann global die 4 günstigsten
+      // cheapest per provider, then the 4 cheapest globally
       for (const list of byProvider.values()) {
         pick.push([...list].sort((a, b) => a.promptPerM - b.promptPerM)[0])
       }
       pick = pick.sort((a, b) => a.promptPerM - b.promptPerM).slice(0, 4)
     } else {
-      // Flaggschiff pro Provider (teuerstes), die 4 stärksten
+      // flagship per provider (most expensive), the 4 strongest
       for (const list of byProvider.values()) {
         pick.push([...list].sort((a, b) => b.promptPerM - a.promptPerM)[0])
       }
       pick = pick.sort((a, b) => b.promptPerM - a.promptPerM).slice(0, 4)
     }
-    // aktuelles Modell immer anbieten
+    // always offer the current model
     if (current && !pick.some((m) => m.id === current)) {
       const cur = models.find((m) => m.id === current)
       pick = [
@@ -1644,7 +1681,7 @@ function ModelList({
       {catalog.isLoading && (
         <span style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}>…</span>
       )}
-      {/* Local only: der Katalog kommt nie automatisch — nur auf Klick */}
+      {/* Local only: the catalog never loads automatically — only on click */}
       {catalog.data?.skipped && (
         <div className="flex items-center gap-2">
           <span style={{ font: '400 9.5px var(--mono)', color: 'var(--faint)' }}>
@@ -1673,7 +1710,7 @@ function ModelList({
   )
 }
 
-/** ZDR-Schalter (M86): Anfragen nur an Anbieter ohne Prompt-Speicherung. */
+/** ZDR switch (M86): requests only to providers without prompt retention. */
 function ZdrCard(): React.JSX.Element {
   const t = useT()
   const [on, setOn] = useState(true)
@@ -1690,7 +1727,7 @@ function ZdrCard(): React.JSX.Element {
       <div className="mlabel" style={{ color: 'var(--ac)' }}>
         {t('zdrHead')}
       </div>
-      {/* Track-Optik des Rules-/Reply-Scope-Toggles wiederverwendet */}
+      {/* Reuses the track look of the rules/reply-scope toggle */}
       <button
         type="button"
         className="reply-scope-toggle"
@@ -1718,10 +1755,10 @@ export function IntelSheet(): React.JSX.Element {
   const accounts = useAccounts()
   const [key, setKey] = useState('')
 
-  // Auto-Resume (Design 1b): Wurde das Training im Onboarding übersprungen,
-  // holt ein später gespeicherter Schlüssel es nach — für jedes Konto ohne
-  // Stilprofil. Scheitert ein Lauf, bleibt das Profil leer und die VoiceCard
-  // bietet weiterhin RETRAIN an — nichts wird still als fertig markiert.
+  // Auto-resume (Design 1b): if training was skipped during onboarding,
+  // a key saved later catches it up — for every account without a
+  // style profile. If a run fails, the profile stays empty and the VoiceCard
+  // keeps offering RETRAIN — nothing is silently marked as done.
   const resumeStyleTraining = async (): Promise<void> => {
     for (const a of accounts.data ?? []) {
       const r = await invoke('settings:get', { key: `ai.styleProfile.${a.id}` })
@@ -1751,7 +1788,7 @@ export function IntelSheet(): React.JSX.Element {
   const profiles = useProfiles()
   const assignments = useTaskAssignments()
 
-  // Modell einer Aufgabe wählen: Profil bleibt, nur das Modell wechselt
+  // Choose a task's model: the profile stays, only the model changes
   const TASK_OF = { scan: 'triage', write: 'draft', stt: 'stt' } as const
   const pick = (kind: 'scan' | 'write' | 'stt') => (id: string) => {
     const task = TASK_OF[kind]
@@ -1769,7 +1806,7 @@ export function IntelSheet(): React.JSX.Element {
     })
   }
 
-  /** Modellwahl je nach Profil: OpenRouter kuratiert, eigene Profile aus /models. */
+  /** Model choice per profile: OpenRouter curated, custom profiles from /models. */
   const renderModels = (kind: 'scan' | 'write' | 'stt'): React.JSX.Element | null => {
     const task: AiTaskName = TASK_OF[kind]
     const a = assignments.data?.[task]
@@ -1826,7 +1863,7 @@ export function IntelSheet(): React.JSX.Element {
           className="mmeta"
           style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          {/* Ohne Schlüssel schläft die Eule — sie wacht mit dem Speichern auf */}
+          {/* Without a key the owl sleeps — it wakes up on save */}
           <OwlGlyph
             pose={orStatus.data?.hasKey ? 'awake' : 'asleep'}
             size={15}
@@ -1925,14 +1962,14 @@ export function IntelSheet(): React.JSX.Element {
   )
 }
 
-// Fenster des Follow-up-Radars (Design-Grafik 09: „Fenster 3–21 Tage")
+// Window of the follow-up radar (design graphic 09: „Fenster 3–21 Tage")
 const FOLLOWUP_MIN_DAYS = 3
 const FOLLOWUP_MAX_DAYS = 21
 
 /**
- * Schwelle des Follow-up-Radars (followup.waitDays): nach wie vielen Tagen
- * Stille eine gesendete Mail unter WARTET auftaucht. Das Backend las die
- * Einstellung schon immer — hier bekommt sie endlich ihre Tür.
+ * Threshold of the follow-up radar (followup.waitDays): after how many days
+ * of silence a sent mail shows up under WARTET. The backend always read the
+ * setting — here it finally gets its door.
  */
 function FollowupRadarCard(): React.JSX.Element {
   const t = useT()
@@ -1952,7 +1989,7 @@ function FollowupRadarCard(): React.JSX.Element {
     const clamped = Math.min(FOLLOWUP_MAX_DAYS, Math.max(FOLLOWUP_MIN_DAYS, next))
     setDays(clamped)
     void invoke('settings:set', { key: 'followup.waitDays', value: String(clamped) }).then(() => {
-      // Die WARTET-Liste rechnet beim nächsten Radar-Scan mit der neuen Schwelle
+      // The WARTET list uses the new threshold on the next radar scan
       void queryClient.invalidateQueries({ queryKey: ['followups'] })
     })
   }
@@ -1998,8 +2035,8 @@ function FollowupRadarCard(): React.JSX.Element {
 }
 
 /**
- * Steuert, ob die Eule gefundene Aufgaben automatisch anlegt (tasks.autoCreate)
- * oder nur in der Mail vorschlägt — übernehmen dann per T.
+ * Controls whether the owl creates found tasks automatically (tasks.autoCreate)
+ * or only suggests them in the mail — then adopted via T.
  */
 function TasksAutoCard(): React.JSX.Element {
   const t = useT()
@@ -2031,7 +2068,7 @@ function TasksAutoCard(): React.JSX.Element {
           <span className="toggle-track" style={{ background: on ? 'var(--ink)' : 'transparent' }}>
             <span
               className="toggle-dot"
-              style={{ background: on ? '#F4F1EA' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
+              style={{ background: on ? 'var(--paper)' : 'var(--ink)', marginLeft: on ? 12 : 0 }}
             />
           </span>
           <span style={{ font: '400 10px var(--mono)', color: 'var(--ink)' }}>
@@ -2043,5 +2080,112 @@ function TasksAutoCard(): React.JSX.Element {
         </span>
       </div>
     </>
+  )
+}
+
+/** Mini preview of a layout for the selection card (purely decorative). */
+function LayoutPreview({ classic }: { classic: boolean }): React.JSX.Element {
+  return (
+    <div className="layout-preview" data-classic={classic} aria-hidden="true">
+      <div className="layout-preview__bar" />
+      <div className="layout-preview__body">
+        {classic && <div className="layout-preview__folders" />}
+        <div className="layout-preview__list" />
+        <div className="layout-preview__sheet" />
+        {!classic && <div className="layout-preview__rail" />}
+      </div>
+    </div>
+  )
+}
+
+/** Settings › Appearance: layout choice and folder view. */
+export function AppearanceSheet(): React.JSX.Element {
+  const t = useT()
+  const layout = usePaper((s) => s.layout)
+  const setLayout = usePaper((s) => s.setLayout)
+  const showFolders = usePaper((s) => s.showFolders)
+  const setShowFolders = usePaper((s) => s.setShowFolders)
+  const theme = usePaper((s) => s.theme)
+  const setTheme = usePaper((s) => s.setTheme)
+  const resetPaneWidths = (): void => {
+    const { setPaneWidth } = usePaper.getState()
+    for (const id of ['folders', 'list', 'rail'] as const) {
+      setPaneWidth(id, PANE_LIMITS[id].default, id === 'rail')
+    }
+  }
+  const options: Array<{ id: PaperLayout; name: string; desc: string }> = [
+    { id: 'letterpress', name: t('layoutLetterpress'), desc: t('layoutLetterpressDesc') },
+    { id: 'classic', name: t('layoutClassic'), desc: t('layoutClassicDesc') }
+  ]
+  return (
+    <SheetShell title={t('appearanceHead')} sub={t('appearanceSub')}>
+      <div className="mlabel" style={{ marginTop: 22, color: 'var(--muted)' }}>
+        {t('layoutHead')}
+      </div>
+      <div className="layout-options" role="radiogroup" aria-label={t('layoutHead')}>
+        {options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={layout === o.id}
+            className="layout-option"
+            onClick={() => setLayout(o.id)}
+          >
+            <LayoutPreview classic={o.id === 'classic'} />
+            <span className="layout-option__copy">
+              <strong>{o.name}</strong>
+              <small>{o.desc}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
+        {t('themeHead')}
+      </div>
+      <div className="appearance-segment" role="radiogroup" aria-label={t('themeHead')}>
+        {(['light', 'dark'] as const).map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={theme === id}
+            onClick={() => setTheme(id)}
+          >
+            {t(id === 'light' ? 'themeLight' : 'themeDark')}
+          </button>
+        ))}
+      </div>
+      <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
+        {t('panesHead')}
+      </div>
+      <div className="appearance-note" style={{ alignItems: 'center' }}>
+        <span style={{ flex: 1 }}>{t('panesHint')}</span>
+        <button type="button" className="appearance-reset" onClick={resetPaneWidths}>
+          {t('panesReset')}
+        </button>
+      </div>
+      <div className="mlabel" style={{ marginTop: 26, color: 'var(--muted)' }}>
+        {t('mailboxHead')}
+      </div>
+      <label className="appearance-check" htmlFor="appearance-show-folders">
+        <input
+          id="appearance-show-folders"
+          type="checkbox"
+          checked={showFolders}
+          onChange={(e) => setShowFolders(e.target.checked)}
+        />
+        <span>
+          <strong>{t('showFoldersLabel')}</strong>
+          <small>{t('showFoldersHint')}</small>
+        </span>
+      </label>
+      <div className="appearance-note">
+        <span className="mlabel" style={{ color: 'var(--ac)' }}>
+          {t('junkAlways')}
+        </span>
+        <span>{t('junkAlwaysNote')}</span>
+      </div>
+    </SheetShell>
   )
 }

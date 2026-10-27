@@ -1,4 +1,4 @@
-// Lokale Fonts (CSP-safe, gebundlet): Editorial-Serif + Grotesk + Mono
+// Local fonts (CSP-safe, bundled): editorial serif + grotesque + mono
 import '@fontsource/newsreader/400.css'
 import '@fontsource/newsreader/500.css'
 import '@fontsource/newsreader/600.css'
@@ -13,6 +13,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
+import { startLongTaskObserver } from './lib/diagnostics'
+
+startLongTaskObserver()
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({

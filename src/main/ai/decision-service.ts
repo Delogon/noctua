@@ -1,5 +1,3 @@
-import type Database from 'better-sqlite3-multiple-ciphers'
-import { PHISHING_SCORE_HIGH } from '@shared/decision-thresholds'
 import { isLocalOnly } from '../privacy'
 import { getSecret } from '../auth/secrets'
 import { getClient, getProfile, profileSecretKey } from './providers/registry'
@@ -8,10 +6,10 @@ import { decide, scoreOf, noulOf, type Questions } from './providers/systemone'
 import type { AiProfile, ModelInfo } from './providers/types'
 
 /**
- * Modellliste eines Profils für die Picker. 'chat' (Standard) schließt reine
- * Entscheidungsmodelle aus – sie würden im Chat nur Fehler liefern. 'decision'
- * liefert ausschließlich Modelle mit der Fähigkeit `decision` (nur Ollama;
- * andere Server ergeben eine leere Liste, der Freitext bleibt möglich).
+ * Model list of a profile for the pickers. 'chat' (default) excludes pure
+ * decision models – they would only produce errors in chat. 'decision'
+ * returns only models with the `decision` capability (Ollama only;
+ * other servers yield an empty list, free text remains possible).
  */
 export async function listProfileModels(
   profile: AiProfile,
@@ -27,13 +25,13 @@ export async function listProfileModels(
       .sort((a, b) => a.id.localeCompare(b.id))
   }
   const models = await getClient(profile).listModels()
-  // Fähigkeiten nur bei lokalen Profilen erfragen – kein zusätzlicher Request an externe Hosts
+  // Query capabilities only for local profiles – no extra request to external hosts
   if (profile.preset === 'openrouter' || !profile.isLocal) return models
   const caps = await getOllamaModelCaps(profile.baseUrl, { apiKey })
   return excludeDecisionOnly(models, caps)
 }
 
-/** Reine Entscheidungsmodelle aus einer Chat-Modellliste entfernen. */
+/** Remove pure decision models from a chat model list. */
 export function excludeDecisionOnly(
   models: ModelInfo[],
   caps: Array<{ name: string; capabilities: string[] | null }>
@@ -52,19 +50,19 @@ export interface DecisionTestResult {
 const TEST_QUESTIONS: Questions = {
   invoice: {
     type: 'noul',
-    instructions: 'Ist das eine Rechnung?',
-    criteria: { false: 'Keine Rechnung', true: 'Eine Rechnung' }
+    instructions: 'Is this an invoice?',
+    criteria: { false: 'Not an invoice', true: 'An invoice' }
   },
   urgency: {
     type: 'score',
-    instructions: 'Wie dringend ist diese E-Mail?',
-    criteria: ['Routine: keine Eile', 'Bald: Frist in Sicht', 'Sofort: Frist läuft ab']
+    instructions: 'How urgent is this email?',
+    criteria: ['Routine: no hurry', 'Soon: deadline approaching', 'Immediate: deadline expiring']
   }
 }
 const TEST_STATE =
-  'Betreff: Rechnung Nr. 4711\n\nHallo, anbei die Rechnung über 120 Euro. Bitte überweise den Betrag bis Freitag.'
+  'Subject: Invoice no. 4711\n\nHello, please find attached the invoice for 120 euros. Please transfer the amount by Friday.'
 
-/** Funktions-Test: zwei Mini-Fragen. Wie runModelTest nur gegen lokale Profile bei Local only. */
+/** Function test: two mini questions. Like runModelTest, only against local profiles under Local only. */
 export async function runDecisionTest(
   profileId: string,
   model: string
@@ -106,25 +104,4 @@ export async function runDecisionTest(
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error), Date.now() - started)
   }
-}
-
-/** Phishing-Einschätzung einer Mail aus ai_decisions (null ohne Entscheidungsmodell-Triage). */
-export function getPhishing(
-  db: Database.Database,
-  messageId: number
-): { score: number; high: boolean; signals: string[] } | null {
-  const row = db
-    .prepare('SELECT phishing, phishing_signals_json FROM ai_decisions WHERE message_id = ?')
-    .get(messageId) as { phishing: number | null; phishing_signals_json: string | null } | undefined
-  if (!row || row.phishing === null) return null
-  let signals: string[] = []
-  try {
-    const parsed = JSON.parse(row.phishing_signals_json ?? '[]') as unknown
-    if (Array.isArray(parsed)) {
-      signals = parsed.filter((s): s is string => typeof s === 'string').slice(0, 10)
-    }
-  } catch {
-    // keine Signale
-  }
-  return { score: row.phishing, high: row.phishing >= PHISHING_SCORE_HIGH, signals }
 }

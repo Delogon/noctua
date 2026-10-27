@@ -33,8 +33,8 @@ export function composerShortcut(event: ShortcutEvent): ComposerShortcut | null 
 }
 
 /**
- * Schaetzt die Textflaeche eines Diktats aus seiner Dauer. Die Folge ist
- * absichtlich deterministisch, damit das Skeleton beim Rendern nicht springt.
+ * Estimates the text area of a dictation from its duration. The sequence is
+ * deliberately deterministic so the skeleton does not jump while rendering.
  */
 export function estimateTranscriptSkeleton(seconds: number): TranscriptSkeleton {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0
@@ -55,7 +55,7 @@ export function appendTranscription(currentText: string, transcript: string): st
   return current ? `${current}\n\n${spoken}` : spoken
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -65,10 +65,10 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * Wandelt reinen Text in die Block-Struktur des Editors um (\n → <div>-Zeilen).
- * Roher Text darf nie direkt als innerHTML/textContent im Editor landen: sein
- * innerHTML hätte \n statt <div>/<br>, und die Umbrüche gingen beim Versand
- * der HTML-Alternative verloren.
+ * Converts plain text into the editor's block structure (\n → <div> lines).
+ * Raw text must never land directly as innerHTML/textContent in the editor: its
+ * innerHTML would have \n instead of <div>/<br>, and the line breaks would be lost
+ * when sending the HTML alternative.
  */
 export function textToComposerHtml(text: string): string {
   if (!text) return ''

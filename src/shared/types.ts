@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-/** DTO-Schemas — Single Source of Truth für IPC-Payloads (zod) und TS-Typen (z.infer). */
+/** DTO schemas — single source of truth for IPC payloads (zod) and TS types (z.infer). */
 
 export const recipientSchema = z.object({
   name: z.string().nullable(),
@@ -13,18 +13,18 @@ export const accountSummarySchema = z.object({
   accountName: z.string(),
   displayName: z.string().nullable(),
   provider: z.enum(['gmail', 'microsoft', 'proton', 'imap']),
-  /** Wie sich das Konto anmeldet — bestimmt „Passwort neu eingeben" vs. „Erneut anmelden". */
+  /** How the account signs in — decides "Re-enter password" vs. "Sign in again". */
   credentialType: z.enum(['password', 'oauth-ms', 'oauth-google', 'bridge']).default('password'),
   color: z.string(),
   syncState: z.enum(['idle', 'connecting', 'syncing', 'error', 'needs-reauth', 'off']),
   lastError: z.string().nullable(),
-  /** Seit wann der aktuelle Fehlerzustand besteht (Design 3b: „since 11:42"). */
+  /** Since when the current error state has existed (design 3b: "since 11:42"). */
   errorSince: z.number().nullable().default(null),
   signature: z.string().nullable(),
   threadCount: z.number().default(0),
-  /** Anzahl Mails — nutzerfreundlicher als Threads (Onboarding/Einstellungen). */
+  /** Number of mails — more user-friendly than threads (onboarding/settings). */
   messageCount: z.number().default(0),
-  /** Sync-Zeitraum in Tagen: 0 = alles, null = Standard (90/183). */
+  /** Sync range in days: 0 = everything, null = default (90/183). */
   syncDays: z.number().int().nullable().default(null)
 })
 
@@ -37,6 +37,18 @@ export const aiCategorySchema = z.enum([
   'transactional',
   'other'
 ])
+
+/** A folder in the folder view (only fully synced folders). */
+export const folderListItemSchema = z.object({
+  id: z.number(),
+  accountId: z.number(),
+  path: z.string(),
+  name: z.string(),
+  delimiter: z.string().nullable(),
+  role: z.enum(['inbox', 'sent', 'drafts', 'archive', 'junk', 'trash', 'other']),
+  threadCount: z.number(),
+  unreadCount: z.number()
+})
 
 export const threadListItemSchema = z.object({
   threadKey: z.string(),
@@ -55,15 +67,15 @@ export const threadListItemSchema = z.object({
   aiPriority: z.number().nullable(),
   aiSummary: z.string().nullable(),
   needsReply: z.boolean(),
-  // Letterpress (M19): Task-Vorschlag der Eule + Zustand des Vorschlags
+  // Letterpress (M19): the owl's task suggestion + state of the suggestion
   suggestedTask: z.object({ label: z.string(), due: z.string().nullable() }).nullable(),
   taskState: z.enum(['suggested', 'accepted', 'dismissed', 'none'])
 })
 
 /**
- * Treffer der lokalen Hybrid-Suche. Die Treffer bleiben absichtlich auf
- * Nachrichtenebene: Datum, Absender und Belegstelle gehören so garantiert
- * zur tatsächlich gefundenen Nachricht und nicht nur zu ihrem Thread.
+ * Hit of the local hybrid search. Hits deliberately stay at message
+ * level: date, sender and evidence are thus guaranteed to belong to the
+ * message actually found and not just to its thread.
  */
 export const semanticSearchSignalSchema = z.enum(['semantic', 'fulltext', 'subject', 'sender'])
 
@@ -83,21 +95,21 @@ export const semanticSearchHitSchema = z.object({
 })
 
 export const semanticSearchIndexSchema = z.object({
-  /** Suchbare Nachrichten ohne Spam, Papierkorb und Entwürfe. */
+  /** Searchable messages excluding spam, trash and drafts. */
   totalMessages: z.number().int().nonnegative(),
-  /** Nachrichten, deren Inhalt im lokalen Volltextindex liegt. */
+  /** Messages whose content is in the local full-text index. */
   searchableMessages: z.number().int().nonnegative(),
-  /** Nachrichten mit lokalem Vektor im semantischen Index. */
+  /** Messages with a local vector in the semantic index. */
   embeddedMessages: z.number().int().nonnegative(),
-  /** Anteil semantisch indexierter Nachrichten von 0 bis 1. */
+  /** Share of semantically indexed messages from 0 to 1. */
   coverage: z.number().min(0).max(1),
   ready: z.boolean()
 })
 
 /**
- * Eulen-Gespräch (Owl-View): der Verlauf wird als JSON in owl_conversations
- * persistiert. Quellen tragen optional Konto/Ordner/Datum aus den Live-Treffern
- * zum Frage-Zeitpunkt — für die SOURCES-Karte nach einem Neustart.
+ * Owl conversation (owl view): the history is persisted as JSON in owl_conversations.
+ * Sources optionally carry account/folder/date from the live hits at the time
+ * of the question — for the SOURCES card after a restart.
  */
 export const owlSourceSchema = z.object({
   index: z.number().int(),
@@ -111,7 +123,7 @@ export const owlSourceSchema = z.object({
 export const owlMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
   content: z.string().max(100_000),
-  /** Zeitstempel des Beitrags — optional, für „DU · 14:34“-Zeilen. */
+  /** Timestamp of the entry — optional, for "YOU · 14:34" lines. */
   at: z.number().optional(),
   sources: z.array(owlSourceSchema).optional()
 })
@@ -128,7 +140,7 @@ export const owlConversationListItemSchema = z.object({
   id: z.number().int(),
   title: z.string(),
   updatedAt: z.number(),
-  /** Erster Satz der ersten Eulen-Antwort — die ↳-Zeile der Gesprächsliste. */
+  /** First sentence of the first owl answer — the ↳ line of the conversation list. */
   answerGist: z.string().nullable()
 })
 
@@ -148,18 +160,18 @@ export const messageDetailSchema = z.object({
   fromAddr: z.string().nullable(),
   to: z.array(recipientSchema),
   cc: z.array(recipientSchema),
-  /** Reply-To-Header (Envelope) — Antworten gehen hierhin statt an From. */
+  /** Reply-To header (envelope) — replies go here instead of to From. */
   replyTo: z.array(recipientSchema),
   date: z.number().nullable(),
   seen: z.boolean(),
   flagged: z.boolean(),
   hasAttachments: z.boolean(),
   bodyText: z.string().nullable(),
-  /** Roh-HTML aus der DB; Sanitizing (DOMPurify) passiert im Renderer vor dem Rendern. */
+  /** Raw HTML from the DB; sanitizing (DOMPurify) happens in the renderer before rendering. */
   bodyHtml: z.string().nullable(),
   bodyState: z.enum(['none', 'full']),
   attachments: z.array(attachmentInfoSchema),
-  /** Remote-Bilder für diesen Absender freigegeben (Sender-Allowlist). */
+  /** Remote images allowed for this sender (sender allowlist). */
   remoteImagesAllowed: z.boolean(),
   listUnsubscribe: z.boolean()
 })
@@ -181,9 +193,9 @@ export const mailHeaderEntrySchema = z.object({
 })
 
 /**
- * Lazy geladene Original-Kopfdaten. Sie bleiben lokal und werden weder in den
- * Suchindex noch in AI-Prompts aufgenommen. Auth-Resultate sind Hinweise aus
- * dem Header, kein eigenes Sicherheitsurteil von Noctua.
+ * Lazily loaded original header data. It stays local and is added neither to the
+ * search index nor to AI prompts. Auth results are hints from the
+ * header, not Noctua's own security verdict.
  */
 export const messageHeaderDetailsSchema = z.object({
   messageId: z.number(),
@@ -228,8 +240,10 @@ export const messageActionSchema = z.enum([
   'unflag',
   'archive',
   'delete',
-  // Spam zurück in den Eingang (Ordner-Filter M31)
-  'notSpam'
+  // Spam back to the inbox (folder filter M31)
+  'notSpam',
+  // Report as spam: move to the junk folder (classic command bar)
+  'spam'
 ])
 
 export const taskItemSchema = z.object({
@@ -244,11 +258,11 @@ export const taskItemSchema = z.object({
   createdAt: z.number(),
   sourceSubject: z.string().nullable(),
   sourceMessageId: z.number().nullable(),
-  /** CalDAV-Abgleich (Phase 3.2); null/fehlend = nicht zugeordnet */
+  /** CalDAV sync (phase 3.2); null/missing = not assigned */
   syncState: z.enum(['pending', 'synced', 'conflict']).nullable().optional()
 })
 
-/** Gespeicherter Antwort-Entwurf (ein Entwurf je Thread, Eulen-Leiste). */
+/** Saved reply draft (one draft per thread, owl bar). */
 export const draftItemSchema = z.object({
   threadKey: z.string(),
   displayName: z.string().nullable(),
@@ -259,16 +273,16 @@ export const draftItemSchema = z.object({
 })
 
 export type Recipient = z.infer<typeof recipientSchema>
-/** Eine Netzwerkverbindung der App (Technik-Seite, Abschnitt „Netzwerkverbindungen"). */
+/** A network connection of the app (technical page, "Network connections" section). */
 export const networkConnectionSchema = z.object({
   kind: z.enum(['mail', 'oauth', 'ai', 'updates', 'embeddings', 'calendar']),
-  /** Konto/Profil/Anbieter; leer bei updates und embeddings */
+  /** Account/profile/provider; empty for updates and embeddings */
   label: z.string().max(200),
-  /** Zielhost; null, wenn nichts verbunden wird (Update-Check aus) */
+  /** Target host; null if nothing connects (update check off) */
   host: z.string().max(255).nullable(),
   scope: z.enum(['external', 'local']),
   status: z.enum(['active', 'blocked', 'manual-only', 'on-demand', 'cached', 'off']),
-  /** nur bei kind = ai: bediente Aufgaben */
+  /** only for kind = ai: tasks served */
   tasks: z.array(z.enum(['triage', 'draft', 'stt', 'decision'])).max(4)
 })
 export const networkConnectionsSchema = z.object({
@@ -280,6 +294,7 @@ export type NetworkConnection = z.infer<typeof networkConnectionSchema>
 export type AccountSummary = z.infer<typeof accountSummarySchema>
 export type DraftItem = z.infer<typeof draftItemSchema>
 export type ThreadListItem = z.infer<typeof threadListItemSchema>
+export type FolderListItem = z.infer<typeof folderListItemSchema>
 export type SemanticSearchSignal = z.infer<typeof semanticSearchSignalSchema>
 export type SemanticSearchHit = z.infer<typeof semanticSearchHitSchema>
 export type SemanticSearchIndex = z.infer<typeof semanticSearchIndexSchema>
@@ -297,21 +312,21 @@ export type TaskItem = z.infer<typeof taskItemSchema>
 
 export const ACCOUNT_COLORS = ['#7c7ff2', '#5ecf8a', '#f2b16d', '#6dc7f2', '#f26d7c', '#c98df2']
 
-/** Pastell-Palette fürs Letterpress-Papier — Konto-Badges & Picker (M22). */
+/** Pastel palette for the letterpress paper — account badges & picker (M22). */
 export const PASTEL_COLORS = [
-  '#e8b4b8', // staubiges Rosa
-  '#b5c9a8', // Salbei
-  '#c3b8e0', // Flieder
-  '#e6cf9f', // Sand
-  '#a8c5d8', // Graublau
-  '#e8c4a8', // Pfirsich
-  '#a8d8c5', // Mint
-  '#d8a8c9', // Mauve
-  '#d9d3a7', // heller Ocker
-  '#b8c4e0' // Taubenblau
+  '#e8b4b8', // dusty rose
+  '#b5c9a8', // sage
+  '#c3b8e0', // lilac
+  '#e6cf9f', // sand
+  '#a8c5d8', // grey-blue
+  '#e8c4a8', // peach
+  '#a8d8c5', // mint
+  '#d8a8c9', // mauve
+  '#d9d3a7', // light ochre
+  '#b8c4e0' // dove blue
 ]
 
-/** Lesbare Textfarbe auf einer Badge-Farbe (Pastell → Tinte, dunkel → Papier). */
+/** Readable text color on a badge color (pastel → ink, dark → paper). */
 export function contrastOn(hex: string): string {
   const v = hex.replace('#', '')
   if (v.length < 6) return '#17150F'

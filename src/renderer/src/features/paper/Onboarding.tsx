@@ -17,12 +17,12 @@ import {
   type TrainRowState
 } from '@renderer/features/paper/onboarding-steps'
 
-// 4-Schritte-Onboarding nach Design 1b (welcome → connect → ai → training)
-// — mit ECHTEN Flows: Google und Microsoft öffnen den Browser-OAuth (M46),
-// IMAP nimmt Host + App-Passwort inline, Schritt 3 fragt „Wo soll die KI
-// laufen?" (lokaler Server zuerst — OnboardingAi.tsx, useOnboardingAi.ts), und
-// das Stil-Training in Schritt 4 zeigt ehrlich, ob es läuft, pausiert oder
-// gescheitert ist — nie ein erfundenes 100 %.
+// 4-step onboarding per Design 1b (welcome → connect → ai → training)
+// — with REAL flows: Google and Microsoft open browser OAuth (M46),
+// IMAP takes host + app password inline, step 3 asks „Wo soll die KI
+// laufen?" (local server first — OnboardingAi.tsx, useOnboardingAi.ts), and
+// the style training in step 4 shows honestly whether it is running, paused
+// or failed — never a made-up 100 %.
 
 interface TrainRow {
   accountId: number
@@ -50,19 +50,19 @@ export function Onboarding(): React.JSX.Element {
   const [pass, setPass] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [train, setTrain] = useState<TrainRow[]>([])
-  // Schritt 4 im Pausen-Modus: keine Entwurfs-KI, Spuren bleiben leer
+  // Step 4 in pause mode: no drafting AI, tracks stay empty
   const [paused, setPaused] = useState(false)
   const [committing, setCommitting] = useState(false)
   const keyInputRef = useRef<HTMLInputElement | null>(null)
 
   const connected = accounts.data ?? []
-  // Company Edition mit hideOpenRouterOnboarding: Profile der Organisation statt
-  // KI-Wahl — dieser Pfad hat Vorrang und verhält sich wie bisher.
+  // Company Edition with hideOpenRouterOnboarding: the organization's profiles instead
+  // of the AI choice — this path takes precedence and behaves as before.
   const orgMode = orgInfo.data?.hideOpenRouterOnboarding === true
   const orgProfiles = (profiles.data ?? []).filter((p) => p.managed)
   const orgReady = orgProfiles.some((p) => p.isLocal || p.hasKey)
   const ai = useOnboardingAi(step === 3 && !orgMode)
-  // Schritt-3-CTA: Org-Pfad braucht einen Schlüssel, sonst zählt die gewählte Option
+  // Step 3 CTA: the org path needs a key, otherwise the chosen option counts
   const aiReady = orgMode ? orgReady : ai.ready
   const aiTrains = orgMode ? orgReady : ai.trains
 
@@ -72,7 +72,7 @@ export function Onboarding(): React.JSX.Element {
     setTimeout(() => toastNow(t('toastWelcome')), 600)
   }
 
-  /** Trainiert EIN Konto: Fortschritts-Intervall bis 92 %, dann ehrliches Ende. */
+  /** Trains ONE account: progress interval up to 92 %, then an honest finish. */
   const runRow = (accountId: number): void => {
     setTrain((prev) =>
       prev.map((x) =>
@@ -114,7 +114,7 @@ export function Onboarding(): React.JSX.Element {
       })
       .catch(() => {
         clearInterval(iv)
-        // Ehrlich scheitern: leere Spur + FAILED — RETRY statt still 100 % (Design 1b)
+        // Fail honestly: empty track + FAILED — RETRY instead of a silent 100 % (Design 1b)
         setTrain((prev) =>
           prev.map((x) =>
             x.accountId === accountId ? { ...x, pct: 0, running: false, failed: true } : x
@@ -123,7 +123,7 @@ export function Onboarding(): React.JSX.Element {
       })
   }
 
-  /** Wechsel zu Schritt 4 — mit Entwurfs-KI läuft das Training, ohne pausiert es. */
+  /** Switch to step 4 — with drafting AI the training runs, without it it pauses. */
   const goTraining = (runs: boolean): void => {
     const rows: TrainRow[] = connected.map((a) => ({
       accountId: a.id,
@@ -143,7 +143,7 @@ export function Onboarding(): React.JSX.Element {
   const rowStates: TrainRowState[] = train.map((r) => rowState(r, paused))
   const finishEnabled = finishCtaEnabled(rowStates)
 
-  /** Schritt-3-CTA: gewählte KI-Option einrichten (nicht im Org-Pfad), dann Schritt 4. */
+  /** Step 3 CTA: set up the chosen AI option (not in the org path), then step 4. */
   const continueFromAi = async (): Promise<void> => {
     if (!aiReady || committing) return
     if (!orgMode) {
@@ -155,8 +155,8 @@ export function Onboarding(): React.JSX.Element {
     goTraining(aiTrains)
   }
 
-  // Enter steuert die Schritte (Spec) — Gating liegt in onboarding-steps.ts.
-  // Buttons sind ausgenommen: dort feuert Enter schon den nativen Klick.
+  // Enter drives the steps (spec) — gating lives in onboarding-steps.ts.
+  // Buttons are excluded: there Enter already fires the native click.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const tag = (e.target as HTMLElement | null)?.tagName ?? ''
@@ -181,25 +181,25 @@ export function Onboarding(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  // Cloud/OpenRouter ohne Schlüssel: Input fokussieren
+  // Cloud/OpenRouter without a key: focus the input
   const focusKey = step === 3 && !orgMode && ai.choice === 'cloud' && ai.cloudKind === 'openrouter'
   useEffect(() => {
     if (focusKey && !ai.state.openrouterKey) keyInputRef.current?.focus()
   }, [focusKey, ai.state.openrouterKey])
 
-  // Laufenden Flow markieren: Ein Neustart mittendrin setzt das Onboarding
-  // dann fort, statt verbundene Konten als „Bestandsinstallation" zu werten
-  // (App.tsx, onboardingBootDecision) — sonst entfiele der Schlüssel-Schritt.
+  // Mark the running flow: a restart midway then resumes the onboarding
+  // instead of treating connected accounts as a legacy installation
+  // (App.tsx, onboardingBootDecision) — otherwise the key step would be skipped.
   useEffect(() => {
     void invoke('settings:set', { key: 'noctua.onboardingStarted', value: '1' })
   }, [])
 
-  // Wiederaufnahme nach Unterbrechung: Sind schon Konten verbunden, ist der
-  // Willkommens-Schritt erledigt — direkt bei VERBINDEN weitermachen.
+  // Resuming after an interruption: if accounts are already connected, the
+  // welcome step is done — continue directly at VERBINDEN.
   if (step === 1 && connected.length > 0) setStep(2)
 
-  // Erst-Sync live verfolgen: Solange ein Konto lädt, die Kontenliste alle
-  // 2,5 s neu ziehen — Mail-Zähler und Puls-Punkt bleiben so ehrlich.
+  // Follow the first sync live: while an account is loading, refetch the account
+  // list every 2.5 s — this keeps the mail counter and pulse dot honest.
   const anySyncing = connected.some(
     (a) => a.syncState === 'connecting' || a.syncState === 'syncing'
   )
@@ -212,8 +212,8 @@ export function Onboarding(): React.JSX.Element {
     return () => clearInterval(iv)
   }, [anySyncing, queryClient])
 
-  // Google und Microsoft laufen über den Browser-OAuth — identischer Ablauf,
-  // nur der IPC-Kanal unterscheidet sich. Kein App-Passwort mehr (M46).
+  // Google and Microsoft go through browser OAuth — identical flow,
+  // only the IPC channel differs. No more app password (M46).
   const addOauth = (provider: 'gmail' | 'microsoft'): void => {
     if (!accountName.trim()) {
       toastNow(t('toastAccountNameRequired'))
@@ -242,8 +242,8 @@ export function Onboarding(): React.JSX.Element {
       toastNow(t('toastImapFields'))
       return
     }
-    // Proton Bridge läuft auf dem Loopback mit eigenen Ports (1143/1025) —
-    // ohne Port-Angabe die richtigen Defaults wählen statt stur 993/587.
+    // Proton Bridge runs on loopback with its own ports (1143/1025) —
+    // without a port given, pick the right defaults instead of rigidly 993/587.
     const cleanHost = host.trim()
     const loopback = ['127.0.0.1', 'localhost', '::1'].includes(cleanHost.toLowerCase())
     setBusy(form)
@@ -438,7 +438,7 @@ export function Onboarding(): React.JSX.Element {
                         {done ? t('obConnected') : busy === p.key ? '···' : t('obConnect')}
                       </button>
                     </div>
-                    {/* Verbinden-Formular klappt direkt unter dem gewählten Anbieter auf */}
+                    {/* The connect form expands directly below the chosen provider */}
                     {form === p.key && (
                       <div className="ink-card flex flex-col gap-2" style={{ padding: 14 }}>
                         <input

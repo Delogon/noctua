@@ -31,11 +31,18 @@ import m030 from './030_carddav.sql?raw'
 import m031 from './031_invitations.sql?raw'
 import m032 from './032_event_suggestions.sql?raw'
 import m033 from './033_ai_decisions.sql?raw'
+import m034 from './034_folder_delimiter.sql?raw'
+import m035 from './035_mail_threats.sql?raw'
+import m036 from './036_message_id_per_account.sql?raw'
+import m037 from './037_folder_date_index.sql?raw'
+import m038 from './038_folder_thread_index.sql?raw'
+import m039 from './039_body_backfill.sql?raw'
+import m040 from './040_embedding_pending.sql?raw'
 
 /**
- * Migrationen als ?raw-Importe, damit sie in das Main-Bundle eingebettet werden
- * (lose .sql-Dateien würden es nicht in die gepackte App schaffen).
- * Neue Migration: Datei anlegen, hier importieren, ans Ende anhängen.
+ * Migrations as ?raw imports so they get embedded into the main bundle
+ * (loose .sql files would not make it into the packaged app).
+ * New migration: create the file, import it here, append it at the end.
  */
 export const migrations: ReadonlyArray<{ version: number; name: string; sql: string }> = [
   { version: 1, name: 'init', sql: m001 },
@@ -70,5 +77,12 @@ export const migrations: ReadonlyArray<{ version: number; name: string; sql: str
   { version: 30, name: '030_carddav', sql: m030 },
   { version: 31, name: '031_invitations', sql: m031 },
   { version: 32, name: '032_event_suggestions', sql: m032 },
-  { version: 33, name: '033_ai_decisions', sql: m033 }
+  { version: 33, name: '033_ai_decisions', sql: m033 },
+  { version: 34, name: '034_folder_delimiter', sql: m034 },
+  { version: 35, name: '035_mail_threats', sql: m035 },
+  { version: 36, name: '036_message_id_per_account', sql: m036 },
+  { version: 37, name: '037_folder_date_index', sql: m037 },
+  { version: 38, name: '038_folder_thread_index', sql: m038 },
+  { version: 39, name: '039_body_backfill', sql: m039 },
+  { version: 40, name: '040_embedding_pending', sql: m040 }
 ]

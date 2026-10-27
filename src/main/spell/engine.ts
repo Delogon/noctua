@@ -6,10 +6,10 @@ export interface DictBuffers {
 }
 
 /**
- * Case-insensitive Damerau-Levenshtein-Distanz (OSA) für das Ranking der
- * Vorschläge. Transposition zählt 1, weil vertauschte Buchstaben der
- * häufigste Tippfehler sind — sonst schlüge bei „Terminvorschalg" die
- * Löschung („Terminvorschal") die eigentliche Korrektur.
+ * Case-insensitive Damerau-Levenshtein distance (OSA) for ranking
+ * suggestions. Transposition counts 1 because swapped letters are the most
+ * common typo — otherwise for "Terminvorschalg" the deletion
+ * ("Terminvorschal") would beat the actual correction.
  */
 export function editDistance(a: string, b: string): number {
   const s = a.toLowerCase()
@@ -36,10 +36,10 @@ export function editDistance(a: string, b: string): number {
 }
 
 /**
- * Mischt Kandidaten beider Sprachen und sortiert nach Nähe zum Tippfehler —
- * sonst landen bei „occured" deutsche Exoten („zurede") vor „occurred".
- * Gleichstand: passende Groß-/Kleinschreibung des Anfangsbuchstabens gewinnt,
- * danach bleibt die Hunspell-Reihenfolge stabil erhalten.
+ * Merges candidates from both languages and sorts by closeness to the typo —
+ * otherwise for "occured" German oddities ("zurede") land before "occurred".
+ * Ties: matching case of the first letter wins,
+ * after that the Hunspell order is kept stable.
  */
 export function rankSuggestions(word: string, candidates: string[], limit = 5): string[] {
   const wordUpper = word[0] === word[0]?.toUpperCase()
@@ -60,10 +60,10 @@ export function rankSuggestions(word: string, candidates: string[], limit = 5): 
 }
 
 /**
- * Rechtschreibprüfung über mehrere Hunspell-Wörterbücher (DE + EN): ein Wort
- * gilt als korrekt, sobald ein Wörterbuch es akzeptiert. Deutsche Klitika
- * („geht's", „gibt's") stehen nicht im igerman98 — dafür gibt es den Fallback
- * ohne ’s-Suffix.
+ * Spell checking across multiple Hunspell dictionaries (DE + EN): a word
+ * counts as correct as soon as one dictionary accepts it. German clitics
+ * ("geht's", "gibt's") are not in igerman98 — hence the fallback
+ * without the ’s suffix.
  */
 export class SpellEngine {
   private constructor(private readonly dicts: Hunspell[]) {}
@@ -85,7 +85,7 @@ export class SpellEngine {
     return false
   }
 
-  /** Liefert die falsch geschriebenen Wörter (dedupliziert, Eingabereihenfolge). */
+  /** Returns the misspelled words (deduplicated, in input order). */
   check(words: string[]): string[] {
     const misspelled: string[] = []
     const seen = new Set<string>()

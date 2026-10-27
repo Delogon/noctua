@@ -27,10 +27,10 @@ import {
 import { buildVTimezone, isValidIana, type Wall } from './tz'
 
 /**
- * ICS schreiben: neue Ereignisse, Änderungen und Löschungen mit Geltungsbereich
- * (dieses Vorkommen / dieses und folgende / alle). Es wird immer die
- * vorhandene Komponente verändert (nicht neu erzeugt), damit unbekannte
- * Properties (X-*, ATTACH, …) erhalten bleiben.
+ * Writing ICS: new events, changes and deletions with a scope
+ * (this occurrence / this and following / all). The existing component is
+ * always modified (never recreated) so that unknown
+ * properties (X-*, ATTACH, …) are preserved.
  */
 
 export interface EditContext {
@@ -43,7 +43,7 @@ export const defaultEditContext = (): EditContext => ({
   newUid: () => `${randomUUID()}@noctua`
 })
 
-// --- Bausteine -----------------------------------------------------------------------
+// --- Building blocks -----------------------------------------------------------------
 
 function utcTime(ms: number): ICAL.Time {
   return ICAL.Time.fromJSDate(new Date(Math.floor(ms / 1000) * 1000), true)
@@ -149,7 +149,7 @@ function parseRule(value: string): ICAL.Recur {
   return rule
 }
 
-/** Setzt DTSTART/DTEND aus der editierbaren Zeitangabe. */
+/** Sets DTSTART/DTEND from the editable time specification. */
 function writeTime(
   comp: ICAL.Component,
   root: ICAL.Component,
@@ -167,7 +167,7 @@ function writeTime(
   comp.removeAllProperties('due')
   comp.addProperty(makeTimeProp('dtstart', time.allDay, start, tzid))
   if (time.allDay) {
-    // Ganztägig: Ende exklusiv, mindestens ein Tag
+    // All-day: end exclusive, at least one day
     const e = endMs <= startMs ? new Date(startMs + DAY_MS) : new Date(endMs)
     const endWall: Wall = {
       y: e.getUTCFullYear(),
@@ -215,7 +215,7 @@ function applyFields(
   }
 }
 
-// --- Neu anlegen -----------------------------------------------------------------------
+// --- Create ----------------------------------------------------------------------------
 
 export function createEventIcs(
   fields: CalendarEventFields,
@@ -235,24 +235,24 @@ export function createEventIcs(
   return { ics: serializeCalendar(root), uid }
 }
 
-// --- Ändern ----------------------------------------------------------------------------
+// --- Update ----------------------------------------------------------------------------
 
 export interface UpdateArgs {
   scope: CalendarEditScope
-  /** Kanonische Vorkommens-ID (bei this/following), sonst null */
+  /** Canonical occurrence ID (for this/following), otherwise null */
   recurrenceId: string | null
   patch: CalendarEventPatch
 }
 
 export interface UpdateResult {
-  /** Neue Fassung der bestehenden Ressource */
+  /** New version of the existing resource */
   ics: string
-  /** Bei „dieses und folgende": neue Ressource für die abgespaltene Serie */
+  /** For "this and following": new resource for the split-off series */
   created: { ics: string; uid: string } | null
 }
 
 function clone(comp: ICAL.Component): ICAL.Component {
-  // toJSON liefert die interne Struktur — tief kopieren, sonst teilen sich Klone ihre Properties
+  // toJSON returns the internal structure — deep copy, otherwise clones share their properties
   return new ICAL.Component(JSON.parse(JSON.stringify(comp.toJSON())))
 }
 
@@ -394,7 +394,7 @@ export function updateIcs(
   const recurring = !!master && (master.hasProperty('rrule') || master.hasProperty('rdate'))
   const { patch } = args
 
-  // Nur Ausnahmen ohne Stamm / nicht wiederkehrend / „alle"
+  // Only exceptions without master / non-recurring / "all"
   if (!master) {
     const target = (args.recurrenceId && findOverride(root, args.recurrenceId)) || overrides[0]
     if (!target) throw new Error('Kein Ereignis gefunden')
@@ -418,7 +418,7 @@ export function updateIcs(
     const schedule = recurring && patchTouchesSchedule(patch, master, vtz)
     applyFields(master, root, patch, { allowRule: true })
     if (schedule) {
-      // Zeit/Regel der Serie geändert: Ausnahmen und EXDATEs würden verwaisen
+      // Series time/rule changed: exceptions and EXDATEs would be orphaned
       for (const o of overrides) root.removeSubcomponent(o)
       master.removeAllProperties('exdate')
     }
@@ -441,7 +441,7 @@ export function updateIcs(
     ov.removeAllProperties('rdate')
     ov.removeAllProperties('exdate')
     ov.removeAllProperties('recurrence-id')
-    // Zeiten dieses Vorkommens
+    // Times of this occurrence
     const startUtc = recurrenceIdToUtcMs(rid)
     const startWall = masterTimes.start.allDay
       ? { ...datePartWall(rid) }
@@ -465,12 +465,12 @@ export function updateIcs(
     return { ics: serializeCalendar(root), created: null }
   }
 
-  // following: Serie teilen
+  // following: split the series
   const splitUtc = recurrenceIdToUtcMs(rid)
   const origRule = master.getFirstPropertyValue('rrule')
   if (!(origRule instanceof ICAL.Recur)) throw new Error('Keine Wiederholungsregel')
 
-  // COUNT: Rest der Serie ab dem Teilungspunkt
+  // COUNT: remainder of the series from the split point
   let remaining: number | null = null
   if (origRule.count) {
     const tmp = new ICAL.Component(['vcalendar', [], []])
@@ -485,7 +485,7 @@ export function updateIcs(
     if (remaining < 1) remaining = 1
   }
 
-  // Neue Serie aus Klon des Stamms
+  // New series from a clone of the master
   const newRoot = new ICAL.Component(['vcalendar', [], []])
   newRoot.addPropertyWithValue('version', '2.0')
   newRoot.addPropertyWithValue('prodid', PRODID)
@@ -496,7 +496,7 @@ export function updateIcs(
   fresh.removeAllProperties('recurrence-id')
   fresh.updatePropertyWithValue('sequence', 0)
   fresh.updatePropertyWithValue('created', utcTime(ctx.now))
-  // DTSTART/DTEND auf das Vorkommen verschieben
+  // Move DTSTART/DTEND to the occurrence
   const startWall = masterTimes.start.allDay
     ? datePartWall(rid)
     : masterTimes.start.zone.utcToWall(splitUtc)
@@ -526,7 +526,7 @@ export function updateIcs(
   stampNow(fresh, ctx, false)
   newRoot.addSubcomponent(fresh)
 
-  // Ausnahmen ab dem Teilungspunkt wandern in die neue Serie (sofern Zeiten unverändert)
+  // Exceptions from the split point move to the new series (if times are unchanged)
   for (const o of overrides) {
     const prop = o.getFirstProperty('recurrence-id')
     const value = prop?.getFirstValue()
@@ -542,7 +542,7 @@ export function updateIcs(
     }
   }
 
-  // Ursprüngliche Serie endet vor dem Teilungspunkt
+  // Original series ends before the split point
   removeExdatesFrom(master, vtz, splitUtc, true)
   setUntil(master, masterTimes.start, splitUtc)
   stampNow(master, ctx, true)
@@ -555,7 +555,7 @@ function datePartWall(day: string): Wall {
   return { y, m, d, h: 0, mi: 0, s: 0 }
 }
 
-// --- Löschen -----------------------------------------------------------------------------
+// --- Delete ------------------------------------------------------------------------------
 
 export type DeleteResult = { kind: 'delete' } | { kind: 'update'; ics: string }
 

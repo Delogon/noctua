@@ -16,6 +16,7 @@ import {
 import {
   assertSecretKey,
   assertSettingReadable,
+  assertSettingValue,
   assertSettingWritable,
   ForbiddenKeyError
 } from '@shared/settings-keys'
@@ -51,13 +52,13 @@ describe('isTrustedAppUrl / isTrustedIpcSender', () => {
   it('Sender: nur Top-Frame des Hauptfensters auf der App-Seite', () => {
     const url = `file://${prod.indexPath}`
     expect(isTrustedIpcSender({ isMainWindowTopFrame: true, frameUrl: url }, prod)).toBe(true)
-    // Subframe (z. B. Mail-iframe) oder anderes Fenster
+    // Subframe (e.g. mail iframe) or another window
     expect(isTrustedIpcSender({ isMainWindowTopFrame: false, frameUrl: url }, prod)).toBe(false)
-    // Top-Frame, aber auf fremder Seite
+    // Top frame, but on a foreign page
     expect(
       isTrustedIpcSender({ isMainWindowTopFrame: true, frameUrl: 'https://evil.example/' }, prod)
     ).toBe(false)
-    // Zerstörter Frame
+    // Destroyed frame
     expect(isTrustedIpcSender({ isMainWindowTopFrame: true, frameUrl: undefined }, prod)).toBe(
       false
     )
@@ -166,5 +167,13 @@ describe('Handler-seitige Schlüssel-Prüfung (SEC-2)', () => {
     expect(() => assertSettingWritable('sig.5')).not.toThrow()
     expect(() => assertSettingWritable('ai.styleMeta')).toThrow(ForbiddenKeyError)
     expect(() => assertSettingReadable('ai.styleMeta')).not.toThrow()
+  })
+
+  it('prüft bei Enum-Einstellungen auch den Wert', () => {
+    expect(() => assertSettingValue('ai.triageProvider', 'apple')).not.toThrow()
+    expect(() => assertSettingValue('ai.triageProvider', '<script>')).toThrow(ForbiddenKeyError)
+    expect(() => assertSettingValue('ui.layout', 'classic')).not.toThrow()
+    expect(() => assertSettingValue('security.autoJunk', 'yes')).toThrow(ForbiddenKeyError)
+    expect(() => assertSettingValue('sig.5', 'beliebiger Text')).not.toThrow()
   })
 })

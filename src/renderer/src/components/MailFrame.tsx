@@ -4,15 +4,20 @@ import { invoke } from '@renderer/lib/ipc'
 import { t, useT } from '@renderer/lib/i18n'
 import { toast } from '@renderer/stores/toast'
 import { linkHostMismatch } from '@shared/link-check'
-import { buildMailSrcdoc, isTrackingPixel, sanitizeInlineStyle } from '@renderer/lib/mail-sanitize'
+import {
+  buildMailSrcdoc,
+  isTrackingPixel,
+  MAIL_URI_REGEXP,
+  sanitizeInlineStyle
+} from '@renderer/lib/mail-sanitize'
 
 /**
- * Rendert Mail-HTML nach hartem Sanitizing. Verteidigungslinien:
- * DOMPurify (Tags/Attribute/URIs, Inline-Styles ohne url()/fixed) + Bild-Transform
- * (Remote-Bilder werden geparkt statt geladen, Tracking-Pixel entfernt) +
- * sandboxed iframe mit eigener CSP (kein Netz ohne Freigabe, kein Overlay über
- * der App-UI) + App-CSP + sandboxed Renderer. Links gehen ausschließlich über
- * den Main-Prozess in den System-Browser.
+ * Renders mail HTML after strict sanitizing. Lines of defense:
+ * DOMPurify (tags/attributes/URIs, inline styles without url()/fixed) + image transform
+ * (remote images are parked instead of loaded, tracking pixels removed) +
+ * sandboxed iframe with its own CSP (no network without approval, no overlay on top
+ * of the app UI) + app CSP + sandboxed renderer. Links go exclusively through
+ * the main process to the system browser.
  */
 const PURIFY_CONFIG: Config = {
   FORBID_TAGS: [
@@ -32,10 +37,10 @@ const PURIFY_CONFIG: Config = {
     'audio'
   ],
   FORBID_ATTR: ['srcset', 'formaction', 'background', 'poster'],
-  ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|cid:|data:image\/)/i
+  ALLOWED_URI_REGEXP: MAIL_URI_REGEXP
 }
 
-// Inline-Styles dürfen keine Netz-Requests auslösen und nichts über die UI legen
+// Inline styles must not trigger network requests or lay anything over the UI
 DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
   if (data.attrName !== 'style') return
   const style = sanitizeInlineStyle(data.attrValue)
@@ -57,8 +62,8 @@ function transformImages(
       if (dataUri) img.setAttribute('src', dataUri)
       else img.removeAttribute('src')
     } else if (/^https?:/i.test(src)) {
-      // Tracking-Pixel fliegen auch bei erlaubten Remote-Bildern raus (die
-      // Freigabe hängt an der fälschbaren From-Adresse) und zählen nicht als blockiert.
+      // Tracking pixels are removed even when remote images are allowed (the
+      // approval hinges on the spoofable From address) and do not count as blocked.
       if (
         isTrackingPixel({
           width: img.getAttribute('width'),
@@ -78,9 +83,9 @@ function transformImages(
 }
 
 /**
- * Öffnet einen Link über den Main-Prozess. Sieht der Linktext wie eine URL aus
- * und führt der href zu einem anderen Host (Phishing-Muster), kommt vorher eine
- * Rückfrage als Toast.
+ * Opens a link via the main process. If the link text looks like a URL
+ * and the href leads to a different host (phishing pattern), a confirmation
+ * toast comes first.
  */
 function openAnchor(anchor: HTMLAnchorElement): void {
   const href = anchor.getAttribute('href')
@@ -102,7 +107,7 @@ function openLink(event: React.MouseEvent): void {
   }
 }
 
-/** Mail-HTML in sandboxed iframe: eigenes Dokument, eigene CSP, kein Zugriff auf die App-UI. */
+/** Mail HTML in a sandboxed iframe: own document, own CSP, no access to the app UI. */
 function SandboxedMail({
   body,
   remoteAllowed
@@ -116,9 +121,9 @@ function SandboxedMail({
 
   useEffect(() => () => observer.current?.disconnect(), [])
 
-  // Sandbox: bewusst OHNE allow-scripts (und ohne Popups/Forms/Navigation). allow-same-origin
-  // ist nur gesetzt, damit das Elternfenster Höhe messen und Klicks abfangen kann; ohne
-  // Scripts (plus CSP default-src 'none') kann der Frame-Inhalt diese Brücke nicht nutzen.
+  // Sandbox: deliberately WITHOUT allow-scripts (and without popups/forms/navigation).
+  // allow-same-origin is only set so the parent window can measure height and catch clicks;
+  // without scripts (plus CSP default-src 'none') the frame content cannot use this bridge.
   const onLoad = (event: React.SyntheticEvent<HTMLIFrameElement>): void => {
     const doc = event.currentTarget.contentDocument
     if (!doc?.body) return
@@ -144,8 +149,8 @@ function SandboxedMail({
       onLoad={onLoad}
       scrolling="no"
       className="mail-html block w-full select-text rounded-lg shadow-[inset_0_0_0_1px_var(--border)]"
-      // Mail-Clients begrenzen Bodys auf ~640-700px — sonst wachsen
-      // Newsletter-Bilder auf Sheet-Breite und wirken riesig.
+      // Mail clients limit bodies to ~640-700px — otherwise newsletter
+      // images grow to sheet width and look huge.
       style={{ maxWidth: 680, margin: '0 auto', height, border: 0 }}
     />
   )

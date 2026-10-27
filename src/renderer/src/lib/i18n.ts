@@ -21,7 +21,7 @@ export function initLanguage(): void {
   })
 }
 
-/** Übersetzt einen Key; {platzhalter} werden ersetzt. */
+/** Translates a key; {placeholders} are replaced. */
 export function t(key: StringKey, vars?: Record<string, string | number>): string {
   const lang = useI18n.getState().lang
   let s: string = STRINGS[key][lang]
@@ -31,13 +31,13 @@ export function t(key: StringKey, vars?: Record<string, string | number>): strin
   return s
 }
 
-/** Hook-Variante: abonniert Sprachwechsel. */
+/** Hook variant: subscribes to language changes. */
 export function useT(): typeof t {
   useI18n((s) => s.lang)
   return t
 }
 
-/** Datumszeile im Masthead: TUE, 7 JULY 2026 / DI., 7. JULI 2026 */
+/** Date line in the masthead: TUE, 7 JULY 2026 / DI., 7. JULI 2026 */
 export function mastheadDate(lang: Lang, now = new Date()): string {
   const s = now
     .toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-GB', {
@@ -50,7 +50,7 @@ export function mastheadDate(lang: Lang, now = new Date()): string {
   return s
 }
 
-/** Relative Zeit für Listenzeilen: 09:41 heute, sonst Wochentag/Datum. */
+/** Relative time for list rows: 09:41 today, otherwise weekday/date. */
 export function rowTime(lang: Lang, ts: number | null): string {
   if (!ts) return ''
   const d = new Date(ts)
@@ -73,7 +73,7 @@ export function rowTime(lang: Lang, ts: number | null): string {
     .toUpperCase()
 }
 
-/** Kompakte Zeitdifferenz für die Thread-Pfeile: „4 T. 5 Std." / "4 d 5 h". */
+/** Compact time difference for the thread arrows: "4 T. 5 Std." / "4 d 5 h". */
 export function formatGap(lang: Lang, ms: number): string {
   const mins = Math.max(1, Math.round(ms / 60_000))
   const days = Math.floor(mins / 1440)

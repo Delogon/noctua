@@ -5,9 +5,9 @@ import { __setTestDb } from '@main/db'
 import { setSecret } from '@main/auth/secrets'
 
 /**
- * Frische In-Memory-DB mit vollem Schema (alle Migrationen + sqlite-vec).
- * Wird zugleich als Singleton injiziert, damit getSetting/getDb-Nutzer
- * (z. B. tasks-Repo, budget) gegen dieselbe DB laufen.
+ * Fresh in-memory DB with full schema (all migrations + sqlite-vec).
+ * Also injected as the singleton so that getSetting/getDb users
+ * (e.g. tasks repo, budget) run against the same DB.
  */
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:')
@@ -25,7 +25,7 @@ export function closeTestDb(db: Database.Database): void {
 
 let accountSeq = 0
 
-/** Legt ein Test-Konto an und gibt dessen id zurück. */
+/** Creates a test account and returns its id. */
 export function seedAccount(
   db: Database.Database,
   overrides: Partial<{ email: string; provider: string; color: string; createdAt: number }> = {}
@@ -42,14 +42,14 @@ export function seedAccount(
       `Testkonto ${accountSeq}`,
       overrides.provider ?? 'imap',
       overrides.color ?? '#7c7ff2',
-      // Vor den makeEnvelope-Defaults (Nov 2023): Test-Mails gelten als
-      // nach der Konto-Einrichtung angekommen, außer ein Test will es anders.
+      // Before the makeEnvelope defaults (Nov 2023): test mails count as
+      // arrived after account setup, unless a test wants otherwise.
       overrides.createdAt ?? 1_600_000_000_000
     )
   return Number(result.lastInsertRowid)
 }
 
-/** Legt einen Ordner mit special_use an und gibt dessen id zurück. */
+/** Creates a folder with special_use and returns its id. */
 export function seedFolder(
   db: Database.Database,
   accountId: number,
@@ -66,7 +66,7 @@ export function seedFolder(
 
 import type { EnvelopeData } from '@main/mail/ingest'
 
-/** Baut ein EnvelopeData mit vernünftigen Defaults; overrides überschreiben. */
+/** Builds an EnvelopeData with sensible defaults; overrides take precedence. */
 export function makeEnvelope(over: Partial<EnvelopeData> = {}): EnvelopeData {
   return {
     uid: 1,
@@ -94,9 +94,9 @@ export function makeEnvelope(over: Partial<EnvelopeData> = {}): EnvelopeData {
 }
 
 /**
- * Wie createTestDb, aber mit hinterlegtem OpenRouter-Key — der Resolver
- * (providers/registry) gibt sonst keinen Client heraus. Gedacht für Tests, die
- * `@main/ai/providers/openai-factory` mocken.
+ * Like createTestDb, but with a stored OpenRouter key — otherwise the resolver
+ * (providers/registry) hands out no client. Intended for tests that
+ * mock `@main/ai/providers/openai-factory`.
  */
 export function createAiTestDb(): Database.Database {
   const db = createTestDb()

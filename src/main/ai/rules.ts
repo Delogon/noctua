@@ -1,7 +1,14 @@
 import type Database from 'better-sqlite3-multiple-ciphers'
 import { z } from 'zod'
 import { requireTask, resolveDecision } from './providers/registry'
-import { decide, isDecisionConfigError, MAX_QUESTIONS, type Questions } from './providers/systemone'
+import {
+  decide,
+  decideEach,
+  isDecisionConfigError,
+  MAX_QUESTIONS,
+  type Questions
+} from './providers/systemone'
+import { decisionMode } from './decision-triage'
 import { RULE_AI_CONDITION_THRESHOLD } from '@shared/decision-thresholds'
 import { htmlToText } from '../mail/parser'
 import {
@@ -11,10 +18,11 @@ import {
   wrapUntrusted
 } from './untrusted'
 import { logUsage } from './budget'
+import { outputLanguage, outputLanguageName, type OutputLanguage } from './output-language'
 
 type RuleActionExecutor = (messageIds: number[], action: 'archive' | 'markRead' | 'flag') => void
 let executeAction: RuleActionExecutor = () => {}
-/** Vom Bootstrap gesetzt (syncEngine.applyAction) — vermeidet Import-Zyklen. */
+/** Set by bootstrap (syncEngine.applyAction) — avoids import cycles. */
 export function setRuleActionExecutor(fn: RuleActionExecutor): void {
   executeAction = fn
 }
@@ -43,8 +51,8 @@ export const ruleJsonSchema = z.object({
       minPriority: z.number().int().min(1).max(5).optional(),
       maxPriority: z.number().int().min(1).max(5).optional(),
       /**
-       * Ja/Nein-Frage in natürlicher Sprache („Ist das eine Rechnung?"), vom
-       * Entscheidungsmodell beantwortet. Ohne Entscheidungsmodell trifft die Regel nie zu.
+       * Yes/no question in natural language ("Is this an invoice?"), answered by
+       * the decision model. Without a decision model the rule never matches.
        */
       aiCondition: z.string().trim().min(1).max(200).optional()
     })
@@ -72,7 +80,7 @@ export const ruleJsonSchema = z.object({
 
 export type RuleJson = z.infer<typeof ruleJsonSchema>
 
-/** KI-Bedingung aus gespeichertem rule_json (null bei keiner/kaputtem JSON). */
+/** AI condition from stored rule_json (null if none/broken JSON). */
 export function aiConditionOf(ruleJson: string): string | null {
   try {
     const parsed = ruleJsonSchema.safeParse(JSON.parse(ruleJson))
@@ -91,16 +99,17 @@ export function ruleNeedsAi(rule: RuleJson): boolean {
   )
 }
 
-const DRAFT_PROMPT = `Du übersetzt eine natürlichsprachliche E-Mail-Regel in eine deterministische JSON-Regel.
-Antworte NUR mit JSON, exakt in dieser Form (nur benötigte Felder angeben):
+function draftPrompt(language: OutputLanguage = outputLanguage()): string {
+  return `You translate a natural-language email rule into a deterministic JSON rule.
+Reply ONLY with JSON, exactly in this form (only include the fields you need):
 {
-  "name": "kurzer Regelname",
-  "description": "Ein Satz, was die Regel tut",
+  "name": "short rule name in ${outputLanguageName(language)}",
+  "description": "one sentence in ${outputLanguageName(language)} describing what the rule does",
   "rule": {
     "match": {
-      "fromContains": ["substring in absender-adresse/name (lowercase)"],
-      "fromDomain": ["beispiel.de"],
-      "subjectContains": ["substring im betreff (lowercase)"],
+      "fromContains": ["substring of the sender address/name (lowercase)"],
+      "fromDomain": ["example.com"],
+      "subjectContains": ["substring of the subject (lowercase)"],
       "listUnsubscribe": true,
       "category": ["newsletter"],
       "minPriority": 1, "maxPriority": 5
@@ -108,13 +117,14 @@ Antworte NUR mit JSON, exakt in dieser Form (nur benötigte Felder angeben):
     "actions": { "archive": true, "markRead": true, "flag": true, "setCategory": "newsletter", "createTask": true }
   }
 }
-Nutze category/priority NUR, wenn die Regel wirklich auf AI-Einordnung Bezug nimmt —
-Absender-/Betreff-Regeln sind robuster. Erfinde keine Kriterien, die der Nutzer nicht nannte.`
+Use category/priority ONLY if the rule really refers to the AI classification —
+sender/subject rules are more robust. Do not invent criteria the user did not mention.`
+}
 
 const AI_CONDITION_HINT = `
-Zusätzliches optionales Match-Feld "aiCondition": eine Ja/Nein-Frage auf Deutsch (max. 200 Zeichen)
-zum Inhalt der Mail, z. B. "Ist das eine Rechnung?". NUR verwenden, wenn der Nutzer ein inhaltliches
-Kriterium nennt, das sich nicht aus Absender, Betreff oder Kategorie ergibt.`
+Additional optional match field "aiCondition": a yes/no question (max. 200 characters) about the
+content of the email, in the language the user wrote the rule in, e.g. "Is this an invoice?". ONLY
+use it if the user names a content criterion that cannot be derived from sender, subject or category.`
 
 export async function draftRule(
   db: Database.Database,
@@ -126,7 +136,7 @@ export async function draftRule(
     messages: [
       {
         role: 'system',
-        content: resolveDecision() ? `${DRAFT_PROMPT}${AI_CONDITION_HINT}` : DRAFT_PROMPT
+        content: resolveDecision() ? `${draftPrompt()}${AI_CONDITION_HINT}` : draftPrompt()
       },
       { role: 'user', content: text.slice(0, 1500) }
     ],
@@ -159,9 +169,9 @@ export interface MessageFacts {
 }
 
 /**
- * `aiProbability`: P(true) der KI-Bedingung dieser Regel (Entscheidungsmodell).
- * Fehlt sie (kein Entscheidungsmodell, Fehler), trifft eine Regel mit
- * aiCondition nie zu. `'skip'` ignoriert die KI-Bedingung (Vorfilter).
+ * `aiProbability`: P(true) of this rule's AI condition (decision model).
+ * If missing (no decision model, error), a rule with
+ * aiCondition never matches. `'skip'` ignores the AI condition (prefilter).
  */
 export function matches(
   rule: RuleJson,
@@ -211,16 +221,23 @@ function loadFacts(db: Database.Database, messageId: number): MessageFacts | und
     .get(messageId) as MessageFacts | undefined
 }
 
-/** Frage-Name einer Regel im gebündelten System-One-Aufruf. */
+/** Question name of a rule in the bundled System One call. */
 export const ruleQuestionName = (ruleId: number): string => `rule_${ruleId}`
 
+/** Per-question mode makes one call per rule: cap the AI conditions checked per email. */
+export const MAX_AI_CONDITIONS_PER_MAIL = 16
+
+function maxConditions(): number {
+  return decisionMode() === 'single' ? MAX_QUESTIONS : MAX_AI_CONDITIONS_PER_MAIL
+}
+
 /**
- * KI-Bedingungen ALLER aktiven Regeln einer Mail in EINEM System-One-Aufruf
- * (eine noul-Frage je Regel, höchstens 64). Nur Regeln, deren übrige Kriterien
- * schon zutreffen, werden gefragt – das spart Kontext. Liefert P(true) je
- * Regel-ID; ohne Entscheidungsmodell oder bei Fehler leer (= Regeln pausieren).
- * Die Bedingung stammt vom Nutzer (vertrauenswürdig), die Mail steht als
- * unvertrauenswürdige Daten im state.
+ * AI conditions of ALL active rules for a mail in ONE System One call
+ * (one noul question per rule, at most 64). Only rules whose other criteria
+ * already match are asked – that saves context. Returns P(true) per
+ * rule ID; empty without a decision model or on error (= rules pause).
+ * The condition comes from the user (trusted), the mail is in the state as
+ * untrusted data.
  */
 export async function evaluateAiConditions(
   db: Database.Database,
@@ -235,7 +252,7 @@ export async function evaluateAiConditions(
 
   const questions: Questions = {}
   for (const row of rows) {
-    if (Object.keys(questions).length >= MAX_QUESTIONS) break
+    if (Object.keys(questions).length >= maxConditions()) break
     let rule: RuleJson
     try {
       rule = ruleJsonSchema.parse(JSON.parse(row.rule_json))
@@ -247,7 +264,7 @@ export async function evaluateAiConditions(
     questions[ruleQuestionName(row.id)] = {
       type: 'noul',
       instructions: condition,
-      criteria: { false: 'Nein, trifft nicht zu', true: 'Ja, trifft zu' }
+      criteria: { false: 'No, does not apply', true: 'Yes, applies' }
     }
   }
   if (Object.keys(questions).length === 0) return {}
@@ -273,20 +290,19 @@ export async function evaluateAiConditions(
   const state = [
     UNTRUSTED_SYSTEM_NOTE,
     '',
-    `Von: ${sanitizeUntrustedLine(body.from_name, 120)} <${sanitizeUntrustedLine(body.from_addr ?? 'unbekannt', 200)}>`,
-    `Betreff: ${sanitizeUntrustedLine(body.subject, 300) || '(kein Betreff)'}`,
+    `From: ${sanitizeUntrustedLine(body.from_name, 120)} <${sanitizeUntrustedLine(body.from_addr ?? 'unknown', 200)}>`,
+    `Subject: ${sanitizeUntrustedLine(body.subject, 300) || '(no subject)'}`,
     '',
-    wrapUntrusted('MAIL', sanitizeUntrusted(text, 6000) || '(kein Textinhalt)')
+    wrapUntrusted('MAIL', sanitizeUntrusted(text, 6000) || '(no text content)')
   ].join('\n')
 
   try {
-    const result = await decide({
-      baseUrl: cfg.profile.baseUrl,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
-      state,
-      questions
-    })
+    const params = { baseUrl: cfg.profile.baseUrl, apiKey: cfg.apiKey, model: cfg.model }
+    // Per-question mode: one call per rule, so each condition is judged alone
+    const result =
+      decisionMode() === 'single'
+        ? await decide({ ...params, state, questions })
+        : await decideEach(params, questions, () => state)
     logUsage(db, cfg.model, result.usage.inputTokens, result.usage.outputTokens, 0)
     const out: Record<number, number> = {}
     for (const name of Object.keys(questions)) {
@@ -300,7 +316,7 @@ export async function evaluateAiConditions(
   }
 }
 
-/** Post-Triage-Regeln inkl. KI-Bedingungen (asynchron, ein Entscheidungs-Aufruf je Mail). */
+/** Post-triage rules incl. AI conditions (asynchronous, one decision call per mail). */
 export async function applyRulesPostTriage(
   db: Database.Database,
   messageId: number
@@ -310,10 +326,10 @@ export async function applyRulesPostTriage(
 }
 
 /**
- * Wendet aktive Regeln auf eine Nachricht an. Phase 'ingest' läuft nach dem
- * Body-Ingest (nur deterministische Kriterien), 'post-triage' nach der
- * AI-Annotation (auch Kategorie/Priorität). Einmal ausgeführte Aktionen sind
- * durch die Optimistik der Engine idempotent genug (archive löscht die Zeile).
+ * Applies active rules to a message. Phase 'ingest' runs after the
+ * body ingest (deterministic criteria only), 'post-triage' after the
+ * AI annotation (also category/priority). Actions once executed are
+ * idempotent enough thanks to the engine's optimism (archive deletes the row).
  */
 export function applyRules(
   db: Database.Database,
@@ -364,7 +380,7 @@ export function applyRules(
     if (actions.markRead) executeAction([messageId], 'markRead')
     if (actions.archive) {
       executeAction([messageId], 'archive')
-      return // Zeile ist weg — weitere Regeln/Aktionen sind gegenstandslos
+      return // row is gone — further rules/actions are moot
     }
   }
 }

@@ -21,8 +21,8 @@ function enabled(): boolean {
 }
 
 /**
- * Sperrbildschirm-Schutz: nur „Neue E-Mail“ statt Absender, Betreff,
- * Kurzfassung (vuln-0015). Privacy by default — nur ein explizites '0' zeigt Inhalte.
+ * Lock-screen protection: only "New email" instead of sender, subject,
+ * summary (vuln-0015). Privacy by default — only an explicit '0' shows content.
  */
 function hideContent(): boolean {
   return getSetting('notifications.hideContent') !== '0'
@@ -34,9 +34,9 @@ function minPriority(): number {
 }
 
 /**
- * Smart Notifications: nur frische, ungelesene Mails, deren AI-Priorität die
- * Schwelle erreicht (Default P4). P5 mit Sound, P4 still. Klick fokussiert
- * das Fenster und öffnet den Thread. Backfill-Altbestand bleibt stumm.
+ * Smart Notifications: only fresh, unread mails whose AI priority reaches the
+ * threshold (default P4). P5 with sound, P4 silent. Click focuses the
+ * window and opens the thread. Backfilled old mail stays silent.
  */
 export function maybeNotify(messageId: number): void {
   if (!db || !enabled() || !Notification.isSupported()) return
@@ -73,7 +73,7 @@ export function maybeNotify(messageId: number): void {
     subtitle: hidden ? undefined : (row.subject ?? undefined),
     body: hidden ? newMail : (row.summary ?? row.subject ?? ''),
     silent: row.priority < 5,
-    // macOS nutzt das Icon der Noctua.app; Windows/Linux brauchen es explizit.
+    // macOS uses the Noctua.app icon; Windows/Linux need it explicitly.
     ...(process.platform === 'darwin' ? {} : { icon })
   })
   notification.on('click', () => {
@@ -88,7 +88,7 @@ export function maybeNotify(messageId: number): void {
   notification.show()
 }
 
-/** Dock-Badge = Anzahl wichtiger ungelesener Threads (nicht alle Ungelesenen). */
+/** Dock badge = number of important unread threads (not all unread ones). */
 export function updateBadge(): void {
   if (!db || process.platform !== 'darwin') return
   const row = db
@@ -106,8 +106,8 @@ export function updateBadge(): void {
 }
 
 /**
- * Kalender-Erinnerung (VALARM) als macOS-Benachrichtigung. Klick fokussiert das
- * Fenster und meldet dem Renderer, welcher Termin gemeint war.
+ * Calendar reminder (VALARM) as a macOS notification. Click focuses the
+ * window and tells the renderer which event was meant.
  */
 export function notifyCalendarReminder(notice: {
   objectId: number

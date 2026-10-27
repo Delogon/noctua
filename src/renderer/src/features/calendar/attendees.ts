@@ -1,8 +1,8 @@
 import type { CalendarAttendee } from '@shared/calendar-types'
 
-// Teilnehmerliste des Termin-Editors: hinzufügen/entfernen/Rolle ändern und der Vergleich
-// vorher/nachher, aus dem sich ergibt, wer eine Einladung oder eine Absage bekommt
-// (spiegelt die Logik des Backends in src/main/calendar/organizer.ts).
+// Attendee list of the event editor: add/remove/change role and the before/after
+// comparison that determines who gets an invitation or a cancellation
+// (mirrors the backend logic in src/main/calendar/organizer.ts).
 
 export type AttendeeRole = 'REQ-PARTICIPANT' | 'OPT-PARTICIPANT'
 
@@ -30,7 +30,7 @@ export function newAttendee(email: string, name: string | null = null): Calendar
   }
 }
 
-/** Fügt hinzu; ungültige Adressen, Duplikate (ohne Groß-/Kleinschreibung) und die eigenen Adressen bleiben draußen. */
+/** Adds; invalid addresses, duplicates (case-insensitive) and own addresses are left out. */
 export function addAttendee(
   list: readonly CalendarAttendee[],
   email: string,
@@ -61,7 +61,7 @@ export function setAttendeeRole(
   return list.map((a) => (normEmail(a.email) === e ? { ...a, role } : a))
 }
 
-/** Pflicht oder optional (CHAIR zählt als Pflicht); alles andere (z. B. NON-PARTICIPANT) bleibt „OTHER". */
+/** Required or optional (CHAIR counts as required); everything else (e.g. NON-PARTICIPANT) stays "OTHER". */
 export function roleOf(a: Pick<CalendarAttendee, 'role'>): AttendeeRole | 'OTHER' {
   const r = a.role.toUpperCase()
   if (r === 'OPT-PARTICIPANT') return 'OPT-PARTICIPANT'
@@ -70,15 +70,15 @@ export function roleOf(a: Pick<CalendarAttendee, 'role'>): AttendeeRole | 'OTHER
 }
 
 export interface AttendeeDiff {
-  /** Neu eingeladen: bekommen eine Einladung (REQUEST) */
+  /** Newly invited: get an invitation (REQUEST) */
   added: string[]
-  /** Entfernt: bekommen eine Absage (CANCEL) */
+  /** Removed: get a cancellation (CANCEL) */
   removed: string[]
-  /** Bleiben: bekommen nur bei geänderter Zeit/Ort ein Update */
+  /** Remaining: get an update only if time/location changed */
   kept: string[]
 }
 
-/** Vergleich zweier Teilnehmerlisten nach Adresse (kleingeschrieben, ohne Duplikate). */
+/** Comparison of two attendee lists by address (lowercased, without duplicates). */
 export function diffAttendees(
   before: readonly Pick<CalendarAttendee, 'email'>[],
   after: readonly Pick<CalendarAttendee, 'email'>[]
@@ -92,12 +92,12 @@ export function diffAttendees(
   }
 }
 
-/** Gibt es vor oder nach der Änderung Teilnehmer? (Nur dann ist der Benachrichtigungs-Schalter sinnvoll.) */
+/** Are there attendees before or after the change? (Only then does the notify toggle make sense.) */
 export function hasAnyAttendees(before: readonly unknown[], after: readonly unknown[]): boolean {
   return before.length > 0 || after.length > 0
 }
 
-/** Meine Antwort (PARTSTAT) in der Teilnehmerliste, sonst null. */
+/** My response (PARTSTAT) in the attendee list, otherwise null. */
 export function myPartstat(
   list: readonly CalendarAttendee[],
   mine: ReadonlySet<string>

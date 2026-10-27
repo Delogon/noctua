@@ -1,16 +1,16 @@
 import { z } from 'zod'
 
-/** Terminvorschlag aus einer Mail (AI-Extraktion), wie ihn der Renderer sieht. */
+/** Event suggestion from a mail (AI extraction), as seen by the renderer. */
 export const eventSuggestionViewSchema = z.object({
   id: z.number().int(),
   messageId: z.number().int(),
   title: z.string(),
   allDay: z.boolean(),
-  /** Wandzeit 'YYYY-MM-DDTHH:mm:ss' bzw. bei ganztägig 'YYYY-MM-DD' */
+  /** Wall time 'YYYY-MM-DDTHH:mm:ss', or 'YYYY-MM-DD' for all-day */
   startLocal: z.string(),
-  /** Bei ganztägig EXKLUSIV (wie im Backend) */
+  /** EXCLUSIVE for all-day (as in the backend) */
   endLocal: z.string(),
-  /** Genannte IANA-Zone; null = Zeitzone des Nutzers */
+  /** Stated IANA zone; null = user's time zone */
   tzid: z.string().nullable(),
   location: z.string().nullable(),
   link: z.string().nullable(),
@@ -18,7 +18,7 @@ export const eventSuggestionViewSchema = z.object({
   confidence: z.number(),
   state: z.enum(['new', 'accepted']),
   objectId: z.number().int().nullable(),
-  /** Standard-Kalender zum Anlegen (null = kein beschreibbarer Kalender) */
+  /** Default calendar for creating (null = no writable calendar) */
   calendarId: z.number().int().nullable()
 })
 export type EventSuggestionView = z.infer<typeof eventSuggestionViewSchema>

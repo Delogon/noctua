@@ -1,15 +1,15 @@
-// String-Tabelle des Letterpress-Designs (aus dem ursprünglichen Design-Handoff).
-// („Noctua Mail.dc.html" = EN kanonisch, „Noctua Mail DE.dc.html" = DE).
-// Platzhalter in {braces} werden von t() ersetzt.
+// String table of the Letterpress design (from the original design handoff).
+// ("Noctua Mail.dc.html" = EN canonical, "Noctua Mail DE.dc.html" = DE).
+// Placeholders in {braces} are replaced by t().
 
 export type Lang = 'de' | 'en'
 
 const table = {
-  // ── Allgemein ──
+  // ── General ──
   cancel: { en: 'Cancel', de: 'Abbrechen' },
   noSubject: { en: '(No subject)', de: '(Kein Betreff)' },
 
-  // ── Die eine Toast-Leiste (Design 1c) ──
+  // ── The one toast bar (Design 1c) ──
   toastUndo: { en: 'Undo', de: 'Rückgängig' },
   toastDismiss: { en: 'Dismiss', de: 'Schließen' },
   toastSendingIn: { en: 'Sending as {addr} in {n}s', de: 'Wird in {n} s als {addr} gesendet' },
@@ -25,7 +25,7 @@ const table = {
   },
   toastOpenDraft: { en: 'Open draft', de: 'Entwurf öffnen' },
 
-  // ── Op-Queue: nicht ausführbare Aktionen (Dead-Letter) ──
+  // ── Op queue: non-executable actions (dead letter) ──
   opsDeadAttempts: {
     en: '{n} action(s) could not be synced to the server and were dropped.',
     de: '{n} Aktion(en) konnten nicht mit dem Server abgeglichen werden und wurden verworfen.'
@@ -43,7 +43,7 @@ const table = {
     de: '{n} Aktion(en) wurden verworfen, weil der Ordner nicht mehr existiert.'
   },
 
-  // ── Kalender-Konten (CalDAV, Phase 2.1) ──
+  // ── Calendar accounts (CalDAV, Phase 2.1) ──
   taskSyncHead: { en: 'SYNC TASKS (CALDAV)', de: 'AUFGABEN SYNCHRONISIEREN (CALDAV)' },
   taskSyncNote: {
     en: 'Accepted tasks and one calendar’s task list stay in sync both ways. Owl suggestions you haven’t accepted are never uploaded; dismissing or deleting a task removes it on the server too.',
@@ -129,7 +129,7 @@ const table = {
     de: 'Kalender: „{title}“ konnte nicht hochgeladen werden und wurde zurückgesetzt.'
   },
 
-  // ── Kalenderansicht (Phase 2.2) ──
+  // ── Calendar view (Phase 2.2) ──
   navCalendar: { en: 'CALENDAR', de: 'KALENDER' },
   cmdGoCalendar: { en: 'Go to Calendar', de: 'Zum Kalender' },
   helpCalView: {
@@ -347,11 +347,11 @@ const table = {
     de: 'Der Termin konnte nicht geladen werden.'
   },
 
-  // ── Update-Hinweis ──
+  // ── Update notice ──
   updateAvailable: { en: 'Version {v} is available', de: 'Version {v} ist verfügbar' },
   updateDownload: { en: 'Download', de: 'Herunterladen' },
 
-  // ── Kategorie-Override (Taste l, Design 3d) ──
+  // ── Category override (key l, Design 3d) ──
   overrideTitle: { en: 'Set category', de: 'Kategorie festlegen' },
   overrideReset: { en: 'Let the owl decide again', de: 'Die Eule wieder entscheiden lassen' },
   overrideFooterSet: { en: '1–7 / 0 SET', de: '1–7 / 0 WÄHLEN' },
@@ -364,7 +364,7 @@ const table = {
   catTransactional: { en: 'Transaction', de: 'Belege' },
   catOther: { en: 'Other', de: 'Sonstiges' },
 
-  // ── Remote-Bilder (Tracking-Schutz) ──
+  // ── Remote images (tracking protection) ──
   remoteImagesBlockedOne: {
     en: '1 remote image blocked (tracking protection)',
     de: '1 externes Bild blockiert (Tracking-Schutz)'
@@ -381,7 +381,7 @@ const table = {
   },
   linkMismatchOpen: { en: 'Open anyway', de: 'Trotzdem öffnen' },
 
-  // ── Owl-View (Suchen + Fragen in einem Eingabefeld) ──
+  // ── Owl view (search + ask in one input field) ──
   chatEmptyTitle: { en: 'Ask your inbox.', de: 'Frag deine E-Mails.' },
   chatSuggestion1: {
     en: 'Which invoices did I receive this month?',
@@ -456,7 +456,7 @@ const table = {
     de: 'DIE EULE INDEXIERT {n} E-MAILS · {coverage}% SEMANTISCH · LOKAL'
   },
 
-  // ── Konto-Dialog (Onboarding) ──
+  // ── Account dialog (onboarding) ──
   addAccountTitle: { en: 'Add account', de: 'Konto hinzufügen' },
   addImapGeneric: { en: 'Other provider (IMAP)', de: 'Anderer Anbieter (IMAP)' },
   addMicrosoftButton: { en: 'Sign in with Microsoft', de: 'Mit Microsoft anmelden' },
@@ -503,13 +503,13 @@ const table = {
   navTasks: { en: 'TASKS', de: 'AUFGABEN' },
   navSettings: { en: 'SETTINGS', de: 'EINSTELLUNGEN' },
 
-  // ── Key-Strip / g-Hint ──
+  // ── Key strip / g hint ──
   keyMove: { en: 'move', de: 'navigieren' },
   keyFile: { en: 'archive', de: 'archivieren' },
   keyDictate: { en: 'dictate', de: 'diktieren' },
   keyKeys: { en: 'keys', de: 'Kürzel' },
 
-  // ── Inbox-Liste ──
+  // ── Inbox list ──
   mailboxFilterLabel: { en: 'ACCOUNT', de: 'KONTO' },
   mailboxFilterAll: { en: 'ALL ACCOUNTS', de: 'ALLE KONTEN' },
   mailboxFilterLoading: { en: 'LOADING…', de: 'LÄDT…' },
@@ -628,7 +628,7 @@ const table = {
     de: 'ERLEDIGTE AUFGABEN SIND AUSGEBLENDET'
   },
 
-  // ── Reading sheet / Task-Strip ──
+  // ── Reading sheet / task strip ──
   owlFoundTask: { en: 'THE OWL FOUND A TASK', de: 'DIE EULE FAND EINE AUFGABE' },
   tAdd: { en: 'T ADD', de: 'T ÜBERNEHMEN' },
   inYourTasks: { en: '✓ IN YOUR TASKS', de: '✓ IN DEINEN AUFGABEN' },
@@ -701,7 +701,7 @@ const table = {
   send: { en: '↵ SEND', de: '↵ SENDEN' },
   redraft: { en: '⇧R REDRAFT', de: '⇧R NEU ENTWERFEN' },
 
-  // ── Owl-Rail ──
+  // ── Owl rail ──
   theOwl: { en: 'THE OWL', de: 'DIE EULE' },
   owlQuiet: { en: 'working quietly', de: 'arbeitet leise' },
   owlAsleepNoKey: { en: 'asleep — no key.', de: 'schläft – kein Schlüssel.' },
@@ -782,14 +782,14 @@ const table = {
   indexing: { en: 'indexing…', de: 'indexiert…' },
   errorState: { en: 'error', de: 'Fehler' },
   disconnect: { en: 'DISCONNECT', de: 'TRENNEN' },
-  // Zweitklick-Bestätigung beim Trennen (Design 3b)
+  // Second-click confirmation when disconnecting (Design 3b)
   disconnectHint: {
     en: 'removes the account + its local index',
     de: 'entfernt das Konto und seinen lokalen Index'
   },
   disconnectYes: { en: 'YES, DISCONNECT', de: 'JA, TRENNEN' },
   disconnectKeep: { en: 'KEEP', de: 'BEHALTEN' },
-  // Sync-Fehler inline (Design 3b): gespeicherter Fehlertext + Zeitpunkt
+  // Inline sync error (Design 3b): stored error text + timestamp
   syncFailed: { en: 'sync failed', de: 'Sync fehlgeschlagen' },
   syncNeedsReauth: { en: 'sign-in needed', de: 'Anmeldung nötig' },
   syncNeedsReauthHint: {
@@ -881,7 +881,7 @@ const table = {
   updatedToday: { en: 'updated today', de: 'heute aktualisiert' },
   updatedYesterday: { en: 'updated yesterday', de: 'gestern aktualisiert' },
   updatedDaysAgo: { en: 'updated {n} days ago', de: 'vor {n} Tagen aktualisiert' },
-  // Ehrlich gescheitertes Nachlernen (Design 3e) — Gründe für ok:false
+  // Honestly failed relearning (Design 3e) — reasons for ok:false
   voiceNoSent: {
     en: 'no sent replies to learn from yet',
     de: 'noch keine gesendeten Antworten zum Lernen'
@@ -934,7 +934,7 @@ const table = {
     de: 'Diktat wird jetzt von {model} transkribiert'
   },
   accountColor: { en: 'COLOR', de: 'FARBE' },
-  // Privacy-Default gedreht (Design 3b): blocken, bis der Nutzer erlaubt
+  // Privacy default flipped (Design 3b): block until the user allows
   privacyHead: { en: 'PRIVACY', de: 'PRIVATSPHÄRE' },
   imagesBlockToggle: {
     en: 'block remote images until I allow them',
@@ -957,7 +957,7 @@ const table = {
     de: 'Kein Schlüssel? E-Mail funktioniert trotzdem – nur die Eule schläft: keine Kurzfassungen, keine Entwürfe, kein Zählen.'
   },
 
-  // ── KI-Anbieter (Profile), Aufgaben-Zuordnung, Local only ──
+  // ── AI providers (profiles), task assignment, Local only ──
   profilesHead: { en: 'AI PROVIDERS', de: 'KI-ANBIETER' },
   profilesSub: {
     en: 'OpenRouter or any OpenAI-compatible server — Ollama, LM Studio, vLLM, LiteLLM …',
@@ -1084,7 +1084,7 @@ const table = {
     de: '✓ Suchmodell bereit – Indexierung startet'
   },
 
-  // ── Palette (nur Befehle — die Mailsuche wohnt bei der Eule) ──
+  // ── Palette (commands only — mail search lives with the owl) ──
   palPlaceholder: { en: 'Type a command…', de: 'Befehl eingeben…' },
   palAria: { en: 'Command palette', de: 'Befehlspalette' },
   palCommandMode: { en: 'COMMANDS ONLY', de: 'NUR BEFEHLE' },
@@ -1141,7 +1141,7 @@ const table = {
   cmdOwlSearchNote: { en: 'email search lives here now', de: 'die E-Mail-Suche ist jetzt hier' },
   cmdLanguage: { en: 'Sprache: Deutsch', de: 'Language: English' },
 
-  // ── Hilfe ──
+  // ── Help ──
   helpTitle: { en: 'Keyboard', de: 'Tastatur' },
   helpSub: {
     en: 'EVERYTHING WORKS WITHOUT THE MOUSE · ESC TO CLOSE',
@@ -1315,7 +1315,7 @@ const table = {
     de: 'du kannst den Stil jederzeit unter STIL neu lernen lassen'
   },
 
-  // ── Onboarding — Schlüssel-Schritt + pausiertes Training (Design 1b) ──
+  // ── Onboarding — key step + paused training (Design 1b) ──
   obOrgHead: { en: 'Your organization’s AI', de: 'Die KI deiner Organisation' },
   obOrgSub: {
     en: 'Gists, tasks and drafts run on the AI profiles your organization provides. Add your key where one is needed.',
@@ -1360,7 +1360,7 @@ const table = {
     de: 'E-Mail funktioniert auch ohne Schlüssel – nur die Eule schläft'
   },
 
-  // ── Onboarding — KI-Schritt „Wo soll die KI laufen?" (lokal zuerst) ──
+  // ── Onboarding — AI step "Where should the AI run?" (local first) ──
   obAiHead: { en: 'Where should the AI run?', de: 'Wo soll die KI laufen?' },
   obAiSub: {
     en: 'The owl reads your email to sort it and write drafts. Choose where that happens — you can change it anytime in Settings → AI.',
@@ -1457,7 +1457,7 @@ const table = {
     de: 'E-Mail funktioniert auch ohne KI – nur die Eule schläft'
   },
 
-  // ── Compose-Overlay (Feature-Erhalt, nicht im Prototyp) ──
+  // ── Compose overlay (feature preserved, not in the prototype) ──
   composeTo: { en: 'TO', de: 'AN' },
   composeCc: { en: 'CC', de: 'CC' },
   composeBcc: { en: 'BCC', de: 'BCC' },
@@ -1484,6 +1484,97 @@ const table = {
   },
   composeChipRemove: { en: 'Remove {addr}', de: '{addr} entfernen' },
 
+  // ── Folder view + appearance ──
+  folderUnified: { en: 'Unified inbox', de: 'Alle Posteingänge' },
+  folderUnifiedSent: { en: 'All sent', de: 'Alle gesendeten' },
+  folderUnifiedJunk: { en: 'All junk', de: 'Gesamter Spam' },
+  folderInbox: { en: 'Inbox', de: 'Posteingang' },
+  folderSent: { en: 'Sent', de: 'Gesendet' },
+  folderArchive: { en: 'Archive', de: 'Archiv' },
+  folderJunk: { en: 'Junk', de: 'Spam' },
+  folderFavorites: { en: 'Favorites', de: 'Favoriten' },
+  foldersToggle: { en: 'FOLDERS', de: 'ORDNER' },
+  foldersToggleAria: { en: 'Show folders', de: 'Ordner anzeigen' },
+  foldersTreeAria: { en: 'Folders', de: 'Ordner' },
+  foldersJunkNote: {
+    en: 'Junk stays out of the unified inbox and search.',
+    de: 'Spam bleibt aus dem Posteingang und der Suche draußen.'
+  },
+  foldersSyncing: {
+    en: 'Your own folders appear after the next sync.',
+    de: 'Eigene Ordner erscheinen nach dem nächsten Abgleich.'
+  },
+  setAppearance: { en: 'Appearance', de: 'Darstellung' },
+  setAppearanceSub: { en: 'layout, folders', de: 'Layout, Ordner' },
+  appearanceHead: { en: 'Appearance', de: 'Darstellung' },
+  appearanceSub: {
+    en: 'Same email, same owl — pick the frame that feels like home.',
+    de: 'Dieselben E-Mails, dieselbe Eule – wähle den Rahmen, in dem du dich zu Hause fühlst.'
+  },
+  layoutHead: { en: 'Layout', de: 'Layout' },
+  layoutLetterpress: { en: 'Letterpress', de: 'Letterpress' },
+  layoutLetterpressDesc: {
+    en: 'Calm paper, top navigation, owl rail. The Noctua original.',
+    de: 'Ruhiges Papier, Navigation oben, Eulen-Leiste. Das Noctua-Original.'
+  },
+  layoutClassic: { en: 'Classic', de: 'Klassisch' },
+  layoutClassicDesc: {
+    en: 'Folder pane on the left, command bar, blue accents — familiar if you come from Outlook.',
+    de: 'Ordnerleiste links, Befehlsleiste, blaue Akzente – vertraut, wenn du von Outlook kommst.'
+  },
+  mailboxHead: { en: 'Folders', de: 'Ordner' },
+  showFoldersLabel: { en: 'Show folders', de: 'Ordner anzeigen' },
+  showFoldersHint: {
+    en: "Browse each account's folders next to the unified inbox. Your own folders sync in the background once this is on.",
+    de: 'Die Ordner jedes Kontos neben dem gemeinsamen Posteingang durchsuchen. Eigene Ordner werden dann im Hintergrund abgeglichen.'
+  },
+  junkAlways: { en: 'ALWAYS', de: 'IMMER' },
+  junkAlwaysNote: {
+    en: 'Junk and spam folders never appear in the unified inbox, “needs you” or search — open them only on purpose.',
+    de: 'Spam-Ordner erscheinen nie im gemeinsamen Posteingang, bei „Braucht dich“ oder in der Suche – nur, wenn du sie gezielt öffnest.'
+  },
+  classicNewMail: { en: 'New email', de: 'Neue E-Mail' },
+  paneList: { en: 'List', de: 'Liste' },
+  paneResizeAria: { en: 'Resize {name}', de: '{name}: Breite ändern' },
+  paneResizeTip: {
+    en: 'Drag to resize · double-click to collapse',
+    de: 'Ziehen ändert die Breite · Doppelklick klappt ein'
+  },
+  paneExpandAria: { en: 'Expand {name}', de: '{name} aufklappen' },
+  paneCollapseAria: { en: 'Collapse {name}', de: '{name} einklappen' },
+  paneAutoCollapsedTip: {
+    en: 'Collapsed because the window is narrow — click to keep it open',
+    de: 'Eingeklappt, weil das Fenster schmal ist – Klick hält es offen'
+  },
+  themeToLight: { en: 'Switch to light mode', de: 'Zum hellen Modus wechseln' },
+  themeToDark: { en: 'Switch to dark mode', de: 'Zum dunklen Modus wechseln' },
+  themeHead: { en: 'Colors', de: 'Farben' },
+  themeLight: { en: 'Light', de: 'Hell' },
+  themeDark: { en: 'Dark', de: 'Dunkel' },
+  panesHead: { en: 'Panes', de: 'Spalten' },
+  panesHint: {
+    en: 'Drag a pane’s edge to resize it; the small tab on the edge collapses it. Narrow windows collapse panes automatically so the email keeps its room.',
+    de: 'Spaltenrand ziehen ändert die Breite, die kleine Lasche am Rand klappt ein. In schmalen Fenstern klappen Spalten automatisch ein, damit die E-Mail Platz behält.'
+  },
+  panesReset: { en: 'Reset widths', de: 'Breiten zurücksetzen' },
+  barAria: { en: 'Email actions', de: 'E-Mail-Aktionen' },
+  barReply: { en: 'Reply', de: 'Antworten' },
+  barReplyAll: { en: 'Reply all', de: 'Allen antworten' },
+  barDictate: { en: 'Dictate', de: 'Diktieren' },
+  barArchive: { en: 'Archive', de: 'Archivieren' },
+  barDelete: { en: 'Delete', de: 'Löschen' },
+  barJunk: { en: 'Report junk', de: 'Als Spam melden' },
+  barNotJunk: { en: 'Not junk', de: 'Kein Spam' },
+  toastDeleted: { en: 'Moved to trash.', de: 'In den Papierkorb verschoben.' },
+  toastJunked: { en: 'Moved to junk.', de: 'In den Spam-Ordner verschoben.' },
+  classicSearch: { en: 'Search or ask the owl', de: 'Suchen oder die Eule fragen' },
+  classicAppsAria: { en: 'Apps', de: 'Apps' },
+  classicMail: { en: 'Email', de: 'E-Mail' },
+  classicWaiting: { en: 'Waiting', de: 'Ausstehend' },
+  classicTasks: { en: 'Tasks', de: 'Aufgaben' },
+  classicCalendar: { en: 'Calendar', de: 'Kalender' },
+  classicOwl: { en: 'Owl', de: 'Eule' },
+  classicSettings: { en: 'Settings', de: 'Einstellungen' },
   mboxInbox: { en: 'INBOX', de: 'POSTEINGANG' },
   mboxSent: { en: 'SENT', de: 'GESENDET' },
   mboxSpam: { en: 'SPAM', de: 'SPAM' },
@@ -1503,7 +1594,7 @@ const table = {
     de: 'Möglicherweise gesendet – sieh im Ordner „Gesendet“ nach'
   },
   composeDraftRestored: { en: 'Draft restored', de: 'Entwurf wiederhergestellt' },
-  // ── Terminvorschläge aus Mails (AI) ──
+  // ── Event suggestions from mails (AI) ──
   eventSuggestHead: { en: 'ADD TO CALENDAR?', de: 'IN DEN KALENDER EINTRAGEN?' },
   eventSuggestProposed: { en: 'PROPOSED', de: 'VORSCHLAG' },
   eventSuggestConfirmed: { en: 'CONFIRMED', de: 'BESTÄTIGT' },
@@ -1557,7 +1648,7 @@ const table = {
     de: 'Nur als Vorschlag in der E-Mail – übernehmen mit T.'
   },
 
-  // ── Regeln (Design 3c — Letterpress) ──
+  // ── Rules (Design 3c — Letterpress) ──
   rulesHead: { en: 'Rules', de: 'Regeln' },
   rulesSub: {
     en: 'describe it in a sentence — the owl builds the rule',
@@ -1635,7 +1726,7 @@ const table = {
   sigImgPadding: { en: 'PADDING', de: 'ABSTAND' },
   sigImgBackground: { en: 'BACKGROUND', de: 'HINTERGRUND' },
   sigImgBackgroundTransparent: { en: 'Transparent', de: 'Transparent' },
-  // Kuratierte Swatches statt OS-Farbwähler (Design 3f)
+  // Curated swatches instead of the OS color picker (Design 3f)
   sigSwatchPaper: { en: 'Paper', de: 'Papier' },
   sigSwatchPastel: { en: 'Pastel {hex}', de: 'Pastell {hex}' },
   sigSwatchInk: { en: 'Ink', de: 'Tinte' },
@@ -1789,7 +1880,7 @@ const table = {
   toggleRailLabel: { en: 'show/hide the owl', de: 'Eule ein-/ausblenden' },
   loading: { en: 'loading…', de: 'lädt…' },
 
-  // ── Rechtschreibprüfung ──
+  // ── Spell checking ──
   followupRadarHead: { en: 'FOLLOW-UP RADAR', de: 'NACHFASS-RADAR' },
   followupRadarSub: {
     en: 'when unanswered sent emails appear under WAITING',
@@ -1805,7 +1896,7 @@ const table = {
   spellIgnore: { en: 'IGNORE', de: 'IGNORIEREN' },
   spellNoSuggestions: { en: 'no suggestions', de: 'keine Vorschläge' },
 
-  // ── Technik-Seite: „Wie die Eule denkt" (Pipelines in Bildern) ──
+  // ── Technology page: "How the owl thinks" (pipelines in pictures) ──
   cmdTech: { en: 'How the owl thinks', de: 'Wie die Eule denkt' },
   cmdTechNote: { en: 'every pipeline, one picture', de: 'jeder Ablauf als Bild' },
   techHead: { en: 'How the owl thinks', de: 'Wie die Eule denkt' },
@@ -1847,7 +1938,7 @@ const table = {
     de: 'Jede neue E-Mail im Posteingang wird einmal günstig gelesen: Kategorie, Priorität, Zusammenfassung in einer Zeile – und ob sie dich braucht. Ein Budget-Wächter begrenzt die Kosten pro Tag und Monat; ist das Budget aufgebraucht, wartet die Warteschlange einfach.'
   },
 
-  // 02 · Adressat-Erkennung
+  // 02 · Addressee detection
   techAddrTitle: { en: 'Who is actually meant', de: 'Wer wirklich gemeint ist' },
   techAddrS1: { en: '1 · SALUTATION', de: '1 · ANREDE' },
   techAddrS1Sample: { en: '“Hi Tim,”', de: '„Hallo Tim,“' },
@@ -1870,7 +1961,7 @@ const table = {
     de: 'Eine Aufgabe entsteht nur, wenn wirklich du gemeint bist: Eine Anrede mit deinem Namen schlägt den Umschlag, der Umschlag schlägt das Modell. Und wenn das Modell zweifelt, schlägt die Eule nur vor – nie legt sie etwas stillschweigend an.'
   },
 
-  // 03 · Aufgaben-Sieb
+  // 03 · Task sieve
   techSieveTitle: { en: 'The task sieve', de: 'Das Aufgaben-Sieb' },
   techSieveIn: { en: 'ACTION ITEMS FROM TRIAGE', de: 'KANDIDATEN AUS DER VORSORTIERUNG' },
   techSieve1: { en: 'AUTO-CREATE IS OFF', de: 'AUTOMATISCHES ANLEGEN IST AUS' },
@@ -1891,7 +1982,7 @@ const table = {
     de: 'Sechs Siebe in genau dieser Reihenfolge – was hängen bleibt, wird verworfen, und im Zweifel gibt es nur einen Vorschlag. Nur was durch alle sechs fällt, wird von selbst zur Aufgabe.'
   },
 
-  // 04 · Semantische Suche
+  // 04 · Semantic search
   techSearchTitle: { en: 'Search — text and meaning', de: 'Suche – Text und Bedeutung' },
   techSearchIn: { en: 'YOUR QUERY', de: 'DEINE SUCHE' },
   techSearchSample: { en: '“lease agreement”', de: '„mietvertrag“' },
@@ -1908,7 +1999,7 @@ const table = {
     de: 'Volltext- und Bedeutungssuche laufen parallel, eine Rang-Fusion mischt beide Listen. Alles läuft auf deinem Gerät – das Embedding-Modell liegt lokal, kostet keine Tokens, und die Abdeckung steht unten in der Eulen-Ansicht.'
   },
 
-  // 05 · Die Eule fragen
+  // 05 · Ask the owl
   techAskTitle: { en: 'Ask the owl', de: 'Die Eule fragen' },
   techAskQ: { en: 'YOUR QUESTION', de: 'DEINE FRAGE' },
   techAskExpand: { en: 'SEARCH TERMS', de: 'SUCHBEGRIFFE' },
@@ -1925,7 +2016,7 @@ const table = {
     de: 'Eine Frage durchsucht zuerst lokal deine E-Mails; nur die Frage und die gefundenen Ausschnitte gehen an das Modell. Die Antwort kommt als Stream mit [n]-Zitaten – das Gespräch selbst bleibt in deiner lokalen Datenbank.'
   },
 
-  // 06 · Entwürfe & Stimme
+  // 06 · Drafts & voice
   techVoiceTitle: { en: 'Drafts & your voice', de: 'Entwürfe & dein Stil' },
   techVoiceSent1: { en: 'SENT', de: 'GESENDETE' },
   techVoiceSent2: { en: 'EMAILS', de: 'E-MAILS' },
@@ -1948,7 +2039,7 @@ const table = {
     de: 'Die Eule lernt deinen Stil pro Adresse aus deinen gesendeten E-Mails. Ob du duzt oder siezt, richtet sich nach dem tatsächlichen Verlauf mit der Person – deterministisch und vor dem Profil. Und es wird nie etwas von allein gesendet: Der letzte Klick gehört immer dir.'
   },
 
-  // 07 · Rechtschreibprüfung
+  // 07 · Spell checking
   techSpellTitle: { en: 'Spelling — offline, honest', de: 'Rechtschreibung – offline und ehrlich' },
   techSpellSample: { en: 'definately', de: 'Rechtschreibpürfung' },
   techSpellEngine: { en: 'HUNSPELL · WASM', de: 'HUNSPELL · WASM' },
@@ -1963,7 +2054,7 @@ const table = {
     de: 'Ein echtes Hunspell läuft als WebAssembly direkt in der App, deutsche und englische Wörterbücher sind gleich mit dabei. Kein Wort verlässt deinen Rechner – die Rechtschreibprüfung von macOS ist bewusst abgeschaltet.'
   },
 
-  // 08 · Regeln
+  // 08 · Rules
   techRulesTitle: {
     en: 'Rules — drafted once, applied forever',
     de: 'Regeln – einmal entworfen, immer angewendet'
@@ -1995,7 +2086,7 @@ const table = {
     de: 'Das Modell entwirft das Regel-JSON nur einmal, aus deiner Beschreibung. Angewendet wird die Regel danach bei jeder E-Mail deterministisch – ganz ohne weitere KI-Aufrufe.'
   },
 
-  // 09 · Follow-up-Radar
+  // 09 · Follow-up radar
   techRadarTitle: { en: 'The follow-up radar', de: 'Das Nachfass-Radar' },
   techRadarSent1: { en: 'YOUR SENT', de: 'GESENDETE' },
   techRadarSent2: { en: 'EMAIL', de: 'E-MAIL' },
@@ -2015,7 +2106,7 @@ const table = {
     de: 'Das Radar findet deine gesendeten E-Mails, die unbeantwortet geblieben sind, zählt die Tage und fragt ein günstiges Modell, ob überhaupt eine Antwort erwartet wird. Der Stups ist nur ein Entwurf in deinem Stil – abgeschickt wird er von dir.'
   },
 
-  // 10 · Datenhaltung
+  // 10 · Data storage
   techDataTitle: { en: 'Where your data lives', de: 'Wo deine Daten liegen' },
   techDataMac: { en: 'YOUR MAC', de: 'DEIN MAC' },
   techDataDb: { en: 'NOCTUA.SQLITE', de: 'NOCTUA.SQLITE' },
@@ -2065,7 +2156,7 @@ const table = {
   techNetTaskStt: { en: 'dictation', de: 'Diktat' },
   techNetTaskDecision: { en: 'decisions', de: 'Entscheidungen' },
 
-  // Entscheidungsmodelle (Ollama System One: clef-flash, nimble, …)
+  // Decision models (Ollama System One: clef-flash, nimble, …)
   modelDecision: { en: 'DECISIONS', de: 'ENTSCHEIDUNGEN' },
   modelDecisionSub: {
     en: 'optional · decision model on your own Ollama server',
@@ -2115,15 +2206,150 @@ const table = {
     de: 'Tipp: „ollama pull clef-flash“ für schnellere Sortierung'
   },
 
-  // Phishing-Warnung in der Mail-Ansicht
+  // Phishing warning in the mail view
   phishingBanner: {
     en: 'This email looks like phishing — do not click links or enter credentials.',
     de: 'Diese E-Mail sieht nach Phishing aus – klicke keine Links, gib keine Zugangsdaten ein.'
   },
+  phishingSuspiciousBanner: {
+    en: 'Some warning signs — check the sender and links before you click.',
+    de: 'Einige Warnzeichen – prüfe Absender und Links, bevor du klickst.'
+  },
+  spamBanner: { en: 'This email looks like spam.', de: 'Diese E-Mail sieht nach Spam aus.' },
+  spamSuspiciousBanner: {
+    en: 'This email may be unwanted bulk advertising.',
+    de: 'Diese E-Mail könnte unerwünschte Massenwerbung sein.'
+  },
   phishingSignals: { en: 'Warning signs', de: 'Warnzeichen' },
   phishingNote: {
-    en: 'Local assessment by your decision model — it can be wrong.',
-    de: 'Lokale Einschätzung deines Entscheidungsmodells – kann irren.'
+    en: 'Local assessment by rules and your decision model — it can be wrong.',
+    de: 'Lokale Einschätzung aus Regeln und deinem Entscheidungsmodell – kann irren.'
+  },
+  securityRulesNote: {
+    en: 'Local check by rules, no AI involved — it can be wrong.',
+    de: 'Lokale Prüfung durch Regeln, ohne KI – kann irren.'
+  },
+  securityMoveToJunk: { en: 'Move to junk', de: 'In den Spam-Ordner' },
+  securityHead: { en: 'Spam & phishing', de: 'Spam & Phishing' },
+  securityAutoJunkToggle: {
+    en: 'Move likely spam to junk automatically',
+    de: 'Wahrscheinlichen Spam automatisch aussortieren'
+  },
+  securityAutoJunkNote: {
+    en: 'only when the decision model confirms it; never for known contacts',
+    de: 'nur mit Bestätigung durch das Entscheidungsmodell; nie bei bekannten Kontakten'
+  },
+  threatReasonHomoglyphSender: {
+    en: 'The sender domain uses look-alike letters from another alphabet (e.g. Cyrillic)',
+    de: 'Die Absenderdomain nutzt Ersatzzeichen aus einem anderen Alphabet (z. B. kyrillisch)'
+  },
+  threatReasonLookalikeSender: {
+    en: 'The sender domain imitates a well-known brand with swapped characters',
+    de: 'Die Absenderdomain imitiert eine bekannte Marke mit vertauschten Zeichen'
+  },
+  threatReasonBrandFreemail: {
+    en: 'The name claims to be a company, but it was sent from a free email address',
+    de: 'Der Name gibt sich als Firma aus, die E-Mail kommt aber von einer Freemail-Adresse'
+  },
+  threatReasonBrandOtherDomain: {
+    en: 'The name claims to be a well-known company, but the email comes from a domain that is not theirs',
+    de: 'Der Name gibt sich als bekannte Firma aus, die E-Mail kommt aber von einer fremden Domain'
+  },
+  threatReasonExecutiveFreemail: {
+    en: 'The name carries an executive title (e.g. CEO), but it was sent from a free email address',
+    de: 'Der Name trägt einen Chef-Titel (z. B. Geschäftsführer), die E-Mail kommt aber von einer Freemail-Adresse'
+  },
+  threatReasonSensitiveRequest: {
+    en: 'Asks for bank details, card data, a password or a fee',
+    de: 'Fragt nach Bankdaten, Kartendaten, einem Passwort oder einer Gebühr'
+  },
+  threatReasonConfidentialPayment: {
+    en: 'Asks for a payment or transfer to be kept confidential (typical of CEO fraud)',
+    de: 'Verlangt eine vertrauliche Zahlung oder Überweisung (typisch für Chef-Betrug)'
+  },
+  threatReasonDmarcFail: {
+    en: 'DMARC check failed — the sender domain did not authorize this email',
+    de: 'DMARC-Prüfung fehlgeschlagen – die Absenderdomain hat die E-Mail nicht autorisiert'
+  },
+  threatReasonAuthFail: {
+    en: 'SPF or DKIM check of the sender failed',
+    de: 'SPF- oder DKIM-Prüfung des Absenders fehlgeschlagen'
+  },
+  threatReasonServerSpam: {
+    en: 'Your mail server marked this email as spam',
+    de: 'Dein Mailserver hat die E-Mail als Spam markiert'
+  },
+  threatReasonMixedScript: {
+    en: 'Words mix Latin with Cyrillic/Greek look-alike letters ({n})',
+    de: 'Wörter mischen lateinische mit kyrillischen/griechischen Ersatzzeichen ({n})'
+  },
+  threatReasonInvisible: {
+    en: 'Invisible characters hidden between letters',
+    de: 'Unsichtbare Zeichen zwischen den Buchstaben versteckt'
+  },
+  threatReasonBidi: {
+    en: 'Text-direction control characters disguise the subject, name or a file name',
+    de: 'Steuerzeichen für die Schreibrichtung tarnen Betreff, Name oder Dateinamen'
+  },
+  threatReasonHomoglyphLink: {
+    en: 'Links lead to a domain with look-alike letters ({n})',
+    de: 'Links führen auf eine Domain mit Ersatzzeichen ({n})'
+  },
+  threatReasonLookalikeLink: {
+    en: 'Links lead to a domain imitating a well-known brand ({n})',
+    de: 'Links führen auf eine Domain, die eine bekannte Marke imitiert ({n})'
+  },
+  threatReasonUserinfoLink: {
+    en: 'Links hide the real target behind an “@” ({n})',
+    de: 'Links verstecken das echte Ziel hinter einem „@“ ({n})'
+  },
+  threatReasonScriptLink: {
+    en: 'Links contain script or data URLs ({n})',
+    de: 'Links enthalten Skript- oder Daten-URLs ({n})'
+  },
+  threatReasonShortener: {
+    en: 'Links use a URL shortener that hides the target ({n})',
+    de: 'Links nutzen einen URL-Kürzer, der das Ziel verbirgt ({n})'
+  },
+  threatReasonForm: {
+    en: 'The email contains an input form',
+    de: 'Die E-Mail enthält ein Eingabeformular'
+  },
+  threatReasonUrgency: {
+    en: 'Pressure phrases (account locked, confirm your data) together with links',
+    de: 'Druck-Formulierungen (Konto gesperrt, Daten bestätigen) zusammen mit Links'
+  },
+  threatReasonDangerousAttachment: {
+    en: 'Executable attachment — program, script or disk image ({n})',
+    de: 'Ausführbarer Anhang – Programm, Skript oder Disk-Image ({n})'
+  },
+  threatReasonMacroAttachment: {
+    en: 'Attachment with Office macros ({n})',
+    de: 'Anhang mit Office-Makros ({n})'
+  },
+  threatReasonHtmlAttachment: {
+    en: 'HTML/SVG attachment — a common way to deliver fake login pages ({n})',
+    de: 'HTML-/SVG-Anhang – beliebter Weg für gefälschte Login-Seiten ({n})'
+  },
+  threatReasonDoubleExtension: {
+    en: 'Attachment disguised with a double extension, e.g. “invoice.pdf.exe” ({n})',
+    de: 'Anhang mit doppelter Dateiendung getarnt, z. B. „rechnung.pdf.exe“ ({n})'
+  },
+  threatReasonSpamPhrases: {
+    en: 'Typical spam phrases — prizes, crypto returns, inheritance ({n})',
+    de: 'Typische Spam-Formulierungen – Gewinne, Krypto-Rendite, Erbschaft ({n})'
+  },
+  threatReasonShouting: {
+    en: 'Subject in capitals or with piled-up !!!/$$$',
+    de: 'Betreff in Großbuchstaben oder mit gehäuften !!!/$$$'
+  },
+  threatReasonImageOnly: {
+    en: 'The email consists almost entirely of images',
+    de: 'Die E-Mail besteht fast nur aus Bildern'
+  },
+  threatReasonHiddenText: {
+    en: 'Lots of hidden text in the HTML',
+    de: 'Viel versteckter Text im HTML'
   },
   phishReasonDisplayName: {
     en: 'The display name shows a different domain than the real sender address',
@@ -2146,7 +2372,45 @@ const table = {
     de: 'Links nutzen eine Domain mit Ersatzzeichen (Punycode) ({n})'
   },
 
-  // Regeln mit KI-Bedingung
+  // Performance diagnostics (technology page)
+  diagTitle: { en: 'Performance diagnostics', de: 'Leistungsdiagnose' },
+  diagToggle: { en: 'Measure', de: 'Messen' },
+  diagCap: {
+    en: 'Measures on this Mac where time and CPU go: operations, database queries, sync, AI queue and the UI. Only names of operations and numbers are recorded, never email content. Nothing is sent: export a ZIP when you want to share it.',
+    de: 'Misst auf diesem Mac, wohin Zeit und CPU gehen: Operationen, Datenbankabfragen, Sync, KI-Warteschlange und Oberfläche. Erfasst werden nur Namen von Operationen und Zahlen, nie Inhalte von E-Mails. Nichts wird gesendet: Exportiere ein ZIP, wenn du es teilen möchtest.'
+  },
+  diagCpu: { en: 'CPU main · all', de: 'CPU Haupt · alle' },
+  diagMemory: { en: 'Memory main · all', de: 'Speicher Haupt · alle' },
+  diagLoop: { en: 'Event loop p99 / max', de: 'Event-Loop p99 / max' },
+  diagSql: { en: 'SQL last 5 s', de: 'SQL letzte 5 s' },
+  diagOperation: { en: 'Operation', de: 'Operation' },
+  diagCalls: { en: 'Calls', de: 'Aufrufe' },
+  diagMax: { en: 'Max', de: 'Max' },
+  diagTotal: { en: 'Total', de: 'Summe' },
+  diagMedian: { en: 'Median', de: 'Median' },
+  diagDuration: { en: 'Duration', de: 'Dauer' },
+  diagStatements: { en: 'Queries', de: 'Abfragen' },
+  diagSlowest: { en: 'Slowest events', de: 'Langsamste Ereignisse' },
+  diagBenchCase: { en: 'Benchmark', de: 'Benchmark' },
+  diagBenchRun: { en: 'Run benchmark', de: 'Benchmark starten' },
+  diagBenchRunning: { en: 'Measuring …', de: 'Misst …' },
+  diagFullScans: {
+    en: '{n} of {total} queries read a whole table without an index',
+    de: '{n} von {total} Abfragen lesen eine ganze Tabelle ohne Index'
+  },
+  diagExport: { en: 'Export diagnostics (.zip)', de: 'Diagnose exportieren (.zip)' },
+  diagExporting: { en: 'Exporting …', de: 'Exportiert …' },
+  diagWithBenchmark: { en: 'with benchmark', de: 'mit Benchmark' },
+  diagExported: { en: 'Saved {file}.', de: '{file} gespeichert.' },
+  diagExportFailed: { en: 'Export failed.', de: 'Export fehlgeschlagen.' },
+  diagClear: { en: 'Delete measurements', de: 'Messwerte löschen' },
+  diagCleared: { en: 'Measurements deleted.', de: 'Messwerte gelöscht.' },
+  diagStored: {
+    en: '{samples} samples · {n} earlier sessions on this Mac',
+    de: '{samples} Messpunkte · {n} frühere Sitzungen auf diesem Mac'
+  },
+
+  // Rules with AI condition
   ruleAiCondition: { en: 'AI condition', de: 'KI-Bedingung' },
   ruleAiNeedsModel: {
     en: 'Needs a decision model (Settings → AI) — skipped until then.',
