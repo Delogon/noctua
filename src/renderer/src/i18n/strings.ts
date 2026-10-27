@@ -420,8 +420,12 @@ const table = {
     de: 'ANTWORT MIT QUELLEN AUS DEN TREFFERN UNTEN'
   },
   owlAskDisabled: {
-    en: 'the owl sleeps — add a key in Settings → AI',
-    de: 'Die Eule schläft – hinterlege einen Schlüssel unter Einstellungen → KI'
+    en: 'the owl sleeps — set up an AI model in Settings → AI',
+    de: 'Die Eule schläft – richte ein KI-Modell unter Einstellungen → KI ein'
+  },
+  owlAskDisabledLocalOnly: {
+    en: 'the owl sleeps — Local only, no local model set',
+    de: 'Die Eule schläft – „Nur lokal“, aber kein lokales Modell gesetzt'
   },
   owlHitsLabel: { en: 'EMAIL · BEST MATCHES', de: 'E-MAILS · BESTE TREFFER' },
   owlHitsNote: {
@@ -1682,6 +1686,28 @@ const table = {
   syncRange365: { en: 'Last year', de: 'Letztes Jahr' },
   syncRangeAll: { en: 'Everything', de: 'Alles' },
   syncRangeDays: { en: '{n} days', de: '{n} Tage' },
+  scanLabel: { en: 'AI SCAN', de: 'KI-SCAN' },
+  scanHint: {
+    en: 'Sorts the emails already in this account’s inbox (within the sync range).',
+    de: 'Sortiert die E-Mails, die schon im Posteingang des Kontos liegen (im Sync-Zeitraum).'
+  },
+  scanNow: { en: 'SCAN EXISTING EMAILS', de: 'BESTEHENDE E-MAILS SCANNEN' },
+  toastScanQueued: {
+    en: 'Scanning {n} emails in the background',
+    de: '{n} E-Mails werden im Hintergrund gescannt'
+  },
+  toastScanStarted: {
+    en: 'Scan started — emails are sorted as they finish downloading',
+    de: 'Scan gestartet – E-Mails werden sortiert, sobald sie geladen sind'
+  },
+  toastScanAiOff: {
+    en: 'AI is switched off for this account',
+    de: 'KI ist für dieses Konto ausgeschaltet'
+  },
+  toastScanBlocked: {
+    en: 'Scan queued — it starts once a sorting model is set up in Settings → AI',
+    de: 'Scan vorgemerkt – er startet, sobald unter Einstellungen → KI ein Sortier-Modell eingerichtet ist'
+  },
   toastSyncRange: {
     en: 'Sync range saved — adjusting in the background',
     de: 'Zeitraum gespeichert – wird im Hintergrund angepasst'

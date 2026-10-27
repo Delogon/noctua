@@ -91,6 +91,7 @@ import {
   getTaskModel,
   getTaskProfileId,
   listProfiles,
+  resolveDecision,
   setProfileKey,
   setTaskAssignment,
   taskBlockReason,
@@ -99,6 +100,7 @@ import {
 import type { AiTask } from '../ai/providers/types'
 import { embeddingIndexer, isEmbeddingModelCached } from '../ai/embeddings'
 import { aiQueue } from '../ai/queue'
+import { backfillCutoff } from '../sync/account-syncer'
 import { checkForUpdates } from '../updates'
 import { buildNetworkConnections } from '../network-connections'
 import { getOrgConfig, productName, resolveUpdateFeed } from '../org-config'
@@ -475,6 +477,7 @@ export const handlers: IpcHandlers = {
       AccountRow | undefined
     await syncEngine.stopAccount(accountId)
     getDb().prepare('DELETE FROM accounts WHERE id = ?').run(accountId)
+    aiQueue.forgetScan(accountId)
     deleteSecret(accountSecretKey(accountId))
     // Google refresh token is tied to the address, not the account ID
     if (row?.credential_type === 'oauth-google') {
@@ -654,6 +657,22 @@ export const handlers: IpcHandlers = {
     // the 10-minute poll. With accountId only one account (RETRY on error state, Design 3b).
     syncEngine.syncNow(input?.accountId)
     return { ok: true }
+  },
+
+  'ai:scanAccount': ({ accountId }) => {
+    const row = getDb()
+      .prepare('SELECT sync_days, ai_enabled FROM accounts WHERE id = ?')
+      .get(accountId) as { sync_days: number | null; ai_enabled: number } | undefined
+    if (!row) throw new Error('Konto nicht gefunden')
+    // Scan as far back as the account keeps bodies (its search window);
+    // mails still missing a body are picked up once the backfill fetches them.
+    const { queued } = aiQueue.scanAccount(accountId, backfillCutoff(row.sync_days, true))
+    syncEngine.syncNow(accountId)
+    const triageBlocked =
+      getTaskProfileId('triage') !== 'apple' &&
+      taskBlockReason('triage') !== null &&
+      resolveDecision() === null
+    return { queued, aiEnabled: row.ai_enabled === 1, triageBlocked }
   },
 
   'ai:overrideCategory': ({ threadKey, category }) => {

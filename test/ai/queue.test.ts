@@ -219,3 +219,67 @@ describe('triage discovery', () => {
     expect(plan).not.toMatch(/SCAN m\b/)
   })
 })
+
+describe('account scan (existing mail)', () => {
+  let db: Database.Database
+  let queue: AiQueue
+  afterEach(() => {
+    queue.stop()
+    closeTestDb(db)
+  })
+
+  it('enqueues older Inbox mail of that account only and disarms once complete', () => {
+    db = createTestDb()
+    runTriage.mockResolvedValue('skipped-no-client')
+    const account = seedAccount(db, { email: 'new@test.de' })
+    const inbox = seedFolder(db, account, '\\Inbox', 'INBOX')
+    const other = seedAccount(db, { email: 'other@test.de' })
+    const otherInbox = seedFolder(db, other, '\\Inbox', 'INBOX')
+    const now = Date.now()
+    const day = 24 * 3600_000
+    let uid = 0
+    const add = (folder: number, accountId: number, age: number, body = 'full'): number => {
+      uid += 1
+      const id = upsertEnvelope(
+        db,
+        accountId,
+        folder,
+        makeEnvelope({
+          uid,
+          messageId: `<s${uid}@test>`,
+          date: now - age * day,
+          internalDate: now - age * day
+        })
+      )!.messageId
+      db.prepare('UPDATE messages SET body_state = ? WHERE id = ?').run(body, id)
+      return id
+    }
+    const old = add(inbox, account, 100)
+    const tooOld = add(inbox, account, 400)
+    const waiting = add(inbox, account, 120, 'none')
+    add(otherInbox, other, 100)
+
+    queue = new AiQueue()
+    queue.init(db, vi.fn())
+    const jobIds = (): number[] =>
+      db
+        .prepare(`SELECT message_id FROM ai_jobs WHERE kind = 'triage' ORDER BY message_id`)
+        .pluck()
+        .all() as number[]
+    const armed = (): boolean =>
+      db.prepare(`SELECT 1 FROM settings WHERE key = ?`).get(`ai.scanSince.${account}`) !==
+      undefined
+
+    expect(queue.scanAccount(account, now - 183 * day).queued).toBeGreaterThanOrEqual(0)
+    expect(jobIds()).toEqual([old])
+    // A body is still on its way: the scan stays armed and picks it up later
+    expect(armed()).toBe(true)
+    db.prepare(`UPDATE messages SET body_state = 'full' WHERE id = ?`).run(waiting)
+    queue.kick()
+    expect(jobIds()).toEqual([old, waiting])
+    expect(jobIds()).not.toContain(tooOld)
+    // Nothing left to come: the scan disarms itself
+    queue.kick()
+    expect(armed()).toBe(false)
+  })
+})

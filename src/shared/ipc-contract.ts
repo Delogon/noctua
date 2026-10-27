@@ -559,6 +559,16 @@ export const invokeContract = {
     input: z.object({ accountId: z.number().int().optional() }).optional(),
     output: z.object({ ok: z.literal(true) })
   },
+  // Manual triage of an account's existing Inbox mail (back to its sync range),
+  // e.g. after adding an account — automatic discovery only covers 30 days.
+  'ai:scanAccount': {
+    input: z.object({ accountId: z.number().int() }),
+    output: z.object({
+      queued: z.number().int(),
+      aiEnabled: z.boolean(),
+      triageBlocked: z.boolean()
+    })
+  },
   'ai:overrideCategory': {
     input: z.object({ threadKey: z.string().max(512), category: aiCategorySchema.nullable() }),
     output: z.object({ ok: z.literal(true) })

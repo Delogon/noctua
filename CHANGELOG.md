@@ -6,7 +6,13 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Added
+
+- **Scan existing emails per account**: Settings → Accounts has a new *Scan existing emails* button on each account. It triages the emails already in the account's inbox back to its sync range (default six months), not only the last 30 days that the automatic scan covers — useful right after adding an account. Emails whose body is still downloading are picked up once it arrives; the scan stops on its own when nothing is left.
+
 ### Fixed
+
+- **Asking the owl without an OpenRouter key**: the search view put the owl to sleep whenever no OpenRouter key was stored, even when a local model (Ollama, LM Studio …) was set up for writing. It now checks whether the writing model can actually run, and says so when *Local only* is on without a local model.
 
 - **Faster typo-tolerant sender search**: the sender list behind "mail from jens buetfisch" is now kept as a token index and only rebuilt when new mail arrives or after a minute, and each distinct name part is compared once (repeat searches with 3,000 senders: 73 ms → 17 ms).
 - **Faster startup**: the one-time repair that removes old tasks from FYI forwards ran on every launch and read the body of every task; it now runs once per database (and no longer removes a task you later create by hand from a forward). The search-index cleanup runs a few seconds after startup instead of before the window is usable.

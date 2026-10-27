@@ -68,8 +68,10 @@ export function OwlView(): React.JSX.Element {
     manual: false
   })
 
-  // No key → question row sleeps (only on explicit false, never while loading)
-  const noKey = orStatus.data?.hasKey === false
+  // No usable chat model → question row sleeps (only on explicit false, never
+  // while loading). Chat runs on the draft task, so a keyless local profile
+  // (Ollama, LM Studio …) counts — not just an OpenRouter key.
+  const noKey = orStatus.data?.ready === false
   const phase = owlPhase(owl)
 
   const debouncedQuery = useDebouncedValue(owl.query, 300)
@@ -266,7 +268,11 @@ export function OwlView(): React.JSX.Element {
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
         >
           {noKey && <OwlGlyph pose="asleep" size={15} color="var(--muted)" />}
-          {noKey ? t('owlAskDisabled') : t('owlAskNote')}
+          {noKey
+            ? t(
+                orStatus.data?.block === 'local-only' ? 'owlAskDisabledLocalOnly' : 'owlAskDisabled'
+              )
+            : t('owlAskNote')}
         </span>
         <span className="owl-ask-row__key">↵</span>
       </button>

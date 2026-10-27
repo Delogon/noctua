@@ -7,6 +7,7 @@ import { applyRulesPostTriage } from './rules'
 import { maybeAutoJunk } from './threat-check'
 import { maybeNotify, updateBadge } from '../notifications'
 import { metrics } from '../diagnostics/metrics'
+import { MAX_BACKFILL_BODY_BYTES, MAX_BODY_ATTEMPTS } from '../sync/account-syncer'
 
 type PushFn = <C extends PushChannel>(channel: C, payload: PushPayload<C>) => void
 
@@ -24,6 +25,9 @@ const PROMPT_VERSION_SETTING = 'ai.queuePromptVersion'
 // Appointment extraction (job 'events'): only mails that arrived AFTER this time — set on the
 // first run with a calendar account so the 30-day window is never paid for retroactively.
 const EVENTS_SINCE_SETTING = 'ai.eventsSince'
+// Manual "scan existing mail" per account: ai.scanSince.<accountId> = cutoff (epoch ms).
+// Widens triage discovery for that account beyond the 30-day window until the scan is complete.
+const SCAN_SINCE_PREFIX = 'ai.scanSince.'
 
 /**
  * Enqueue triage candidates (parameters: since, PROMPT_VERSION). Exported
@@ -48,6 +52,37 @@ export const TRIAGE_DISCOVERY_SQL = `INSERT OR IGNORE INTO ai_jobs (message_id, 
       WHERE an.message_id = m.id AND an.prompt_version = ?
     )`
 export const TRIAGE_WINDOW_MS = TRIAGE_WINDOW_DAYS * 24 * 3600 * 1000
+
+/** Like TRIAGE_DISCOVERY_SQL, for one account (parameters: account id, since, PROMPT_VERSION). */
+export const ACCOUNT_SCAN_DISCOVERY_SQL = `INSERT OR IGNORE INTO ai_jobs (message_id, kind, status)
+  SELECT m.id, 'triage', 'pending'
+  FROM folders f
+  CROSS JOIN messages m ON m.folder_id = f.id
+  JOIN accounts a ON a.id = m.account_id
+  WHERE f.account_id = ?
+    AND f.special_use = '\\Inbox'
+    AND coalesce(m.date, m.internal_date) >= ?
+    AND m.body_state = 'full'
+    AND a.ai_enabled = 1
+    AND NOT EXISTS (
+      SELECT 1 FROM ai_annotations an
+      WHERE an.message_id = m.id AND an.prompt_version = ?
+    )`
+
+/**
+ * Inbox mails of the account in the scan window whose body the backfill will
+ * still fetch (parameters: account id, since, MAX_BODY_ATTEMPTS). While any
+ * remain, the scan stays armed so they are triaged once the body arrives.
+ */
+const SCAN_BODIES_PENDING_SQL = `SELECT 1 FROM folders f
+  CROSS JOIN messages m ON m.folder_id = f.id
+  WHERE f.account_id = ?
+    AND f.special_use = '\\Inbox'
+    AND m.body_state = 'none'
+    AND coalesce(m.date, m.internal_date) >= ?
+    AND m.body_attempts < ?
+    AND coalesce(m.size, 0) <= ${MAX_BACKFILL_BODY_BYTES}
+  LIMIT 1`
 
 const TRANSIENT_NET_CODES = new Set([
   'ECONNREFUSED',
@@ -172,6 +207,44 @@ export class AiQueue {
     ).run(PROMPT_VERSION_SETTING, String(PROMPT_VERSION))
   }
 
+  /**
+   * Manual scan of an account's existing Inbox mail back to `since` (0 = all).
+   * Arms an account-scoped discovery that also picks up mails whose body
+   * arrives later; returns the number of triage jobs now open for the account.
+   */
+  scanAccount(accountId: number, since: number): { queued: number } {
+    const db = this.db!
+    const key = `${SCAN_SINCE_PREFIX}${accountId}`
+    const current = Number(
+      (
+        db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
+          { value: string } | undefined
+      )?.value
+    )
+    const cutoff = Number.isFinite(current) ? Math.min(current, since) : since
+    db.prepare(
+      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    ).run(key, String(Math.max(0, cutoff)))
+    this.kick()
+    return { queued: this.openTriageJobs(accountId) }
+  }
+
+  /** Forget an account's scan (account removed). */
+  forgetScan(accountId: number): void {
+    this.db?.prepare('DELETE FROM settings WHERE key = ?').run(`${SCAN_SINCE_PREFIX}${accountId}`)
+  }
+
+  /** Pending/running triage jobs of an account. */
+  openTriageJobs(accountId: number): number {
+    return (
+      this.db!.prepare(
+        `SELECT count(*) AS n FROM ai_jobs j
+         JOIN messages m ON m.id = j.message_id
+         WHERE m.account_id = ? AND j.kind = 'triage' AND j.status IN ('pending', 'running')`
+      ).get(accountId) as { n: number }
+    ).n
+  }
+
   /** Kick off discovery + drain (after ingest, body store, app start). */
   kick(): void {
     if (!this.db) return
@@ -184,7 +257,31 @@ export class AiQueue {
       this.discoverEvents()
       const since = Date.now() - TRIAGE_WINDOW_MS
       this.db!.prepare(TRIAGE_DISCOVERY_SQL).run(since, PROMPT_VERSION)
+      this.discoverScans()
     })
+  }
+
+  /** Account scans: enqueue their window; disarm once nothing is left to come. */
+  private discoverScans(): void {
+    const db = this.db!
+    const scans = db
+      .prepare(`SELECT key, value FROM settings WHERE key LIKE '${SCAN_SINCE_PREFIX}%'`)
+      .all() as Array<{ key: string; value: string }>
+    for (const { key, value } of scans) {
+      const accountId = Number(key.slice(SCAN_SINCE_PREFIX.length))
+      const since = Number(value)
+      if (!Number.isInteger(accountId) || !Number.isFinite(since)) {
+        db.prepare('DELETE FROM settings WHERE key = ?').run(key)
+        continue
+      }
+      const added = db.prepare(ACCOUNT_SCAN_DISCOVERY_SQL).run(accountId, since, PROMPT_VERSION)
+      const bodiesPending = db
+        .prepare(SCAN_BODIES_PENDING_SQL)
+        .get(accountId, since, MAX_BODY_ATTEMPTS)
+      if (added.changes === 0 && !bodiesPending) {
+        db.prepare('DELETE FROM settings WHERE key = ?').run(key)
+      }
+    }
   }
 
   /**

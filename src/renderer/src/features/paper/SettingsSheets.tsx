@@ -461,6 +461,7 @@ function AccountCard({
       </div>
       <ColorRow account={a} />
       <SyncRangeRow account={a} />
+      <ScanRow account={a} />
       <CredentialsRow account={a} failed={failed} />
     </div>
   )
@@ -789,6 +790,53 @@ function SyncRangeRow({ account }: { account: AccountSummary }): React.JSX.Eleme
         <option value="365">{t('syncRange365')}</option>
         <option value="0">{t('syncRangeAll')}</option>
       </select>
+    </div>
+  )
+}
+
+/**
+ * Manual triage of the mail already in the account: automatic discovery only
+ * looks at the last 30 days, so a freshly added account needs this once.
+ */
+function ScanRow({ account }: { account: AccountSummary }): React.JSX.Element {
+  const t = useT()
+  const { toastNow } = usePaper()
+  const [busy, setBusy] = useState(false)
+
+  const scan = (): void => {
+    setBusy(true)
+    invoke('ai:scanAccount', { accountId: account.id })
+      .then(({ queued, aiEnabled, triageBlocked }) => {
+        if (!aiEnabled) toastNow(t('toastScanAiOff'))
+        else if (triageBlocked) toastNow(t('toastScanBlocked'))
+        else if (queued > 0) toastNow(t('toastScanQueued', { n: queued }))
+        else toastNow(t('toastScanStarted'))
+      })
+      .catch((err) => toastNow(err instanceof Error ? err.message : String(err)))
+      .finally(() => setBusy(false))
+  }
+
+  return (
+    <div className="flex items-baseline gap-2" style={{ marginTop: 8 }}>
+      <span className="mlabel flex-none" style={{ color: 'var(--muted)' }}>
+        {t('scanLabel')}
+      </span>
+      <button
+        type="button"
+        onClick={scan}
+        disabled={busy}
+        title={t('scanHint')}
+        className="btn-bare"
+        style={{
+          font: '500 9px var(--mono)',
+          letterSpacing: '.5px',
+          border: '1px solid var(--ink)',
+          color: 'var(--ink)',
+          padding: '4px 10px'
+        }}
+      >
+        {t('scanNow')}
+      </button>
     </div>
   )
 }
